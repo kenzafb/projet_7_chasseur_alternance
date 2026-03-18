@@ -11,6 +11,49 @@ load_dotenv()
 
 FICHIER_VUES = "offres_vues.json"
 
+# Mapping requête → domaine (sans IA, sans token)
+DOMAINES_MAP = {
+    "devops": "DevOps",
+    "infrastructure": "DevOps",
+    "linux": "DevOps",
+    "systemes": "Sys/Réseau",
+    "réseaux": "Sys/Réseau",
+    "reseau": "Sys/Réseau",
+    "technicien": "Sys/Réseau",
+    "administrateur": "Sys/Réseau",
+    "helpdesk": "Support",
+    "support": "Support",
+    "développeur": "Développement",
+    "developpeur": "Développement",
+    "python": "Développement",
+    "slam": "Développement",
+    "web": "Développement",
+    "data": "Data/IA",
+    "ia": "Data/IA",
+    "iosi": "Généraliste",
+    "informatique": "Généraliste",
+    "bts": "Généraliste",
+    "but": "Généraliste",
+}
+
+def detecter_domaine(query):
+    q = query.lower()
+    for mot, domaine in DOMAINES_MAP.items():
+        if mot in q:
+            return domaine
+    return "Autre"
+
+def detecter_zone(lieu):
+    if not lieu:
+        return "Non précisé"
+    if "75" in lieu or "paris" in lieu.lower():
+        return "Paris"
+    if any(x in lieu for x in ["92", "93", "94"]):
+        return "Petite couronne"
+    if any(x in lieu for x in ["77", "78", "91", "95"]):
+        return "Grande couronne"
+    return "IDF"
+
 def charger_offres_vues():
     if os.path.exists(FICHIER_VUES):
         with open(FICHIER_VUES, "r") as f:
@@ -24,17 +67,11 @@ def sauvegarder_offres_vues(vues):
 def generer_id(texte):
     return hashlib.md5(texte.encode()).hexdigest()
 
-# ─────────────────────────────────────────────
-# AUTHENTIFICATION FRANCE TRAVAIL
-# Le token expire après 25 minutes.
-# On le régénère automatiquement si besoin.
-# ─────────────────────────────────────────────
 _token_cache = {"token": None, "expire": 0}
 
 def get_token():
     if time.time() < _token_cache["expire"]:
         return _token_cache["token"]
-
     r = requests.post(
         "https://entreprise.francetravail.fr/connexion/oauth2/access_token?realm=/partenaire",
         data={
@@ -44,7 +81,6 @@ def get_token():
             "scope": "api_offresdemploiv2 o2dsoffre"
         }
     )
-
     if r.status_code == 200:
         data = r.json()
         _token_cache["token"] = data["access_token"]
@@ -54,20 +90,17 @@ def get_token():
         print(f"Erreur token France Travail : {r.status_code}")
         return None
 
-
-# ─────────────────────────────────────────────
-# SCRAPER FRANCE TRAVAIL
-# ─────────────────────────────────────────────
 def scraper_france_travail(query):
     offres = []
     token = get_token()
     if not token:
         return offres
 
+    domaine = detecter_domaine(query)
     url = "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search"
     params = {
         "motsCles": query + " alternance",
-	"region": "11",
+        "region": "11",
         "range": "0-14",
         "sort": "1",
     }
@@ -81,15 +114,18 @@ def scraper_france_travail(query):
                 lien = offre.get("origineOffre", {}).get("urlOrigine", "")
                 if not lien:
                     lien = f"https://candidat.francetravail.fr/offres/recherche/detail/{offre.get('id', '')}"
+                lieu = offre.get("lieuTravail", {}).get("libelle", "Paris")
                 offres.append({
                     "id": generer_id(offre.get("id", lien)),
                     "titre": offre.get("intitule", "Sans titre"),
                     "entreprise": offre.get("entreprise", {}).get("nom", "Inconnue"),
-                    "lieu": offre.get("lieuTravail", {}).get("libelle", "Paris"),
+                    "lieu": lieu,
+                    "zone": detecter_zone(lieu),
+                    "domaine": domaine,
                     "lien": lien,
                     "source": "France Travail",
                     "description": offre.get("description", "")[:800],
-                    "date_trouvee": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "date_trouvee": offre.get("dateCreation", "")[:10] or datetime.now().strftime("%Y-%m-%d"),
                     "score": 0,
                     "lettre": "",
                     "statut": "nouveau"
@@ -101,40 +137,30 @@ def scraper_france_travail(query):
 
     return offres
 
-
-# ─────────────────────────────────────────────
-# FONCTION PRINCIPALE
-# ─────────────────────────────────────────────
 def chercher_offres():
     print("Recherche des offres en cours...\n")
-
     offres_vues = charger_offres_vues()
     toutes_offres = []
     ids_session = set()
-
     queries = PROFIL["recherche"]["titre_poste"]
 
     for query in queries:
         print(f"  -> '{query}'")
         nouvelles = scraper_france_travail(query)
-
         for offre in nouvelles:
             if offre["id"] not in offres_vues and offre["id"] not in ids_session:
                 if offre["titre"] and offre["titre"] != "Sans titre":
                     toutes_offres.append(offre)
                     ids_session.add(offre["id"])
-
         time.sleep(0.3)
 
     print(f"\n{len(toutes_offres)} nouvelles offres trouvees !\n")
     return toutes_offres, offres_vues
-
 
 if __name__ == "__main__":
     offres, _ = chercher_offres()
     print(f"\n-- Apercu des 5 premieres --")
     for o in offres[:5]:
         print(f"\n[{o['source']}] {o['titre']}")
-        print(f"  Entreprise : {o['entreprise']}")
-        print(f"  Lieu       : {o['lieu']}")
-        print(f"  Lien       : {o['lien']}")
+        print(f"  Domaine : {o['domaine']} | Zone : {o['zone']}")
+        print(f"  Lieu : {o['lieu']}")

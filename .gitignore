@@ -8,6 +8,5 @@ token_chasseur.json
 credentials.json
 CV_Kenza_Filali-Bouami.pdf
 lettres_pdf/
-templates/
 debug.py
 app_route_envoi.py

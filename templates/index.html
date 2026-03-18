@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Chasseur Alternance</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root{--bg:#0f0f14;--surface:#16161e;--border:#2a2a3a;--accent:#6c63ff;--accent2:#ff6584;--green:#4ade80;--yellow:#fbbf24;--text:#e8e8f0;--muted:#6b6b8a;--radius:6px;--sw:220px;--sc:52px}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:var(--bg);color:var(--text);font-family:'DM Mono',monospace;min-height:100vh;display:flex}
+    /* SIDEBAR — fermée par défaut, PAS de transition au chargement */
+    .sidebar{width:var(--sc);min-height:100vh;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;position:sticky;top:0;height:100vh;overflow:hidden}
+    .sidebar.open{width:var(--sw);transition:width .25s}
+    .sidebar.closing{width:var(--sc);transition:width .25s}
+    .sidebar-top{padding:16px 12px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);min-height:56px;gap:8px}
+    .sidebar-logo{font-family:'Instrument Serif',serif;font-size:1.1rem;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap;overflow:hidden;max-width:0;opacity:0}
+    .sidebar.open .sidebar-logo{max-width:200px;opacity:1;transition:opacity .2s .1s}
+    .toggle-btn{background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.1rem;padding:4px;flex-shrink:0;line-height:1}
+    .toggle-btn:hover{color:var(--text)}
+    .nav{flex:1;padding:12px 0}
+    .nav-item{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;border-left:2px solid transparent;transition:all .15s;white-space:nowrap;overflow:hidden}
+    .nav-item:hover{background:rgba(108,99,255,.08);color:var(--text)}
+    .nav-item.active{border-left-color:var(--accent);color:var(--accent);background:rgba(108,99,255,.1)}
+    .nav-icon{font-size:1rem;flex-shrink:0;width:20px;text-align:center}
+    .nav-label,.nav-badge,.sidebar-stats{opacity:0;pointer-events:none}
+    .sidebar.open .nav-label,.sidebar.open .nav-badge,.sidebar.open .sidebar-stats{opacity:1;pointer-events:auto;transition:opacity .2s .1s}
+    .nav-label{font-size:.75rem;letter-spacing:.04em}
+    .nav-badge{margin-left:auto;background:var(--accent);color:white;font-size:.58rem;padding:1px 5px;border-radius:10px;flex-shrink:0}
+    .sidebar-stats{padding:12px;border-top:1px solid var(--border)}
+    .stat-mini{display:flex;justify-content:space-between;font-size:.65rem;color:var(--muted);padding:3px 0}
+    .stat-mini span:last-child{color:var(--text);font-weight:500}
+    /* MAIN */
+    .main{flex:1;min-width:0;display:flex;flex-direction:column}
+    .topbar{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;min-height:56px}
+    .topbar-left{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+    .page-title{font-family:'Instrument Serif',serif;font-size:1.3rem;font-weight:400}
+    .search-status{font-size:.72rem;color:var(--muted);padding:4px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius)}
+    .content{padding:20px 24px;flex:1}
+    .btn{padding:7px 16px;border-radius:var(--radius);font-family:'DM Mono',monospace;font-size:.74rem;cursor:pointer;border:1px solid;transition:all .15s;letter-spacing:.04em}
+    .btn-primary{background:var(--accent);color:white;border-color:var(--accent)}
+    .btn-primary:hover{opacity:.85}
+    .btn-secondary{background:transparent;color:var(--muted);border-color:var(--border)}
+    .btn-secondary:hover{border-color:var(--accent);color:var(--accent)}
+    .btn:disabled{opacity:.4;cursor:not-allowed}
+    /* TOOLBAR */
+    .toolbar-filtres{display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+    /* PANEL DROPDOWN */
+    .panel-dropdown{display:none;position:absolute;top:calc(100% + 8px);left:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;z-index:100;box-shadow:0 8px 32px rgba(0,0,0,.5);min-width:240px}
+    .panel-dropdown.open{display:block}
+    .panel-sec{font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin:12px 0 6px}
+    .panel-sec:first-child{margin-top:0}
+    .fg{display:flex;gap:5px;flex-wrap:wrap}
+    .fsm{padding:3px 8px;border-radius:20px;font-size:.65rem;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--muted);transition:all .15s;font-family:'DM Mono',monospace}
+    .fsm:hover,.fsm.actif{border-color:var(--accent);color:var(--accent);background:rgba(108,99,255,.1)}
+    .fsm.actif-zone{border-color:var(--yellow);color:var(--yellow);background:rgba(251,191,36,.1)}
+    .fsm.actif-domaine{border-color:var(--green);color:var(--green);background:rgba(74,222,128,.1)}
+    .tri-opt{padding:8px 10px;border-radius:4px;cursor:pointer;font-size:.72rem;display:flex;align-items:center;gap:8px;transition:background .1s}
+    .tri-opt:hover{background:rgba(108,99,255,.08)}
+    /* OFFRES */
+    .offres{display:flex;flex-direction:column;gap:10px}
+    .offre{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:border-color .2s}
+    .offre:hover{border-color:rgba(108,99,255,.4)}
+    .offre-header{padding:13px 16px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;gap:12px}
+    .offre-left{display:flex;flex-direction:column;gap:3px;flex:1;min-width:0}
+    .offre-titre{font-family:'Instrument Serif',serif;font-size:1rem;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .offre-meta{font-size:.68rem;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+    .mtag{padding:1px 6px;border-radius:3px;font-size:.6rem}
+    .mzone{background:rgba(251,191,36,.1);color:var(--yellow);border:1px solid rgba(251,191,36,.2)}
+    .mdom{background:rgba(74,222,128,.1);color:var(--green);border:1px solid rgba(74,222,128,.2)}
+    .msrc{background:rgba(108,99,255,.1);color:var(--accent);border:1px solid rgba(108,99,255,.2)}
+    .offre-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+    .score{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:500;flex-shrink:0}
+    .score.haut{background:rgba(74,222,128,.15);color:var(--green);border:1px solid rgba(74,222,128,.3)}
+    .score.moyen{background:rgba(251,191,36,.15);color:var(--yellow);border:1px solid rgba(251,191,36,.3)}
+    .score.bas{background:rgba(255,101,132,.15);color:var(--accent2);border:1px solid rgba(255,101,132,.3)}
+    .badge-statut{font-size:.6rem;padding:2px 7px;border-radius:20px;border:1px solid;white-space:nowrap}
+    .badge-nouveau{color:var(--accent);border-color:rgba(108,99,255,.4);background:rgba(108,99,255,.1)}
+    .badge-en_cours{color:var(--yellow);border-color:rgba(251,191,36,.4);background:rgba(251,191,36,.1)}
+    .badge-envoye{color:var(--green);border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.1)}
+    .badge-rejete{color:var(--muted);border-color:var(--border)}
+    .badge-reponse{color:#60a5fa;border-color:rgba(96,165,250,.4);background:rgba(96,165,250,.1)}
+    .badge-entretien{color:#f472b6;border-color:rgba(244,114,182,.4);background:rgba(244,114,182,.1)}
+    .badge-refus{color:var(--accent2);border-color:rgba(255,101,132,.4);background:rgba(255,101,132,.1)}
+    .offre-body{display:none;padding:16px;border-top:1px solid var(--border)}
+    .offre-body.open{display:block}
+    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+    @media(max-width:750px){.grid-2{grid-template-columns:1fr}}
+    .sl{font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:7px}
+    .abox{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:11px;font-size:.76rem;line-height:1.6}
+    .points{list-style:none;margin-top:5px}
+    .points li{font-size:.73rem;color:var(--muted);padding:2px 0}
+    .points li::before{content:"→ ";color:var(--accent)}
+    .points.faibles li::before{color:var(--accent2)}
+    .tl{width:100%;min-height:260px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:11px;font-family:'DM Mono',monospace;font-size:.74rem;line-height:1.7;color:var(--text);resize:vertical;outline:none;transition:border-color .2s}
+    .tl:focus{border-color:var(--accent)}
+    .actions{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap}
+    .lo{font-size:.7rem;color:var(--accent);text-decoration:none}
+    .lo:hover{text-decoration:underline}
+    .empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:.82rem}
+    .empty .icon{font-size:2.5rem;margin-bottom:12px}
+    .toast{position:fixed;bottom:24px;right:24px;padding:11px 18px;border-radius:var(--radius);font-size:.76rem;font-family:'DM Mono',monospace;z-index:1000;border:1px solid;animation:tin .25s ease}
+    .toast.ok{background:#0f2318;color:var(--green);border-color:rgba(74,222,128,.3)}
+    .toast.err{background:#1f0f14;color:var(--accent2);border-color:rgba(255,101,132,.3)}
+    @keyframes tin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+    .is{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:7px 11px;font-family:'DM Mono',monospace;font-size:.74rem;outline:none;margin-bottom:7px}
+    .is:focus{border-color:var(--accent)}
+    .cg{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+    .cc{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+    .cc-titre{font-family:'Instrument Serif',serif;font-size:.95rem;margin-bottom:4px}
+    .cc-meta{font-size:.68rem;color:var(--muted);margin-bottom:10px}
+    .cc-date{font-size:.65rem;color:var(--muted)}
+    .cc-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+    .cs{text-align:center;padding:80px 20px;color:var(--muted)}
+    .cs .big{font-family:'Instrument Serif',serif;font-size:2rem;font-weight:400;margin-bottom:12px;color:var(--text)}
+    .cs p{font-size:.8rem;line-height:1.7}
+  </style>
+</head>
+<body>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-top">
+    <span class="sidebar-logo">Chasseur</span>
+    <button class="toggle-btn" id="toggle-btn" onclick="toggleSidebar()">☰</button>
+  </div>
+  <nav class="nav">
+    <div class="nav-item active" id="nav-offres" onclick="afficherSection('offres')">
+      <span class="nav-icon">🔍</span>
+      <span class="nav-label">Offres</span>
+      <span class="nav-badge" id="badge-offres">0</span>
+    </div>
+    <div class="nav-item" id="nav-candidatures" onclick="afficherSection('candidatures')">
+      <span class="nav-icon">📬</span>
+      <span class="nav-label">Candidatures</span>
+      <span class="nav-badge" id="badge-candidatures" style="background:var(--green)">0</span>
+    </div>
+    <div class="nav-item" id="nav-spontanees" onclick="afficherSection('spontanees')">
+      <span class="nav-icon">⚡</span>
+      <span class="nav-label">Spontanées</span>
+    </div>
+  </nav>
+  <div class="sidebar-stats">
+    <div class="stat-mini"><span>Total</span><span id="s-total">0</span></div>
+    <div class="stat-mini"><span>Score 7+</span><span id="s-top">0</span></div>
+    <div class="stat-mini"><span>Envoyées</span><span id="s-env">0</span></div>
+    <div class="stat-mini"><span>Entretiens</span><span id="s-entr">0</span></div>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="page-title" id="page-title">Offres</span>
+      <div class="search-status" id="searchStatus">Prêt</div>
+    </div>
+    <button class="btn btn-primary" id="btnRecherche" onclick="lancerRecherche()">🔍 Nouvelle recherche</button>
+  </div>
+
+  <div class="content">
+
+    <div id="section-offres">
+      <div class="toolbar-filtres">
+        <div style="position:relative">
+          <button class="btn btn-secondary" id="btn-filtres" onclick="togglePanel('panel-filtres')">
+            ⚙ Filtres <span id="filtres-count" style="display:none;background:var(--accent);color:white;font-size:.58rem;padding:1px 5px;border-radius:10px;margin-left:4px">0</span>
+          </button>
+          <div class="panel-dropdown" id="panel-filtres">
+            <div class="panel-sec">Score</div>
+            <div class="fg" id="filtres-score">
+              <button class="fsm actif" onclick="setFiltre('score','tous',this)">Tous</button>
+              <button class="fsm" onclick="setFiltre('score','haut',this)">8-10 ★</button>
+              <button class="fsm" onclick="setFiltre('score','moyen',this)">5-7</button>
+              <button class="fsm" onclick="setFiltre('score','bas',this)">&lt;5</button>
+            </div>
+            <div class="panel-sec">Zone</div>
+            <div class="fg" id="filtres-zone"></div>
+            <div class="panel-sec">Domaine</div>
+            <div class="fg" id="filtres-domaine"></div>
+            <div class="panel-sec">Source</div>
+            <div class="fg" id="filtres-source"></div>
+            <button onclick="reinitialiserFiltres()" style="margin-top:14px;font-size:.68rem;color:var(--accent2);background:none;border:none;cursor:pointer;font-family:DM Mono,monospace">✕ Réinitialiser</button>
+          </div>
+        </div>
+
+        <div style="position:relative">
+          <button class="btn btn-secondary" id="btn-tri" onclick="togglePanel('panel-tri')">
+            ↕ Trier : <span id="tri-label">Note</span>
+          </button>
+          <div class="panel-dropdown" id="panel-tri">
+            <div class="tri-opt" onclick="setTri('score',this)">
+              <span id="tri-check-score" style="color:var(--accent)">✓</span> Note (meilleure en premier)
+            </div>
+            <div class="tri-opt" onclick="setTri('date',this)">
+              <span id="tri-check-date" style="color:transparent">✓</span> Date (plus récente en premier)
+            </div>
+          </div>
+        </div>
+
+        <span id="offres-count" style="font-size:.68rem;color:var(--muted)"></span>
+      </div>
+      <div class="offres" id="offres"></div>
+    </div>
+
+    <div id="section-candidatures" style="display:none">
+      <div class="toolbar-filtres">
+        <button class="btn btn-secondary actif" onclick="setFiltreCand('tous',this)" style="border-color:var(--accent);color:var(--accent)">Toutes</button>
+        <button class="btn btn-secondary" onclick="setFiltreCand('envoye',this)">Envoyées</button>
+        <button class="btn btn-secondary" onclick="setFiltreCand('reponse',this)">Réponse</button>
+        <button class="btn btn-secondary" onclick="setFiltreCand('entretien',this)">Entretien</button>
+        <button class="btn btn-secondary" onclick="setFiltreCand('refus',this)">Refus</button>
+      </div>
+      <div class="cg" id="cand-grid"></div>
+    </div>
+
+    <div id="section-spontanees" style="display:none">
+      <div class="cs">
+        <div class="big">Candidatures spontanées</div>
+        <p>Cibler des entreprises en IDF, récupérer leurs coordonnées<br>
+        et envoyer des candidatures spontanées automatiquement.<br><br>
+        <em style="color:var(--accent)">Bientôt disponible ✦</em></p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
