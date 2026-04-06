@@ -124,15 +124,14 @@
     <button class="toggle-btn" id="toggle-btn" onclick="toggleSidebar()">☰</button>
   </div>
   <nav class="nav">
-    <div class="nav-item active" id="nav-offres" onclick="afficherSection('offres')">
-      <span class="nav-icon">🔍</span>
-      <span class="nav-label">Offres</span>
-      <span class="nav-badge" id="badge-offres">0</span>
+    <div class="nav-item" id="nav-offres" onclick="afficherSection('offres')">
+      <span class="nav-icon">🔍</span><span class="nav-label">Offres</span><span class="nav-badge" id="badge-offres">0</span>
     </div>
     <div class="nav-item" id="nav-candidatures" onclick="afficherSection('candidatures')">
-      <span class="nav-icon">📬</span>
-      <span class="nav-label">Candidatures</span>
-      <span class="nav-badge" id="badge-candidatures" style="background:var(--green)">0</span>
+      <span class="nav-icon">📬</span><span class="nav-label">Candidatures</span>
+    </div>
+    <div class="nav-item" id="nav-archive" onclick="afficherSection('archive')">
+      <span class="nav-icon">🗑</span><span class="nav-label">Archives</span>
     </div>
     <div class="nav-item" id="nav-spontanees" onclick="afficherSection('spontanees')">
       <span class="nav-icon">⚡</span>
@@ -144,6 +143,7 @@
     <div class="stat-mini"><span>Score 7+</span><span id="s-top">0</span></div>
     <div class="stat-mini"><span>Envoyées</span><span id="s-env">0</span></div>
     <div class="stat-mini"><span>Entretiens</span><span id="s-entr">0</span></div>
+    <div class="stat-mini"><span>Archivées</span><span id="s-arch">0</span></div>
   </div>
 </aside>
 
@@ -219,6 +219,9 @@
         et envoyer des candidatures spontanées automatiquement.<br><br>
         <em style="color:var(--accent)">Bientôt disponible ✦</em></p>
       </div>
+    </div>
+
+    <div id="section-archive" style="display:none" class="offres">
     </div>
 
   </div>

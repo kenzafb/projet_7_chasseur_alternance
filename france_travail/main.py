@@ -1,10 +1,10 @@
 import json
 import os
-from scraper import chercher_offres, sauvegarder_offres_vues
-from analyseur import analyser_offres
 
-FICHIER_CANDIDATURES = "candidatures.json"
+from france_travail.scraper import chercher_offres, sauvegarder_offres_vues
+from france_travail.analyseur import analyser_offres
 
+FICHIER_CANDIDATURES = "data/candidatures.json"
 
 def charger_candidatures():
     if os.path.exists(FICHIER_CANDIDATURES):
@@ -31,43 +31,30 @@ def ajouter_candidatures(nouvelles_offres):
             offre.setdefault("notes", "")
             candidatures.append(offre)
             ajoutees += 1
-
-    # Tri global par score décroissant
     candidatures.sort(key=lambda x: x.get("score", 0), reverse=True)
     sauvegarder_candidatures(candidatures)
     return ajoutees
 
 
 def lancer_recherche(analyser=True, max_analyse=999):
-    print("\n" + "=" * 55)
-    print("   CHASSEUR D'ALTERNANCE — Recherche en cours")
-    print("=" * 55 + "\n")
-
+    print("\nRecherche des offres...")
     nouvelles_offres, offres_vues = chercher_offres()
 
     if not nouvelles_offres:
-        print("Aucune nouvelle offre trouvée.")
+        print("Aucune nouvelle offre.")
         return []
 
     if analyser:
-        offres_analysees = analyser_offres(nouvelles_offres[:max_analyse])
-        # Les éventuelles non analysées (si max_analyse < total)
-        for o in nouvelles_offres[max_analyse:]:
-            o.update({"score": 5, "verdict": "non analysé", "points_forts": [],
-                      "points_faibles": [], "resume_analyse": "Non analysée — cliquer pour analyser"})
-        toutes = offres_analysees + nouvelles_offres[max_analyse:]
+        # Callback : sauvegarde chaque offre dès qu'elle est analysée
+        def sauvegarder_au_fur(index, total, offre_analysee):
+            ajouter_candidatures([offre_analysee])
+
+        analyser_offres(nouvelles_offres[:max_analyse], callback=sauvegarder_au_fur)
     else:
-        for o in nouvelles_offres:
-            o.update({"score": 5, "verdict": "non analysé", "points_forts": [],
-                      "points_faibles": [], "resume_analyse": "Non analysée"})
-        toutes = nouvelles_offres
+        ajouter_candidatures(nouvelles_offres)
 
-    nb = ajouter_candidatures(toutes)
-
-    for offre in toutes:
+    for offre in nouvelles_offres:
         offres_vues.add(offre["id"])
     sauvegarder_offres_vues(offres_vues)
 
-    print(f"\n{nb} nouvelles offres ajoutées au tableau de bord !")
-    print("Ouvre http://localhost:5002 pour les voir.\n")
-    return toutes
+    return nouvelles_offres

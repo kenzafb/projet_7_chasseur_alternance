@@ -10,3 +10,8 @@ CV_Kenza_Filali-Bouami.pdf
 lettres_pdf/
 debug.py
 app_route_envoi.py
+credentials.json
+token_chasseur.json
+_archive/
+data/
+.env

@@ -1,11 +1,10 @@
 from flask import Flask, render_template, request, jsonify, send_file
 from dotenv import load_dotenv
-from main import lancer_recherche, charger_candidatures, sauvegarder_candidatures
-from generateur import generer_lettre, generer_email
-from analyseur import analyser_offre
-from pdf_generator import generer_pdf_lettre
+from france_travail.main import lancer_recherche, charger_candidatures, sauvegarder_candidatures
+from france_travail.generateur import generer_lettre
+from france_travail.analyseur import analyser_offre
+from france_travail.pdf_generator import generer_pdf_lettre
 from datetime import datetime
-from envoi_gmail import envoyer_candidature
 import threading
 import os
 
@@ -13,7 +12,7 @@ load_dotenv()
 app = Flask(__name__)
 
 # État de la recherche en cours
-etat_recherche = {"en_cours": False, "message": ""}
+etat_recherche = {"en_cours": False, "message": "Prêt"}
 
 @app.route("/")
 def index():
@@ -63,22 +62,6 @@ def api_generer_lettre():
     sauvegarder_candidatures(candidatures)
     return jsonify({"lettre": lettre})
 
-@app.route("/api/generer_email", methods=["POST"])
-def api_generer_email():
-    data = request.get_json()
-    offre_id = data.get("id")
-    candidatures = charger_candidatures()
-    offre = next((c for c in candidatures if c["id"] == offre_id), None)
-    if not offre:
-        return jsonify({"erreur": "Offre introuvable"}), 404
-    email = generer_email(offre)
-    for c in candidatures:
-        if c["id"] == offre_id:
-            c["email_candidature"] = email
-            break
-    sauvegarder_candidatures(candidatures)
-    return jsonify({"email": email})
-
 @app.route("/api/analyser", methods=["POST"])
 def api_analyser():
     data = request.get_json()
@@ -90,11 +73,14 @@ def api_analyser():
     analyse = analyser_offre(offre)
     for c in candidatures:
         if c["id"] == offre_id:
-            c["score"] = analyse.get("score", 5)
-            c["verdict"] = analyse.get("verdict", "moyen")
-            c["points_forts"] = analyse.get("points_forts", [])
-            c["points_faibles"] = analyse.get("points_faibles", [])
-            c["resume_analyse"] = analyse.get("resume", "")
+            c.update({
+                "score": analyse.get("score", 5),
+                "verdict": analyse.get("verdict", "moyen"),
+                "eligible": analyse.get("eligible", True),
+                "points_forts": analyse.get("points_forts", []),
+                "points_faibles": analyse.get("points_faibles", []),
+                "resume_analyse": analyse.get("resume", "")
+            })
             break
     sauvegarder_candidatures(candidatures)
     return jsonify(analyse)
@@ -104,19 +90,27 @@ def api_maj_statut():
     data = request.get_json()
     offre_id = data.get("id")
     statut = data.get("statut")
-    lettre = data.get("lettre", None)
     candidatures = charger_candidatures()
     for c in candidatures:
         if c["id"] == offre_id:
             c["statut"] = statut
-            if lettre is not None:
-                c["lettre"] = lettre
             if statut in ["envoye", "reponse", "entretien", "refus"]:
-                from datetime import datetime
                 if not c.get("date_candidature"):
                     c["date_candidature"] = datetime.now().strftime("%Y-%m-%d")
             break
     sauvegarder_candidatures(candidatures)
+    return jsonify({"ok": True})
+
+@app.route("/api/archiver", methods=["POST"])
+def api_archiver():
+    data = request.get_json()
+    offre_id = data.get("id")
+    cands = charger_candidatures()
+    for c in cands:
+        if c["id"] == offre_id:
+            c["statut"] = "archive"
+            break
+    sauvegarder_candidatures(cands)
     return jsonify({"ok": True})
 
 @app.route("/api/sauvegarder", methods=["POST"])
@@ -126,12 +120,9 @@ def api_sauvegarder():
     candidatures = charger_candidatures()
     for c in candidatures:
         if c["id"] == offre_id:
-            if "lettre" in data:
-                c["lettre"] = data["lettre"]
-            if "email_candidature" in data:
-                c["email_candidature"] = data["email_candidature"]
-            if "objet_email" in data:
-                c["objet_email"] = data["objet_email"]
+            if "lettre" in data: c["lettre"] = data["lettre"]
+            if "email_candidature" in data: c["email_candidature"] = data["email_candidature"]
+            if "objet_email" in data: c["objet_email"] = data["objet_email"]
             break
     sauvegarder_candidatures(candidatures)
     return jsonify({"ok": True})
@@ -140,46 +131,14 @@ def api_sauvegarder():
 def api_telecharger_pdf():
     data = request.get_json()
     offre_id = data.get("id")
-    lettre = data.get("lettre", "")
-    candidatures = charger_candidatures()
-    offre = next((c for c in candidatures if c["id"] == offre_id), None)
-    if not offre:
-        return jsonify({"erreur": "Offre introuvable"}), 404
-    if not lettre:
-        lettre = offre.get("lettre", "")
-    if not lettre:
-        return jsonify({"erreur": "Lettre vide"}), 404
+    cands = charger_candidatures()
+    offre = next((c for c in cands if c["id"] == offre_id), None)
+    if not offre: return jsonify({"erreur": "Non trouvé"}), 404
+    lettre = data.get("lettre") or offre.get("lettre")
+    if not lettre: return jsonify({"erreur": "Vide"}), 400
     chemin = generer_pdf_lettre(offre, lettre)
-    return send_file(chemin, as_attachment=True, download_name=f"Lettre_{offre['entreprise'][:20]}.pdf")
-
-@app.route("/api/envoyer_candidature", methods=["POST"])
-def api_envoyer_candidature():
-    data = request.get_json()
-    offre_id = data.get("id")
-    destinataire = data.get("destinataire", "")
-    objet = data.get("objet", "")
-    candidatures = charger_candidatures()
-    offre = next((c for c in candidatures if c["id"] == offre_id), None)
-    if not offre:
-        return jsonify({"succes": False, "erreur": "Offre introuvable"}), 404
-    lettre = offre.get("lettre", "")
-    email_texte = offre.get("email_candidature", "")
-    if not lettre or not email_texte:
-        return jsonify({"succes": False, "erreur": "Genere d'abord la lettre et l'email"}), 400
-    if not destinataire:
-        return jsonify({"succes": False, "erreur": "Adresse email manquante"}), 400
-    succes = envoyer_candidature(offre, lettre, email_texte, destinataire, objet)
-    if succes:
-        for c in candidatures:
-            if c["id"] == offre_id:
-                c["statut"] = "envoye"
-                if not c.get("date_candidature"):
-                    c["date_candidature"] = datetime.now().strftime("%Y-%m-%d")
-                break
-        sauvegarder_candidatures(candidatures)
-    return jsonify({"succes": succes})
+    return jsonify({"ok": True, "chemin": chemin})
 
 if __name__ == "__main__":
-    print("\n🚀 Chasseur Alternance démarré !")
-    print("   Interface : http://localhost:5002\n")
+    print("\n🚀 Chasseur Alternance démarré sur http://localhost:5002\n")
     app.run(debug=False, port=5002)

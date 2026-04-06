@@ -1,5 +1,5 @@
 from weasyprint import HTML as WeasyHTML
-from profil import PROFIL
+from shared.profil import PROFIL
 from datetime import datetime
 import os
 
@@ -12,7 +12,7 @@ def generer_pdf_lettre(offre, lettre, dossier_output="lettres_pdf"):
     date_str = f"{now.day} {mois[now.month-1]} {now.year}"
 
     nom_entreprise = offre.get("entreprise", "Entreprise").replace(" ", "_").replace("/", "-")[:30]
-    nom_fichier = f"Lettre_{p['prenom']}_{nom_entreprise}.pdf"
+    nom_fichier = "Lettre_Kenza_Filali-Bouami.pdf"
     chemin_pdf = os.path.join(dossier_output, nom_fichier)
 
     # Nom entreprise — si inconnu, on met "À l'attention du service recrutement"

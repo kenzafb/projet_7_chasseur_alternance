@@ -5,11 +5,11 @@ import time
 import hashlib
 from datetime import datetime
 from dotenv import load_dotenv
-from profil import PROFIL
+from shared.profil import PROFIL
 
 load_dotenv()
 
-FICHIER_VUES = "offres_vues.json"
+FICHIER_VUES = "data/offres_vues.json"
 
 # Mapping requête → domaine (sans IA, sans token)
 DOMAINES_MAP = {

@@ -1,121 +1,160 @@
-# Chasseur Alternance 🎯
+# Chasseur d'Alternance
 
-Outil personnel d'automatisation de recherche d'alternance, construit avec Python, Flask et l'API Claude d'Anthropic.
+Pipeline automatisé de recherche et candidature en alternance DevOps/SysAdmin/Sécurité.
+Développé par **Kenza FILALI-BOUAMI** — DEUST IOSI CNAM Paris, rentrée septembre 2026.
 
-## Ce que ça fait
-
-- Scrape les offres d'alternance depuis l'API France Travail en Île-de-France
-- Analyse chaque offre avec Claude Sonnet (scoring /10, éligibilité, points forts/faibles)
-- Génère des lettres de motivation personnalisées et des emails de candidature
-- Exporte les lettres en PDF avec mise en page professionnelle
-- Envoie les candidatures par Gmail avec lettre PDF et CV en pièces jointes
-- Interface web pour tout gérer : suivi des statuts, relances, entretiens
-
-## Stack technique
-
-- **Backend** : Python 3, Flask
-- **IA** : API Anthropic (Claude Sonnet pour l'analyse et les lettres, Claude Haiku pour les emails)
-- **Scraping** : API France Travail (OAuth2)
-- **Email** : Gmail API (OAuth2)
-- **PDF** : WeasyPrint
-- **Frontend** : HTML/CSS/JS vanilla
+---
 
 ## Structure du projet
 
 ```
 chasseur_alternance/
-├── app.py              # Serveur Flask + routes API
-├── analyseur.py        # Analyse des offres avec Claude
-├── generateur.py       # Génération lettres et emails
-├── scraper.py          # Scraping France Travail
-├── main.py             # Orchestrateur principal
-├── connexion.py        # Authentification Gmail
-├── envoi_gmail.py      # Envoi des candidatures
-├── pdf_generator.py    # Export PDF des lettres
-├── profil.py           # Profil candidat (compétences, projets...)
-├── static/app.js       # Interface web
-├── .env.example        # Variables d'environnement à configurer
-└── requirements.txt    # Dépendances Python
+│
+├── app.py                          ← Serveur Flask (interface web)
+│
+├── france_travail/                 ← Système A : offres France Travail
+│   ├── scraper.py                  ← Récupère les offres via API France Travail
+│   ├── analyseur.py                ← Score 1-10 par Gemini (Vertex AI)
+│   ├── generateur.py               ← Génère la lettre de motivation (Gemini)
+│   └── pdf_generator.py            ← Génère le PDF de la lettre
+│
+├── spontanees/                     ← Système B : candidatures spontanées
+│   ├── fetch_entreprises.py        ← Récupère les entreprises IT IDF (API Sirene)
+│   ├── scraper_emails.py           ← Trouve sites + emails (DuckDuckGo + Gemini)
+│   ├── generateur_lettres.py       ← Génère les lettres personnalisées (Gemini)
+│   ├── envoyeur.py                 ← Envoie les mails (SMTP Gmail)
+│   └── export_excel.py             ← Export Excel du suivi
+│
+├── shared/
+│   └── profil.py                   ← Profil Kenza (compétences, projets, critères)
+│
+├── data/                           ← Fichiers de données (non versionnés)
+│   ├── entreprises_raw.json        ← Source brute Sirene (ne jamais modifier)
+│   ├── entreprises_enrichies.json  ← Enrichi par scraper_emails.py
+│   ├── candidatures.json           ← Offres FT analysées (interface web)
+│   └── offres_vues.json            ← IDs offres déjà vues (anti-doublons)
+│
+├── assets/                         ← Fichiers fixes
+│   ├── CV_Kenza_Filali-Bouami.pdf
+│   └── lettre_template_KENZA.docx  ← Template avec balises {{...}}
+│
+├── lettres_pdf/                    ← Lettre PDF générée (1 seul fichier, écrasé)
+│   └── Lettre_Kenza_Filali-Bouami.pdf
+│
+├── static/
+│   └── app.js                      ← Frontend interface web
+├── templates/
+│   └── index.html                  ← Interface web
+│
+├── .env                            ← Variables d'environnement (non versionné)
+├── .env.example                    ← Exemple de configuration
+├── requirements.txt
+└── prompt.md                       ← Contexte projet pour IAs
 ```
 
-## Installation
+---
+
+## ⚙Configuration `.env`
+
+```env
+# Vertex AI / GCP
+GOOGLE_CLOUD_PROJECT=ton-projet-gcp
+GCP_REGION=us-central1
+
+# France Travail API
+FT_CLIENT_ID=xxx
+FT_CLIENT_SECRET=xxx
+
+# Gmail SMTP
+GMAIL_SENDER=ton@gmail.com
+GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+```
+
+---
+
+## Lancement
 
 ### Prérequis
-- Python 3.10+
-- Un compte Anthropic avec crédits API
-- Un compte France Travail Recruteur (API gratuite)
-- Un compte Google avec Gmail API activée
-
-### 1. Cloner le repo
-
 ```bash
-git clone https://github.com/kenzafb/chasseur-alternance.git
-cd chasseur-alternance
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+gcloud auth application-default login  # pour Vertex AI
 ```
 
-### 2. Installer les dépendances
-
+### Système A — Interface web France Travail
 ```bash
-pip install -r requirements.txt --break-system-packages
+python app.py
+# → http://localhost:5002
 ```
+Depuis l'interface :
+1. **Nouvelle recherche** — scrape les offres France Travail et les analyse
+2. **Générer lettre** — génère une lettre personnalisée pour l'offre
+3. **PDF** — génère le PDF dans `lettres_pdf/`
+4. **Postuler FT** — ouvre l'offre + génère le PDF
 
-### 3. Configurer les variables d'environnement
-
+### Système B — Candidatures spontanées (pipeline CLI)
 ```bash
-cp .env.example .env
-nano .env
+# Étape 1 : récupérer les entreprises IT IDF
+python spontanees/fetch_entreprises.py
+
+# Étape 2 : trouver les emails (long, reprend automatiquement)
+python spontanees/scraper_emails.py
+
+# Étape 3 : générer les lettres personnalisées
+python spontanees/generateur_lettres.py
+
+# Étape 4 : envoyer les candidatures (50/jour)
+python spontanees/envoyeur.py --limite 50
+
+# Mode test (envoie tout à ton propre email)
+python spontanees/envoyeur.py --test --limite 5
+
+# Export Excel du suivi
+python spontanees/export_excel.py
 ```
 
-Remplis les valeurs :
+---
 
-```
-ANTHROPIC_API_KEY=sk-ant-xxx
-FT_CLIENT_ID=PAR_xxx
-FT_CLIENT_SECRET=xxx
-```
+## Stack technique
 
-### 4. Configurer Gmail
+| Composant | Technologie |
+|-----------|-------------|
+| Interface web | Flask + HTML/CSS/JS vanilla |
+| IA scoring & génération | Gemini 2.5 Flash/Pro via Vertex AI |
+| Scraping offres | API France Travail (OAuth2) |
+| Scraping emails | DuckDuckGo (ddgs) + BeautifulSoup |
+| Données entreprises | API Recherche Entreprises (Sirene) |
+| Envoi mails | SMTP Gmail (mot de passe application) |
+| Génération PDF | WeasyPrint |
+| Génération DOCX | python-docx |
+| Export Excel | openpyxl |
 
-- Va sur [console.cloud.google.com](https://console.cloud.google.com)
-- Crée un projet, active l'API Gmail
-- Crée des identifiants OAuth2 (Application de bureau)
-- Télécharge le fichier et renomme-le `credentials.json`
-- Place-le à la racine du projet
+---
 
-### 5. Configurer ton profil
+## Données
 
-Édite `profil.py` avec tes informations personnelles, compétences et projets.
+- **6576 entreprises IT** en IDF dans `entreprises_raw.json`
+- Scoring des offres : 1-10 avec détection automatique inéligibles
+- Archivage automatique des offres écoles/CFA
+- Reprise automatique du scraper (champ `traite`)
+- Limite 50 mails/jour avec pauses anti-spam (30-90s)
 
-### 6. Ajouter ton CV
+---
 
-Place ton CV PDF à la racine sous le nom `CV_Ton_Nom.pdf` et mets à jour la variable `CV_PATH` dans `envoi_gmail.py`.
+## Sécurité
 
-### 7. Lancer l'application
+Fichiers **non versionnés** (dans `.gitignore`) :
+- `.env`
+- `data/`
+- `_archive/`
 
-```bash
-python3 app.py
-```
+---
 
-Ouvre [http://localhost:5002](http://localhost:5002)
+## Fichiers importants à ne jamais supprimer
 
-## Utilisation
-
-1. **Nouvelle recherche** → scrape les offres France Travail et les analyse automatiquement
-2. **Analyser** → relance l'analyse IA sur une offre spécifique
-3. **Générer lettre** → lettre de motivation personnalisée pour l'offre
-4. **PDF** → télécharge la lettre en PDF prête à envoyer
-5. **Postuler sur France Travail** → télécharge le PDF et ouvre la page de l'offre
-6. **Générer email + Envoyer** → envoie la candidature complète par Gmail (lettre PDF + CV)
-
-## Variables d'environnement
-
-| Variable | Description |
-|---|---|
-| `ANTHROPIC_API_KEY` | Clé API Anthropic |
-| `FT_CLIENT_ID` | Client ID France Travail |
-| `FT_CLIENT_SECRET` | Secret France Travail |
-
-## Projet réalisé dans le cadre
-
-DSP DevOps — CNAM Paris (2025-2026)
-Projet personnel — non affilié à France Travail ni à Anthropic
+- `data/entreprises_raw.json` — source brute des 6576 entreprises
+- `data/entreprises_enrichies.json` — résultat du scraping (en cours)
+- `data/candidatures.json` — toutes les offres analysées
+- `assets/lettre_template_KENZA.docx` — template avec balises `{{...}}`
+- `shared/profil.py` — cerveau du système
