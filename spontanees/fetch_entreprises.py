@@ -196,7 +196,7 @@ def main():
     print(f"  Par catégorie         : {par_cat}")
     print(f"  Fichier               : {FICHIER_SORTIE}")
     print("=" * 55)
-    print("\n→ Lance maintenant : python scraper_emails.py")
+    print("\n→ Lance maintenant : python -m spontanees.scraper_emails.py")
 
 
 if __name__ == "__main__":

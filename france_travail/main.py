@@ -1,5 +1,7 @@
 import json
 import os
+import threading
+_lock = threading.Lock()
 
 from france_travail.scraper import chercher_offres, sauvegarder_offres_vues
 from france_travail.analyseur import analyser_offres
@@ -7,16 +9,16 @@ from france_travail.analyseur import analyser_offres
 FICHIER_CANDIDATURES = "data/candidatures.json"
 
 def charger_candidatures():
-    if os.path.exists(FICHIER_CANDIDATURES):
-        with open(FICHIER_CANDIDATURES, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
-
+    with _lock:
+        if os.path.exists(FICHIER_CANDIDATURES):
+            with open(FICHIER_CANDIDATURES, "r", encoding="utf-8") as f:
+                return json.load(f)
+        return []
 
 def sauvegarder_candidatures(candidatures):
-    with open(FICHIER_CANDIDATURES, "w", encoding="utf-8") as f:
-        json.dump(candidatures, f, ensure_ascii=False, indent=2)
-
+    with _lock:
+        with open(FICHIER_CANDIDATURES, "w", encoding="utf-8") as f:
+            json.dump(candidatures, f, ensure_ascii=False, indent=2)
 
 def ajouter_candidatures(nouvelles_offres):
     candidatures = charger_candidatures()

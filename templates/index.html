@@ -114,6 +114,32 @@
     .cs{text-align:center;padding:80px 20px;color:var(--muted)}
     .cs .big{font-family:'Instrument Serif',serif;font-size:2rem;font-weight:400;margin-bottom:12px;color:var(--text)}
     .cs p{font-size:.8rem;line-height:1.7}
+    .pipeline{display:flex;flex-direction:column;gap:12px;margin-bottom:24px}
+    .pipe-step{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;display:flex;align-items:center;gap:16px;transition:border-color .2s}
+    .pipe-step.active{border-color:var(--accent)}
+    .pipe-step.done{border-color:rgba(74,222,128,.4)}
+    .pipe-num{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.72rem;color:var(--muted);flex-shrink:0}
+    .pipe-step.active .pipe-num{border-color:var(--accent);color:var(--accent);background:rgba(108,99,255,.1)}
+    .pipe-step.done .pipe-num{border-color:var(--green);color:var(--green);background:rgba(74,222,128,.1)}
+    .pipe-info{flex:1}
+    .pipe-title{font-size:.82rem;margin-bottom:3px}
+    .pipe-desc{font-size:.66rem;color:var(--muted)}
+    .pipe-stat{font-size:.72rem;color:var(--accent);font-weight:500;flex-shrink:0;min-width:60px;text-align:right}
+    .pipe-actions{display:flex;gap:8px;align-items:center;flex-shrink:0}
+    .spont-msg{font-size:.72rem;color:var(--muted);padding:10px 14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;min-height:36px}
+    .spont-table{width:100%;border-collapse:collapse;font-size:.7rem}
+    .spont-table th{text-align:left;color:var(--muted);font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;padding:6px 10px;border-bottom:1px solid var(--border)}
+    .spont-table td{padding:8px 10px;border-bottom:1px solid rgba(42,42,58,.5)}
+    .spont-table tr:last-child td{border-bottom:none}
+    .tag-envoye{color:var(--green);font-size:.6rem}
+    .tag-genere{color:var(--yellow);font-size:.6rem}
+    .spont-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px}
+    @media(max-width:700px){.spont-grid{grid-template-columns:1fr}}
+    .spont-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
+    .spont-card-val{font-size:1.6rem;font-family:'Instrument Serif',serif;color:var(--text);margin-bottom:2px}
+    .spont-card-label{font-size:.62rem;color:var(--muted)}
+    .limite-input{width:64px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-family:'DM Mono',monospace;font-size:.72rem;text-align:center;outline:none}
+    .limite-input:focus{border-color:var(--accent)}
   </style>
 </head>
 <body>
@@ -212,14 +238,110 @@
       <div class="cg" id="cand-grid"></div>
     </div>
 
-    <div id="section-spontanees" style="display:none">
-      <div class="cs">
-        <div class="big">Candidatures spontanées</div>
-        <p>Cibler des entreprises en IDF, récupérer leurs coordonnées<br>
-        et envoyer des candidatures spontanées automatiquement.<br><br>
-        <em style="color:var(--accent)">Bientôt disponible ✦</em></p>
+        <div id="section-spontanees" style="display:none">
+ 
+      <!-- Stats globales -->
+      <div class="spont-grid">
+        <div class="spont-card">
+          <div class="spont-card-val" id="sp-raw">—</div>
+          <div class="spont-card-label">Entreprises en base</div>
+        </div>
+        <div class="spont-card">
+          <div class="spont-card-val" id="sp-email">—</div>
+          <div class="spont-card-label">Avec email trouvé</div>
+        </div>
+        <div class="spont-card">
+          <div class="spont-card-val" id="sp-gen">—</div>
+          <div class="spont-card-label">Mails générés</div>
+        </div>
+        <div class="spont-card">
+          <div class="spont-card-val" id="sp-env">—</div>
+          <div class="spont-card-label">Mails envoyés</div>
+        </div>
       </div>
+ 
+      <!-- Message statut pipeline -->
+      <div class="spont-msg" id="spont-status">Prêt</div>
+ 
+      <!-- Pipeline 4 étapes -->
+      <div class="pipeline">
+ 
+        <!-- Étape 1 : Fetch -->
+        <div class="pipe-step" id="pipe-1">
+          <div class="pipe-num">1</div>
+          <div class="pipe-info">
+            <div class="pipe-title">Fetch entreprises</div>
+            <div class="pipe-desc">Récupère les entreprises IT IDF via l'API Recherche Entreprises (codes NAF 62.*)</div>
+          </div>
+          <div class="pipe-stat" id="stat-raw">—</div>
+          <div class="pipe-actions">
+            <button class="btn btn-secondary" style="font-size:.7rem" id="btn-fetch" onclick="spontLancer('fetch')">▶ Lancer</button>
+          </div>
+        </div>
+ 
+        <!-- Étape 2 : Scraper -->
+        <div class="pipe-step" id="pipe-2">
+          <div class="pipe-num">2</div>
+          <div class="pipe-info">
+            <div class="pipe-title">Scraper emails</div>
+            <div class="pipe-desc">Trouve les sites web et adresses email via DuckDuckGo + BeautifulSoup + Gemini</div>
+          </div>
+          <div class="pipe-stat" id="stat-email">—</div>
+          <div class="pipe-actions">
+            <button class="btn btn-secondary" style="font-size:.7rem" id="btn-scraper" onclick="spontLancer('scraper')">▶ Lancer</button>
+          </div>
+        </div>
+ 
+        <!-- Étape 3 : Générer -->
+        <div class="pipe-step" id="pipe-3">
+          <div class="pipe-num">3</div>
+          <div class="pipe-info">
+            <div class="pipe-title">Générer mails</div>
+            <div class="pipe-desc">Gemini génère 1-2 phrases de personnalisation par entreprise</div>
+          </div>
+          <div class="pipe-stat" id="stat-gen">—</div>
+          <div class="pipe-actions">
+            <button class="btn btn-secondary" style="font-size:.7rem" id="btn-generer" onclick="spontLancer('generer')">▶ Lancer</button>
+          </div>
+        </div>
+ 
+        <!-- Étape 4 : Envoyer -->
+        <div class="pipe-step" id="pipe-4">
+          <div class="pipe-num">4</div>
+          <div class="pipe-info">
+            <div class="pipe-title">Envoyer</div>
+            <div class="pipe-desc">Envoie les mails avec CV + plaquette DEUST en pièces jointes</div>
+          </div>
+          <div class="pipe-stat" id="stat-env">—</div>
+          <div class="pipe-actions">
+            <input class="limite-input" type="number" id="limite-envoi" value="10" min="1" max="50" title="Nombre max de mails ce run"/>
+            <button class="btn btn-secondary" style="font-size:.7rem;color:#fbbf24;border-color:rgba(251,191,36,.4)" id="btn-test" onclick="spontLancer('envoyer', true)">Test</button>
+            <button class="btn btn-primary" style="font-size:.7rem;background:#4ade80;border-color:#4ade80;color:#0f0f14" id="btn-envoyer" onclick="spontLancer('envoyer', false)">▶ Envoyer</button>
+          </div>
+        </div>
+ 
+      </div>
+ 
+      <!-- Dernières entreprises traitées -->
+      <div class="sl" style="margin-bottom:10px">Dernières entreprises traitées</div>
+      <table class="spont-table">
+        <thead>
+          <tr>
+            <th>Entreprise</th>
+            <th>Ville</th>
+            <th>Email</th>
+            <th>Statut</th>
+            <th>Date</th>
+          </tr>
+        </thead>
+        <tbody id="spont-table-body">
+          <tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px">Aucune donnée</td></tr>
+        </tbody>
+      </table>
+ 
     </div>
+
+
 
     <div id="section-archive" style="display:none" class="offres">
     </div>

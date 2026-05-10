@@ -17,7 +17,7 @@ import os
 from datetime import datetime
 from openpyxl import Workbook
 from openpyxl.styles import (
-    Font, PatternFill, Alignment, Border, Side, GradientFill
+    Font, PatternFill, Alignment, Border, Side
 )
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
@@ -304,7 +304,7 @@ def main():
     # Charger les données (enrichies si dispo, sinon raw)
     fichier = FICHIER_ENTREE
     if not os.path.exists(fichier):
-        fichier = "entreprises_raw.json"
+        fichier = "data/entreprises_raw.json"
     if not os.path.exists(fichier):
         print("[ERREUR] Aucun fichier JSON trouvé. Lance d'abord fetch_entreprises.py")
         return

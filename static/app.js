@@ -6,6 +6,17 @@ var filtreCand = 'tous';
 var triActif = 'score';
 var sidebarOpen = false;
 
+// ─── ÉCHAPPEMENT HTML (anti-XSS) ─────────────
+function esc(str) {
+    if (!str && str !== 0) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function formatDate(d) {
     if (!d) return '';
     var mois = ['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc'];
@@ -102,6 +113,7 @@ function afficherSection(section) {
     if (section==='offres') afficherOffres();
     if (section==='candidatures') afficherCandidatures();
     if (section==='archive') afficherArchives();
+    if (section==='spontanees') chargerStatsSpontanees();
 }
 
 // ─── INIT ────────────────────────────────────
@@ -138,7 +150,7 @@ function construireFiltresDynamiques() {
         if (!el) return;
         el.innerHTML = '<button class="fsm actif" onclick="setFiltre(\''+type+'\',\'tous\',this)">Tous</button>';
         vals.forEach(function(v) {
-            el.innerHTML += '<button class="fsm" onclick="setFiltre(\''+type+'\',\''+v+'\',this)">'+v+'</button>';
+            el.innerHTML += '<button class="fsm" onclick="setFiltre(\''+type+'\',\''+esc(v)+'\',this)">'+esc(v)+'</button>';
         });
     }
     build('filtres-zone', zones, 'zone');
@@ -189,12 +201,12 @@ function afficherCandidatures() {
     var sl = {envoye:'Envoyée',reponse:'Réponse reçue',entretien:'Entretien',refus:'Refus'};
     grid.innerHTML = liste.map(function(o) {
         return '<div class="cc">'
-            +'<div class="cc-titre">'+o.titre+'</div>'
-            +'<div class="cc-meta">'+o.entreprise+' · '+o.lieu+'</div>'
+            +'<div class="cc-titre">'+esc(o.titre)+'</div>'
+            +'<div class="cc-meta">'+esc(o.entreprise)+' · '+esc(o.lieu)+'</div>'
             +'<span class="badge-statut badge-'+o.statut+'">'+(sl[o.statut]||o.statut)+'</span>'
             +(o.date_candidature?'<div class="cc-date">Envoyée le '+formatDate(o.date_candidature)+'</div>':'')
             +'<div class="cc-actions">'
-            +'<a class="btn btn-secondary" style="font-size:.68rem;padding:4px 10px;text-decoration:none" href="'+o.lien+'" target="_blank">Voir l\'offre</a>'
+            +'<a class="btn btn-secondary" style="font-size:.68rem;padding:4px 10px;text-decoration:none" href="'+esc(o.lien)+'" target="_blank">Voir l\'offre</a>'
             +'<select onchange="changerStatutCand(\''+o.id+'\',this.value)" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-family:DM Mono,monospace;font-size:.68rem;outline:none">'
             +'<option value="envoye"'+(o.statut==='envoye'?' selected':'')+'>Envoyée</option>'
             +'<option value="reponse"'+(o.statut==='reponse'?' selected':'')+'>Réponse reçue</option>'
@@ -216,20 +228,20 @@ async function changerStatutCand(id, statut) {
 function construireOffre(o) {
     var sc = o.score>=8?'haut':(o.score>=5?'moyen':'bas');
     var sl = {nouveau:'Nouvelle',en_cours:'En cours',rejete:'Rejetée',archive:'Archivée'};
-    var pf = (o.points_forts||[]).map(function(p){return '<li>'+p+'</li>';}).join('');
-    var pw = (o.points_faibles||[]).map(function(p){return '<li>'+p+'</li>';}).join('');
+    var pf = (o.points_forts||[]).map(function(p){return '<li>'+esc(p)+'</li>';}).join('');
+    var pw = (o.points_faibles||[]).map(function(p){return '<li>'+esc(p)+'</li>';}).join('');
     var lt = (o.lettre||'').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    var da = o.resume_analyse && o.resume_analyse!=='Non analysée' && o.resume_analyse!=='Non analysee' && o.resume_analyse!=='Analyse echouee';
+    var da = o.resume_analyse && o.resume_analyse!=='Non analysée' && o.resume_analyse!=='Non analysee' && o.resume_analyse!=='Analyse echouee' && o.resume_analyse!=='Erreur analyse';
     var isArchive = o.statut==='archive';
 
     return '<div class="offre" id="offre-'+o.id+'">'
         +'<div class="offre-header" onclick="toggleOffre(\''+o.id+'\')">'
         +'<div class="offre-left">'
-        +'<div class="offre-titre">'+o.titre+'</div>'
-        +'<div class="offre-meta">'+o.entreprise+' · '+o.lieu
-        +(o.zone?' <span class="mtag mzone">'+o.zone+'</span>':'')
-        +(o.domaine?' <span class="mtag mdom">'+o.domaine+'</span>':'')
-        +' <span class="mtag msrc">'+o.source+'</span>'
+        +'<div class="offre-titre">'+esc(o.titre)+'</div>'
+        +'<div class="offre-meta">'+esc(o.entreprise)+' · '+esc(o.lieu)
+        +(o.zone?' <span class="mtag mzone">'+esc(o.zone)+'</span>':'')
+        +(o.domaine?' <span class="mtag mdom">'+esc(o.domaine)+'</span>':'')
+        +' <span class="mtag msrc">'+esc(o.source)+'</span>'
         +' · '+formatDate(o.date_trouvee)+'</div></div>'
         +'<div class="offre-right">'
         +'<span class="badge-statut badge-'+(o.statut||'nouveau')+'">'+(sl[o.statut]||'Nouvelle')+'</span>'
@@ -241,11 +253,11 @@ function construireOffre(o) {
 
         // Colonne gauche — Analyse IA
         +'<div><div class="sl">Analyse IA</div>'
-        +'<div class="abox">'+(o.resume_analyse||'Non analysée')+'</div>'
+        +'<div class="abox">'+esc(o.resume_analyse||'Non analysée')+'</div>'
         +(pf?'<ul class="points" style="margin-top:7px">'+pf+'</ul>':'')
         +(pw?'<ul class="points faibles" style="margin-top:3px">'+pw+'</ul>':'')
         +'<div style="margin-top:8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
-        +'<a class="lo" href="'+o.lien+'" target="_blank">Voir l\'offre →</a>'
+        +'<a class="lo" href="'+esc(o.lien)+'" target="_blank">Voir l\'offre →</a>'
         +(da?'<span style="font-size:.65rem;color:var(--muted)">✓ Analysée</span>'
             :'<button class="btn btn-secondary" style="font-size:.68rem;padding:4px 9px" onclick="analyser(\''+o.id+'\')">Analyser</button>')
         +(isArchive
@@ -275,7 +287,7 @@ function construireOffre(o) {
         +'<div class="actions">'
         +'<button class="btn btn-primary" style="font-size:.7rem" onclick="genererLettre(\''+o.id+'\')">Générer lettre</button>'
         +'<button class="btn btn-secondary" style="font-size:.7rem" onclick="telechargerPDF(\''+o.id+'\')">PDF</button>'
-        +(o.source==='France Travail'?'<button class="btn btn-primary" style="font-size:.7rem;background:#e8301e;border-color:#e8301e" onclick="postulerFranceTravail(\''+o.id+'\',\''+o.lien+'\')">Postuler FT</button>':'')
+        +(o.source==='France Travail'?'<button class="btn btn-primary" style="font-size:.7rem;background:#e8301e;border-color:#e8301e" onclick="postulerFranceTravail(\''+o.id+'\',\''+esc(o.lien)+'\')">Postuler FT</button>':'')
         +'</div></div>'
         +'</div></div>';
 }
@@ -416,20 +428,19 @@ async function postulerFranceTravail(id, lien) {
         body: JSON.stringify({id: id, lettre: lt})
     });
     var data2 = await r2.json();
-    if (data2.ok) {
-        toast('✅ Lettre prête dans lettres_pdf/ — France Travail ouvert !', 'ok');
-    } else {
+    if (!data2.ok) {
         toast('Erreur génération lettre', 'err');
     }
     var c = candidatures.find(function(c){return c.id===id;});
-    if (c && c.statut==='nouveau') {
-        c.statut = 'en_cours';
+    if (c) {
+        c.statut = 'envoye';
         fetch('/api/maj_statut', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({id: id, statut: 'en_cours'})
+            body: JSON.stringify({id: id, statut: 'envoye'})
         });
         mettreAJourStats();
+        toast('✅ Lettre prête — candidature marquée Envoyée !', 'ok');
     }
 }
 
@@ -477,6 +488,111 @@ async function desarchiver(id) {
 function toast(msg, type) {
     var t=document.createElement('div'); t.className='toast '+type; t.textContent=msg;
     document.body.appendChild(t); setTimeout(function(){t.remove();},3500);
+}
+
+// ─── SPONTANÉES ──────────────────────────────────────────────────────────────
+var spontPolling = null;
+
+async function chargerStatsSpontanees() {
+    var r = await fetch('/api/spontanees/stats');
+    var s = await r.json();
+
+    // Stats cards
+    document.getElementById('sp-raw').textContent   = s.raw   || 0;
+    document.getElementById('sp-email').textContent = s.avec_email || 0;
+    document.getElementById('sp-gen').textContent   = s.mail_generee || 0;
+    document.getElementById('sp-env').textContent   = s.mail_envoye || 0;
+
+    // Stats inline dans les étapes
+    document.getElementById('stat-raw').textContent   = s.raw   ? s.raw + ' entrep.' : '—';
+    document.getElementById('stat-email').textContent = s.avec_email ? s.avec_email + ' emails' : '—';
+    document.getElementById('stat-gen').textContent   = s.mail_generee ? s.mail_generee + ' générés' : '—';
+    document.getElementById('stat-env').textContent   = s.mail_envoye ? s.mail_envoye + ' envoyés' : '—';
+
+    // Message statut
+    document.getElementById('spont-status').textContent = s.message || 'Prêt';
+
+    // Coloration des étapes selon l'étape active
+    ['fetch','scraper','generer','envoyer'].forEach(function(etape, i) {
+        var step = document.getElementById('pipe-'+(i+1));
+        step.classList.remove('active','done');
+        if (s.etape === etape) {
+            step.classList.add('active');
+        }
+        // Marquer done selon les stats
+        if (i===0 && s.raw > 0 && !s.en_cours) step.classList.add('done');
+        if (i===1 && s.avec_email > 0 && !s.en_cours) step.classList.add('done');
+        if (i===2 && s.mail_generee > 0 && !s.en_cours) step.classList.add('done');
+        if (i===3 && s.mail_envoye > 0 && !s.en_cours) step.classList.add('done');
+    });
+
+    // Griser les boutons si pipeline en cours
+    var btns = ['btn-fetch','btn-scraper','btn-generer','btn-envoyer','btn-test'];
+    btns.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.disabled = s.en_cours;
+    });
+
+    // Table des dernières entreprises
+    var tbody = document.getElementById('spont-table-body');
+    if (s.dernieres && s.dernieres.length > 0) {
+        tbody.innerHTML = s.dernieres.map(function(e) {
+            var tag = e.envoye
+                ? '<span class="tag-envoye">✓ Envoyé</span>'
+                : '<span class="tag-genere">⏳ Généré</span>';
+            return '<tr>'
+                + '<td>' + esc(e.nom) + '</td>'
+                + '<td>' + esc(e.ville) + '</td>'
+                + '<td style="color:var(--muted)">' + esc(e.email) + '</td>'
+                + '<td>' + tag + '</td>'
+                + '<td style="color:var(--muted)">' + esc(e.date) + '</td>'
+                + '</tr>';
+        }).join('');
+    } else {
+        tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px">Aucune entreprise traitée pour l\'instant</td></tr>';
+    }
+
+    return s;
+}
+
+async function spontLancer(etape, test) {
+    var routes = {
+        fetch:   '/api/spontanees/fetch',
+        scraper: '/api/spontanees/scraper',
+        generer: '/api/spontanees/generer',
+        envoyer: '/api/spontanees/envoyer',
+    };
+
+    var body = {};
+    if (etape === 'envoyer') {
+        body.limite = parseInt(document.getElementById('limite-envoi').value) || 10;
+        body.test   = test === true;
+    }
+
+    var labels = {
+        fetch:   'Fetch lancé...',
+        scraper: 'Scraping lancé...',
+        generer: 'Génération lancée...',
+        envoyer: test ? 'Envoi TEST lancé...' : 'Envoi lancé...',
+    };
+    toast(labels[etape], 'ok');
+
+    await fetch(routes[etape], {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+    });
+
+    // Polling toutes les 5 secondes
+    if (spontPolling) clearInterval(spontPolling);
+    spontPolling = setInterval(async function() {
+        var s = await chargerStatsSpontanees();
+        if (!s.en_cours) {
+            clearInterval(spontPolling);
+            spontPolling = null;
+            toast(s.message || 'Terminé !', 'ok');
+        }
+    }, 5000);
 }
 
 charger();

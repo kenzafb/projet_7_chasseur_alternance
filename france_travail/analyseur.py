@@ -14,8 +14,9 @@ client = genai.Client(
     project=os.getenv("GOOGLE_CLOUD_PROJECT"),
     location="us-central1"
 )
-MODELE = "gemini-2.5-flash"
 
+MODELE = "gemini-2.5-flash"
+PAUSE_GEMINI = 4 # secondes entre chaque appel Gemini (rate limit)
 
 def construire_contexte_profil():
     competences = ", ".join(PROFIL["competences"])
@@ -56,8 +57,9 @@ def analyser_offre(offre):
         "- Le poste n'a aucun rapport avec l'informatique, le developpement, les systemes/reseaux, la data ou l'IA.\n"
         "- L'offre exige explicitement un niveau Master, Bac+4, Bac+5, ou mentionne 'cycle ingenieur' "
         "comme prerequis d'entree (pas comme diplome prepare).\n"
-        "- L'offre exige 3+ ans d'experience professionnelle.
-- Le poste n'a aucun rapport avec l'informatique technique : exclure les postes commerciaux, marketing, RH, finance, juridique, analyst metier non-technique, sales, business developer, meme si mentionne "IT" ou "data".\n"
+        "- L'offre exige 3+ ans d'experience professionnelle.\n"
+        "- Le poste n'a aucun rapport avec l'informatique technique : exclure les postes commerciaux, "
+        "marketing, RH, finance... meme si mentionne 'IT' ou 'data'.\n"
         "\n"
         "REGLE STRICTE sur le mot 'Ingenieur' dans le titre ou la description :\n"
         "- Si 'Ingenieur' designe le POSTE OCCUPE (ex: 'Alternance Ingenieur DevOps', 'Ingenieur logiciel') "
@@ -167,11 +169,14 @@ def analyser_offres(offres, callback=None):
         })
         if analyse.get("statut_auto") == "archive":
             offre["statut"] = "archive"
+        elif not offre.get("eligible", True) and offre.get("score", 10) <= 2:
+            offre["statut"] = "archive"
+            print(f"     → Archivée automatiquement (inéligible score {offre['score']})")
         eligible_str = "eligible" if offre["eligible"] else "INELIGIBLE"
         print(f"     Score : {offre['score']}/10 — {offre['verdict']} — {eligible_str}")
         offres_analysees.append(offre)
         if callback:
             callback(i, len(offres), offre)
-        time.sleep(4)
+        time.sleep(PAUSE_GEMINI)
     offres_analysees.sort(key=lambda x: x["score"], reverse=True)
     return offres_analysees

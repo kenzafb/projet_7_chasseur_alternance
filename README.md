@@ -1,7 +1,43 @@
 # Chasseur d'Alternance
 
-Pipeline automatisé de recherche et candidature en alternance DevOps/SysAdmin/Sécurité.
-Développé par **Kenza FILALI-BOUAMI** — DEUST IOSI CNAM Paris, rentrée septembre 2026.
+Outil Python que j'ai développé pendant mon stage au Garage Numérique pour automatiser ma recherche d'alternance. Il interroge l'API France Travail, analyse chaque offre avec un LLM (Gemini via Google Cloud), génère des lettres de motivation personnalisées et envoie des candidatures spontanées par email.
+
+> Construit par **Kenza Filali-Bouami** — DSP DevOps CNAM Paris, future étudiante DEUST IOSI en alternance (septembre 2026).
+
+---
+
+## Fonctionnalités
+
+**Pipeline offres France Travail**
+- Scraping automatique de l'API France Travail sur 23 requêtes ciblées (DevOps, Sys/Réseau, Support, Dev...)
+- Analyse IA de chaque offre : score /10, éligibilité, points forts/faibles, verdict — via Gemini 2.5 Flash
+- Génération de lettres de motivation personnalisées (template fixe + paragraphe IA) via Gemini 2.5 Pro
+- Export PDF des lettres avec WeasyPrint
+- Interface web de suivi : filtres, tri, statuts, sauvegarde auto
+
+**Pipeline candidatures spontanées**
+- Récupération des entreprises IT IDF via l'API Recherche Entreprises (codes NAF 62.*)
+- Recherche des sites web via DuckDuckGo + validation du domaine
+- Scraping des emails de contact (BeautifulSoup + Gemini pour filtrage intelligent)
+- Génération de mails personnalisés (1-2 phrases IA par entreprise)
+- Envoi SMTP Gmail avec CV et plaquette DEUST en pièces jointes
+- Export Excel de suivi (3 feuilles : candidatures, stats, données brutes)
+
+---
+
+## Stack technique
+
+| Composant | Technologie |
+|---|---|
+| Backend | Python 3.13, Flask |
+| IA | Gemini 2.5 Flash / Pro via Vertex AI (Google Cloud) |
+| Scraping offres | API France Travail OAuth2 |
+| Scraping emails | DuckDuckGo (ddgs), BeautifulSoup4, Gemini |
+| Données entreprises | API Recherche Entreprises (api.gouv.fr) |
+| PDF | WeasyPrint |
+| Excel | openpyxl |
+| Envoi email | SMTP Gmail (App Password) |
+| Frontend | HTML/CSS/JS vanilla (pas de framework) |
 
 ---
 
@@ -9,152 +45,147 @@ Développé par **Kenza FILALI-BOUAMI** — DEUST IOSI CNAM Paris, rentrée sept
 
 ```
 chasseur_alternance/
-│
-├── app.py                          ← Serveur Flask (interface web)
-│
-├── france_travail/                 ← Système A : offres France Travail
-│   ├── scraper.py                  ← Récupère les offres via API France Travail
-│   ├── analyseur.py                ← Score 1-10 par Gemini (Vertex AI)
-│   ├── generateur.py               ← Génère la lettre de motivation (Gemini)
-│   └── pdf_generator.py            ← Génère le PDF de la lettre
-│
-├── spontanees/                     ← Système B : candidatures spontanées
-│   ├── fetch_entreprises.py        ← Récupère les entreprises IT IDF (API Sirene)
-│   ├── scraper_emails.py           ← Trouve sites + emails (DuckDuckGo + Gemini)
-│   ├── generateur_lettres.py       ← Génère les lettres personnalisées (Gemini)
-│   ├── envoyeur.py                 ← Envoie les mails (SMTP Gmail)
-│   └── export_excel.py             ← Export Excel du suivi
-│
+├── app.py                          # Serveur Flask — toutes les routes API
+├── france_travail/
+│   ├── scraper.py                  # Scraping API France Travail
+│   ├── analyseur.py                # Analyse IA des offres (Gemini)
+│   ├── generateur.py               # Génération des lettres (Gemini)
+│   ├── pdf_generator.py            # Export PDF (WeasyPrint)
+│   └── main.py                     # Orchestration recherche + sauvegarde
+├── spontanees/
+│   ├── fetch_entreprises.py        # Récupération entreprises IT IDF
+│   ├── scraper_emails.py           # Scraping emails + Gemini
+│   ├── generateur_mail.py          # Génération mails personnalisés
+│   ├── envoyeur.py                 # Envoi SMTP Gmail
+│   └── export_excel.py             # Export Excel de suivi
 ├── shared/
-│   └── profil.py                   ← Profil Kenza (compétences, projets, critères)
-│
-├── data/                           ← Fichiers de données (non versionnés)
-│   ├── entreprises_raw.json        ← Source brute Sirene (ne jamais modifier)
-│   ├── entreprises_enrichies.json  ← Enrichi par scraper_emails.py
-│   ├── candidatures.json           ← Offres FT analysées (interface web)
-│   └── offres_vues.json            ← IDs offres déjà vues (anti-doublons)
-│
-├── assets/                         ← Fichiers fixes
-│   ├── CV_Kenza_Filali-Bouami.pdf
-│   └── lettre_template_KENZA.docx  ← Template avec balises {{...}}
-│
-├── lettres_pdf/                    ← Lettre PDF générée (1 seul fichier, écrasé)
-│   └── Lettre_Kenza_Filali-Bouami.pdf
-│
-├── static/
-│   └── app.js                      ← Frontend interface web
-├── templates/
-│   └── index.html                  ← Interface web
-│
-├── .env                            ← Variables d'environnement (non versionné)
-├── .env.example                    ← Exemple de configuration
-├── requirements.txt
-└── prompt.md                       ← Contexte projet pour IAs
+│   ├── profil.py                   # Profil candidat (gitignore)
+│   └── profil.example.py           # Template profil à copier
+├── templates/index.html            # Interface web
+├── static/app.js                   # Logique frontend
+├── assets/                         # CV + plaquette (gitignore)
+├── data/                           # JSON générés (gitignore)
+├── lettres_pdf/                    # PDF générés (gitignore)
+├── .env                            # Variables d'environnement (gitignore)
+├── .env.example                    # Template .env
+└── requirements.txt
 ```
 
 ---
 
-## ⚙Configuration `.env`
+## Installation
 
-```env
-# Vertex AI / GCP
-GOOGLE_CLOUD_PROJECT=ton-projet-gcp
+### Prérequis
+
+- Python 3.11+
+- Un projet Google Cloud avec Vertex AI activé
+- Un compte France Travail API (gratuit) : [francetravail.io](https://francetravail.io)
+- Un App Password Gmail pour l'envoi SMTP
+
+### Mise en place
+
+```bash
+# Cloner le projet
+git clone https://github.com/kenzafb/chasseur-alternance
+cd chasseur-alternance
+
+# Créer et activer l'environnement virtuel
+python -m venv venv
+source venv/bin/activate
+
+# Installer les dépendances
+pip install -r requirements.txt
+
+# Configurer les variables d'environnement
+cp .env.example .env
+nano .env
+
+# Configurer votre profil
+cp shared/profil.example.py shared/profil.py
+nano shared/profil.py
+```
+
+### Configuration `.env`
+
+```bash
+# Google Cloud / Vertex AI
+GOOGLE_CLOUD_PROJECT=votre-projet-gcp
 GCP_REGION=us-central1
 
 # France Travail API
-FT_CLIENT_ID=xxx
-FT_CLIENT_SECRET=xxx
+FT_CLIENT_ID=PAR_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+FT_CLIENT_SECRET=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # Gmail SMTP
-GMAIL_SENDER=ton@gmail.com
+GMAIL_SENDER=votre.email@gmail.com
 GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
+
+# Debug scraper emails (true/false)
+DEBUG_SCRAPER=false
 ```
 
 ---
 
-## Lancement
+## Utilisation
 
-### Prérequis
-```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-gcloud auth application-default login  # pour Vertex AI
-```
+### Lancer l'interface web
 
-### Système A — Interface web France Travail
 ```bash
 python app.py
 # → http://localhost:5002
 ```
-Depuis l'interface :
-1. **Nouvelle recherche** — scrape les offres France Travail et les analyse
-2. **Générer lettre** — génère une lettre personnalisée pour l'offre
-3. **PDF** — génère le PDF dans `lettres_pdf/`
-4. **Postuler FT** — ouvre l'offre + génère le PDF
 
-### Système B — Candidatures spontanées (pipeline CLI)
+L'interface permet de gérer tout le pipeline offres France Travail : recherche, analyse, lettre, PDF, statuts.
+
+### Pipeline candidatures spontanées
+
+Les 4 étapes sont accessibles depuis l'onglet **Spontanées** de l'interface, ou en ligne de commande :
+
 ```bash
-# Étape 1 : récupérer les entreprises IT IDF
-python spontanees/fetch_entreprises.py
+# Étape 1 — Récupérer les entreprises IT IDF
+python -m spontanees.fetch_entreprises
 
-# Étape 2 : trouver les emails (long, reprend automatiquement)
-python spontanees/scraper_emails.py
+# Étape 2 — Scraper les emails de contact
+python -m spontanees.scraper_emails
 
-# Étape 3 : générer les lettres personnalisées
-python spontanees/generateur_lettres.py
+# Étape 3 — Générer les mails personnalisés
+python -m spontanees.generateur_mail
 
-# Étape 4 : envoyer les candidatures (50/jour)
-python spontanees/envoyeur.py --limite 50
+# Étape 4 — Envoyer (--test pour envoyer à soi-même)
+python -m spontanees.envoyeur --limite 10 --test
 
-# Mode test (envoie tout à ton propre email)
-python spontanees/envoyeur.py --test --limite 5
-
-# Export Excel du suivi
-python spontanees/export_excel.py
+# Export Excel de suivi
+python -m spontanees.export_excel
 ```
 
 ---
 
-## Stack technique
+## Adapter à votre profil
 
-| Composant | Technologie |
-|-----------|-------------|
-| Interface web | Flask + HTML/CSS/JS vanilla |
-| IA scoring & génération | Gemini 2.5 Flash/Pro via Vertex AI |
-| Scraping offres | API France Travail (OAuth2) |
-| Scraping emails | DuckDuckGo (ddgs) + BeautifulSoup |
-| Données entreprises | API Recherche Entreprises (Sirene) |
-| Envoi mails | SMTP Gmail (mot de passe application) |
-| Génération PDF | WeasyPrint |
-| Génération DOCX | python-docx |
-| Export Excel | openpyxl |
+Tout ce qui vous concerne est centralisé dans `shared/profil.py` :
+
+- Informations personnelles (nom, email, téléphone, LinkedIn, GitHub)
+- Formation et compétences techniques
+- Projets GitHub
+- Expérience professionnelle
+- Mots-clés de recherche (titre des postes visés)
+
+La lettre de motivation est un **template fixe** (`france_travail/generateur.py`) — seul le paragraphe de personnalisation est généré par l'IA. Modifiez le template pour l'adapter à votre parcours.
 
 ---
 
-## Données
+## Ce qui est exclu du dépôt (`.gitignore`)
 
-- **6576 entreprises IT** en IDF dans `entreprises_raw.json`
-- Scoring des offres : 1-10 avec détection automatique inéligibles
-- Archivage automatique des offres écoles/CFA
-- Reprise automatique du scraper (champ `traite`)
-- Limite 50 mails/jour avec pauses anti-spam (30-90s)
-
----
-
-## Sécurité
-
-Fichiers **non versionnés** (dans `.gitignore`) :
-- `.env`
-- `data/`
-- `_archive/`
+| Fichier / dossier | Raison |
+|---|---|
+| `.env` | Clés API et credentials |
+| `shared/profil.py` | Données personnelles |
+| `assets/` | CV et documents personnels |
+| `data/` | JSON générés (offres, entreprises) |
+| `lettres_pdf/` | Lettres générées |
 
 ---
 
-## Fichiers importants à ne jamais supprimer
+## Licence
 
-- `data/entreprises_raw.json` — source brute des 6576 entreprises
-- `data/entreprises_enrichies.json` — résultat du scraping (en cours)
-- `data/candidatures.json` — toutes les offres analysées
-- `assets/lettre_template_KENZA.docx` — template avec balises `{{...}}`
-- `shared/profil.py` — cerveau du système
+MIT — libre d'utilisation, d'adaptation et de redistribution.

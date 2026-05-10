@@ -6,12 +6,10 @@ offres_vues.json
 candidatures.json
 token_chasseur.json
 credentials.json
-CV_Kenza_Filali-Bouami.pdf
+assets/
 lettres_pdf/
 debug.py
 app_route_envoi.py
-credentials.json
-token_chasseur.json
 _archive/
 data/
-.env
+shared/profil.py

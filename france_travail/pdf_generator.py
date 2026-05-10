@@ -11,7 +11,6 @@ def generer_pdf_lettre(offre, lettre, dossier_output="lettres_pdf"):
     now = datetime.now()
     date_str = f"{now.day} {mois[now.month-1]} {now.year}"
 
-    nom_entreprise = offre.get("entreprise", "Entreprise").replace(" ", "_").replace("/", "-")[:30]
     nom_fichier = "Lettre_Kenza_Filali-Bouami.pdf"
     chemin_pdf = os.path.join(dossier_output, nom_fichier)
 

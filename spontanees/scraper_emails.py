@@ -45,7 +45,7 @@ FICHIER_SORTIE  = "data/entreprises_enrichies.json"
 SAUVEGARDE_TOUS = 20
 
 # ← Passe à False pour désactiver le debug une fois que tout tourne bien
-DEBUG = True
+DEBUG = os.getenv("DEBUG_SCRAPER", "false").lower() == "true"
 
 PAUSE_DDG        = (3, 6)
 PAUSE_LONGUE_N   = 15
@@ -386,7 +386,6 @@ def scraper_et_extraire(url_site, nom_entreprise):
 
     domaine = extraire_domaine(url_site)
     tous_emails_bruts = []
-    meilleur_texte_contact = ""  # texte de la page la plus pertinente pour Gemini
 
     html, url_finale = get_page(url_site)
     if not html:
@@ -554,7 +553,7 @@ def main():
     print(f"  Avec téléphone : {avec_tel}")
     print(f"  Fichier        : {FICHIER_SORTIE}")
     print("=" * 60)
-    print("\n→ Lance : python export_excel.py")
+    print("\n→ Lance : python -m spontanees.export_excel.py")
 
 
 if __name__ == "__main__":

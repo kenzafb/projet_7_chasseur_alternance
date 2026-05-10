@@ -1,16 +1,21 @@
 """
 envoyeur.py
 ===========
-Pour chaque entreprise avec lettre_generee=true et mail_envoye=false,
-génère le docx personnalisé, l'attache avec le CV et envoie le mail.
+Pour chaque entreprise avec mail_generee=true et mail_envoye=false,
+envoie le mail de motivation avec CV et plaquette DEUST en pièces jointes.
 
-Lancement : python envoyeur.py
-Lancement limité : python envoyeur.py --limite 10
+Lancement CLI :
+  python -m spontanees.envoyeur
+  python -m spontanees.envoyeur --limite 10
+  python -m spontanees.envoyeur --test
+
+Depuis Flask :
+  from spontanees.envoyeur import main as env_main
+  env_main(limite=10, test=True)
 """
 
 import json
 import os
-import io
 import time
 import random
 import smtplib
@@ -20,25 +25,45 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
-from docx import Document
-from docx.shared import Pt, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
 from dotenv import load_dotenv
 
 load_dotenv()
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
-FICHIER_JSON  = "data/entreprises_enrichies.json"
-CV_PATH       = "assets/CV_Kenza_Filali-Bouami.pdf"
-TEMPLATE_PATH = "assets/lettre_template_KENZA.docx"
+FICHIER_JSON      = "data/entreprises_enrichies.json"
+CV_PATH           = "assets/CV_Kenza_Filali-Bouami.pdf"
+PLAQUETTE_PATH    = "assets/Programme_DEUST_IOSI.pdf"
 
-GMAIL_SENDER     = os.getenv("GMAIL_SENDER", "kenzafilbou@gmail.com")
-GMAIL_PASSWORD   = os.getenv("GMAIL_APP_PASSWORD", "")
+GMAIL_SENDER      = os.getenv("GMAIL_SENDER", "")
+GMAIL_PASSWORD    = os.getenv("GMAIL_APP_PASSWORD", "")
 
-LIMITE_PAR_RUN   = 50          # max mails par lancement
-PAUSE_ENTRE_MAILS = (30, 90)   # secondes (humain et anti-spam)
-SAUVEGARDE_TOUS  = 10
+SUJET_FIXE        = "Alternance DevOps / SysAdmin — septembre 2026"
+LIMITE_PAR_RUN    = 50
+PAUSE_ENTRE_MAILS = (30, 90)   # secondes (anti-spam)
+SAUVEGARDE_TOUS   = 10
+
+# ─── Mail de motivation fixe ──────────────────────────────────────────────────
+# {phrases_ia} est le seul endroit généré par Gemini (1-2 phrases, 200 car. max).
+# Tout le reste est rédigé par Kenza et ne change jamais.
+
+MAIL_TEMPLATE = """\
+Bonjour,
+
+Je me permets de vous contacter pour une candidature spontanée en alternance à partir de septembre 2026, au rythme d'une semaine en entreprise et une semaine en formation.
+
+Je termine actuellement un Diplôme de Spécialisation DevOps au CNAM de Paris et j'intègre en septembre la deuxième année du DEUST Informatique, toujours au CNAM, en alternance. Mon quotidien tourne autour de Linux, Python, Docker, Bash et des réseaux — des compétences que j'ai eu l'occasion de mettre en pratique lors d'un stage de deux mois et à travers plusieurs projets personnels disponibles sur mon GitHub.
+
+Je cherche une entreprise où je peux continuer à apprendre sur le terrain, contribuer concrètement, et m'investir sur la durée. {phrases_ia}
+
+Vous trouverez en pièce jointe mon CV ainsi que la plaquette de la formation. Je suis disponible pour un échange si vous souhaitez en savoir plus.
+
+Cordialement,
+
+Kenza Filali-Bouami
+kenzafilbou@gmail.com | 07 50 87 21 76
+linkedin.com/in/kenza-filali-bouami | github.com/kenzafb\
+"""
 
 # ─── Helpers JSON ─────────────────────────────────────────────────────────────
 
@@ -46,107 +71,57 @@ def charger_json():
     with open(FICHIER_JSON, "r", encoding="utf-8") as f:
         return json.load(f)
 
+
 def sauvegarder_json(data):
     with open(FICHIER_JSON, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-# ─── Génération du DOCX personnalisé ─────────────────────────────────────────
 
-def generer_docx(zones):
-    """
-    Charge le template, remplace les 4 balises {{...}} et retourne les bytes du docx.
-    """
-    doc = Document(TEMPLATE_PATH)
+# ─── Construction du corps du mail ────────────────────────────────────────────
 
-    remplacements = {
-        "{{NOM_ENTREPRISE}}"        : zones.get("nom_entreprise", ""),
-        "{{ADRESSE_ENTREPRISE}}"    : zones.get("adresse", ""),
-        "{{DATE}}"                  : zones.get("date", ""),
-        "{{OBJET_MAIL}}"            : zones.get("objet", ""),
-        "{{PARAGRAPHE_PERSONNALISE}}": zones.get("paragraphe_personnalise", ""),
-    }
+def construire_corps(zones):
+    phrases_ia = zones.get("phrases_ia", "").strip()
+    return MAIL_TEMPLATE.format(phrases_ia=phrases_ia)
 
-    for para in doc.paragraphs:
-        for balise, valeur in remplacements.items():
-            if balise in para.text:
-                # Remplacer en préservant le style du premier run
-                for run in para.runs:
-                    if balise in run.text:
-                        run.text = run.text.replace(balise, valeur)
-
-    buf = io.BytesIO()
-    doc.save(buf)
-    buf.seek(0)
-    return buf.read()
-
-# ─── Construction du corps du mail ───────────────────────────────────────────
-
-def corps_mail(zones):
-    """Corps du mail court et professionnel."""
-    nom_e = zones.get("nom_entreprise", "votre entreprise")
-    return f"""\
-Madame, Monsieur,
-
-Je me permets de vous adresser ma candidature pour un contrat d'alternance \
-en DevOps / SysAdmin / Sécurité à compter de septembre 2026, dans le cadre \
-de ma 2ᵉ année de DEUST IOSI au CNAM Paris.
-
-{zones.get("paragraphe_personnalise", "")}
-
-Vous trouverez en pièce jointe mon curriculum vitae ainsi qu'une lettre de \
-motivation détaillée.
-
-Dans l'attente de votre retour, je reste disponible pour un entretien à votre \
-convenance.
-
-Cordialement,
-Kenza FILALI-BOUAMI
-07 50 87 21 76 | kenzafilbou@gmail.com | github.com/kenzafb
-"""
 
 # ─── Envoi du mail ────────────────────────────────────────────────────────────
 
-def envoyer_mail(destinataire, sujet, corps, docx_bytes, nom_entreprise):
+def envoyer_mail(destinataire, corps):
     """
-    Envoie le mail avec le CV et la lettre en pièces jointes.
+    Envoie le mail avec CV et plaquette DEUST en pièces jointes.
     Retourne True si succès, False sinon.
     """
     msg = MIMEMultipart()
     msg["From"]    = GMAIL_SENDER
     msg["To"]      = destinataire
-    msg["Subject"] = sujet
+    msg["Subject"] = SUJET_FIXE
 
-    # Corps texte
     msg.attach(MIMEText(corps, "plain", "utf-8"))
 
     # Pièce jointe 1 : CV PDF
     try:
         with open(CV_PATH, "rb") as f:
-            cv_data = f.read()
-        part_cv = MIMEBase("application", "pdf")
-        part_cv.set_payload(cv_data)
+            part_cv = MIMEBase("application", "pdf")
+            part_cv.set_payload(f.read())
         encoders.encode_base64(part_cv)
-        part_cv.add_header(
-            "Content-Disposition",
-            "attachment",
-            filename="CV_Kenza_Filali-Bouami.pdf"
-        )
+        part_cv.add_header("Content-Disposition", "attachment",
+                           filename="CV_Kenza_Filali-Bouami.pdf")
         msg.attach(part_cv)
     except FileNotFoundError:
-        print(f"    [⚠️] CV introuvable : {CV_PATH}")
+        print(f"    [❌] CV introuvable : {CV_PATH}")
         return False
 
-    # Pièce jointe 2 : Lettre DOCX
-    nom_fichier = f"Lettre_Kenza_Filali-Bouami_{nom_entreprise[:30].replace(' ', '_')}.docx"
-    part_lettre = MIMEBase("application", "vnd.openxmlformats-officedocument.wordprocessingml.document")
-    part_lettre.set_payload(docx_bytes)
-    encoders.encode_base64(part_lettre)
-    part_lettre.add_header(
-        "Content-Disposition",
-        "attachment",
-        filename=nom_fichier
-    )
-    msg.attach(part_lettre)
+    # Pièce jointe 2 : Plaquette DEUST IOSI PDF
+    try:
+        with open(PLAQUETTE_PATH, "rb") as f:
+            part_plaquette = MIMEBase("application", "pdf")
+            part_plaquette.set_payload(f.read())
+        encoders.encode_base64(part_plaquette)
+        part_plaquette.add_header("Content-Disposition", "attachment",
+                                  filename="Programme_DEUST_IOSI_CNAM.pdf")
+        msg.attach(part_plaquette)
+    except FileNotFoundError:
+        print(f"    [⚠️] Plaquette introuvable : {PLAQUETTE_PATH} — envoi sans plaquette")
 
     # Envoi SMTP Gmail
     try:
@@ -158,86 +133,75 @@ def envoyer_mail(destinataire, sujet, corps, docx_bytes, nom_entreprise):
         print(f"    [❌] Erreur SMTP : {e}")
         return False
 
+
 # ─── Pipeline principal ────────────────────────────────────────────────────────
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--limite", type=int, default=LIMITE_PAR_RUN,
-                        help="Nombre maximum de mails à envoyer ce run")
-    parser.add_argument("--test", action="store_true",
-                        help="Mode test : envoie tout à kenzafilbou@gmail.com sans marquer mail_envoye")
-    args = parser.parse_args()
-
+def main(limite=LIMITE_PAR_RUN, test=False):
+    """
+    Paramètres :
+      limite (int) : nombre max de mails à envoyer ce run
+      test   (bool): si True, envoie tout à GMAIL_SENDER sans marquer mail_envoye
+    """
     print("=" * 60)
     print("  Envoyeur — Chasseur d'Alternance")
-    if args.test:
-        print("  ⚠️  MODE TEST — tous les mails vont à", GMAIL_SENDER)
+    if test:
+        print(f"  ⚠️  MODE TEST — tous les mails vont à {GMAIL_SENDER}")
     print("=" * 60)
 
     if not GMAIL_PASSWORD:
         print("❌ GMAIL_APP_PASSWORD manquant dans .env")
+        return
+    if not GMAIL_SENDER:
+        print("❌ GMAIL_SENDER manquant dans .env")
         return
 
     entreprises = charger_json()
 
     a_envoyer = [
         e for e in entreprises
-        if e.get("lettre_generee") and
+        if e.get("mail_generee") and
            e.get("emails_trouves") and
            not e.get("mail_envoye")
     ]
 
     deja_envoyes = sum(1 for e in entreprises if e.get("mail_envoye"))
     print(f"[Queue] {len(a_envoyer)} à envoyer | {deja_envoyes} déjà envoyés")
-    print(f"[Limite] {args.limite} mails ce run\n")
+    print(f"[Limite] {limite} mails ce run")
+    print(f"[Sujet] {SUJET_FIXE}\n")
 
     if not a_envoyer:
         print("✅ Rien à envoyer.")
         return
 
-    envoyes    = 0
-    echecs     = 0
-    traites    = 0
+    envoyes = 0
+    echecs  = 0
+    traites = 0
 
     for e in entreprises:
-        if envoyes >= args.limite:
-            print(f"\n⏹️  Limite de {args.limite} mails atteinte pour ce run.")
+        if envoyes >= limite:
+            print(f"\n⏹️  Limite de {limite} mails atteinte pour ce run.")
             break
 
-        if not e.get("lettre_generee") or not e.get("emails_trouves") or e.get("mail_envoye"):
+        if not e.get("mail_generee") or not e.get("emails_trouves") or e.get("mail_envoye"):
             continue
 
-        nom       = (e.get("nom_commercial") or e.get("nom", "?"))[:50]
-        zones     = e.get("lettre_zones", {})
-        emails    = e.get("emails_trouves", [])
-        destinataire = GMAIL_SENDER if args.test else emails[0]
+        nom          = (e.get("nom_commercial") or e.get("nom", "?"))[:50]
+        zones        = e.get("mail_zones", {})
+        destinataire = GMAIL_SENDER if test else e["emails_trouves"][0]
 
-        idx = deja_envoyes + traites + 1
+        idx   = deja_envoyes + traites + 1
         total = deja_envoyes + len(a_envoyer)
         print(f"[{idx}/{total}] {nom}")
         print(f"  → {destinataire}")
 
-        # Générer le docx
-        try:
-            docx_bytes = generer_docx(zones)
-        except Exception as ex:
-            print(f"  [❌] Erreur génération docx : {ex}")
-            echecs += 1
-            traites += 1
-            continue
-
-        # Corps et sujet du mail
-        sujet = zones.get("objet", f"Candidature alternance DevOps – {nom}")
-        corps = corps_mail(zones)
-
-        # Envoi
-        ok = envoyer_mail(destinataire, sujet, corps, docx_bytes, nom)
+        corps = construire_corps(zones)
+        ok    = envoyer_mail(destinataire, corps)
 
         if ok:
             print(f"  ✅ Envoyé")
-            if not args.test:
-                e["mail_envoye"]    = True
-                e["mail_envoye_le"] = datetime.today().strftime("%Y-%m-%d %H:%M")
+            if not test:
+                e["mail_envoye"]       = True
+                e["mail_envoye_le"]    = datetime.today().strftime("%Y-%m-%d %H:%M")
                 e["mail_destinataire"] = destinataire
             envoyes += 1
         else:
@@ -246,13 +210,11 @@ def main():
 
         traites += 1
 
-        # Sauvegarde intermédiaire
         if traites % SAUVEGARDE_TOUS == 0:
             sauvegarder_json(entreprises)
             print(f"\n  [💾 Sauvegarde — {envoyes} envoyés, {echecs} échecs]\n")
 
-        # Pause anti-spam (sauf dernier)
-        if envoyes < args.limite:
+        if envoyes < limite and traites < len(a_envoyer):
             pause = random.uniform(*PAUSE_ENTRE_MAILS)
             print(f"  ⏸️  Pause {pause:.0f}s...")
             time.sleep(pause)
@@ -263,9 +225,15 @@ def main():
     print(f"  Envoyés  : {envoyes}")
     print(f"  Échecs   : {echecs}")
     print("=" * 60)
-    if not args.test and envoyes > 0:
+    if not test and envoyes > 0:
         print("\n→ Relance demain pour continuer le batch.")
 
 
+# ─── Entrée CLI ───────────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limite", type=int, default=LIMITE_PAR_RUN)
+    parser.add_argument("--test", action="store_true")
+    args = parser.parse_args()
+    main(limite=args.limite, test=args.test)
