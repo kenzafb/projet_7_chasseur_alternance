@@ -2,8 +2,6 @@
 
 Outil Python que j'ai développé pendant mon stage au Garage Numérique pour automatiser ma recherche d'alternance. Il interroge l'API France Travail, analyse chaque offre avec un LLM (Gemini via Google Cloud), génère des lettres de motivation personnalisées et envoie des candidatures spontanées par email.
 
-> Construit par **Kenza Filali-Bouami**
-
 ---
 
 ## Fonctionnalités
