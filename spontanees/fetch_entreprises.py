@@ -116,7 +116,7 @@ def sauvegarder(entreprises_dict):
         json.dump(list(entreprises_dict.values()), f, ensure_ascii=False, indent=2)
 
 
-def main():
+def main(stop_event=None):
     print("=" * 55)
     print("  Chasseur d'Alternance — Fetch Entreprises IT IDF")
     print("=" * 55)
@@ -130,6 +130,10 @@ def main():
 
     for dept in DEPARTEMENTS:
         for naf in CODES_NAF:
+            if stop_event and stop_event.is_set():
+                print("⏹️  Arrêt — sauvegarde en cours...")
+                sauvegarder(entreprises)
+                return
             print(f"\n[API] Dept {dept} | NAF {naf}")
             page = 1
             pages_vides_consecutives = 0

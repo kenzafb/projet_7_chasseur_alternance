@@ -6,6 +6,7 @@ from france_travail.analyseur import analyser_offre
 from france_travail.pdf_generator import generer_pdf_lettre
 from datetime import datetime
 import threading
+import collections
 import json
 import os
 
@@ -13,11 +14,23 @@ load_dotenv()
 app = Flask(__name__)
 
 # ─── États des pipelines ──────────────────────────────────────────────────────
-etat_recherche   = {"en_cours": False, "message": "Prêt"}
-etat_spontanees  = {"en_cours": False, "etape": None, "message": "Prêt"}
+etat_recherche  = {"en_cours": False, "message": "Prêt"}
+etat_spontanees = {"en_cours": False, "etape": None, "message": "Prêt"}
+_stop_event     = threading.Event()
 
 FICHIER_ENRICHIES = "data/entreprises_enrichies.json"
 FICHIER_RAW       = "data/entreprises_raw.json"
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+_logs = collections.deque(maxlen=80)
+
+def log(msg):
+    _logs.append({"t": datetime.now().strftime("%H:%M:%S"), "msg": msg})
+    print(msg)
+
+@app.route("/api/logs")
+def api_logs():
+    return jsonify(list(_logs))
 
 # ─── Routes principales ───────────────────────────────────────────────────────
 
@@ -39,11 +52,14 @@ def api_recherche():
     def lancer():
         etat_recherche["en_cours"] = True
         etat_recherche["message"] = "Recherche des offres..."
+        log("🔍 Recherche France Travail démarrée")
         try:
             lancer_recherche(analyser=True, max_analyse=999)
             etat_recherche["message"] = "Terminé !"
+            log("✅ Recherche France Travail terminée")
         except Exception as e:
             etat_recherche["message"] = f"Erreur : {e}"
+            log(f"❌ Erreur recherche : {e}")
         finally:
             etat_recherche["en_cours"] = False
 
@@ -79,7 +95,6 @@ def api_analyser():
     offre = next((c for c in candidatures if c["id"] == offre_id), None)
     if not offre:
         return jsonify({"erreur": "Offre introuvable"}), 404
-
     analyse = analyser_offre(offre)
     for c in candidatures:
         if c["id"] == offre_id:
@@ -155,34 +170,23 @@ def api_telecharger_pdf():
 
 @app.route("/api/spontanees/stats")
 def api_spontanees_stats():
-    """Retourne les compteurs de chaque étape du pipeline."""
     stats = {
-        "raw": 0,
-        "avec_email": 0,
-        "mail_generee": 0,
-        "mail_envoye": 0,
+        "raw": 0, "avec_email": 0, "mail_generee": 0, "mail_envoye": 0,
         "en_cours": etat_spontanees["en_cours"],
         "etape": etat_spontanees["etape"],
         "message": etat_spontanees["message"],
         "dernieres": []
     }
-
-    # Stats depuis entreprises_enrichies si dispo, sinon raw
     fichier = FICHIER_ENRICHIES if os.path.exists(FICHIER_ENRICHIES) else FICHIER_RAW
     if os.path.exists(fichier):
         try:
             with open(fichier, "r", encoding="utf-8") as f:
                 entreprises = json.load(f)
-            stats["raw"]         = len(entreprises)
-            stats["avec_email"]  = sum(1 for e in entreprises if e.get("emails_trouves"))
-            stats["mail_generee"]= sum(1 for e in entreprises if e.get("mail_generee"))
-            stats["mail_envoye"] = sum(1 for e in entreprises if e.get("mail_envoye"))
-
-            # 5 dernières entreprises avec mail envoyé ou généré
-            recentes = [
-                e for e in entreprises
-                if e.get("mail_envoye") or e.get("mail_generee")
-            ][-5:]
+            stats["raw"]          = len(entreprises)
+            stats["avec_email"]   = sum(1 for e in entreprises if e.get("emails_trouves"))
+            stats["mail_generee"] = sum(1 for e in entreprises if e.get("mail_generee"))
+            stats["mail_envoye"]  = sum(1 for e in entreprises if e.get("mail_envoye"))
+            recentes = [e for e in entreprises if e.get("mail_envoye") or e.get("mail_generee")][-5:]
             stats["dernieres"] = [
                 {
                     "nom": (e.get("nom_commercial") or e.get("nom", "?"))[:40],
@@ -195,8 +199,16 @@ def api_spontanees_stats():
             ]
         except Exception:
             pass
-
     return jsonify(stats)
+
+# ─── Spontanées — Stop ────────────────────────────────────────────────────────
+
+@app.route("/api/spontanees/stop", methods=["POST"])
+def api_spontanees_stop():
+    _stop_event.set()
+    etat_spontanees["message"] = "Arrêt demandé — sauvegarde en cours..."
+    log("⏹️  Arrêt demandé par l'utilisateur")
+    return jsonify({"ok": True})
 
 # ─── Spontanées — Lancement des étapes ───────────────────────────────────────
 
@@ -206,14 +218,18 @@ def api_spontanees_fetch():
         return jsonify({"erreur": "Pipeline déjà en cours"}), 400
 
     def lancer():
+        _stop_event.clear()
         etat_spontanees.update({"en_cours": True, "etape": "fetch",
                                  "message": "Récupération des entreprises IT IDF..."})
+        log("▶ Fetch entreprises démarré")
         try:
             from spontanees.fetch_entreprises import main as fetch_main
-            fetch_main()
+            fetch_main(stop_event=_stop_event)
             etat_spontanees["message"] = "Fetch terminé !"
+            log("✅ Fetch terminé")
         except Exception as e:
             etat_spontanees["message"] = f"Erreur fetch : {e}"
+            log(f"❌ Erreur fetch : {e}")
         finally:
             etat_spontanees.update({"en_cours": False, "etape": None})
 
@@ -226,14 +242,21 @@ def api_spontanees_scraper():
         return jsonify({"erreur": "Pipeline déjà en cours"}), 400
 
     def lancer():
+        _stop_event.clear()
         etat_spontanees.update({"en_cours": True, "etape": "scraper",
                                  "message": "Scraping des emails..."})
+        log("▶ Scraper emails démarré")
         try:
             from spontanees.scraper_emails import main as scraper_main
-            scraper_main()
-            etat_spontanees["message"] = "Scraping terminé !"
+            scraper_main(stop_event=_stop_event, log_fn=log)
+            if _stop_event.is_set():
+                etat_spontanees["message"] = "Arrêté — données sauvegardées"
+            else:
+                etat_spontanees["message"] = "Scraping terminé !"
+                log("✅ Scraping terminé")
         except Exception as e:
             etat_spontanees["message"] = f"Erreur scraper : {e}"
+            log(f"❌ Erreur scraper : {e}")
         finally:
             etat_spontanees.update({"en_cours": False, "etape": None})
 
@@ -246,14 +269,21 @@ def api_spontanees_generer():
         return jsonify({"erreur": "Pipeline déjà en cours"}), 400
 
     def lancer():
+        _stop_event.clear()
         etat_spontanees.update({"en_cours": True, "etape": "generer",
                                  "message": "Génération des mails personnalisés..."})
+        log("▶ Génération mails démarrée")
         try:
             from spontanees.generateur_mail import main as gen_main
-            gen_main()
-            etat_spontanees["message"] = "Génération terminée !"
+            gen_main(stop_event=_stop_event, log_fn=log)
+            if _stop_event.is_set():
+                etat_spontanees["message"] = "Arrêté — données sauvegardées"
+            else:
+                etat_spontanees["message"] = "Génération terminée !"
+                log("✅ Génération terminée")
         except Exception as e:
             etat_spontanees["message"] = f"Erreur génération : {e}"
+            log(f"❌ Erreur génération : {e}")
         finally:
             etat_spontanees.update({"en_cours": False, "etape": None})
 
@@ -270,14 +300,21 @@ def api_spontanees_envoyer():
     test   = bool(data.get("test", False))
 
     def lancer():
+        _stop_event.clear()
         etat_spontanees.update({"en_cours": True, "etape": "envoyer",
                                  "message": f"Envoi en cours (limite: {limite})..."})
+        log(f"▶ Envoi démarré — limite {limite} {'[TEST]' if test else ''}")
         try:
             from spontanees.envoyeur import main as env_main
-            env_main(limite=limite, test=test)
-            etat_spontanees["message"] = "Envoi terminé !"
+            env_main(limite=limite, test=test, stop_event=_stop_event, log_fn=log)
+            if _stop_event.is_set():
+                etat_spontanees["message"] = "Arrêté — données sauvegardées"
+            else:
+                etat_spontanees["message"] = "Envoi terminé !"
+                log("✅ Envoi terminé")
         except Exception as e:
             etat_spontanees["message"] = f"Erreur envoi : {e}"
+            log(f"❌ Erreur envoi : {e}")
         finally:
             etat_spontanees.update({"en_cours": False, "etape": None})
 

@@ -1,10 +1,32 @@
 var candidatures = [];
 var timers = {};
-var sectionActive = 'offres';
+var sectionActive = sessionStorage.getItem('section') || 'offres';
 var filtres = {score:'tous', zone:'tous', domaine:'tous', source:'tous'};
 var filtreCand = 'tous';
+var filtreArchive = 'bas_score'; // défaut : offres à bas score, sans CFA
 var triActif = 'score';
 var sidebarOpen = false;
+
+// ─── DÉTECTION CFA côté client ────────────────
+// Même logique que analyseur.py — sert à catégoriser les archives existantes.
+var CFA_NOMS = [
+    'iscod','scholia','imc alternance','mydigitalschool','simplon','afpa',
+    'epitech','openclassrooms','studi','ikigai','la plateforme','digital campus',
+    'm2i','doranco','efficom','hitema','h3 hitema','isefac','sup de vinci'
+];
+var CFA_MOTS = ['organisme de formation','centre de formation',' cfa ','le cfa '];
+
+function raisonArchive(o) {
+    var entreprise = (o.entreprise || '').toLowerCase();
+    var txt = entreprise + ' ' + (o.titre || '').toLowerCase()
+              + ' ' + (o.description || '').toLowerCase();
+    if (CFA_NOMS.some(function(m){ return entreprise.indexOf(m) !== -1; }) ||
+        CFA_MOTS.some(function(m){ return txt.indexOf(m) !== -1; })) {
+        return 'cfa';
+    }
+    if (o.eligible === false || o.score <= 2) return 'bas_score';
+    return 'autre';
+}
 
 // ─── ÉCHAPPEMENT HTML (anti-XSS) ─────────────
 function esc(str) {
@@ -65,7 +87,7 @@ function setTri(type) {
     afficherOffres();
 }
 
-// ─── FILTRES ─────────────────────────────────
+// ─── FILTRES OFFRES ───────────────────────────
 function setFiltre(type, val, btn) {
     filtres[type] = val;
     var parent = btn.parentElement;
@@ -99,9 +121,20 @@ function setFiltreCand(val, btn) {
     afficherCandidatures();
 }
 
+// ─── FILTRE ARCHIVES ──────────────────────────
+function setFiltreArchive(val, btn) {
+    filtreArchive = val;
+    document.querySelectorAll('#toolbar-archive .btn').forEach(function(b) {
+        b.style.borderColor = ''; b.style.color = '';
+    });
+    btn.style.borderColor = 'var(--accent)'; btn.style.color = 'var(--accent)';
+    afficherArchives();
+}
+
 // ─── NAVIGATION ──────────────────────────────
 function afficherSection(section) {
     sectionActive = section;
+    sessionStorage.setItem('section', section);
     ['offres','candidatures','spontanees','archive'].forEach(function(s) {
         var el = document.getElementById('section-'+s);
         if (el) el.style.display = s===section ? 'block' : 'none';
@@ -180,13 +213,38 @@ function afficherOffres() {
 
 // ─── AFFICHAGE ARCHIVES ──────────────────────
 function afficherArchives() {
-    var liste = candidatures.filter(function(c){return c.statut==='archive';});
-    var el = document.getElementById('section-archive');
-    if (!el) return;
-    if (liste.length===0) {
-        el.innerHTML = '<div class="empty"><div class="icon">🗑</div><p>Aucune offre archivée.</p></div>';
+    var toutes = candidatures.filter(function(c){ return c.statut === 'archive'; });
+
+    var liste;
+    if (filtreArchive === 'toutes') {
+        liste = toutes;
     } else {
-        el.innerHTML = '<div class="offres">'+liste.map(construireOffre).join('')+'</div>';
+        liste = toutes.filter(function(o){ return raisonArchive(o) === filtreArchive; });
+    }
+    liste.sort(function(a,b){ return b.score - a.score; });
+
+    // Comptes par catégorie pour les labels des boutons
+    var nbBas  = toutes.filter(function(o){ return raisonArchive(o)==='bas_score'; }).length;
+    var nbCfa  = toutes.filter(function(o){ return raisonArchive(o)==='cfa'; }).length;
+    var nbAutre= toutes.filter(function(o){ return raisonArchive(o)==='autre'; }).length;
+    var lblBas   = document.getElementById('lbl-arch-bas');
+    var lblCfa   = document.getElementById('lbl-arch-cfa');
+    var lblAutre = document.getElementById('lbl-arch-autre');
+    var lblTout  = document.getElementById('lbl-arch-tout');
+    if (lblBas)   lblBas.textContent   = 'À postuler (' + nbBas + ')';
+    if (lblCfa)   lblCfa.textContent   = 'CFA (' + nbCfa + ')';
+    if (lblAutre) lblAutre.textContent = 'Manuelles (' + nbAutre + ')';
+    if (lblTout)  lblTout.textContent  = 'Toutes (' + toutes.length + ')';
+
+    var cnt = document.getElementById('archive-count');
+    if (cnt) cnt.textContent = liste.length + ' offre' + (liste.length > 1 ? 's' : '');
+
+    var el = document.getElementById('archives-list');
+    if (!el) return;
+    if (liste.length === 0) {
+        el.innerHTML = '<div class="empty"><div class="icon">🗑</div><p>Aucune offre dans cette catégorie.</p></div>';
+    } else {
+        el.innerHTML = liste.map(construireOffre).join('');
     }
 }
 
@@ -497,43 +555,34 @@ async function chargerStatsSpontanees() {
     var r = await fetch('/api/spontanees/stats');
     var s = await r.json();
 
-    // Stats cards
     document.getElementById('sp-raw').textContent   = s.raw   || 0;
     document.getElementById('sp-email').textContent = s.avec_email || 0;
     document.getElementById('sp-gen').textContent   = s.mail_generee || 0;
     document.getElementById('sp-env').textContent   = s.mail_envoye || 0;
 
-    // Stats inline dans les étapes
     document.getElementById('stat-raw').textContent   = s.raw   ? s.raw + ' entrep.' : '—';
     document.getElementById('stat-email').textContent = s.avec_email ? s.avec_email + ' emails' : '—';
     document.getElementById('stat-gen').textContent   = s.mail_generee ? s.mail_generee + ' générés' : '—';
     document.getElementById('stat-env').textContent   = s.mail_envoye ? s.mail_envoye + ' envoyés' : '—';
 
-    // Message statut
     document.getElementById('spont-status').textContent = s.message || 'Prêt';
 
-    // Coloration des étapes selon l'étape active
     ['fetch','scraper','generer','envoyer'].forEach(function(etape, i) {
         var step = document.getElementById('pipe-'+(i+1));
         step.classList.remove('active','done');
-        if (s.etape === etape) {
-            step.classList.add('active');
-        }
-        // Marquer done selon les stats
+        if (s.etape === etape) step.classList.add('active');
         if (i===0 && s.raw > 0 && !s.en_cours) step.classList.add('done');
         if (i===1 && s.avec_email > 0 && !s.en_cours) step.classList.add('done');
         if (i===2 && s.mail_generee > 0 && !s.en_cours) step.classList.add('done');
         if (i===3 && s.mail_envoye > 0 && !s.en_cours) step.classList.add('done');
     });
 
-    // Griser les boutons si pipeline en cours
     var btns = ['btn-fetch','btn-scraper','btn-generer','btn-envoyer','btn-test'];
     btns.forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.disabled = s.en_cours;
     });
 
-    // Table des dernières entreprises
     var tbody = document.getElementById('spont-table-body');
     if (s.dernieres && s.dernieres.length > 0) {
         tbody.innerHTML = s.dernieres.map(function(e) {
@@ -562,13 +611,11 @@ async function spontLancer(etape, test) {
         generer: '/api/spontanees/generer',
         envoyer: '/api/spontanees/envoyer',
     };
-
     var body = {};
     if (etape === 'envoyer') {
         body.limite = parseInt(document.getElementById('limite-envoi').value) || 10;
         body.test   = test === true;
     }
-
     var labels = {
         fetch:   'Fetch lancé...',
         scraper: 'Scraping lancé...',
@@ -576,23 +623,50 @@ async function spontLancer(etape, test) {
         envoyer: test ? 'Envoi TEST lancé...' : 'Envoi lancé...',
     };
     toast(labels[etape], 'ok');
-
     await fetch(routes[etape], {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify(body)
     });
-
-    // Polling toutes les 5 secondes
+    var btnStop = document.getElementById('btn-stop');
+    if (btnStop) btnStop.style.display = 'block';
     if (spontPolling) clearInterval(spontPolling);
     spontPolling = setInterval(async function() {
         var s = await chargerStatsSpontanees();
+        chargerLogs();
         if (!s.en_cours) {
             clearInterval(spontPolling);
             spontPolling = null;
+            var btnStop = document.getElementById('btn-stop');
+            if (btnStop) btnStop.style.display = 'none';
             toast(s.message || 'Terminé !', 'ok');
         }
     }, 5000);
+}
+
+async function spontStop() {
+    await fetch('/api/spontanees/stop', {method: 'POST'});
+    toast('Arrêt en cours — sauvegarde...', 'ok');
+    var btnStop = document.getElementById('btn-stop');
+    if (btnStop) btnStop.disabled = true;
+}
+
+async function chargerLogs() {
+    var r = await fetch('/api/logs');
+    var logs = await r.json();
+    var el = document.getElementById('logs-content');
+    if (!el) return;
+    el.innerHTML = logs.slice().reverse().map(function(l) {
+        var couleur = l.msg.startsWith('✅') ? 'var(--green)'
+                    : l.msg.startsWith('❌') ? 'var(--accent2)'
+                    : l.msg.startsWith('⏹') ? 'var(--yellow)'
+                    : l.msg.startsWith('▶') ? 'var(--accent)'
+                    : 'var(--muted)';
+        return '<div style="padding:2px 0;border-bottom:1px solid rgba(42,42,58,.3)">'
+            + '<span style="color:var(--muted);font-size:.6rem;margin-right:8px">' + esc(l.t) + '</span>'
+            + '<span style="color:' + couleur + ';font-size:.68rem">' + esc(l.msg) + '</span>'
+            + '</div>';
+    }).join('');
 }
 
 charger();

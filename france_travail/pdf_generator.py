@@ -3,28 +3,44 @@ from shared.profil import PROFIL
 from datetime import datetime
 import os
 
+
 def generer_pdf_lettre(offre, lettre, dossier_output="lettres_pdf"):
     os.makedirs(dossier_output, exist_ok=True)
     p = PROFIL
-
-    mois = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"]
+    mois = ["janvier","février","mars","avril","mai","juin","juillet","août",
+            "septembre","octobre","novembre","décembre"]
     now = datetime.now()
     date_str = f"{now.day} {mois[now.month-1]} {now.year}"
-
     nom_fichier = "Lettre_Kenza_Filali-Bouami.pdf"
     chemin_pdf = os.path.join(dossier_output, nom_fichier)
 
-    # Nom entreprise — si inconnu, on met "À l'attention du service recrutement"
+    # Nom entreprise
     entreprise_brute = offre.get("entreprise", "")
     if not entreprise_brute or entreprise_brute.lower() in ["inconnue", "inconnu", "", "none"]:
         entreprise_affichee = "À l'attention du service recrutement"
-        lieu_affiche = offre.get("lieu", "")
     else:
         entreprise_affichee = entreprise_brute
-        lieu_affiche = offre.get("lieu", "")
+    lieu_affiche = offre.get("lieu", "")
 
+    # ── Ne garder que le corps de la lettre (à partir de "Madame, Monsieur") ──
+    # L'en-tête (contact entreprise, date, objet) est déjà géré par le HTML
+    # ci-dessous — l'inclure depuis le template créerait un doublon.
+    marqueur = None
+    for candidat in ["Madame, Monsieur", "Madame,\nMonsieur", "Madame"]:
+        if candidat in lettre:
+            marqueur = candidat
+            break
+
+    if marqueur:
+        corps_lettre = lettre[lettre.index(marqueur):]
+    else:
+        # Fallback : on saute les 3 premiers blocs (contact, date, objet)
+        blocs = lettre.strip().split("\n\n")
+        corps_lettre = "\n\n".join(blocs[3:])
+
+    # Conversion en balises <p>
     paragraphes = ""
-    for para in lettre.strip().split("\n\n"):
+    for para in corps_lettre.strip().split("\n\n"):
         para = para.strip()
         if para:
             paragraphes += f"<p>{para.replace(chr(10), '<br>')}</p>\n"

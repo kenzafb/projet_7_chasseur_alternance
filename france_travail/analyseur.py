@@ -81,6 +81,8 @@ def analyser_offre(offre):
         "elle l'apprendra durant l'alternance.\n"
         "- Competence absente et hors programme (Azure, Kubernetes, .NET, COBOL, Mainframe) → point faible important.\n"
         "\n"
+        "- Si l'offre exige Windows Server, Active Directory ou Windows 11 comme compétence principale "
+        "ET que ce n'est pas mentionné dans le profil → retire 2 points.\n"
         "=== SCORING ===\n"
         "Ne jamais penaliser pour la date de debut ou disponibilite : ignorer ce critere.\n"
         "Localisation : toute l'IDF est acceptable. -1 point max pour grande couronne (77/78/91/95) "
@@ -111,7 +113,8 @@ def analyser_offre(offre):
         "iscod", "scholia", "imc alternance", "mydigitalschool", "simplon",
         "afpa", "cfa", "epitech", "openclassrooms", "studi", "ikigai",
         "la plateforme", "digital campus", "m2i", "doranco", "efficom",
-        "ecole", "organisme de formation", "centre de formation"
+        "ecole", "organisme de formation", "centre de formation",
+        "hitema", "h3", "igs", "isefac", "sup de vinci"
     ]
     description_lower = offre.get("description", "").lower()
     entreprise_lower = offre.get("entreprise", "").lower()

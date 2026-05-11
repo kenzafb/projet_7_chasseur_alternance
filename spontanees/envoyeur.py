@@ -1,17 +1,12 @@
 """
 envoyeur.py
 ===========
-Pour chaque entreprise avec mail_generee=true et mail_envoye=false,
-envoie le mail de motivation avec CV et plaquette DEUST en pièces jointes.
-
-Lancement CLI :
-  python -m spontanees.envoyeur
-  python -m spontanees.envoyeur --limite 10
-  python -m spontanees.envoyeur --test
-
 Depuis Flask :
   from spontanees.envoyeur import main as env_main
-  env_main(limite=10, test=True)
+  env_main(limite=10, test=True, stop_event=event, log_fn=log)
+
+CLI :
+  python -m spontanees.envoyeur --limite 10 --test
 """
 
 import json
@@ -29,8 +24,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# ─── Config ───────────────────────────────────────────────────────────────────
-
 FICHIER_JSON      = "data/entreprises_enrichies.json"
 CV_PATH           = "assets/CV_Kenza_Filali-Bouami.pdf"
 PLAQUETTE_PATH    = "assets/Programme_DEUST_IOSI.pdf"
@@ -40,12 +33,8 @@ GMAIL_PASSWORD    = os.getenv("GMAIL_APP_PASSWORD", "")
 
 SUJET_FIXE        = "Alternance DevOps / SysAdmin — septembre 2026"
 LIMITE_PAR_RUN    = 50
-PAUSE_ENTRE_MAILS = (30, 90)   # secondes (anti-spam)
+PAUSE_ENTRE_MAILS = (30, 90)
 SAUVEGARDE_TOUS   = 10
-
-# ─── Mail de motivation fixe ──────────────────────────────────────────────────
-# {phrases_ia} est le seul endroit généré par Gemini (1-2 phrases, 200 car. max).
-# Tout le reste est rédigé par Kenza et ne change jamais.
 
 MAIL_TEMPLATE = """\
 Bonjour,
@@ -65,40 +54,25 @@ kenzafilbou@gmail.com | 07 50 87 21 76
 linkedin.com/in/kenza-filali-bouami | github.com/kenzafb\
 """
 
-# ─── Helpers JSON ─────────────────────────────────────────────────────────────
-
 def charger_json():
     with open(FICHIER_JSON, "r", encoding="utf-8") as f:
         return json.load(f)
-
 
 def sauvegarder_json(data):
     with open(FICHIER_JSON, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-
-# ─── Construction du corps du mail ────────────────────────────────────────────
-
 def construire_corps(zones):
     phrases_ia = zones.get("phrases_ia", "").strip()
     return MAIL_TEMPLATE.format(phrases_ia=phrases_ia)
 
-
-# ─── Envoi du mail ────────────────────────────────────────────────────────────
-
 def envoyer_mail(destinataire, corps):
-    """
-    Envoie le mail avec CV et plaquette DEUST en pièces jointes.
-    Retourne True si succès, False sinon.
-    """
     msg = MIMEMultipart()
     msg["From"]    = GMAIL_SENDER
     msg["To"]      = destinataire
     msg["Subject"] = SUJET_FIXE
-
     msg.attach(MIMEText(corps, "plain", "utf-8"))
 
-    # Pièce jointe 1 : CV PDF
     try:
         with open(CV_PATH, "rb") as f:
             part_cv = MIMEBase("application", "pdf")
@@ -111,7 +85,6 @@ def envoyer_mail(destinataire, corps):
         print(f"    [❌] CV introuvable : {CV_PATH}")
         return False
 
-    # Pièce jointe 2 : Plaquette DEUST IOSI PDF
     try:
         with open(PLAQUETTE_PATH, "rb") as f:
             part_plaquette = MIMEBase("application", "pdf")
@@ -123,7 +96,6 @@ def envoyer_mail(destinataire, corps):
     except FileNotFoundError:
         print(f"    [⚠️] Plaquette introuvable : {PLAQUETTE_PATH} — envoi sans plaquette")
 
-    # Envoi SMTP Gmail
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(GMAIL_SENDER, GMAIL_PASSWORD)
@@ -134,43 +106,30 @@ def envoyer_mail(destinataire, corps):
         return False
 
 
-# ─── Pipeline principal ────────────────────────────────────────────────────────
+def main(limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=None):
+    _log = log_fn or print
 
-def main(limite=LIMITE_PAR_RUN, test=False):
-    """
-    Paramètres :
-      limite (int) : nombre max de mails à envoyer ce run
-      test   (bool): si True, envoie tout à GMAIL_SENDER sans marquer mail_envoye
-    """
-    print("=" * 60)
-    print("  Envoyeur — Chasseur d'Alternance")
-    if test:
-        print(f"  ⚠️  MODE TEST — tous les mails vont à {GMAIL_SENDER}")
-    print("=" * 60)
+    _log(f"Envoyeur | limite={limite} | test={test}")
 
     if not GMAIL_PASSWORD:
-        print("❌ GMAIL_APP_PASSWORD manquant dans .env")
+        _log("❌ GMAIL_APP_PASSWORD manquant dans .env")
         return
     if not GMAIL_SENDER:
-        print("❌ GMAIL_SENDER manquant dans .env")
+        _log("❌ GMAIL_SENDER manquant dans .env")
         return
 
     entreprises = charger_json()
 
     a_envoyer = [
         e for e in entreprises
-        if e.get("mail_generee") and
-           e.get("emails_trouves") and
-           not e.get("mail_envoye")
+        if e.get("mail_generee") and e.get("emails_trouves") and not e.get("mail_envoye")
     ]
 
     deja_envoyes = sum(1 for e in entreprises if e.get("mail_envoye"))
-    print(f"[Queue] {len(a_envoyer)} à envoyer | {deja_envoyes} déjà envoyés")
-    print(f"[Limite] {limite} mails ce run")
-    print(f"[Sujet] {SUJET_FIXE}\n")
+    _log(f"Queue : {len(a_envoyer)} à envoyer | {deja_envoyes} déjà envoyés")
 
     if not a_envoyer:
-        print("✅ Rien à envoyer.")
+        _log("✅ Rien à envoyer.")
         return
 
     envoyes = 0
@@ -178,8 +137,14 @@ def main(limite=LIMITE_PAR_RUN, test=False):
     traites = 0
 
     for e in entreprises:
+        # ── Check stop DANS la boucle principale ──────────────────────────────
+        if stop_event and stop_event.is_set():
+            _log("⏹️  Arrêt — sauvegarde en cours...")
+            sauvegarder_json(entreprises)
+            return
+
         if envoyes >= limite:
-            print(f"\n⏹️  Limite de {limite} mails atteinte pour ce run.")
+            _log(f"⏹️  Limite de {limite} mails atteinte.")
             break
 
         if not e.get("mail_generee") or not e.get("emails_trouves") or e.get("mail_envoye"):
@@ -191,45 +156,37 @@ def main(limite=LIMITE_PAR_RUN, test=False):
 
         idx   = deja_envoyes + traites + 1
         total = deja_envoyes + len(a_envoyer)
-        print(f"[{idx}/{total}] {nom}")
-        print(f"  → {destinataire}")
+        _log(f"[{idx}/{total}] {nom} → {destinataire}")
 
         corps = construire_corps(zones)
         ok    = envoyer_mail(destinataire, corps)
 
         if ok:
-            print(f"  ✅ Envoyé")
+            _log(f"  ✅ Envoyé")
             if not test:
                 e["mail_envoye"]       = True
                 e["mail_envoye_le"]    = datetime.today().strftime("%Y-%m-%d %H:%M")
                 e["mail_destinataire"] = destinataire
             envoyes += 1
         else:
-            print(f"  ❌ Échec envoi")
+            _log(f"  ❌ Échec envoi")
             echecs += 1
 
         traites += 1
 
         if traites % SAUVEGARDE_TOUS == 0:
             sauvegarder_json(entreprises)
-            print(f"\n  [💾 Sauvegarde — {envoyes} envoyés, {echecs} échecs]\n")
+            _log(f"  💾 Sauvegarde — {envoyes} envoyés, {echecs} échecs")
 
         if envoyes < limite and traites < len(a_envoyer):
-            pause = random.uniform(*PAUSE_ENTRE_MAILS)
-            print(f"  ⏸️  Pause {pause:.0f}s...")
-            time.sleep(pause)
+            if not (stop_event and stop_event.is_set()):
+                pause = random.uniform(*PAUSE_ENTRE_MAILS)
+                _log(f"  ⏸️  Pause {pause:.0f}s...")
+                time.sleep(pause)
 
     sauvegarder_json(entreprises)
+    _log(f"✅ Envoi terminé — {envoyes} envoyés, {echecs} échecs")
 
-    print("\n" + "=" * 60)
-    print(f"  Envoyés  : {envoyes}")
-    print(f"  Échecs   : {echecs}")
-    print("=" * 60)
-    if not test and envoyes > 0:
-        print("\n→ Relance demain pour continuer le batch.")
-
-
-# ─── Entrée CLI ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

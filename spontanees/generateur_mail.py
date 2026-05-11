@@ -13,11 +13,11 @@ load_dotenv()
 
 FICHIER_JSON    = "data/entreprises_enrichies.json"
 PROJET_GCP      = os.getenv("GOOGLE_CLOUD_PROJECT", "")
-MODELE_GEMINI   = "gemini-2.5-flash"
-PAUSE_GEMINI    = (4, 8)      # secondes entre chaque appel (rate limit)
+MODELE_GEMINI   = "gemini-2.5-pro"
+PAUSE_GEMINI    = (4, 8)
 SAUVEGARDE_TOUS = 20
 
-# ─── Initialisation Gemini ────────────────────────────────────────────────────
+# ─── Gemini ───────────────────────────────────────────────────────────────────
 
 gemini_client = genai.Client(
     vertexai=True,
@@ -31,28 +31,18 @@ def charger_json():
     with open(FICHIER_JSON, "r", encoding="utf-8") as f:
         return json.load(f)
 
-
 def sauvegarder_json(data):
     with open(FICHIER_JSON, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
-
 
 def nettoyer_json_gemini(texte):
     texte = re.sub(r'```json\s*', '', texte)
     texte = re.sub(r'```\s*', '', texte)
     return texte.strip()
 
-
 # ─── Appel Gemini ─────────────────────────────────────────────────────────────
 
 def generer_phrases_mail(entreprise):
-    """
-    Génère 1-2 phrases de personnalisation à insérer dans le mail fixe.
-    Ces phrases montrent que la candidate connaît l'entreprise et expliquent
-    pourquoi elle la contacte spécifiquement.
-
-    Retourne un dict {"phrases_ia": "..."} ou None si erreur.
-    """
     nom   = entreprise.get("nom_commercial") or entreprise.get("nom", "")
     ville = entreprise.get("ville") or ""
     cp    = entreprise.get("code_postal") or ""
@@ -97,9 +87,7 @@ Réponds UNIQUEMENT en JSON valide sans backticks :
         result = json.loads(texte)
 
         if "phrases_ia" not in result or not result["phrases_ia"].strip():
-            print(f"    [⚠️] Gemini — réponse vide ou incomplète")
             return None
-
         return result
 
     except Exception as e:
@@ -109,25 +97,23 @@ Réponds UNIQUEMENT en JSON valide sans backticks :
 
 # ─── Pipeline principal ────────────────────────────────────────────────────────
 
-def main():
-    print("=" * 60)
-    print("  Générateur mail — Chasseur d'Alternance")
-    print(f"  Modèle : {MODELE_GEMINI}  |  Projet : {PROJET_GCP}")
-    print("=" * 60)
+def main(stop_event=None, log_fn=None):
+    _log = log_fn or print
+
+    _log(f"Générateur mail | Modèle : {MODELE_GEMINI}")
 
     entreprises = charger_json()
 
-    # Uniquement celles avec email ET pas encore de mail généré
     a_traiter = [
         e for e in entreprises
         if e.get("emails_trouves") and not e.get("mail_generee")
     ]
     deja_faites = sum(1 for e in entreprises if e.get("mail_generee"))
 
-    print(f"[Queue] {len(a_traiter)} à traiter | {deja_faites} déjà générées\n")
+    _log(f"Queue : {len(a_traiter)} à traiter | {deja_faites} déjà générées")
 
     if not a_traiter:
-        print("✅ Tous les mails sont générés ! Lance : python -m spontanees.envoyeur")
+        _log("✅ Tous les mails sont générés !")
         return
 
     traites_ce_run = 0
@@ -135,14 +121,20 @@ def main():
     erreurs = 0
 
     for e in entreprises:
+        # ── Check stop DANS la boucle principale ──────────────────────────────
+        if stop_event and stop_event.is_set():
+            _log("⏹️  Arrêt — sauvegarde en cours...")
+            sauvegarder_json(entreprises)
+            return
+
         if not e.get("emails_trouves") or e.get("mail_generee"):
             continue
 
         nom = (e.get("nom_commercial") or e.get("nom", "?"))[:50]
         idx = deja_faites + traites_ce_run + 1
-        total_avec_email = deja_faites + len(a_traiter)
+        total = deja_faites + len(a_traiter)
 
-        print(f"[{idx}/{total_avec_email}] {nom}")
+        _log(f"[{idx}/{total}] {nom}")
 
         result = generer_phrases_mail(e)
 
@@ -152,29 +144,23 @@ def main():
                 "phrases_ia":     result["phrases_ia"],
             }
             e["mail_generee"] = True
-            print(f"  ✅ Phrases : {result['phrases_ia'][:80]}...")
+            _log(f"  ✅ {result['phrases_ia'][:80]}...")
             succes += 1
         else:
             e["mail_generee"] = False
-            print(f"  ❌ Échec génération")
+            _log(f"  ❌ Échec génération")
             erreurs += 1
 
         traites_ce_run += 1
 
         if traites_ce_run % SAUVEGARDE_TOUS == 0:
             sauvegarder_json(entreprises)
-            print(f"\n  [💾 Sauvegarde — {idx}/{total_avec_email} | {succes} générés]\n")
+            _log(f"  💾 Sauvegarde — {idx}/{total} | {succes} générés")
 
         time.sleep(random.uniform(*PAUSE_GEMINI))
 
     sauvegarder_json(entreprises)
-
-    print("\n" + "=" * 60)
-    print(f"  Mails générés : {succes}")
-    print(f"  Échecs        : {erreurs}")
-    print(f"  Fichier       : {FICHIER_JSON}")
-    print("=" * 60)
-    print("\n→ Lance : python -m spontanees.envoyeur")
+    _log(f"✅ Génération terminée — {succes} ok, {erreurs} échecs")
 
 
 if __name__ == "__main__":

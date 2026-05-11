@@ -140,6 +140,9 @@
     .spont-card-label{font-size:.62rem;color:var(--muted)}
     .limite-input{width:64px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-family:'DM Mono',monospace;font-size:.72rem;text-align:center;outline:none}
     .limite-input:focus{border-color:var(--accent)}
+    #logs-content::-webkit-scrollbar{width:4px}
+    #logs-content::-webkit-scrollbar-track{background:transparent}
+    #logs-content::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
   </style>
 </head>
 <body>
@@ -262,7 +265,12 @@
  
       <!-- Message statut pipeline -->
       <div class="spont-msg" id="spont-status">Prêt</div>
- 
+      <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+        <button class="btn btn-secondary" id="btn-stop"
+                style="font-size:.7rem;color:var(--accent2);border-color:rgba(255,101,132,.4);display:none"
+                onclick="spontStop()">⏹ Stop & Sauvegarder</button>
+      </div>
+
       <!-- Pipeline 4 étapes -->
       <div class="pipeline">
  
@@ -321,6 +329,17 @@
         </div>
  
       </div>
+
+      <div class="sl" style="margin-bottom:8px;margin-top:20px">
+        Terminal
+        <button onclick="chargerLogs()" style="background:none;border:none;color:var(--accent);
+          cursor:pointer;font-size:.6rem;font-family:DM Mono,monospace;margin-left:8px">↻ Rafraîchir</button>
+      </div>
+      <div id="logs-content" style="background:var(--bg);border:1px solid var(--border);
+        border-radius:var(--radius);padding:10px;max-height:240px;overflow-y:auto;
+        font-family:'DM Mono',monospace">
+        <span style="color:var(--muted);font-size:.68rem">Aucun log pour l'instant.</span>
+      </div>
  
       <!-- Dernières entreprises traitées -->
       <div class="sl" style="margin-bottom:10px">Dernières entreprises traitées</div>
@@ -338,12 +357,30 @@
           <tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px">Aucune donnée</td></tr>
         </tbody>
       </table>
- 
+
     </div>
 
 
 
-    <div id="section-archive" style="display:none" class="offres">
+    <div id="section-archive" style="display:none">
+      <div class="toolbar-filtres" id="toolbar-archive">
+        <button class="btn btn-secondary"
+                style="border-color:var(--accent);color:var(--accent)"
+                onclick="setFiltreArchive('bas_score',this)">
+          <span id="lbl-arch-bas">À postuler</span>
+        </button>
+        <button class="btn btn-secondary" onclick="setFiltreArchive('cfa',this)">
+          <span id="lbl-arch-cfa">CFA</span>
+        </button>
+        <button class="btn btn-secondary" onclick="setFiltreArchive('autre',this)">
+          <span id="lbl-arch-autre">Manuelles</span>
+        </button>
+        <button class="btn btn-secondary" onclick="setFiltreArchive('toutes',this)">
+          <span id="lbl-arch-tout">Toutes</span>
+        </button>
+        <span id="archive-count" style="font-size:.68rem;color:var(--muted)"></span>
+      </div>
+      <div id="archives-list" class="offres"></div>
     </div>
 
   </div>
