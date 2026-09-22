@@ -1,0 +1,101 @@
+<!-- ════════════ PAGE SPONTANÉES ════════════ -->
+<section class="page" data-page-content="spontanees">
+  <div class="guide" data-guide="spontanees">
+    <span class="guide__txt">Le Chasseur trouve des entreprises IT en Île-de-France, récupère leurs emails, et envoie des candidatures spontanées personnalisées avec tes pièces jointes. Lance les étapes dans l'ordre : <strong>Récupérer</strong>, <strong>Scraper</strong>, <strong>Envoyer</strong>.</span>
+    <span class="guide__x" data-guide-close="spontanees">×</span>
+  </div>
+
+  <div class="kpis kpis--3">
+    <div class="kpi">
+      <div class="kpi__label">Entreprises</div>
+      <div class="kpi__val" data-sp="raw">0</div>
+      <div class="kpi__note">dans la base</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi__label">Emails trouvés</div>
+      <div class="kpi__val kpi__val--vert" data-sp="avec_email">0</div>
+      <div class="kpi__note" data-sp="taux_email">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi__label">Envoyés</div>
+      <div class="kpi__val kpi__val--signal" data-sp="mail_envoye">0</div>
+      <div class="kpi__note">candidatures spontanées</div>
+    </div>
+  </div>
+
+  <!-- Pipeline : fetch → scrape → envoi (cartes interactives avec état) -->
+  <div class="pipe" data-pipe>
+    <div class="pipe__step" data-step="fetch">
+      <div class="pipe__top">
+        <span class="pipe__num">01</span>
+        <span class="pipe__badge" data-step-badge>En cours…</span>
+      </div>
+      <div class="pipe__name">Récupérer</div>
+      <div class="pipe__sub">Entreprises IT en Île-de-France (Sirene)</div>
+      <div class="pipe__msg" data-step-msg></div>
+      <div class="pipe__progress" data-step-progress>
+        <div class="pipe__progress-track">
+          <div class="pipe__progress-bar" data-step-progress-bar></div>
+        </div>
+        <span class="pipe__progress-pct" data-step-progress-pct></span>
+      </div>
+      <button class="pipe__btn" data-action="fetch">Lancer</button>
+      <button class="pipe__stop" data-stop>Arrêter</button>
+    </div>
+    <div class="pipe__step" data-step="scraper">
+      <div class="pipe__top">
+        <span class="pipe__num">02</span>
+        <span class="pipe__badge" data-step-badge>En cours…</span>
+      </div>
+      <div class="pipe__name">Scraper</div>
+      <div class="pipe__sub">Trouver les emails de contact</div>
+      <div class="pipe__msg" data-step-msg></div>
+      <div class="pipe__progress" data-step-progress>
+        <div class="pipe__progress-track">
+          <div class="pipe__progress-bar" data-step-progress-bar></div>
+        </div>
+        <span class="pipe__progress-pct" data-step-progress-pct></span>
+      </div>
+      <button class="pipe__btn" data-action="scraper">Lancer</button>
+      <button class="pipe__stop" data-stop>Arrêter</button>
+    </div>
+    <div class="pipe__step" data-step="envoyer">
+      <div class="pipe__top">
+        <span class="pipe__num">03</span>
+        <span class="pipe__badge" data-step-badge>En cours…</span>
+      </div>
+      <div class="pipe__name">Envoyer</div>
+      <div class="pipe__sub">Candidature personnalisée + PDF</div>
+      <div class="pipe__msg" data-step-msg></div>
+      <div class="pipe__progress" data-step-progress>
+        <div class="pipe__progress-track">
+          <div class="pipe__progress-bar" data-step-progress-bar></div>
+        </div>
+        <span class="pipe__progress-pct" data-step-progress-pct></span>
+      </div>
+      <label class="pipe__nombre">
+        <span>Nombre de mails à envoyer (max 50)</span>
+        <input type="number" data-envoyer-nombre value="10" min="1" max="50">
+      </label>
+      <button class="pipe__btn pipe__btn--signal" data-action="envoyer">Lancer</button>
+      <button class="pipe__stop" data-stop>Arrêter</button>
+    </div>
+  </div>
+
+  <div class="section-bar">
+    <div class="filters" data-filters="spontanees">
+      <button class="filter is-active" data-filter="all">Tous</button>
+      <button class="filter" data-filter="email">Avec email</button>
+      <button class="filter" data-filter="envoye">Envoyés</button>
+    </div>
+  </div>
+
+  <div class="table">
+    <div class="trow thead">
+      <span>Entreprise</span><span>Email</span><span>Statut</span>
+    </div>
+    <div data-list="spontanees">
+      <!-- lignes injectées par spontanees.js -->
+    </div>
+  </div>
+</section>

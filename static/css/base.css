@@ -1,0 +1,328 @@
+/* ============================================================================
+   base.css — Chasseur d'Alternance
+   Tokens · reset · typographie · layout du shell (sidebar + main)
+   Direction "instrument de précision" : encre + papier, bleu = signal d'action
+   ============================================================================ */
+
+/* ── Tokens ──────────────────────────────────────────────────────────────── */
+:root {
+  /* Surfaces */
+  --encre:        #15191E;   /* sidebar, texte fort, boutons primaires */
+  --encre-soft:   #1F262E;   /* hover sur encre */
+  --papier:       #F5F6F8;   /* canvas principal */
+  --surface:      #FFFFFF;   /* cartes, panneaux */
+  --surface-2:    #FAFBFC;   /* lignes alternées, zones secondaires */
+
+  /* Texte */
+  --txt:          #15191E;
+  --txt-muted:    #6B7682;
+  --txt-faint:    #9AA3AD;
+  --txt-invert:   #F5F6F8;
+
+  /* Traits */
+  --hair:         #E6E8EC;   /* hairlines */
+  --hair-strong:  #D4D8DE;
+
+  /* Signal (action, sélection) — réservé, jamais décoratif */
+  --signal:       #2F5BEA;
+  --signal-soft:  #EAF0FE;
+  --signal-deep:  #2447C4;
+
+  /* Sémantique score / statut */
+  --vert:         #0E9F6E;  --vert-soft:  #E6F6F0;
+  --ambre:        #E0890B;  --ambre-soft: #FBF1DF;
+  --rouge:        #E5484D;  --rouge-soft: #FCEBEC;
+  --violet:       #7C5CFC;  --violet-soft:#EFEBFE;
+
+  /* Rayons & ombres */
+  --r-sm: 6px;  --r-md: 9px;  --r-lg: 13px;  --r-pill: 999px;
+  --sh-1: 0 1px 2px rgba(21,25,30,.04);
+  --sh-2: 0 4px 14px rgba(21,25,30,.07);
+  --sh-pop: 0 10px 34px rgba(21,25,30,.14);
+
+  /* Typo */
+  --f-display: "Space Grotesk", system-ui, sans-serif;
+  --f-body:    "Inter", system-ui, -apple-system, sans-serif;
+  --f-mono:    "JetBrains Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+
+/* ── Reset ───────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: var(--f-body);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--txt);
+  background: var(--papier);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+a { color: inherit; text-decoration: none; }
+ul { list-style: none; }
+:focus-visible { outline: 2px solid var(--signal); outline-offset: 2px; border-radius: 4px; }
+
+/* ── Layout du shell ─────────────────────────────────────────────────────── */
+.app {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Sidebar ----------------------------------------------------------------- */
+.sidebar {
+  width: 232px;
+  flex-shrink: 0;
+  background: var(--encre);
+  color: var(--txt-invert);
+  display: flex;
+  flex-direction: column;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 18px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.brand__mark {
+  width: 34px; height: 34px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  background: linear-gradient(150deg, #2F5BEA 0%, #1B2C7A 100%);
+  display: grid; place-items: center;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
+}
+.brand__mark svg { width: 18px; height: 18px; }
+.brand__name { font-family: var(--f-display); font-weight: 600; font-size: 15px; letter-spacing: -.01em; }
+.brand__sub  { font-size: 11px; color: #5C6470; font-family: var(--f-mono); letter-spacing: .02em; margin-top: 1px; }
+
+.nav { flex: 1; padding: 10px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.nav__label {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .12em;
+  color: #4A525C; font-weight: 600;
+  padding: 14px 10px 6px;
+}
+.nav__item {
+  position: relative;
+  display: flex; align-items: center; gap: 11px;
+  width: 100%;
+  padding: 9px 11px;
+  border-radius: var(--r-sm);
+  color: #95A0AC;
+  font-size: 13.5px;
+  text-align: left;
+  transition: background .14s, color .14s;
+}
+.nav__item svg { width: 17px; height: 17px; flex-shrink: 0; }
+.nav__item:hover { background: rgba(255,255,255,.05); color: #CBD2DA; }
+.nav__item.is-active { background: rgba(47,91,234,.16); color: #fff; }
+.nav__item.is-active::before {
+  content: ""; position: absolute; left: -10px; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 18px; border-radius: 0 3px 3px 0; background: var(--signal);
+}
+.nav__count {
+  margin-left: auto;
+  font-family: var(--f-mono); font-size: 11px;
+  padding: 1px 7px; border-radius: var(--r-pill);
+  background: rgba(255,255,255,.08); color: #95A0AC;
+}
+.nav__item.is-active .nav__count { background: rgba(47,91,234,.32); color: #BAC9FF; }
+
+/* Pied de sidebar : compteur live ---------------------------------------- */
+.sidefoot { padding: 14px 16px; border-top: 1px solid rgba(255,255,255,.07); }
+.sidefoot__row { display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 4px; }
+.sidefoot__row span:first-child { color: #5C6470; }
+.sidefoot__row span:last-child  { color: #AEB6BF; font-family: var(--f-mono); }
+.sidefoot__bar { height: 3px; border-radius: 3px; background: rgba(255,255,255,.08); margin-top: 8px; overflow: hidden; }
+.sidefoot__fill { height: 100%; background: var(--signal); border-radius: 3px; transition: width .4s ease; }
+.sidefoot__pct { font-size: 10.5px; color: #4A525C; margin-top: 5px; }
+.sidefoot__logout {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 8px 10px;
+  border-radius: var(--r-sm);
+  color: #95A0AC;
+  font-size: 13px;
+  transition: background .14s, color .14s;
+}
+.sidefoot__logout svg { width: 16px; height: 16px; }
+.sidefoot__logout:hover { background: rgba(255,255,255,.05); color: #CBD2DA; }
+
+/* Main -------------------------------------------------------------------- */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 22px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--hair);
+}
+.topbar__title { font-family: var(--f-display); font-size: 16px; font-weight: 600; letter-spacing: -.01em; }
+.topbar__badge {
+  font-size: 12px; font-weight: 500;
+  padding: 2px 10px; border-radius: var(--r-pill);
+  background: var(--signal-soft); color: var(--signal-deep);
+}
+.topbar__actions { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+
+.search {
+  display: flex; align-items: center; gap: 7px;
+  background: var(--papier);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-sm);
+  padding: 7px 11px;
+  min-width: 210px;
+  color: var(--txt-faint);
+  transition: border-color .14s;
+}
+.search:focus-within { border-color: var(--signal); }
+.search svg { width: 15px; height: 15px; }
+.search input { border: none; background: none; outline: none; font-size: 13px; color: var(--txt); width: 100%; }
+.search input::placeholder { color: var(--txt-faint); }
+
+.content { flex: 1; overflow-y: auto; padding: 22px; }
+
+/* Bandeau d'état des pipelines (live) ------------------------------------ */
+.runbar {
+  display: none;
+  align-items: center; gap: 10px;
+  padding: 9px 14px; margin-bottom: 16px;
+  background: var(--encre); color: var(--txt-invert);
+  border-radius: var(--r-md);
+  font-size: 13px;
+}
+.runbar.is-on { display: flex; }
+.runbar__dot { width: 8px; height: 8px; border-radius: 50%; background: var(--signal); animation: pulse 1.2s infinite; }
+.runbar__msg { flex: 1; font-family: var(--f-mono); font-size: 12px; color: #CBD2DA; }
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+/* ── Responsive : sidebar repliée en barre haute sur mobile ─────────────── */
+@media (max-width: 720px) {
+  .app { flex-direction: column; height: auto; min-height: 100vh; }
+  .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .brand { flex: 1; border-bottom: none; padding: 12px 16px; }
+  .nav { flex-direction: row; flex: 0 0 100%; overflow-x: auto; padding: 0 10px 10px; gap: 6px; }
+  .nav__label, .sidefoot { display: none; }
+  .nav__item { width: auto; white-space: nowrap; }
+  .nav__item.is-active::before { display: none; }
+  .content { padding: 16px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+/* ════════════ SIDEBAR REPLIABLE ════════════ */
+.sidebar { transition: width .22s ease; position: relative; }
+
+/* Bouton de repli (flèche) */
+.sidebar__toggle {
+  position: absolute; top: 14px; right: -11px; z-index: 5;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--encre-soft); color: #95A0AC;
+  border: 1px solid rgba(255,255,255,.12);
+  display: grid; place-items: center; cursor: pointer;
+  transition: color .14s, transform .22s;
+}
+.sidebar__toggle:hover { color: #fff; }
+.sidebar__toggle svg { width: 13px; height: 13px; }
+
+/* ── Mode replié ── */
+.sidebar.is-collapsed { width: 64px; }
+.sidebar.is-collapsed .sidebar__toggle svg { transform: rotate(180deg); }
+
+/* Masquer les textes, garder les icônes */
+.sidebar.is-collapsed .brand__name,
+.sidebar.is-collapsed .brand__sub,
+.sidebar.is-collapsed .nav__item span,
+.sidebar.is-collapsed .nav__label,
+.sidebar.is-collapsed .sidefoot__row,
+.sidebar.is-collapsed .sidefoot__bar,
+.sidebar.is-collapsed .sidefoot__pct,
+.sidebar.is-collapsed .sidefoot__logout span,
+.sidebar.is-collapsed .sidefoot__logout { font-size: 0; }
+
+.sidebar.is-collapsed .brand { justify-content: center; padding: 18px 0; }
+.sidebar.is-collapsed .nav { padding: 10px 8px; }
+.sidebar.is-collapsed .nav__item { justify-content: center; padding: 9px 0; }
+.sidebar.is-collapsed .nav__label { padding: 8px 0 2px; height: 8px; }
+
+/* Tooltip au survol en mode replié */
+.sidebar.is-collapsed .nav__item { }
+.sidebar.is-collapsed .nav__item::after {
+  content: attr(data-page);
+  position: absolute; left: calc(100% + 10px); top: 50%;
+  transform: translateY(-50%);
+  background: var(--encre-soft); color: #fff;
+  padding: 5px 10px; border-radius: var(--r-sm);
+  font-size: 12px; white-space: nowrap;
+  opacity: 0; pointer-events: none; z-index: 10;
+  border: 1px solid rgba(255,255,255,.1);
+  transition: opacity .14s;
+}
+.sidebar.is-collapsed .nav__item:hover::after { opacity: 1; }
+
+/* ── Corrections esthétiques mode replié ── */
+/* Masquer les compteurs (les petits traits gris) */
+.sidebar.is-collapsed .nav__count { display: none; }
+
+/* Labels de section : masquer complètement au lieu de laisser un vide */
+.sidebar.is-collapsed .nav__label {
+  height: 0; padding: 6px 0 0; margin: 0; overflow: hidden;
+}
+
+/* Pied de sidebar : icône déconnexion centrée, reste masqué proprement */
+.sidebar.is-collapsed .sidefoot {
+  padding: 12px 8px; align-items: center;
+}
+.sidebar.is-collapsed .sidefoot__logout {
+  justify-content: center; padding: 9px 0; width: 100%;
+}
+.sidebar.is-collapsed .sidefoot__logout svg { width: 18px; height: 18px; }
+/* Masquer les stats (emails/envoyés/barre) en replié */
+.sidebar.is-collapsed .sidefoot__row,
+.sidebar.is-collapsed .sidefoot__bar,
+.sidebar.is-collapsed .sidefoot__pct { display: none; }
+
+/* Marque : icône seule bien centrée */
+.sidebar.is-collapsed .brand__mark { margin: 0 auto; }
+
+/* Anti-flash : applique le repli dès le chargement HTML (avant le JS app) */
+html.sidebar-pre-collapsed .sidebar { width: 64px; }
+html.sidebar-pre-collapsed .sidebar .brand__name,
+html.sidebar-pre-collapsed .sidebar .brand__sub,
+html.sidebar-pre-collapsed .sidebar .nav__item span,
+html.sidebar-pre-collapsed .sidebar .nav__count,
+html.sidebar-pre-collapsed .sidebar .nav__label,
+html.sidebar-pre-collapsed .sidebar .sidefoot__row,
+html.sidebar-pre-collapsed .sidebar .sidefoot__bar,
+html.sidebar-pre-collapsed .sidebar .sidefoot__pct { display: none; }
+
+/* ═══ Thème MODE JOB : le bleu (signal) devient orange ═══ */
+html[data-mode="job"] {
+  --signal:       #F97316;   /* orange vif */
+  --signal-soft:  #FFF1E6;   /* orange très clair */
+  --signal-deep:  #C2560F;   /* orange foncé */
+}
+
+/* Sélecteur de mode (alternance / job) dans la sidebar */
+.mode-switch {
+  display: flex; gap: 4px; margin: 10px 14px 4px;
+  background: var(--surface-2); border-radius: var(--r-sm, 8px);
+  padding: 3px; border: 1px solid var(--hair);
+}
+.mode-switch__btn {
+  flex: 1; padding: 6px 8px; border: none; background: transparent;
+  font-size: 12px; font-weight: 600; color: var(--txt-muted);
+  border-radius: 6px; cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.mode-switch__btn.is-active { background: var(--signal); color: #fff; }
+.sidebar.is-collapsed .mode-switch { display: none; }

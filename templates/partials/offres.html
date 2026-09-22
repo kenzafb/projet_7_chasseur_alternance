@@ -1,0 +1,77 @@
+<!-- ════════════ PAGE OFFRES ════════════ -->
+<section class="page is-active" data-page-content="offres">
+  <div class="guide" data-guide="offres">
+    <span class="guide__txt">Clique sur <strong>Lancer la recherche</strong> : le Chasseur récupère les offres d'alternance et les note selon ton profil. Les meilleures remontent en haut. Clique sur une offre pour l'analyser en détail et générer une lettre.</span>
+    <span class="guide__x" data-guide-close="offres">×</span>
+  </div>
+
+  <div class="kpis kpis--4">
+    <div class="kpi">
+      <div class="kpi__label">Nouvelles</div>
+      <div class="kpi__val" data-kpi="nouvelles">0</div>
+      <div class="kpi__note kpi__note--up" data-kpi="nouvelles-note">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi__label">Score moyen</div>
+      <div class="kpi__val" data-kpi="score-moyen">—</div>
+      <div class="kpi__note">/ 10</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi__label">À postuler</div>
+      <div class="kpi__val kpi__val--vert" data-kpi="a-postuler">0</div>
+      <div class="kpi__note">score ≥ 7</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi__label">Lettres générées</div>
+      <div class="kpi__val kpi__val--signal" data-kpi="lettres">0</div>
+      <div class="kpi__note">prêtes à envoyer</div>
+    </div>
+  </div>
+
+  <div class="section-bar">
+    <!-- Filtres mode NORMAL : menus combinables (source + localisation + score) -->
+    <div class="filters-menus" data-mode="normal">
+      <select class="filtre-menu" data-foffre="source">
+        <option value="all">Toutes sources</option>
+        <option value="ft">France Travail</option>
+        <option value="lba">La Bonne Alternance</option>
+      </select>
+      <select class="filtre-menu" data-foffre="zone">
+        <option value="all">Toute localisation</option>
+        <option value="Paris">Paris</option>
+        <option value="Petite couronne">Petite couronne</option>
+        <option value="Grande couronne">Grande couronne</option>
+      </select>
+      <select class="filtre-menu" data-foffre="score">
+        <option value="all">Tous les scores</option>
+        <option value="haut">À postuler (≥7)</option>
+        <option value="moyen">Moyen (5-6)</option>
+        <option value="bas">Faible (&lt;5)</option>
+      </select>
+    </div>
+    <!-- Filtres mode ARCHIVES (par raison) — cachés par défaut -->
+    <div class="filters" data-filters="offres-archives" data-mode="archives" style="display:none;">
+      <button class="filter is-active" data-filter="all">Toutes</button>
+      <button class="filter" data-filter="manuel">Manuel</button>
+      <button class="filter" data-filter="note_basse">Note basse</button>
+      <button class="filter" data-filter="ecole_cfa">École / CFA</button>
+      <button class="filter" data-filter="hors_it">Hors IT</button>
+      <button class="filter" data-filter="public_specifique">Public spécifique</button>
+      <button class="filter" data-filter="stage">Stage</button>
+    </div>
+    <!-- Bouton bascule normal ↔ archives -->
+    <button class="btn btn--ghost btn--sm" data-archives-toggle>
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/><line x1="10" y1="13" x2="14" y2="13"/></svg>
+      <span data-archives-label>Archivées</span>
+    </button>
+  </div>
+
+  <div class="offre__list stagger" data-list="offres">
+    <!-- cartes injectées par offres.js -->
+    <div class="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+      <div class="empty__title">Aucune offre pour l'instant</div>
+      <div class="empty__hint">Lance une recherche depuis le bouton en haut à droite pour interroger France Travail et La Bonne Alternance.</div>
+    </div>
+  </div>
+</section>

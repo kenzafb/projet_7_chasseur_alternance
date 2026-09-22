@@ -1,17 +1,17 @@
 from weasyprint import HTML as WeasyHTML
-from shared.profil import PROFIL
+from database.profil_db import lire_profil
 from datetime import datetime
 import os
 
 
-def generer_pdf_lettre(offre, lettre, dossier_output="lettres_pdf"):
+def generer_pdf_lettre(offre, lettre, profil=None, dossier_output="lettres_pdf"):
     os.makedirs(dossier_output, exist_ok=True)
-    p = PROFIL
+    p = profil or lire_profil(1)
     mois = ["janvier","février","mars","avril","mai","juin","juillet","août",
             "septembre","octobre","novembre","décembre"]
     now = datetime.now()
     date_str = f"{now.day} {mois[now.month-1]} {now.year}"
-    nom_fichier = "Lettre_Kenza_Filali-Bouami.pdf"
+    nom_fichier = f"Lettre_{p.get('prenom','')}_{p.get('nom','candidat')}.pdf".replace(" ", "_")
     chemin_pdf = os.path.join(dossier_output, nom_fichier)
 
     # Nom entreprise
@@ -68,7 +68,7 @@ def generer_pdf_lettre(offre, lettre, dossier_output="lettres_pdf"):
 <div class="entete">
   <div class="expediteur">
     <div class="nom">{p['prenom']} {p['nom']}</div>
-    <div class="info">{p['ville']} &bull; {p['telephone']} &bull; {p['email']}<br>{p['github']}</div>
+    <div class="info">{p['ville']}<br>{p['telephone']}<br>{p['email']}<br>{p['github']}</div>
   </div>
   <div class="destinataire">
     <div class="entreprise">{entreprise_affichee}</div>

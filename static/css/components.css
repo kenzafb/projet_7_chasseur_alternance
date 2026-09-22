@@ -1,0 +1,187 @@
+/* ============================================================================
+   components.css — éléments réutilisables
+   Boutons · cartes · chips · KPI · viseur de score (signature) · table · kanban
+   ============================================================================ */
+
+/* ── Boutons ─────────────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 13px;
+  border-radius: var(--r-sm);
+  font-size: 13px; font-weight: 500;
+  border: 1px solid var(--hair-strong);
+  background: var(--surface); color: var(--txt);
+  transition: background .14s, border-color .14s, transform .05s;
+}
+.btn svg { width: 15px; height: 15px; }
+.btn:hover { background: var(--surface-2); border-color: var(--txt-faint); }
+.btn:active { transform: translateY(1px); }
+.btn--primary { background: var(--encre); color: var(--txt-invert); border-color: var(--encre); }
+.btn--primary:hover { background: var(--encre-soft); border-color: var(--encre-soft); }
+.btn--signal  { background: var(--signal); color: #fff; border-color: var(--signal); }
+.btn--signal:hover { background: var(--signal-deep); border-color: var(--signal-deep); }
+.btn--ghost { border-color: transparent; background: transparent; color: var(--txt-muted); }
+.btn--ghost:hover { background: var(--surface-2); color: var(--txt); }
+.btn--sm { padding: 5px 10px; font-size: 12px; }
+.btn[disabled] { opacity: .5; pointer-events: none; }
+
+/* ── Carte ───────────────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-lg);
+  box-shadow: var(--sh-1);
+  transition: border-color .15s, box-shadow .15s;
+}
+.card:hover { border-color: var(--hair-strong); box-shadow: var(--sh-2); }
+
+/* ── Chips / badges ──────────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: var(--r-sm);
+  letter-spacing: .01em;
+}
+.chip--ft    { background: var(--signal-soft); color: var(--signal-deep); }
+.chip--lba   { background: var(--violet-soft); color: #5B3FD6; }
+.chip--vert  { background: var(--vert-soft);  color: #0A7A54; }
+.chip--ambre { background: var(--ambre-soft); color: #9A6406; }
+.chip--rouge { background: var(--rouge-soft); color: #C0353A; }
+.chip--gris  { background: #F0F1F3; color: var(--txt-muted); }
+
+/* ── Le viseur de score (élément signature) ──────────────────────────────── */
+/* Une jauge horizontale graduée avec un repère au seuil 7.0 = "à postuler".
+   Lecture instantanée : la barre se remplit, sa couleur dit le verdict,
+   le tick fixe rappelle le seuil de décision. */
+.viseur { display: flex; align-items: center; gap: 11px; }
+.viseur__val {
+  font-family: var(--f-display); font-weight: 600;
+  font-size: 21px; line-height: 1; letter-spacing: -.02em;
+  min-width: 38px;
+}
+.viseur__val small { font-size: 11px; color: var(--txt-faint); font-weight: 500; }
+.viseur__track {
+  position: relative;
+  flex: 1; min-width: 90px; height: 7px;
+  background: #EDEFF2; border-radius: var(--r-pill);
+  overflow: visible;
+}
+.viseur__fill { position: absolute; inset: 0 auto 0 0; height: 100%; border-radius: var(--r-pill); transition: width .5s cubic-bezier(.2,.7,.3,1); }
+.viseur__tick {                      /* repère du seuil 7.0 */
+  position: absolute; top: -3px; bottom: -3px; left: 70%;
+  width: 2px; background: var(--encre); border-radius: 2px; opacity: .35;
+}
+.viseur--vert  .viseur__fill { background: var(--vert); }
+.viseur--vert  .viseur__val  { color: var(--vert); }
+.viseur--ambre .viseur__fill { background: var(--ambre); }
+.viseur--ambre .viseur__val  { color: var(--ambre); }
+.viseur--rouge .viseur__fill { background: var(--rouge); }
+.viseur--rouge .viseur__val  { color: var(--rouge); }
+
+/* ── Bandeau KPI ─────────────────────────────────────────────────────────── */
+.kpis { display: grid; gap: 10px; margin-bottom: 18px; }
+.kpis--4 { grid-template-columns: repeat(4, 1fr); }
+.kpis--3 { grid-template-columns: repeat(3, 1fr); }
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--hair);
+  border-radius: var(--r-md);
+  padding: 13px 15px;
+}
+.kpi__label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--txt-faint); margin-bottom: 5px; }
+.kpi__val   { font-family: var(--f-display); font-size: 25px; font-weight: 600; line-height: 1; letter-spacing: -.02em; }
+.kpi__val--vert   { color: var(--vert); }
+.kpi__val--signal { color: var(--signal); }
+.kpi__note  { font-size: 11px; color: var(--txt-muted); margin-top: 4px; }
+.kpi__note--up { color: var(--vert); }
+@media (max-width: 720px) { .kpis--4, .kpis--3 { grid-template-columns: repeat(2, 1fr); } }
+
+/* ── Filtres en pilule ───────────────────────────────────────────────────── */
+.filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.filter {
+  font-size: 12.5px; padding: 5px 12px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--hair-strong); background: var(--surface); color: var(--txt-muted);
+  transition: all .12s;
+}
+.filter:hover { border-color: var(--txt-faint); color: var(--txt); }
+.filter.is-active { border-color: var(--signal); background: var(--signal-soft); color: var(--signal-deep); font-weight: 600; }
+
+/* ── Table (spontanées) ──────────────────────────────────────────────────── */
+.table { background: var(--surface); border: 1px solid var(--hair); border-radius: var(--r-lg); overflow: hidden; }
+.trow {
+  display: grid; grid-template-columns: 1fr 220px 100px;
+  gap: 14px; align-items: center;
+  padding: 11px 16px;
+}
+.trow + .trow { border-top: 1px solid var(--hair); }
+.trow:nth-child(even of .trow) { background: var(--surface-2); }
+.thead { background: var(--surface-2); border-bottom: 1px solid var(--hair); }
+.thead span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--txt-faint); font-weight: 600; }
+.trow__name { font-size: 13.5px; font-weight: 500; }
+.trow__sub  { font-size: 11px; color: var(--txt-faint); font-family: var(--f-mono); margin-top: 1px; }
+.trow__mail { font-size: 12.5px; color: var(--txt-muted); font-family: var(--f-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trow__mail--none { font-style: italic; color: var(--txt-faint); font-family: var(--f-body); }
+@media (max-width: 720px) {
+  .trow { grid-template-columns: 1fr auto; }
+  .trow__mail { display: none; }
+}
+
+/* ── Kanban (candidatures) ───────────────────────────────────────────────── */
+.kanban { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; align-items: start; }
+.kcol__head { display: flex; align-items: center; gap: 7px; margin-bottom: 9px; padding: 0 2px; }
+.kcol__dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.kcol__title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--txt-muted); }
+.kcol__count { font-size: 11px; color: var(--txt-faint); font-family: var(--f-mono); }
+.kcol__body { display: flex; flex-direction: column; gap: 8px; min-height: 40px; }
+.kcard {
+  background: var(--surface); border: 1px solid var(--hair);
+  border-radius: var(--r-md); padding: 11px 12px;
+  box-shadow: var(--sh-1); cursor: grab;
+  border-left: 3px solid transparent;
+}
+.kcard:hover { box-shadow: var(--sh-2); }
+.kcard__title { font-size: 13px; font-weight: 500; margin-bottom: 3px; line-height: 1.35; }
+.kcard__org   { font-size: 12px; color: var(--txt-muted); }
+.kempty {
+  border: 1px dashed var(--hair-strong); border-radius: var(--r-md);
+  padding: 22px 12px; text-align: center; color: var(--txt-faint); font-size: 12px;
+}
+@media (max-width: 980px) { .kanban { grid-template-columns: repeat(2, 1fr); overflow-x: visible; } }
+
+/* ── État vide générique ─────────────────────────────────────────────────── */
+.empty {
+  display: grid; place-items: center; gap: 10px;
+  padding: 60px 20px; text-align: center;
+  color: var(--txt-faint);
+}
+.empty svg { width: 34px; height: 34px; opacity: .5; }
+.empty__title { font-family: var(--f-display); font-size: 15px; color: var(--txt-muted); font-weight: 500; }
+.empty__hint  { font-size: 13px; max-width: 320px; }
+
+/* ── Apparition échelonnée des cartes au chargement ──────────────────────── */
+.stagger > * { opacity: 0; transform: translateY(6px); animation: rise .45s ease forwards; }
+.stagger > *:nth-child(1) { animation-delay: .02s; }
+.stagger > *:nth-child(2) { animation-delay: .07s; }
+.stagger > *:nth-child(3) { animation-delay: .12s; }
+.stagger > *:nth-child(4) { animation-delay: .17s; }
+.stagger > *:nth-child(5) { animation-delay: .22s; }
+.stagger > *:nth-child(n+6) { animation-delay: .26s; }
+@keyframes rise { to { opacity: 1; transform: none; } }
+
+/* Jauge de progression dans la bannière runbar */
+.runbar__progress { display: none; align-items: center; gap: 8px; flex: 1; max-width: 320px; }
+.runbar.is-on .runbar__progress { display: flex; }
+.runbar__progress-track {
+  flex: 1; height: 6px; border-radius: var(--r-pill);
+  background: rgba(255,255,255,.18); overflow: hidden;
+}
+.runbar__progress-bar {
+  height: 100%; width: 0%;
+  background: #fff; border-radius: var(--r-pill);
+  transition: width .4s ease;
+}
+.runbar__progress-pct {
+  font-family: var(--f-mono); font-size: 11px; font-weight: 600;
+  color: #fff; min-width: 34px; text-align: right;
+}

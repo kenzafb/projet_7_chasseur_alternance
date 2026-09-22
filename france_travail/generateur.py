@@ -2,19 +2,13 @@ import re
 import os
 import json
 from datetime import datetime
-from google import genai
-from google.genai import types
+from mistralai.client import Mistral
 from dotenv import load_dotenv
-from shared.profil import PROFIL
 
 load_dotenv()
 
-client = genai.Client(
-    vertexai=True,
-    project=os.getenv("GOOGLE_CLOUD_PROJECT"),
-    location="us-central1"
-)
-MODELE_LETTRE = "gemini-2.5-pro"
+client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
+MODELE_LETTRE = "mistral-large-latest"
 
 # ─── Lettre de motivation fixe ────────────────────────────────────────────────
 # Seuls {contact_entreprise} et {paragraphe_entreprise} sont générés par l'IA.
@@ -23,25 +17,21 @@ MODELE_LETTRE = "gemini-2.5-pro"
 LETTRE_TEMPLATE = """\
 {contact_entreprise}
 
-Paris, le {date}
+Le {date}
 
-Objet : Candidature alternance DevOps / SysAdmin / Sécurité — septembre 2026
+Objet : Candidature en alternance
 
 Madame, Monsieur,
 
-Actuellement en fin de Diplôme de Spécialisation Professionnelle DevOps au Conservatoire National des Arts et Métiers de Paris, je prépare mon entrée en deuxième année de DEUST Informatique d'Organisation et Systèmes d'Information en septembre 2026, en alternance au rythme d'une semaine sur deux. C'est dans ce cadre que je vous adresse ma candidature pour un poste de technicienne en administration système, réseaux ou DevOps.
-
-Ma formation au CNAM m'a permis de construire des bases solides en administration Linux, en scripting Bash et Python, en réseaux TCP/IP et en sécurité. La deuxième année du DEUST approfondira ces compétences avec des modules en programmation orientée objet, administration système et réseau avancée, bases de données et sécurité applicative.
-
-Lors de mon stage au Garage Numérique, j'ai configuré des systèmes Linux, rédigé de la documentation technique et développé de façon autonome le Chasseur d'Alternance, un outil Python couplant l'API France Travail et un LLM via Google Cloud. Parmi mes projets personnels : une stack Docker Compose avec reverse proxy, un système de gestion de parc avec collecte automatisée, et un outil CLI de validation d'images via l'API Docker Hub. Ces projets sont disponibles sur mon GitHub.
+Actuellement en formation et à la recherche d'une alternance, je vous adresse ma candidature pour rejoindre votre équipe.
 
 {paragraphe_entreprise}
 
-Disponible en alternance dès septembre 2026 au rythme d'une semaine en entreprise et une semaine en formation, je serais ravie de vous présenter mon parcours plus en détail lors d'un entretien.
+Mon parcours et ma motivation m'amènent à vouloir mettre mes compétences au service de votre structure, dans le cadre de mon alternance. Sérieux(se), impliqué(e) et désireux(se) d'apprendre, je m'investirai pleinement dans les missions qui me seront confiées.
 
-Je vous adresse, Madame, Monsieur, mes sincères salutations.
+Je serais ravi(e) de vous présenter mon parcours plus en détail lors d'un entretien.
 
-Kenza Filali-Bouami
+Dans l'attente de votre retour, je vous prie d'agréer, Madame, Monsieur, mes salutations distinguées.
 """
 
 
@@ -67,7 +57,7 @@ def _nettoyer_contact(contact):
     return "\n".join(lignes_propres[:3]).strip()
 
 
-def generer_lettre(offre):
+def generer_lettre(offre, profil=None, mode="alternance"):
     """
     Demande à Gemini uniquement :
     1. Le bloc contact de l'entreprise (coin haut gauche de la lettre)
@@ -80,49 +70,89 @@ def generer_lettre(offre):
     lieu           = offre.get("lieu", "")
     description    = (offre.get("description", "") or "")[:800]
 
+    # Compétences réelles du candidat (depuis son profil) — pour ne PAS coder en dur l'IT
+    _profil = profil or {}
+    _comps = _profil.get("competences", []) or []
+    _comps_txt = ", ".join(_comps) if _comps else ""
+    _formation = (_profil.get("formation", "") or "").strip()
+    _experience = (_profil.get("experience", "") or "").strip()
+    _bagage = []
+    if _comps_txt:   _bagage.append(f"Compétences : {_comps_txt}")
+    if _formation:   _bagage.append(f"Formation : {_formation[:200]}")
+    if _experience:  _bagage.append(f"Expérience : {_experience[:200]}")
+    bagage_candidat = "\n".join(_bagage) if _bagage else "Voir le profil du candidat."
+
+    # L'élément 2 (paragraphe entreprise) dépend du mode
+    if mode == "job":
+        element2 = (
+            "=== ÉLÉMENT 2 — PARAGRAPHE_ENTREPRISE ===\n"
+            "Un seul paragraphe de 2 à 3 phrases MAX (350 caractères max).\n"
+            "Règles impératives :\n"
+            "- NE commence PAS par 'Je'. Commence par le nom de l'entreprise, 'Votre', 'C'est', etc.\n"
+            "- Montre un intérêt concret pour CETTE entreprise ou ce poste (secteur, mission, contexte).\n"
+            "- Mets en avant les QUALITÉS HUMAINES adaptées à un job court : fiabilité, sérieux, "
+            "polyvalence, sens du contact, rigueur, capacité à apprendre vite et à s'intégrer dans une équipe.\n"
+            "- N'utilise PAS de compétences techniques pointues (Docker, Python, Linux, scripting...) "
+            "SAUF si le poste les demande EXPLICITEMENT (ex. saisie informatique, support). "
+            "Pour un poste manuel, de vente, d'accueil ou de manutention, ne parle PAS d'informatique.\n"
+            "- Ton simple, direct et sincère, sans superlatifs ('passionnée', 'incroyable').\n"
+            "- Ne mentionne PAS la formation ni la disponibilité (déjà dans le corps de la lettre).\n"
+            "Exemple (manutention) : \"Votre entreprise recherche des profils fiables et rapides ; "
+            "rigoureuse et habituée au travail en équipe, je m'investis pleinement dans les missions confiées.\"\n\n"
+        )
+    else:
+        element2 = (
+            "=== ÉLÉMENT 2 — PARAGRAPHE_ENTREPRISE ===\n"
+            "Un seul paragraphe de 2 à 3 phrases MAX (350 caractères max).\n"
+            "Règles impératives :\n"
+            "- NE commence PAS par 'Je'. Commence par le nom de l'entreprise, 'Votre', 'C'est', etc.\n"
+            "- Montre un intérêt spécifique pour cette entreprise (secteur, missions, taille, contexte).\n"
+            "- Relie les compétences RÉELLES de la candidate (ci-dessous) au contexte du poste. "
+            "N'invente PAS de compétences qu'elle n'a pas.\n"
+            f"  Bagage du candidat :\n{bagage_candidat}\n"
+            "- Ton direct et professionnel, sans superlatifs ('passionnée', 'incroyable', 'parfaite').\n"
+            "- Ne mentionne PAS la formation, les projets personnels, ni la disponibilité "
+            "(déjà dans le corps de la lettre).\n"
+            "Exemple : \"ORMA INFORMATIQUE, votre spécialisation en infrastructures correspond "
+            "à mes compétences en administration Linux et Docker, consolidées lors de mon stage "
+            "au Garage Numérique.\"\n\n"
+        )
+
     prompt = (
-        "Tu aides une candidate à personnaliser sa lettre de motivation.\n\n"
-        "MISSION : Génère UNIQUEMENT deux éléments en JSON, rien d'autre.\n\n"
-        f"ENTREPRISE : {nom_entreprise} — {lieu}\n"
-        f"POSTE : {titre_poste}\n"
-        f"DESCRIPTION : {description}\n\n"
+        "Tu aides une candidate à personnaliser sa lettre de motivation.\n"
+        "Génère UNIQUEMENT ces 2 éléments en JSON valide, sans backticks ni texte autour.\n\n"
 
-        "1. CONTACT_ENTREPRISE : le bloc destinataire, 2-3 lignes maximum.\n"
-        "   Format : nom de l'entreprise sur la première ligne, puis ville ou adresse.\n"
-        "   Exemple : \"ACME Solutions\\n75010 Paris\"\n"
-        "   ⚠️ INTERDIT : ne mets JAMAIS de date, de ligne 'Objet :', de formule\n"
-        "   de politesse, de 'Paris, le', ni aucun autre élément de la lettre.\n"
-        "   UNIQUEMENT le nom et la ville, rien d'autre.\n\n"
+        "=== OFFRE ===\n"
+        f"Entreprise : {nom_entreprise} — {lieu}\n"
+        f"Poste : {titre_poste}\n"
+        f"Description : {description}\n\n"
 
-        "2. PARAGRAPHE_ENTREPRISE : UN paragraphe de 2 à 3 phrases MAXIMUM.\n"
-        "   Règles impératives :\n"
-        "   - Ne commence PAS par 'Je' — commence par le nom de l'entreprise, 'Votre', 'C'est', etc.\n"
-        "   - Montre un intérêt spécifique pour cette entreprise (secteur, missions, taille, réputation).\n"
-        "   - Relie les compétences de la candidate (Linux, Docker, Python, sécurité) au contexte de l'offre.\n"
-        "   - Ton naturel et direct, pas de superlatifs, pas de formulations IA génériques.\n"
-        "   - 350 caractères maximum.\n"
-        "   - Ne répète pas ce qui est déjà dans la lettre (formations, projets, disponibilité).\n"
-        "   - Style cohérent avec une lettre formelle en français.\n\n"
+        "=== ÉLÉMENT 1 — CONTACT_ENTREPRISE ===\n"
+        "Bloc destinataire pour le coin supérieur gauche de la lettre. 2-3 lignes MAX.\n"
+        "Format : nom de l'entreprise ligne 1, ville ou adresse ligne 2.\n"
+        "Exemple : \"ACME Solutions\\n75010 Paris\"\n"
+        "INTERDIT : date, 'Objet :', formule de politesse, 'Paris le', tout autre élément de lettre.\n"
+        "UNIQUEMENT le nom et la ville, rien d'autre.\n\n"
 
-        "Réponds UNIQUEMENT en JSON valide sans backticks :\n"
+        f"{element2}"
+
+        "Réponds UNIQUEMENT en JSON valide :\n"
         "{\"contact_entreprise\": \"...\", \"paragraphe_entreprise\": \"...\"}"
     )
 
+
     try:
-        response = client.models.generate_content(
+        response = client.chat.complete(
             model=MODELE_LETTRE,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.6,
-            )
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            temperature=0.6,
         )
-        # Log finish_reason pour détecter les coupures
-        finish = getattr(response.candidates[0], "finish_reason", "?") if response.candidates else "?"
-        texte = re.sub(r'```json\s*', '', response.text or "")
+        finish = response.choices[0].finish_reason
+        texte = re.sub(r'```json\s*', '', response.choices[0].message.content or "")
         texte = re.sub(r'```\s*', '', texte).strip()
-        if str(finish) not in ("FinishReason.STOP", "STOP", "1"):
-            print(f"  ⚠️  Gemini finish_reason={finish} — réponse potentiellement tronquée")
+        if finish != "stop":
+            print(f"  ⚠️  Mistral finish_reason={finish} — réponse potentiellement tronquée")
         result = json_parse(texte)
 
         contact    = result.get("contact_entreprise", nom_entreprise)
@@ -130,8 +160,15 @@ def generer_lettre(offre):
 
         # ── Nettoyage défensif du bloc contact ────────────────────────────────
         contact = _nettoyer_contact(contact)
-        if not contact:
-            contact = nom_entreprise
+        # Entreprise masquée par France Travail (~1 offre sur 2) :
+        # on bascule sur une formule neutre plutôt qu'un nom bidon.
+        noms_vides = {"", "inconnue", "inconnu", "non précisé", "non precise",
+                      "non renseigné", "non renseigne", "n/a", "na"}
+        if not contact or nom_entreprise.strip().lower() in noms_vides:
+            ville = (offre.get("lieu", "") or "").strip()
+            contact = "À l'attention du service recrutement"
+            if ville:
+                contact += "\n" + ville
 
         # ── Alerte si paragraphe manquant ─────────────────────────────────────
         if not paragraphe:
@@ -142,7 +179,8 @@ def generer_lettre(offre):
         contact    = nom_entreprise
         paragraphe = ""
 
-    lettre = LETTRE_TEMPLATE.format(
+    template = (profil or {}).get("lettre_type") or LETTRE_TEMPLATE
+    lettre = template.format(
         contact_entreprise=contact,
         date=_date_du_jour(),
         paragraphe_entreprise=paragraphe,

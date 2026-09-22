@@ -1,0 +1,30 @@
+<!-- ════════════ PAGE CANDIDATURES (tableau de suivi) ════════════ -->
+<section class="page" data-page-content="candidatures">
+  <div class="guide" data-guide="candidatures">
+    <span class="guide__txt">Le suivi de tes candidatures (offres où tu as envoyé une lettre). Mets à jour le statut au fil des réponses, et clique sur <strong>Voir</strong> pour revoir l'offre et la lettre — pratique pour préparer un entretien.</span>
+    <span class="guide__x" data-guide-close="candidatures">×</span>
+  </div>
+
+  <div class="section-bar">
+    <div class="filters" data-filters="candidatures">
+      <button class="filter is-active" data-filter="all">Toutes</button>
+      <button class="filter" data-filter="envoye">Envoyé</button>
+      <button class="filter" data-filter="reponse">Réponse</button>
+      <button class="filter" data-filter="entretien">Entretien</button>
+      <button class="filter" data-filter="refus">Refus</button>
+    </div>
+  </div>
+
+  <div class="suivi-table">
+    <div class="suivi-row suivi-head suivi-row--cand">
+      <span>Entreprise</span>
+      <span>Poste</span>
+      <span>Score</span>
+      <span>Statut</span>
+      <span></span>
+    </div>
+    <div data-list="candidatures">
+      <!-- lignes injectées par candidatures.js -->
+    </div>
+  </div>
+</section>

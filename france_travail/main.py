@@ -38,9 +38,19 @@ def ajouter_candidatures(nouvelles_offres):
     return ajoutees
 
 
-def lancer_recherche(analyser=True, max_analyse=999):
+def lancer_recherche(analyser=True, max_analyse=999, on_offre=None, profil=None, mode="alternance"):
     print("\nRecherche des offres...")
-    nouvelles_offres, offres_vues = chercher_offres()
+    from shared.modes import get_mode
+    cfg = get_mode(mode)
+    ft_params = cfg["ft_params"]
+    filtrer_domaines = cfg["utilise_domaines"]
+    # Domaines choisis par l'utilisateur (seulement si le mode filtre par domaine)
+    from shared.domaines import ft_grands_domaines
+    cles_domaines = (profil or {}).get("recherche", {}).get("domaines", [])
+    grands_domaines = ft_grands_domaines(cles_domaines) if filtrer_domaines else None
+    nouvelles_offres, offres_vues = chercher_offres(
+        grands_domaines, ft_params=ft_params, filtrer_domaines=filtrer_domaines,
+        mode=mode, limite_lot=cfg.get("limite_lot"))
 
     if not nouvelles_offres:
         print("Aucune nouvelle offre.")
@@ -49,9 +59,9 @@ def lancer_recherche(analyser=True, max_analyse=999):
     if analyser:
         # Callback : sauvegarde chaque offre dès qu'elle est analysée
         def sauvegarder_au_fur(index, total, offre_analysee):
-            ajouter_candidatures([offre_analysee])
+            (on_offre(offre_analysee) if on_offre else ajouter_candidatures([offre_analysee]))
 
-        analyser_offres(nouvelles_offres[:max_analyse], callback=sauvegarder_au_fur)
+        analyser_offres(nouvelles_offres[:max_analyse], profil=profil, callback=sauvegarder_au_fur, mode=mode)
     else:
         ajouter_candidatures(nouvelles_offres)
 

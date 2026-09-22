@@ -254,10 +254,6 @@
           <div class="spont-card-label">Avec email trouvé</div>
         </div>
         <div class="spont-card">
-          <div class="spont-card-val" id="sp-gen">—</div>
-          <div class="spont-card-label">Mails générés</div>
-        </div>
-        <div class="spont-card">
           <div class="spont-card-val" id="sp-env">—</div>
           <div class="spont-card-label">Mails envoyés</div>
         </div>
@@ -271,9 +267,9 @@
                 onclick="spontStop()">⏹ Stop & Sauvegarder</button>
       </div>
 
-      <!-- Pipeline 4 étapes -->
+      <!-- Pipeline 3 étapes -->
       <div class="pipeline">
- 
+
         <!-- Étape 1 : Fetch -->
         <div class="pipe-step" id="pipe-1">
           <div class="pipe-num">1</div>
@@ -286,7 +282,7 @@
             <button class="btn btn-secondary" style="font-size:.7rem" id="btn-fetch" onclick="spontLancer('fetch')">▶ Lancer</button>
           </div>
         </div>
- 
+
         <!-- Étape 2 : Scraper -->
         <div class="pipe-step" id="pipe-2">
           <div class="pipe-num">2</div>
@@ -299,26 +295,13 @@
             <button class="btn btn-secondary" style="font-size:.7rem" id="btn-scraper" onclick="spontLancer('scraper')">▶ Lancer</button>
           </div>
         </div>
- 
-        <!-- Étape 3 : Générer -->
+
+        <!-- Étape 3 : Envoyer -->
         <div class="pipe-step" id="pipe-3">
           <div class="pipe-num">3</div>
           <div class="pipe-info">
-            <div class="pipe-title">Générer mails</div>
-            <div class="pipe-desc">Gemini génère 1-2 phrases de personnalisation par entreprise</div>
-          </div>
-          <div class="pipe-stat" id="stat-gen">—</div>
-          <div class="pipe-actions">
-            <button class="btn btn-secondary" style="font-size:.7rem" id="btn-generer" onclick="spontLancer('generer')">▶ Lancer</button>
-          </div>
-        </div>
- 
-        <!-- Étape 4 : Envoyer -->
-        <div class="pipe-step" id="pipe-4">
-          <div class="pipe-num">4</div>
-          <div class="pipe-info">
             <div class="pipe-title">Envoyer</div>
-            <div class="pipe-desc">Envoie les mails avec CV + plaquette DEUST en pièces jointes</div>
+            <div class="pipe-desc">Envoie les mails avec CV, plaquette DEUST et lettre de recommandation en pièces jointes</div>
           </div>
           <div class="pipe-stat" id="stat-env">—</div>
           <div class="pipe-actions">
@@ -327,7 +310,7 @@
             <button class="btn btn-primary" style="font-size:.7rem;background:#4ade80;border-color:#4ade80;color:#0f0f14" id="btn-envoyer" onclick="spontLancer('envoyer', false)">▶ Envoyer</button>
           </div>
         </div>
- 
+
       </div>
 
       <div class="sl" style="margin-bottom:8px;margin-top:20px">

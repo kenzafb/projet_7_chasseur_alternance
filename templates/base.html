@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="fr" data-mode="{{ mode|default('alternance') }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chasseur d'Alternance</title>
+
+  <!-- Polices -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <!-- Styles (servis par FastAPI depuis /static) -->
+  <link rel="stylesheet" href="/static/css/base.css">
+  <link rel="stylesheet" href="/static/css/components.css">
+  <link rel="stylesheet" href="/static/css/pages.css">
+  <script>
+    // Applique l'état replié de la sidebar avant le rendu (évite le flash)
+    try {
+      if (localStorage.getItem("sidebar_repliee") === "1") {
+        document.documentElement.classList.add("sidebar-pre-collapsed");
+      }
+    } catch (_) {}
+  </script>
+</head>
+<body>
+<div class="app">
+
+  <!-- ════════════ SIDEBAR ════════════ -->
+  <aside class="sidebar" data-sidebar>
+    <button class="sidebar__toggle" data-sidebar-toggle title="Replier / déplier le menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="brand">
+      <div class="brand__mark">
+        <!-- viseur : rappel du "chasseur" -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round">
+          <circle cx="12" cy="12" r="7"/><line x1="12" y1="1" x2="12" y2="4"/>
+          <line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/>
+          <line x1="20" y1="12" x2="23" y2="12"/><circle cx="12" cy="12" r="1.5" fill="#fff"/>
+        </svg>
+      </div>
+      <div>
+        <div class="brand__name">Chasseur</div>
+        <div class="brand__sub" data-brand-sub>alternance</div>
+      </div>
+    </div>
+    <div class="mode-switch" data-mode-switch>
+      <button class="mode-switch__btn" data-mode-btn="alternance">Alternance</button>
+      <button class="mode-switch__btn" data-mode-btn="job">Job</button>
+    </div>
+
+    <nav class="nav">
+      <p class="nav__label">Recherche</p>
+      <button class="nav__item is-active" data-page="offres">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+        <span>Offres</span><span class="nav__count" data-count="offres">0</span>
+      </button>
+      <button class="nav__item" data-page="spontanees">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14"/><path d="M9 9h.01M9 13h.01M9 17h.01"/></svg>
+        <span>Spontanées</span><span class="nav__count" data-count="spontanees">0</span>
+      </button>
+
+      <p class="nav__label">Suivi</p>
+      <button class="nav__item" data-page="candidatures">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        <span>Candidatures</span><span class="nav__count" data-count="candidatures">0</span>
+      </button>
+      <button class="nav__item" data-page="spontanees-suivi">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
+        <span>Spontanées envoyées</span><span class="nav__count" data-count="spontanees-suivi">0</span>
+      </button>
+
+      <p class="nav__label">Mon compte</p>
+      <button class="nav__item" data-page="profil">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        <span>Profil</span>
+      </button>
+    </nav>
+
+    <div class="sidefoot">
+      <div class="sidefoot__row"><span>Emails trouvés</span><span data-stat="avec_email">—</span></div>
+      <div class="sidefoot__row"><span>Envoyés</span><span data-stat="envoyes">—</span></div>
+      <div class="sidefoot__bar"><div class="sidefoot__fill" data-stat="taux-bar" style="width:0%"></div></div>
+      <p class="sidefoot__pct" data-stat="taux">— de taux d'envoi</p>
+      <a href="/logout" class="sidefoot__logout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        Déconnexion
+      </a>
+    </div>
+  </aside>
+
+  <!-- ════════════ MAIN ════════════ -->
+  <main class="main">
+    <div class="topbar">
+      <h1 class="topbar__title" data-topbar="title">Offres d'alternance</h1>
+      <span class="topbar__badge" data-topbar="badge">—</span>
+      <div class="topbar__actions">
+        <label class="search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input type="search" placeholder="Rechercher…" data-search>
+        </label>
+        <button class="btn btn--primary" data-topbar="action">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
+          <span data-topbar="action-label">Lancer la recherche</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="content">
+      <!-- bandeau d'état des pipelines en cours -->
+      <div class="runbar" data-runbar>
+        <span class="runbar__dot"></span>
+        <span class="runbar__msg" data-runbar-msg>Traitement en cours — cela peut prendre du temps, y compris l'arrêt. Garde cet onglet ouvert et l'ordinateur allumé.</span>
+        <div class="runbar__progress" data-runbar-progress>
+          <div class="runbar__progress-track"><div class="runbar__progress-bar" data-runbar-bar></div></div>
+          <span class="runbar__progress-pct" data-runbar-pct></span>
+        </div>
+        <button class="btn btn--sm" data-runbar-stop>Arrêter</button>
+      </div>
+
+      {% include "partials/offres.html" %}
+      {% include "partials/candidatures.html" %}
+      {% include "partials/spontanees.html" %}
+      {% include "partials/spontanees_suivi.html" %}
+      {% include "partials/profil.html" %}
+    </div>
+  </main>
+</div>
+
+<!-- Modale lettre -->
+<div class="modal-bg" data-modal>
+  <div class="modal">
+    <div class="modal__head">
+      <span class="modal__title" data-modal-title>Lettre de motivation</span>
+      <button class="btn btn--ghost btn--sm" data-modal-close>Fermer</button>
+    </div>
+    <div class="modal__body">
+      <textarea class="modal__letter" data-modal-letter spellcheck="false"></textarea>
+    </div>
+    <div class="modal__foot">
+      <button class="btn" data-modal-pdf>Télécharger en PDF</button>
+      <button class="btn btn--signal" data-modal-save>Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bascule de mode (alternance / job) -->
+<script>
+  (function () {
+    const htmlMode = document.documentElement.getAttribute("data-mode") || "alternance";
+    // Marquer le bon bouton actif
+    document.querySelectorAll("[data-mode-btn]").forEach(btn => {
+      btn.classList.toggle("is-active", btn.dataset.modeBtn === htmlMode);
+      btn.addEventListener("click", async () => {
+        const choisi = btn.dataset.modeBtn;
+        if (choisi === htmlMode) return;   // déjà dessus
+        try {
+          await fetch("/api/mode", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ mode: choisi }),
+          });
+          location.reload();   // recharge dans le nouveau mode
+        } catch (_) {}
+      });
+    });
+    // Ajuster le sous-titre du brand
+    const sub = document.querySelector("[data-brand-sub]");
+    if (sub) sub.textContent = (htmlMode === "job") ? "job" : "alternance";
+  })();
+</script>
+
+<!-- Modules JS (servis depuis /static) -->
+<script type="module" src="/static/js/app.js"></script>
+</body>
+</html>

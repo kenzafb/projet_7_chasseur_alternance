@@ -1,0 +1,350 @@
+<!-- ════════════ PAGE PROFIL ════════════ -->
+<section class="page" data-page-content="profil">
+
+  <!-- Bandeau d'accueil / onboarding -->
+  <div class="profil-intro" data-profil-intro>
+    <div class="profil-intro__txt">
+      <strong>Ton profil, c'est le carburant du Chasseur.</strong>
+      Plus il est complet, meilleures sont les analyses d'offres et les lettres générées.
+      Compte une dizaine de minutes pour tout remplir — tu pourras modifier à tout moment.
+    </div>
+  </div>
+
+  <!-- ─── Section 1 : Identité (commun) ─── -->
+  <div class="card profil-card" data-mode-section="commun">
+    <div class="profil-card__head">
+      <span class="profil-card__num">01</span>
+      <div>
+        <h3 class="profil-card__title">Identité</h3>
+        <p class="profil-card__sub">Tes coordonnées, utilisées dans les lettres et les emails.</p>
+      </div>
+    </div>
+
+    <div class="profil-grid">
+      <label class="field">
+        <span class="field__label">Prénom</span>
+        <input class="field__input" type="text" data-profil="prenom" placeholder="Kenza">
+      </label>
+      <label class="field">
+        <span class="field__label">Nom</span>
+        <input class="field__input" type="text" data-profil="nom" placeholder="Filali-Bouami">
+      </label>
+      <label class="field">
+        <span class="field__label">Email de contact</span>
+        <input class="field__input" type="email" data-profil="email" placeholder="prenom@email.com">
+      </label>
+      <label class="field">
+        <span class="field__label">Téléphone</span>
+        <input class="field__input" type="tel" data-profil="telephone" placeholder="06 12 34 56 78">
+      </label>
+      <label class="field">
+        <span class="field__label">Ville</span>
+        <input class="field__input" type="text" data-profil="ville" placeholder="Paris 9e">
+      </label>
+      <label class="field">
+        <span class="field__label">LinkedIn</span>
+        <input class="field__input" type="url" data-profil="linkedin" placeholder="https://linkedin.com/in/...">
+      </label>
+      <label class="field">
+        <span class="field__label">GitHub</span>
+        <input class="field__input" type="url" data-profil="github" placeholder="https://github.com/...">
+      </label>
+    </div>
+  </div>
+
+  <!-- ─── Section 2 : Parcours (alternance) ─── -->
+  <div class="card profil-card" data-mode-section="alternance">
+    <div class="profil-card__head">
+      <span class="profil-card__num">02</span>
+      <div>
+        <h3 class="profil-card__title">Parcours</h3>
+        <p class="profil-card__sub">Ta formation et ton expérience, utilisées pour évaluer les offres.</p>
+      </div>
+    </div>
+
+    <div class="profil-grid">
+      <label class="field field--full">
+        <span class="field__label">Formation</span>
+        <textarea class="field__area" data-profil="formation" rows="5"
+          placeholder="- DSP DevOps (Bac+1), CNAM Paris (2025-2026)&#10;- DEUST IOSI en alternance (rentrée 2026)&#10;..."></textarea>
+        <span class="field__hint">Une ligne par diplôme. Indique le niveau, l'intitulé, l'établissement et les dates.</span>
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Niveau d'études visé</span>
+        <input class="field__input" type="text" data-profil="niveau_vise"
+          placeholder="Bac+2 (DEUST Informatique) — ce que le contrat prépare">
+        <span class="field__hint">Le diplôme que cette alternance prépare. Sert à écarter les offres demandant un niveau trop élevé.</span>
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Ce que ta formation va t'apporter</span>
+        <textarea class="field__area" data-profil="formation_apporte" rows="3"
+          placeholder="Java, sécurité, bases de données, POO… (ou pour l'immobilier : droit immobilier, gestion locative, négociation…)"></textarea>
+        <span class="field__hint">Les compétences que tu vas acquérir pendant ta formation. Évite d'être pénalisé sur ce que tu apprends justement.</span>
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Ce que tu préfères éviter <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
+        <textarea class="field__area" data-profil="criteres_eviter" rows="2"
+          placeholder="Ex. postes 100% Windows/Active Directory, déplacements fréquents…"></textarea>
+        <span class="field__hint">Types de postes ou missions que tu préfères éviter. Laisse vide si tu n'as pas de préférence.</span>
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Expérience professionnelle</span>
+        <textarea class="field__area" data-profil="experience" rows="5"
+          placeholder="- Stage technicien au Garage Numérique (2026) : maintenance, Linux, support&#10;..."></textarea>
+        <span class="field__hint">Stages, jobs, missions. Décris brièvement les tâches techniques.</span>
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Langues</span>
+        <input class="field__input" type="text" data-profil="langues"
+          placeholder="Français (natif), Anglais (B2), Espagnol (A2)">
+      </label>
+    </div>
+  </div>
+
+  <!-- ─── Section 3 : Compétences (alternance) ─── -->
+  <div class="card profil-card" data-mode-section="alternance">
+    <div class="profil-card__head">
+      <span class="profil-card__num">03</span>
+      <div>
+        <h3 class="profil-card__title">Compétences techniques</h3>
+        <p class="profil-card__sub">Ajoute tes compétences une par une. L'IA s'en sert pour matcher les offres.</p>
+      </div>
+    </div>
+
+    <div class="tags" data-tags="competences"></div>
+    <input class="field__input tags__input" data-tags-input="competences"
+           type="text" placeholder="Tape une compétence et appuie sur Entrée (ex. Linux, Docker, Python…)">
+  </div>
+
+  <!-- ─── Section 4 : Projets (alternance) ─── -->
+  <div class="card profil-card" data-mode-section="alternance">
+    <div class="profil-card__head">
+      <span class="profil-card__num">04</span>
+      <div>
+        <h3 class="profil-card__title">Projets</h3>
+        <p class="profil-card__sub">Tes projets techniques. Cités dans l'analyse et valorisés auprès des recruteurs.</p>
+      </div>
+    </div>
+
+    <div class="projets" data-projets></div>
+    <button class="btn" type="button" data-projet-add>+ Ajouter un projet</button>
+  </div>
+
+  <!-- ─── Section 5 : Lettre type (alternance) ─── -->
+  <div class="card profil-card" data-mode-section="alternance">
+    <div class="profil-card__head">
+      <span class="profil-card__num">05</span>
+      <div>
+        <h3 class="profil-card__title">Lettre de motivation type</h3>
+        <p class="profil-card__sub">Ta trame de lettre. L'IA remplacera seulement le paragraphe sur l'entreprise.</p>
+      </div>
+    </div>
+    <div class="profil-aide">
+      <strong>Important :</strong> insère <code>{paragraphe_entreprise}</code> à l'endroit où l'IA doit écrire
+      le paragraphe personnalisé sur l'entreprise. Tu peux aussi utiliser <code>{contact_entreprise}</code>
+      (bloc destinataire) et <code>{date}</code>. N'utilise pas d'autres accolades.
+    </div>
+    <label class="field field--full">
+      <textarea class="field__area" data-profil="lettre_type" rows="14"
+        placeholder="{contact_entreprise}&#10;&#10;Paris, le {date}&#10;&#10;Objet : ...&#10;&#10;Madame, Monsieur,&#10;&#10;...&#10;&#10;{paragraphe_entreprise}&#10;&#10;..."></textarea>
+    </label>
+  </div>
+
+  <!-- ─── Section 6 : Mail type (commun) ─── -->
+  <div class="card profil-card" data-mode-section="commun">
+    <div class="profil-card__head">
+      <span class="profil-card__num">06</span>
+      <div>
+        <h3 class="profil-card__title">Email de candidature spontanée</h3>
+        <p class="profil-card__sub">Le message envoyé aux entreprises lors des candidatures spontanées.</p>
+      </div>
+    </div>
+    <label class="field field--full">
+      <textarea class="field__area" data-profil="email_type" rows="12"
+        placeholder="Bonjour,&#10;&#10;Je me permets de vous contacter pour une candidature spontanée...&#10;&#10;Cordialement,&#10;Prénom Nom"></textarea>
+      <span class="field__hint">Texte simple, sans placeholder. Termine par tes coordonnées (nom, téléphone, liens).</span>
+    </label>
+  </div>
+
+  <!-- ─── Section 7 : Critères de recherche (alternance) ─── -->
+  <div class="card profil-card" data-mode-section="alternance">
+    <div class="profil-card__head">
+      <span class="profil-card__num">07</span>
+      <div>
+        <h3 class="profil-card__title">Critères de recherche</h3>
+        <p class="profil-card__sub">Ce que tu cherches. Utilisé pour cibler les offres.</p>
+      </div>
+    </div>
+
+    <div class="profil-grid">
+      <label class="field">
+        <span class="field__label">Type de contrat</span>
+        <input class="field__input" type="text" data-rech="type_contrat" value="alternance" readonly
+               style="background:var(--surface-2,#f5f5f5);cursor:not-allowed;">
+        <span class="field__hint">Le Chasseur recherche uniquement des alternances.</span>
+      </label>
+      <label class="field">
+        <span class="field__label">Localisation</span>
+        <input class="field__input" type="text" data-rech="localisation" value="Île-de-France" readonly
+               style="background:var(--surface-2,#f5f5f5);cursor:not-allowed;">
+        <span class="field__hint">Pour l'instant, le Chasseur recherche uniquement en Île-de-France.</span>
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Disponibilité</span>
+        <input class="field__input" type="text" data-rech="disponibilite" placeholder="septembre 2026">
+      </label>
+    </div>
+
+    <div style="margin-top:14px;">
+      <span class="field__label">Domaines recherchés</span>
+      <p class="profil-card__sub" style="margin:4px 0 10px;">Coche les domaines qui t'intéressent. Ils déterminent quelles offres le Chasseur va chercher pour toi.</p>
+      <div class="domaines-choix" data-domaines-choix>
+        <!-- cases à cocher injectées par profil.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Section 8 : Pièces jointes (commun) ─── -->
+  <div class="card profil-card" data-mode-section="commun">
+    <div class="profil-card__head">
+      <span class="profil-card__num">08</span>
+      <div>
+        <h3 class="profil-card__title">Pièces jointes</h3>
+        <p class="profil-card__sub">CV, lettre de recommandation, etc. Jointes aux candidatures spontanées (PDF, max 5 Mo).</p>
+      </div>
+    </div>
+
+    <div class="pj-list" data-pj-list></div>
+
+    <div class="pj-add">
+      <input type="file" accept="application/pdf" data-pj-file id="pj-file" hidden>
+      <label for="pj-file" class="btn">Choisir un PDF</label>
+      <span class="pj-add__fname" data-pj-fname>Aucun fichier</span>
+      <button class="btn btn--signal" type="button" data-pj-upload>Téléverser</button>
+    </div>
+    <span class="field__hint">Le nom du fichier sera utilisé comme nom du document. Tu peux en ajouter plusieurs.</span>
+  </div>
+
+  <!-- ════════ SECTIONS MODE JOB ════════ -->
+
+  <!-- ─── Job A : Ce que tu as (job) ─── -->
+  <div class="card profil-card" data-mode-section="job">
+    <div class="profil-card__head">
+      <span class="profil-card__num">02</span>
+      <div>
+        <h3 class="profil-card__title">Ton profil</h3>
+        <p class="profil-card__sub">Ce que tu as déjà. Sert à juger si un job t'est accessible.</p>
+      </div>
+    </div>
+    <div class="profil-grid">
+      <label class="field field--full">
+        <span class="field__label">Niveau d'études obtenu</span>
+        <input class="field__input" type="text" data-profil="niveau_etudes"
+          placeholder="Ex. Bac + Bac+1 DevOps (CNAM)">
+        <span class="field__hint">Ton niveau actuel. Les offres exigeant un diplôme que tu n'as pas seront écartées.</span>
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Expérience professionnelle</span>
+        <textarea class="field__area" data-profil="experience" rows="4"
+          placeholder="- 1 mois en relation client / télécom&#10;- petits jobs, stages…"></textarea>
+        <span class="field__hint">Tout ce que tu as fait, même court. Les offres exigeant plus d'expérience que la tienne seront écartées.</span>
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Atouts / compétences</span>
+        <input class="field__input" type="text" data-profil="langues"
+          placeholder="Langues, permis B, savoir-être (ponctualité, contact client)…">
+        <span class="field__hint">Langues, permis, qualités utiles pour un job.</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- ─── Job B : Disponibilité & durée ─── -->
+  <div class="card profil-card" data-mode-section="job">
+    <div class="profil-card__head">
+      <span class="profil-card__num">03</span>
+      <div>
+        <h3 class="profil-card__title">Disponibilité &amp; durée</h3>
+        <p class="profil-card__sub">Quand tu peux travailler et pour combien de temps.</p>
+      </div>
+    </div>
+    <div class="profil-grid">
+      <label class="field">
+        <span class="field__label">Durée souhaitée</span>
+        <input class="field__input" type="text" data-profil="duree_souhaitee"
+          placeholder="Ex. 1 à 2,5 mois">
+      </label>
+      <label class="field">
+        <span class="field__label">Disponibilité (dates)</span>
+        <input class="field__input" type="text" data-rech="disponibilite"
+          placeholder="Ex. de juillet à mi-septembre">
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Disponibilité horaire</span>
+        <input class="field__input" type="text" data-profil="dispo_horaires"
+          placeholder="Ex. journée, soir et week-end OK">
+        <span class="field__hint">Beaucoup de jobs d'été sont en horaires décalés (resto, événementiel…).</span>
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Mobilité</span>
+        <input class="field__input" type="text" data-profil="mobilite"
+          placeholder="Ex. permis B, mobile sur Paris et petite couronne">
+      </label>
+    </div>
+  </div>
+
+  <!-- ─── Job C : Préférences de jobs ─── -->
+  <div class="card profil-card" data-mode-section="job">
+    <div class="profil-card__head">
+      <span class="profil-card__num">04</span>
+      <div>
+        <h3 class="profil-card__title">Tes préférences de jobs</h3>
+        <p class="profil-card__sub">Ce que tu acceptes ou non. Affine le tri des offres.</p>
+      </div>
+    </div>
+    <div class="profil-grid">
+      <label class="field field--full">
+        <span class="field__label">Types de jobs qui te vont</span>
+        <textarea class="field__area" data-profil="types_jobs_ok" rows="2"
+          placeholder="Ex. vente, accueil, restauration, manutention, saisie…"></textarea>
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Types de jobs à éviter <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
+        <textarea class="field__area" data-profil="types_jobs_eviter" rows="2"
+          placeholder="Ex. garde d'enfants, démarchage téléphonique…"></textarea>
+      </label>
+    </div>
+  </div>
+
+  <!-- ─── Job D : Préférences fines (optionnelles) ─── -->
+  <div class="card profil-card" data-mode-section="job">
+    <div class="profil-card__head">
+      <span class="profil-card__num">05</span>
+      <div>
+        <h3 class="profil-card__title">Localisation &amp; domaines préférés <span style="opacity:.6;font-weight:400;font-size:.8em;">(optionnel)</span></h3>
+        <p class="profil-card__sub">Si tu remplis, l'analyse favorisera ces offres. Sinon, elle juge juste l'accessibilité.</p>
+      </div>
+    </div>
+    <div class="profil-grid">
+      <label class="field field--full">
+        <span class="field__label">Localisation préférée <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
+        <input class="field__input" type="text" data-profil="localisation_pref"
+          placeholder="Ex. Paris 9e de préférence, plus on s'éloigne moins ça me va">
+        <span class="field__hint">La recherche reste en Île-de-France. Ceci influence seulement le tri des offres.</span>
+      </label>
+    </div>
+    <div style="margin-top:14px;">
+      <span class="field__label">Domaines préférés <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
+      <p class="profil-card__sub" style="margin:4px 0 10px;">La recherche scanne tous les domaines. Coche pour favoriser certains dans l'analyse (ou laisse vide).</p>
+      <div class="domaines-choix" data-domaines-choix-job>
+        <!-- cases injectées par profil.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Barre d'enregistrement -->
+  <div class="profil-save">
+    <span class="profil-save__status" data-profil-status></span>
+    <button class="btn btn--signal" data-profil-save>Enregistrer mon profil</button>
+  </div>
+
+</section>

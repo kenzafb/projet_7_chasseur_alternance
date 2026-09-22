@@ -18,3 +18,5 @@ openpyxl==3.1.5
 
 # Outils
 python-dotenv==1.2.2
+
+mistralai

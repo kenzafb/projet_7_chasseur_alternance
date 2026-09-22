@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Connexion — Chasseur d'Alternance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "Inter", sans-serif; background: #15191E; color: #15191E;
+           display: grid; place-items: center; min-height: 100vh; padding: 20px; }
+    .box { background: #fff; border-radius: 14px; padding: 36px 32px; width: 100%; max-width: 380px;
+           box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+    .mark { width: 44px; height: 44px; border-radius: 11px; margin: 0 auto 18px;
+            background: linear-gradient(150deg,#2F5BEA,#1B2C7A); display: grid; place-items: center; }
+    h1 { font-family: "Space Grotesk", sans-serif; font-size: 21px; text-align: center; margin-bottom: 4px; }
+    .sub { text-align: center; color: #6B7682; font-size: 13px; margin-bottom: 26px; }
+    label { display: block; font-size: 12.5px; font-weight: 600; margin: 14px 0 5px; }
+    input { width: 100%; padding: 10px 12px; border: 1px solid #E6E8EC; border-radius: 8px;
+            font-size: 14px; font-family: inherit; }
+    input:focus { outline: none; border-color: #2F5BEA; }
+    button { width: 100%; margin-top: 22px; padding: 11px; background: #15191E; color: #fff;
+             border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer;
+             font-family: inherit; }
+    button:hover { background: #1F262E; }
+    .err { background: #FCEBEC; color: #C0353A; font-size: 13px; padding: 9px 12px;
+           border-radius: 8px; margin-bottom: 16px; }
+    .alt { text-align: center; margin-top: 18px; font-size: 13px; color: #6B7682; }
+    .alt a { color: #2F5BEA; font-weight: 600; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="mark">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round">
+        <circle cx="12" cy="12" r="7"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/>
+        <line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><circle cx="12" cy="12" r="1.5" fill="#fff"/>
+      </svg>
+    </div>
+    <h1>Chasseur d'Alternance</h1>
+    <p class="sub">Connecte-toi pour accéder à ton espace</p>
+
+    {% if erreur %}<div class="err">{{ erreur }}</div>{% endif %}
+
+    <form method="post" action="/login">
+      <label>Email</label>
+      <input type="email" name="email" required autofocus>
+      <label>Mot de passe</label>
+      <input type="password" name="mot_de_passe" required>
+      <button type="submit">Se connecter</button>
+    </form>
+
+    <p class="alt">Pas encore de compte ? <a href="/register">Créer un compte</a></p>
+  </div>
+</body>
+</html>

@@ -12,9 +12,10 @@ var sidebarOpen = false;
 var CFA_NOMS = [
     'iscod','scholia','imc alternance','mydigitalschool','simplon','afpa',
     'epitech','openclassrooms','studi','ikigai','la plateforme','digital campus',
-    'm2i','doranco','efficom','hitema','h3 hitema','isefac','sup de vinci'
+    'm2i','doranco','efficom','hitema','h3 hitema','isefac','sup de vinci','groupe igf',
+    'cfa insta',
 ];
-var CFA_MOTS = ['organisme de formation','centre de formation',' cfa ','le cfa '];
+var CFA_MOTS = ['organisme de formation','centre de formation',' cfa ','le cfa ','centre de formation groupe'];
 
 function raisonArchive(o) {
     var entreprise = (o.entreprise || '').toLowerCase();
@@ -266,6 +267,8 @@ function afficherCandidatures() {
             +'<div class="cc-actions">'
             +'<a class="btn btn-secondary" style="font-size:.68rem;padding:4px 10px;text-decoration:none" href="'+esc(o.lien)+'" target="_blank">Voir l\'offre</a>'
             +'<select onchange="changerStatutCand(\''+o.id+'\',this.value)" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:var(--radius);padding:4px 8px;font-family:DM Mono,monospace;font-size:.68rem;outline:none">'
+            +'<option value="nouveau"'+(o.statut==='nouveau'?' selected':'')+'>↩ Remettre en Offres</option>'
+            +'<option value="en_cours"'+(o.statut==='en_cours'?' selected':'')+'>↩ En cours</option>'
             +'<option value="envoye"'+(o.statut==='envoye'?' selected':'')+'>Envoyée</option>'
             +'<option value="reponse"'+(o.statut==='reponse'?' selected':'')+'>Réponse reçue</option>'
             +'<option value="entretien"'+(o.statut==='entretien'?' selected':'')+'>Entretien</option>'
@@ -278,8 +281,14 @@ async function changerStatutCand(id, statut) {
     await fetch('/api/maj_statut',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id:id,statut:statut})});
     var c = candidatures.find(function(c){return c.id===id;});
     if (c) c.statut = statut;
-    mettreAJourStats(); afficherCandidatures();
-    toast('Statut mis à jour !','ok');
+    mettreAJourStats();
+    if (['nouveau','en_cours'].includes(statut)) {
+        afficherSection('offres');
+        toast('Offre remise dans les offres !', 'ok');
+    } else {
+        afficherCandidatures();
+        toast('Statut mis à jour !', 'ok');
+    }
 }
 
 // ─── CONSTRUCTION OFFRE ──────────────────────
@@ -486,19 +495,10 @@ async function postulerFranceTravail(id, lien) {
         body: JSON.stringify({id: id, lettre: lt})
     });
     var data2 = await r2.json();
-    if (!data2.ok) {
-        toast('Erreur génération lettre', 'err');
-    }
-    var c = candidatures.find(function(c){return c.id===id;});
-    if (c) {
-        c.statut = 'envoye';
-        fetch('/api/maj_statut', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({id: id, statut: 'envoye'})
-        });
-        mettreAJourStats();
-        toast('✅ Lettre prête — candidature marquée Envoyée !', 'ok');
+    if (data2.ok) {
+        toast('✅ Page FT ouverte + lettre PDF prête — marque "Envoyée" quand c\'est fait !', 'ok');
+    } else {
+        toast('Page FT ouverte — pense à générer la lettre', 'ok');
     }
 }
 
@@ -557,27 +557,24 @@ async function chargerStatsSpontanees() {
 
     document.getElementById('sp-raw').textContent   = s.raw   || 0;
     document.getElementById('sp-email').textContent = s.avec_email || 0;
-    document.getElementById('sp-gen').textContent   = s.mail_generee || 0;
     document.getElementById('sp-env').textContent   = s.mail_envoye || 0;
 
     document.getElementById('stat-raw').textContent   = s.raw   ? s.raw + ' entrep.' : '—';
     document.getElementById('stat-email').textContent = s.avec_email ? s.avec_email + ' emails' : '—';
-    document.getElementById('stat-gen').textContent   = s.mail_generee ? s.mail_generee + ' générés' : '—';
     document.getElementById('stat-env').textContent   = s.mail_envoye ? s.mail_envoye + ' envoyés' : '—';
 
     document.getElementById('spont-status').textContent = s.message || 'Prêt';
 
-    ['fetch','scraper','generer','envoyer'].forEach(function(etape, i) {
+    ['fetch','scraper','envoyer'].forEach(function(etape, i) {
         var step = document.getElementById('pipe-'+(i+1));
         step.classList.remove('active','done');
         if (s.etape === etape) step.classList.add('active');
         if (i===0 && s.raw > 0 && !s.en_cours) step.classList.add('done');
         if (i===1 && s.avec_email > 0 && !s.en_cours) step.classList.add('done');
-        if (i===2 && s.mail_generee > 0 && !s.en_cours) step.classList.add('done');
-        if (i===3 && s.mail_envoye > 0 && !s.en_cours) step.classList.add('done');
+        if (i===2 && s.mail_envoye > 0 && !s.en_cours) step.classList.add('done');
     });
 
-    var btns = ['btn-fetch','btn-scraper','btn-generer','btn-envoyer','btn-test'];
+    var btns = ['btn-fetch','btn-scraper','btn-envoyer','btn-test'];
     btns.forEach(function(id) {
         var el = document.getElementById(id);
         if (el) el.disabled = s.en_cours;
@@ -608,7 +605,6 @@ async function spontLancer(etape, test) {
     var routes = {
         fetch:   '/api/spontanees/fetch',
         scraper: '/api/spontanees/scraper',
-        generer: '/api/spontanees/generer',
         envoyer: '/api/spontanees/envoyer',
     };
     var body = {};
@@ -619,7 +615,6 @@ async function spontLancer(etape, test) {
     var labels = {
         fetch:   'Fetch lancé...',
         scraper: 'Scraping lancé...',
-        generer: 'Génération lancée...',
         envoyer: test ? 'Envoi TEST lancé...' : 'Envoi lancé...',
     };
     toast(labels[etape], 'ok');

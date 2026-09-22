@@ -4,6 +4,7 @@ from france_travail.main import lancer_recherche, charger_candidatures, sauvegar
 from france_travail.generateur import generer_lettre
 from france_travail.analyseur import analyser_offre
 from france_travail.pdf_generator import generer_pdf_lettre
+from france_travail.scraper_lba import chercher_offres_lba
 from datetime import datetime
 import threading
 import collections
@@ -42,7 +43,7 @@ def index():
 def api_candidatures():
     return jsonify(charger_candidatures())
 
-# ─── France Travail ───────────────────────────────────────────────────────────
+# ─── France Travail + La Bonne Alternance ────────────────────────────────────
 
 @app.route("/api/recherche", methods=["POST"])
 def api_recherche():
@@ -51,12 +52,61 @@ def api_recherche():
 
     def lancer():
         etat_recherche["en_cours"] = True
-        etat_recherche["message"] = "Recherche des offres..."
-        log("🔍 Recherche France Travail démarrée")
         try:
+            # ── Étape 1 : France Travail ──────────────────────────────────
+            etat_recherche["message"] = "Recherche France Travail..."
+            log("🔍 Recherche France Travail démarrée")
             lancer_recherche(analyser=True, max_analyse=999)
+            log("✅ France Travail terminé")
+
+            # ── Étape 2 : La Bonne Alternance ────────────────────────────
+            etat_recherche["message"] = "Recherche La Bonne Alternance..."
+            log("🔍 Recherche La Bonne Alternance démarrée")
+
+            offres_lba = chercher_offres_lba()
+
+            if offres_lba:
+                # Charge les candidatures déjà sauvegardées (FT + anciennes)
+                candidatures_existantes = charger_candidatures()
+                ids_existants = {c["id"] for c in candidatures_existantes}
+
+                nouvelles_lba = [o for o in offres_lba if o["id"] not in ids_existants]
+                log(f"  {len(nouvelles_lba)} nouvelles offres LBA (hors doublons FT)")
+
+                if nouvelles_lba:
+                    # ── Étape 3 : Analyse des offres LBA ─────────────────
+                    etat_recherche["message"] = f"Analyse de {len(nouvelles_lba)} offres LBA..."
+                    log(f"🧠 Analyse des offres LBA...")
+
+                    analysees = []
+                    for i, offre in enumerate(nouvelles_lba, 1):
+                        try:
+                            etat_recherche["message"] = f"Analyse LBA {i}/{len(nouvelles_lba)}..."
+                            analyse = analyser_offre(offre)
+                            offre.update({
+                                "score":         analyse.get("score", 5),
+                                "verdict":       analyse.get("verdict", "moyen"),
+                                "eligible":      analyse.get("eligible", True),
+                                "points_forts":  analyse.get("points_forts", []),
+                                "points_faibles":analyse.get("points_faibles", []),
+                                "resume_analyse":analyse.get("resume", ""),
+                            })
+                            if analyse.get("statut_auto") == "archive":
+                                offre["statut"] = "archive"
+                        except Exception as e:
+                            log(f"  ⚠️ Erreur analyse LBA {offre.get('titre', '?')[:40]} : {e}")
+                        analysees.append(offre)
+
+                    # Sauvegarde fusionnée FT + LBA
+                    toutes = candidatures_existantes + analysees
+                    sauvegarder_candidatures(toutes)
+                    log(f"✅ {len(analysees)} offres LBA ajoutées et analysées")
+            else:
+                log("ℹ️  Aucune offre LBA récupérée")
+
             etat_recherche["message"] = "Terminé !"
-            log("✅ Recherche France Travail terminée")
+            log("✅ Recherche complète terminée")
+
         except Exception as e:
             etat_recherche["message"] = f"Erreur : {e}"
             log(f"❌ Erreur recherche : {e}")
@@ -99,10 +149,10 @@ def api_analyser():
     for c in candidatures:
         if c["id"] == offre_id:
             c.update({
-                "score": analyse.get("score", 5),
-                "verdict": analyse.get("verdict", "moyen"),
-                "eligible": analyse.get("eligible", True),
-                "points_forts": analyse.get("points_forts", []),
+                "score":          analyse.get("score", 5),
+                "verdict":        analyse.get("verdict", "moyen"),
+                "eligible":       analyse.get("eligible", True),
+                "points_forts":   analyse.get("points_forts", []),
                 "points_faibles": analyse.get("points_faibles", []),
                 "resume_analyse": analyse.get("resume", "")
             })
@@ -147,9 +197,9 @@ def api_sauvegarder():
     candidatures = charger_candidatures()
     for c in candidatures:
         if c["id"] == offre_id:
-            if "lettre" in data: c["lettre"] = data["lettre"]
-            if "email_candidature" in data: c["email_candidature"] = data["email_candidature"]
-            if "objet_email" in data: c["objet_email"] = data["objet_email"]
+            if "lettre" in data:             c["lettre"] = data["lettre"]
+            if "email_candidature" in data:  c["email_candidature"] = data["email_candidature"]
+            if "objet_email" in data:        c["objet_email"] = data["objet_email"]
             break
     sauvegarder_candidatures(candidatures)
     return jsonify({"ok": True})
@@ -189,11 +239,11 @@ def api_spontanees_stats():
             recentes = [e for e in entreprises if e.get("mail_envoye") or e.get("mail_generee")][-5:]
             stats["dernieres"] = [
                 {
-                    "nom": (e.get("nom_commercial") or e.get("nom", "?"))[:40],
-                    "ville": e.get("ville", ""),
-                    "email": (e.get("emails_trouves") or [""])[0],
+                    "nom":    (e.get("nom_commercial") or e.get("nom", "?"))[:40],
+                    "ville":  e.get("ville", ""),
+                    "email":  (e.get("emails_trouves") or [""])[0],
                     "envoye": e.get("mail_envoye", False),
-                    "date": e.get("mail_envoye_le", "")
+                    "date":   e.get("mail_envoye_le", "")
                 }
                 for e in recentes
             ]
@@ -263,32 +313,6 @@ def api_spontanees_scraper():
     threading.Thread(target=lancer, daemon=True).start()
     return jsonify({"status": "démarré"})
 
-@app.route("/api/spontanees/generer", methods=["POST"])
-def api_spontanees_generer():
-    if etat_spontanees["en_cours"]:
-        return jsonify({"erreur": "Pipeline déjà en cours"}), 400
-
-    def lancer():
-        _stop_event.clear()
-        etat_spontanees.update({"en_cours": True, "etape": "generer",
-                                 "message": "Génération des mails personnalisés..."})
-        log("▶ Génération mails démarrée")
-        try:
-            from spontanees.generateur_mail import main as gen_main
-            gen_main(stop_event=_stop_event, log_fn=log)
-            if _stop_event.is_set():
-                etat_spontanees["message"] = "Arrêté — données sauvegardées"
-            else:
-                etat_spontanees["message"] = "Génération terminée !"
-                log("✅ Génération terminée")
-        except Exception as e:
-            etat_spontanees["message"] = f"Erreur génération : {e}"
-            log(f"❌ Erreur génération : {e}")
-        finally:
-            etat_spontanees.update({"en_cours": False, "etape": None})
-
-    threading.Thread(target=lancer, daemon=True).start()
-    return jsonify({"status": "démarré"})
 
 @app.route("/api/spontanees/envoyer", methods=["POST"])
 def api_spontanees_envoyer():
