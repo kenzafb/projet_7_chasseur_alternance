@@ -2,7 +2,7 @@
 
 Application web (FastAPI) qui automatise une recherche d'alternance ou de job court en Île-de-France : collecte des offres France Travail et La Bonne Alternance, analyse de chaque offre par Mistral AI, génération de lettres de motivation, et pipeline de candidatures spontanées (entreprises INSEE Sirene, recherche des emails de contact, envoi SMTP). Comptes utilisateurs multiples, un profil par utilisateur et par mode (`alternance`, `job`), données en SQLite.
 
-Projet en cours de refonte. L'état des lieux détaillé est dans `ARCHITECTURE_ACTUELLE.md`, le ménage de la phase 0 dans `PHASE_0_RAPPORT.md`.
+Projet en cours de refonte. L'état des lieux détaillé est dans `docs/ARCHITECTURE_ACTUELLE.md`, le ménage de la phase 0 dans `docs/PHASE_0_RAPPORT.md`.
 
 ## Structure
 
