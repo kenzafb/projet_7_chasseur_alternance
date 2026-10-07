@@ -43,9 +43,14 @@
     <h1>Créer un compte</h1>
     <p class="sub">Rejoins le Chasseur d'Alternance</p>
 
+    {% if not ouverte %}
+    <div class="err">Les inscriptions sont fermées pour le moment.</div>
+    {% else %}
     {% if erreur %}<div class="err">{{ erreur }}</div>{% endif %}
 
     <form method="post" action="/register">
+      <label>Code d'invitation</label>
+      <input type="text" name="code_invitation" required autocomplete="off">
       <div class="row">
         <div><label>Prénom</label><input type="text" name="prenom"></div>
         <div><label>Nom</label><input type="text" name="nom"></div>
@@ -53,9 +58,10 @@
       <label>Email</label>
       <input type="email" name="email" required>
       <label>Mot de passe</label>
-      <input type="password" name="mot_de_passe" required minlength="6">
+      <input type="password" name="mot_de_passe" required minlength="{{ longueur_min }}">
       <button type="submit">Créer mon compte</button>
     </form>
+    {% endif %}
 
     <p class="alt">Déjà un compte ? <a href="/login">Se connecter</a></p>
   </div>

@@ -4,8 +4,14 @@
    que des fonctions, jamais des URL.
    ============================================================================ */
 
+/* Session absente ou expirée : retour à la page de connexion */
+function verifierSession(r) {
+  if (r.status === 401) window.location.href = "/login";
+}
+
 async function get(url) {
   const r = await fetch(url);
+  verifierSession(r);
   if (!r.ok) throw new Error(`GET ${url} → ${r.status}`);
   return r.json();
 }
@@ -16,6 +22,7 @@ async function post(url, body) {
     headers: { "Content-Type": "application/json" },
     body: body ? JSON.stringify(body) : "{}",
   });
+  verifierSession(r);
   if (!r.ok) {
     let detail = "";
     try { detail = (await r.json()).erreur || ""; } catch (_) {}

@@ -30,6 +30,8 @@ pip install -r requirements.txt
 cp .env.example .env    # puis remplir les clés
 ```
 
+Dans `.env`, `SECRET_KEY` est obligatoire (32 caractères minimum, l'application refuse de démarrer sinon). `CODE_INVITATION` ouvre l'inscription : sans lui, `/register` est fermé. `COOKIE_SECURE=true` en production derrière HTTPS.
+
 La base `data/chasseur.db` doit exister. Pour une base neuve, `database.connexion.creer_tables()` crée les tables à partir de `database/models.py`.
 
 ## Lancement
@@ -39,7 +41,7 @@ uvicorn main:app --reload --port 5002
 # ou : python main.py
 ```
 
-Puis http://localhost:5002 (redirige vers `/login`, inscription sur `/register`). Documentation de l'API : http://localhost:5002/docs.
+Puis http://localhost:5002 (redirige vers `/login`, inscription sur `/register` avec le code d'invitation). Documentation de l'API, une fois connecté : http://localhost:5002/docs.
 
 L'envoi des candidatures spontanées existe aussi en ligne de commande :
 

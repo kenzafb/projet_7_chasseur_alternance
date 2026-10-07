@@ -22,6 +22,7 @@ from database.models import User, Profil, Candidature, Entreprise
 
 # fastapi-users fournit le même hachage que celui utilisé au login
 from fastapi_users.password import PasswordHelper
+from auth.securite import LONGUEUR_MIN_MOT_DE_PASSE
 
 FICHIER_CANDIDATURES = str(DATA_DIR / "candidatures.json")
 FICHIER_ENTREPRISES  = str(DATA_DIR / "entreprises_enrichies.json")
@@ -81,8 +82,8 @@ def migrer():
             if mdp != mdp2:
                 print("❌ Les mots de passe ne correspondent pas. Migration annulée.")
                 return
-            if len(mdp) < 6:
-                print("❌ Mot de passe trop court (min 6 caractères). Migration annulée.")
+            if len(mdp) < LONGUEUR_MIN_MOT_DE_PASSE:
+                print(f"❌ Mot de passe trop court (min {LONGUEUR_MIN_MOT_DE_PASSE} caractères). Migration annulée.")
                 return
             hash_mdp = PasswordHelper().hash(mdp)
             user = User(email=email, mot_de_passe_hash=hash_mdp)

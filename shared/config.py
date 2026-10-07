@@ -18,7 +18,8 @@ from dotenv import load_dotenv
 
 # ─── Racine du projet + .env ──────────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env")
+# CHASSEUR_ENV_FILE permet aux tests de ne pas lire le vrai .env
+load_dotenv(os.getenv("CHASSEUR_ENV_FILE", BASE_DIR / ".env"))
 
 # ─── Chemins ──────────────────────────────────────────────────────────────────
 DATA_DIR        = BASE_DIR / "data"
@@ -29,6 +30,28 @@ STATIC_DIR      = BASE_DIR / "static"
 
 # Base de données : DATABASE_URL du .env si présente, sinon SQLite local
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATA_DIR / 'chasseur.db'}")
+
+# ─── Sécurité ─────────────────────────────────────────────────────────────────
+LONGUEUR_MIN_SECRET_KEY = 32
+
+def secret_key() -> str:
+    """Clé de signature des cookies de session. Pas de valeur de repli :
+    absente ou trop courte, l'application refuse de démarrer."""
+    cle = os.getenv("SECRET_KEY", "")
+    if len(cle) < LONGUEUR_MIN_SECRET_KEY:
+        raise RuntimeError(
+            f"SECRET_KEY absente ou trop courte ({LONGUEUR_MIN_SECRET_KEY} caractères minimum). "
+            "Génère-la avec : python -c \"import secrets; print(secrets.token_urlsafe(48))\" "
+            "puis ajoute-la au .env.")
+    return cle
+
+def code_invitation() -> str:
+    """Code exigé à l'inscription. Vide ou absent : inscriptions fermées.
+    Relu à chaque appel, pour qu'un changement d'environnement suffise."""
+    return os.getenv("CODE_INVITATION", "").strip()
+
+# Cookie de session réservé à HTTPS : true en production, false en local (http)
+COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").strip().lower() in ("1", "true", "oui", "yes")
 
 # ─── IA ───────────────────────────────────────────────────────────────────────
 MODELE_MISTRAL = "mistral-large-latest"

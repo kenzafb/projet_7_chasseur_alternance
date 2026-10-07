@@ -5,6 +5,7 @@ Briques de sécurité de l'authentification :
   - vérifier un mot de passe contre son hash
   - hacher un nouveau mot de passe (pour /register)
   - récupérer l'utilisateur actuellement connecté depuis la session
+  - utilisateur_requis : LA dépendance FastAPI de toutes les routes privées
 
 On réutilise le PasswordHelper de fastapi-users (déjà utilisé à la migration),
 donc les hashs créés hier restent valides.
@@ -17,6 +18,9 @@ from database.connexion import SessionLocal
 from database.models import User
 
 _pwd = PasswordHelper()
+
+# Pour les nouveaux comptes seulement : les hashs existants restent valides
+LONGUEUR_MIN_MOT_DE_PASSE = 10
 
 
 def verifier_mot_de_passe(mot_de_passe: str, hash_stocke: str) -> bool:
@@ -59,6 +63,24 @@ def utilisateur_courant(request: Request):
         return db.query(User).filter_by(id=user_id).first()
     finally:
         db.close()
+
+
+class NonConnecte(Exception):
+    """Levée par utilisateur_requis ; main.py la traduit en 401 JSON (/api)
+    ou en redirection vers /login (pages)."""
+
+
+def utilisateur_requis(request: Request) -> User:
+    """
+    Dépendance FastAPI unique pour les routes privées : renvoie l'utilisateur
+    connecté, ou lève NonConnecte. FastAPI la met en cache le temps d'une
+    requête, donc la base n'est lue qu'une fois même si elle est déclarée
+    à la fois sur le routeur et dans la signature de la route.
+    """
+    user = utilisateur_courant(request)
+    if not user:
+        raise NonConnecte()
+    return user
 
 
 def mode_courant(request) -> str:

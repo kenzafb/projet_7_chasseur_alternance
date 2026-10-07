@@ -17,14 +17,16 @@ import threading
 import collections
 from datetime import datetime
 
-from shared.config import BASE_DIR, STATIC_DIR, TEMPLATES_DIR, UPLOADS_DIR
-from fastapi import FastAPI, Request, Body, UploadFile, File, Form
+from shared.config import BASE_DIR, STATIC_DIR, TEMPLATES_DIR, UPLOADS_DIR, COOKIE_SECURE, secret_key
+from fastapi import FastAPI, APIRouter, Depends, Request, Body, UploadFile, File, Form
+from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from auth.routes import router as auth_router
-from auth.securite import utilisateur_courant, mode_courant
+from auth.securite import NonConnecte, utilisateur_requis, mode_courant
+from database.models import User
 from database.candidatures_db import lire_candidatures, lire_candidature, modifier_candidature, ajouter_candidature
 from database.profil_db import lire_profil, sauvegarder_profil, ajouter_piece_jointe, supprimer_piece_jointe
 from database.entreprises_db import calculer_stats, lire_entreprises_envoyees, modifier_statut_suivi
@@ -37,17 +39,35 @@ from france_travail.analyseur import analyser_offre, score_to_verdict, appliquer
 from france_travail.pdf_generator import generer_pdf_lettre
 from france_travail.scraper_lba import chercher_offres_lba
 
-app = FastAPI(title="Chasseur d'Alternance", version="15")
+# Documentation automatique désactivée ici : elle est servie plus bas par des
+# routes privées (/docs, /openapi.json), réservées aux utilisateurs connectés.
+app = FastAPI(title="Chasseur d'Alternance", version="15",
+              docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
-# Sessions signées (cookie de connexion). La clé vient du .env en prod.
+# Sessions signées (cookie de connexion). secret_key() lève une erreur si
+# SECRET_KEY est absente ou trop courte : l'app ne démarre pas sans elle.
 app.add_middleware(
     SessionMiddleware,
-    secret_key=os.getenv("SECRET_KEY", "dev-secret-a-changer-en-prod"),
+    secret_key=secret_key(),
     max_age=60 * 60 * 24 * 14,   # session valable 14 jours
+    same_site="lax",
+    https_only=COOKIE_SECURE,
 )
-app.include_router(auth_router)
+app.include_router(auth_router)   # /login, /logout, /register : publiques
+
+# Toutes les autres routes passent par ce routeur : utilisateur_requis
+# s'applique à chacune, qu'elle se serve de l'utilisateur ou non.
+prive = APIRouter(dependencies=[Depends(utilisateur_requis)])
+
+
+@app.exception_handler(NonConnecte)
+def non_connecte(request: Request, exc: NonConnecte):
+    """Sans session : 401 JSON pour l'API, redirection vers /login pour les pages."""
+    if request.url.path.startswith("/api/"):
+        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+    return RedirectResponse(url="/login", status_code=303)
 
 # ─── États des pipelines ──────────────────────────────────────────────────────
 etat_recherche  = {"en_cours": False, "message": "Prêt", "pourcentage": 0}
@@ -87,27 +107,21 @@ class Envoyer(BaseModel):
 
 # ─── Page + logs ──────────────────────────────────────────────────────────────
 
-@app.get("/")
+@prive.get("/")
 def index(request: Request):
-    user = utilisateur_courant(request)
-    if not user:
-        return RedirectResponse(url="/login", status_code=303)
     return templates.TemplateResponse(request, "base.html", {"mode": mode_courant(request)})
 
-@app.get("/api/logs")
+@prive.get("/api/logs")
 def api_logs():
     return list(_logs)
 
-@app.get("/api/candidatures")
-def api_candidatures(request: Request):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.get("/api/candidatures")
+def api_candidatures(request: Request, user: User = Depends(utilisateur_requis)):
     return lire_candidatures(user.id, mode=mode_courant(request))
 
 
 # ─── Profil utilisateur ───────────────────────────────────────────────────────
-@app.get("/api/mode")
+@prive.get("/api/mode")
 def api_get_mode(request: Request):
     """Mode actuel (alternance/job) + son label et sa couleur."""
     from shared.modes import get_mode
@@ -116,7 +130,7 @@ def api_get_mode(request: Request):
     return {"mode": cle, "label": m["label"], "couleur": m["couleur"]}
 
 
-@app.post("/api/mode")
+@prive.post("/api/mode")
 def api_set_mode(request: Request, body: dict = Body(...)):
     """Bascule le mode de chasse dans la session."""
     from shared.modes import MODES, MODE_DEFAUT
@@ -127,26 +141,20 @@ def api_set_mode(request: Request, body: dict = Body(...)):
     return {"ok": True, "mode": nouveau}
 
 
-@app.get("/api/domaines")
+@prive.get("/api/domaines")
 def api_domaines():
     """Liste des domaines disponibles pour le choix dans le profil."""
     from shared.domaines import labels_domaines
     return labels_domaines()
 
 
-@app.get("/api/profil")
-def api_get_profil(request: Request):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.get("/api/profil")
+def api_get_profil(request: Request, user: User = Depends(utilisateur_requis)):
     return lire_profil(user.id, mode=mode_courant(request))
 
 
-@app.post("/api/profil")
-def api_post_profil(request: Request, body: dict = Body(...)):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.post("/api/profil")
+def api_post_profil(request: Request, body: dict = Body(...), user: User = Depends(utilisateur_requis)):
     ok = sauvegarder_profil(user.id, body, mode=mode_courant(request))
     return {"ok": ok}
 
@@ -162,13 +170,11 @@ def _nom_fichier_sur(nom: str) -> str:
     nom = _re.sub(r"[^A-Za-z0-9._-]", "_", nom)
     return nom[:80] or "fichier.pdf"
 
-@app.post("/api/profil/upload")
+@prive.post("/api/profil/upload")
 async def api_profil_upload(request: Request,
                             nom: str = Form(""),
-                            fichier: UploadFile = File(...)):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+                            fichier: UploadFile = File(...),
+                            user: User = Depends(utilisateur_requis)):
     # Validation type PDF
     if not (fichier.filename or "").lower().endswith(".pdf"):
         return JSONResponse({"erreur": "Seuls les fichiers PDF sont acceptés"}, status_code=400)
@@ -191,11 +197,8 @@ async def api_profil_upload(request: Request,
     ajouter_piece_jointe(user.id, nom, str(chemin.relative_to(BASE_DIR)), mode=mode_courant(request))
     return {"ok": True, "nom": nom, "fichier": nom_fichier}
 
-@app.post("/api/profil/piece/supprimer")
-def api_profil_piece_supprimer(request: Request, body: dict = Body(...)):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.post("/api/profil/piece/supprimer")
+def api_profil_piece_supprimer(request: Request, body: dict = Body(...), user: User = Depends(utilisateur_requis)):
     nom = body.get("nom", "")
     # Retrouve le chemin pour supprimer le fichier du disque
     prof = lire_profil(user.id, mode=mode_courant(request))
@@ -208,11 +211,8 @@ def api_profil_piece_supprimer(request: Request, body: dict = Body(...)):
     supprimer_piece_jointe(user.id, nom, mode=mode_courant(request))
     return {"ok": True}
 
-@app.get("/api/profil/piece")
-def api_profil_piece_get(request: Request, nom: str):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.get("/api/profil/piece")
+def api_profil_piece_get(request: Request, nom: str, user: User = Depends(utilisateur_requis)):
     prof = lire_profil(user.id, mode=mode_courant(request))
     for pj in prof.get("pieces_jointes", []):
         if pj.get("nom") == nom and pj.get("fichier") and os.path.exists(pj["fichier"]):
@@ -222,11 +222,8 @@ def api_profil_piece_get(request: Request, nom: str):
 
 # ─── France Travail + La Bonne Alternance ────────────────────────────────────
 
-@app.post("/api/recherche")
-def api_recherche(request: Request):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.post("/api/recherche")
+def api_recherche(request: Request, user: User = Depends(utilisateur_requis)):
     if etat_recherche["en_cours"]:
         return JSONResponse({"erreur": "Recherche déjà en cours"}, status_code=400)
 
@@ -304,15 +301,12 @@ def api_recherche(request: Request):
     threading.Thread(target=lancer, daemon=True).start()
     return {"status": "démarré"}
 
-@app.get("/api/statut_recherche")
+@prive.get("/api/statut_recherche")
 def api_statut_recherche():
     return etat_recherche
 
-@app.post("/api/generer_lettre")
-def api_generer_lettre(body: OffreId, request: Request):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.post("/api/generer_lettre")
+def api_generer_lettre(body: OffreId, request: Request, user: User = Depends(utilisateur_requis)):
     offre = lire_candidature(user.id, body.id, mode=mode_courant(request))
     if not offre:
         return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
@@ -321,11 +315,8 @@ def api_generer_lettre(body: OffreId, request: Request):
     modifier_candidature(user.id, body.id, {"lettre": lettre, "statut": "en_cours"}, mode=mode_courant(request))
     return {"lettre": lettre}
 
-@app.post("/api/analyser")
-def api_analyser(body: OffreId, request: Request):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.post("/api/analyser")
+def api_analyser(body: OffreId, request: Request, user: User = Depends(utilisateur_requis)):
     offre = lire_candidature(user.id, body.id, mode=mode_courant(request))
     if not offre:
         return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
@@ -344,11 +335,8 @@ def api_analyser(body: OffreId, request: Request):
     modifier_candidature(user.id, body.id, modifs, mode=mode_courant(request))
     return analyse
 
-@app.post("/api/maj_statut")
-def api_maj_statut(body: MajStatut, request: Request):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.post("/api/maj_statut")
+def api_maj_statut(body: MajStatut, request: Request, user: User = Depends(utilisateur_requis)):
     modifs = {"statut": body.statut}
     if body.statut in ["envoye", "reponse", "entretien", "refus"]:
         offre = lire_candidature(user.id, body.id, mode=mode_courant(request))
@@ -357,20 +345,14 @@ def api_maj_statut(body: MajStatut, request: Request):
     modifier_candidature(user.id, body.id, modifs, mode=mode_courant(request))
     return {"ok": True}
 
-@app.post("/api/archiver")
-def api_archiver(body: OffreId, request: Request):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.post("/api/archiver")
+def api_archiver(body: OffreId, request: Request, user: User = Depends(utilisateur_requis)):
     modifier_candidature(user.id, body.id, {"statut": "archive"}, mode=mode_courant(request))
     return {"ok": True}
 
-@app.post("/api/offre/archivage")
-def api_offre_archivage(request: Request, body: dict = Body(...)):
+@prive.post("/api/offre/archivage")
+def api_offre_archivage(request: Request, body: dict = Body(...), user: User = Depends(utilisateur_requis)):
     """Gère la raison d'archivage et le désarchivage d'une offre."""
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
     offre_id = body.get("id")
     if not offre_id:
         return JSONResponse({"erreur": "id manquant"}, status_code=400)
@@ -385,11 +367,8 @@ def api_offre_archivage(request: Request, body: dict = Body(...)):
         modifier_candidature(user.id, offre_id, modifs, mode=mode_courant(request))
     return {"ok": True}
 
-@app.post("/api/sauvegarder")
-def api_sauvegarder(body: Sauvegarde, request: Request):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.post("/api/sauvegarder")
+def api_sauvegarder(body: Sauvegarde, request: Request, user: User = Depends(utilisateur_requis)):
     modifs = {}
     if body.lettre is not None:            modifs["lettre"] = body.lettre
     if body.email_candidature is not None: modifs["email_candidature"] = body.email_candidature
@@ -397,11 +376,8 @@ def api_sauvegarder(body: Sauvegarde, request: Request):
     modifier_candidature(user.id, body.id, modifs, mode=mode_courant(request))
     return {"ok": True}
 
-@app.post("/api/telecharger_pdf")
-def api_telecharger_pdf(body: TelechargerPdf, request: Request):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.post("/api/telecharger_pdf")
+def api_telecharger_pdf(body: TelechargerPdf, request: Request, user: User = Depends(utilisateur_requis)):
     offre = lire_candidature(user.id, body.id, mode=mode_courant(request))
     if not offre:
         return JSONResponse({"erreur": "Non trouvé"}, status_code=404)
@@ -414,30 +390,21 @@ def api_telecharger_pdf(body: TelechargerPdf, request: Request):
 
 
 # ─── Spontanées — Suivi des candidatures ──────────────────────────────────────
-@app.get("/api/spontanees/suivi")
-def api_spontanees_suivi(request: Request):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.get("/api/spontanees/suivi")
+def api_spontanees_suivi(request: Request, user: User = Depends(utilisateur_requis)):
     return lire_entreprises_envoyees(user.id)
 
 
-@app.post("/api/spontanees/suivi/statut")
-def api_spontanees_statut(request: Request, body: dict = Body(...)):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.post("/api/spontanees/suivi/statut")
+def api_spontanees_statut(request: Request, body: dict = Body(...), user: User = Depends(utilisateur_requis)):
     ok = modifier_statut_suivi(user.id, body.get("id"), body.get("statut", ""))
     return {"ok": ok}
 
 
 # ─── Spontanées — Stats ───────────────────────────────────────────────────────
 
-@app.get("/api/spontanees/stats")
-def api_spontanees_stats(request: Request):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.get("/api/spontanees/stats")
+def api_spontanees_stats(request: Request, user: User = Depends(utilisateur_requis)):
     # Lecture des stats depuis la base
     stats = calculer_stats(user.id)
     # On ajoute l'état du pipeline, géré en mémoire
@@ -447,18 +414,15 @@ def api_spontanees_stats(request: Request):
     stats["pourcentage"] = etat_spontanees.get("pourcentage", 0)
     return stats
 
-@app.post("/api/spontanees/stop")
+@prive.post("/api/spontanees/stop")
 def api_spontanees_stop():
     _stop_event.set()
     etat_spontanees["message"] = "Arrêt demandé — sauvegarde en cours..."
     log("⏹️  Arrêt demandé par l'utilisateur")
     return {"ok": True}
 
-@app.post("/api/spontanees/fetch")
-def api_spontanees_fetch(request: Request):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.post("/api/spontanees/fetch")
+def api_spontanees_fetch(request: Request, user: User = Depends(utilisateur_requis)):
     user_id = user.id
     if etat_spontanees["en_cours"]:
         return JSONResponse({"erreur": "Pipeline déjà en cours"}, status_code=400)
@@ -487,11 +451,8 @@ def api_spontanees_fetch(request: Request):
     threading.Thread(target=lancer, daemon=True).start()
     return {"status": "démarré"}
 
-@app.post("/api/spontanees/scraper")
-def api_spontanees_scraper(request: Request):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.post("/api/spontanees/scraper")
+def api_spontanees_scraper(request: Request, user: User = Depends(utilisateur_requis)):
     user_id = user.id
     if etat_spontanees["en_cours"]:
         return JSONResponse({"erreur": "Pipeline déjà en cours"}, status_code=400)
@@ -523,11 +484,8 @@ def api_spontanees_scraper(request: Request):
     threading.Thread(target=lancer, daemon=True).start()
     return {"status": "démarré"}
 
-@app.post("/api/spontanees/envoyer")
-def api_spontanees_envoyer(body: Envoyer, request: Request):
-    user = utilisateur_courant(request)
-    if not user:
-        return JSONResponse({"erreur": "Non connecté"}, status_code=401)
+@prive.post("/api/spontanees/envoyer")
+def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends(utilisateur_requis)):
     user_id = user.id
     if etat_spontanees["en_cours"]:
         return JSONResponse({"erreur": "Pipeline déjà en cours"}, status_code=400)
@@ -561,9 +519,23 @@ def api_spontanees_envoyer(body: Envoyer, request: Request):
     threading.Thread(target=lancer, daemon=True).start()
     return {"status": "démarré"}
 
-@app.get("/api/spontanees/statut")
+@prive.get("/api/spontanees/statut")
 def api_spontanees_etat():
     return etat_spontanees
+
+
+# ─── Documentation de l'API (connecté uniquement) ─────────────────────────────
+@prive.get("/openapi.json", include_in_schema=False)
+def openapi_json():
+    return app.openapi()
+
+@prive.get("/docs", include_in_schema=False)
+def docs():
+    return get_swagger_ui_html(openapi_url="/openapi.json", title=app.title + " : API")
+
+
+# Enregistré en dernier : include_router copie les routes déjà déclarées.
+app.include_router(prive)
 
 
 if __name__ == "__main__":
