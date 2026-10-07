@@ -59,7 +59,7 @@ def _nettoyer_contact(contact):
 
 def generer_lettre(offre, profil=None, mode="alternance"):
     """
-    Demande à Gemini uniquement :
+    Demande à Mistral uniquement :
     1. Le bloc contact de l'entreprise (coin haut gauche de la lettre)
     2. Le paragraphe de personnalisation (~3 phrases max)
 

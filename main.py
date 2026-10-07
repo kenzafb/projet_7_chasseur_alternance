@@ -1,24 +1,18 @@
 """
 main.py — Chasseur d'Alternance (FastAPI)
 =========================================
-Remplace app.py (Flask). Mêmes routes, mêmes modules métier importés.
+Application web : pages, routes /api, lancement des pipelines.
 
 Lancement :
     uvicorn main:app --reload --port 5002
     → http://localhost:5002
     → doc API auto-générée : http://localhost:5002/docs
 
-Différences avec Flask :
-  - render_template  → templates.TemplateResponse
-  - jsonify(x)       → on retourne directement x (dict / list)
-  - request.get_json → modèle Pydantic en paramètre
-  - send_file        → FileResponse
-Les pipelines longs tournent toujours dans des threads avec stop_event
-(inchangé par rapport à Flask : tes fonctions métier sont synchrones).
+Les pipelines longs (recherche, fetch, scraper, envoi) tournent dans des
+threads avec stop_event : les fonctions métier sont synchrones.
 """
 
 import os
-import json
 import threading
 import collections
 from datetime import datetime
@@ -36,10 +30,8 @@ from database.entreprises_db import calculer_stats, lire_entreprises_envoyees, m
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-# ─── Modules métier (inchangés) ───────────────────────────────────────────────
-from france_travail.main import (
-    lancer_recherche, charger_candidatures, sauvegarder_candidatures,
-)
+# ─── Modules métier ───────────────────────────────────────────────
+from france_travail.main import lancer_recherche
 from france_travail.generateur import generer_lettre
 from france_travail.analyseur import analyser_offre, score_to_verdict
 from france_travail.pdf_generator import generer_pdf_lettre
@@ -64,9 +56,6 @@ etat_recherche  = {"en_cours": False, "message": "Prêt", "pourcentage": 0}
 etat_spontanees = {"en_cours": False, "etape": None, "message": "Prêt", "pourcentage": 0}
 _stop_event     = threading.Event()
 
-FICHIER_ENRICHIES = "data/entreprises_enrichies.json"
-FICHIER_RAW       = "data/entreprises_raw.json"
-
 # ─── Logs ─────────────────────────────────────────────────────────────────────
 _logs = collections.deque(maxlen=80)
 
@@ -75,7 +64,7 @@ def log(msg):
     print(msg)
 
 
-# ─── Modèles de requête (remplacent request.get_json) ─────────────────────────
+# ─── Modèles de requête ───────────────────────────────────────────────────────
 class OffreId(BaseModel):
     id: str
 
@@ -464,7 +453,7 @@ def api_spontanees_stats(request: Request):
     user = utilisateur_courant(request)
     if not user:
         return JSONResponse({"erreur": "Non connecté"}, status_code=401)
-    # Lecture des stats depuis la BASE (le JSON n'est plus lu ici)
+    # Lecture des stats depuis la base
     stats = calculer_stats(user.id)
     # On ajoute l'état du pipeline, géré en mémoire
     stats["en_cours"] = etat_spontanees["en_cours"]
@@ -588,7 +577,7 @@ def api_spontanees_envoyer(body: Envoyer, request: Request):
     return {"status": "démarré"}
 
 @app.get("/api/spontanees/statut")
-def api_spontanees_statut():
+def api_spontanees_etat():
     return etat_spontanees
 
 

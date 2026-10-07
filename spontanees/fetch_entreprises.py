@@ -17,7 +17,6 @@ Ce que la v7 apporte :
 """
 
 import requests
-import json
 import time
 import os
 from dotenv import load_dotenv
@@ -25,36 +24,12 @@ from dotenv import load_dotenv
 load_dotenv()
 INSEE_API_KEY = os.getenv("INSEE_API_KEY")
 
-FICHIER_RAW    = "/home/kenza/Bureau/chasseur_alternance/data/entreprises_raw.json"
-FICHIER_SORTIE = "/home/kenza/Bureau/chasseur_alternance/data/entreprises_enrichies.json"
-
 BASE_URL = "https://api.insee.fr/api-sirene/3.11/siret"
 
 HEADERS = {
     "X-INSEE-Api-Key-Integration": INSEE_API_KEY,
     "Accept": "application/json",
 }
-
-# ─── Codes NAF ────────────────────────────────────────────────────────────────
-
-CODES_NAF = [
-    "62.01Z",   # Programmation informatique
-    "62.02A",   # Conseil en systèmes et logiciels informatiques
-    "62.02B",   # Tierce maintenance de systèmes et d'applications
-    "62.03Z",   # Gestion d'installations informatiques
-    "62.09Z",   # Autres activités informatiques n.c.a.
-    "63.11Z",   # Traitement de données, hébergement et activités connexes
-    "58.21Z",   # Édition de jeux électroniques
-    "58.29A",   # Édition de logiciels système et réseau
-    "58.29B",   # Édition de logiciels outils de développement
-    "58.29C",   # Édition d'autres logiciels applicatifs
-    "61.10Z",   # Télécommunications filaires
-    "61.20Z",   # Télécommunications sans fil
-    "61.90Z",   # Autres activités de télécommunication
-    "70.22Z",   # Conseil pour les affaires et autres conseils de gestion
-    "71.12B",   # Ingénierie, études techniques
-    "74.90B",   # Activités spécialisées, scientifiques et techniques diverses
-]
 
 # ─── Départements IDF ─────────────────────────────────────────────────────────
 
@@ -228,24 +203,6 @@ def extraire_infos(etab):
         "traite":         False,
         "emails_trouves": [],
     }
-
-
-# ─── Chargement / sauvegarde ──────────────────────────────────────────────────
-
-def charger_base():
-    cible = FICHIER_SORTIE if os.path.exists(FICHIER_SORTIE) else FICHIER_RAW
-    if os.path.exists(cible):
-        with open(cible, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        print(f"[Reprise] {len(data)} entreprises chargées depuis {cible}")
-        return {e["siret"]: e for e in data if e.get("siret")}
-    return {}
-
-
-def sauvegarder(entreprises_dict, fichier):
-    os.makedirs(os.path.dirname(fichier), exist_ok=True)
-    with open(fichier, "w", encoding="utf-8") as f:
-        json.dump(list(entreprises_dict.values()), f, ensure_ascii=False, indent=2)
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────

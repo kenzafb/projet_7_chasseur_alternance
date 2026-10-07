@@ -40,8 +40,6 @@ MODELE_MISTRAL = "mistral-large-latest"
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
-FICHIER_ENTREE  = "/home/kenza/Bureau/chasseur_alternance/data/entreprises_raw.json"
-FICHIER_SORTIE  = "/home/kenza/Bureau/chasseur_alternance/data/entreprises_enrichies.json"
 SAUVEGARDE_TOUS = 5
 
 DEBUG = os.getenv("DEBUG_SCRAPER", "false").lower() == "true"

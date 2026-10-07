@@ -1,10 +1,8 @@
 """
 database/entreprises_db.py
 ==========================
-Couche d'accès aux entreprises EN BASE, par utilisateur.
-Pour l'instant : LECTURE SEULE (stats + listing).
-Le JSON entreprises reste la source d'écriture (scraper/envoyeur/crontab)
-jusqu'à ce qu'on raccorde ces pipelines plus tard, en sécurité.
+Couche d'accès aux entreprises EN BASE, par utilisateur : stats, listing,
+et écritures des pipelines spontanées (fetch, scraper, envoyeur, suivi).
 """
 
 from database.connexion import SessionLocal
@@ -12,7 +10,7 @@ from database.models import Entreprise
 
 
 def calculer_stats(user_id: int) -> dict:
-    """Statistiques globales des entreprises d'un utilisateur (lecture seule)."""
+    """Statistiques globales des entreprises d'un utilisateur."""
     db = SessionLocal()
     try:
         q = db.query(Entreprise).filter_by(user_id=user_id)
@@ -36,7 +34,6 @@ def calculer_stats(user_id: int) -> dict:
         return {
             "raw": raw,
             "avec_email": avec_email,
-            "mail_generee": 0,   # champ historique, plus suivi en base
             "mail_envoye": mail_envoye,
             "dernieres": dernieres,
         }

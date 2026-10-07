@@ -1,16 +1,16 @@
 """
 envoyeur.py
 ===========
-Depuis Flask :
+Depuis l'application (main.py) :
   from spontanees.envoyeur import main as env_main
-  env_main(limite=10, test=True, stop_event=event, log_fn=log)
+  env_main(limite=10, test=True, stop_event=event, log_fn=log, user_id=user_id)
 
 CLI :
   python -m spontanees.envoyeur --limite 10 --test
 
 Système de déduplication :
-  - Au démarrage : charge data/emails_deja_envoyes.json (généré par fetch_envoyes_gmail.py)
-    + les emails déjà trackés dans entreprises_enrichies.json
+  - Au démarrage : charge data/emails_deja_envoyes.json
+    + les destinataires déjà enregistrés en base (mail_destinataires)
   - À chaque envoi réussi : met à jour emails_deja_envoyes.json immédiatement
   - Si une entreprise a 2 emails et qu'un seul a déjà été contacté,
     le mail est envoyé uniquement à l'autre
@@ -31,11 +31,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-FICHIER_JSON          = "/home/kenza/Bureau/chasseur_alternance/data/entreprises_enrichies.json"
 FICHIER_EMAILS_ENVOYES = "/home/kenza/Bureau/chasseur_alternance/data/emails_deja_envoyes.json"
-CV_PATH               = "/home/kenza/Bureau/chasseur_alternance/assets/CV_Kenza_Filali-Bouami.pdf"
-PLAQUETTE_PATH        = "/home/kenza/Bureau/chasseur_alternance/assets/Programme_DEUST_IOSI.pdf"
-RECO_PATH             = "/home/kenza/Bureau/chasseur_alternance/assets/Lettre_Recommandation_Kenza_Filali-Bouami.pdf"
 
 GMAIL_SENDER      = os.getenv("GMAIL_SENDER", "")
 GMAIL_PASSWORD    = os.getenv("GMAIL_APP_PASSWORD", "")
@@ -62,7 +58,7 @@ Cordialement,
 
 def charger_emails_deja_envoyes():
     """
-    Charge le fichier de déduplication Gmail (généré par fetch_envoyes_gmail.py).
+    Charge le fichier de déduplication des adresses déjà contactées.
     Retourne un set vide si le fichier n'existe pas encore.
     """
     if os.path.exists(FICHIER_EMAILS_ENVOYES):
@@ -84,7 +80,7 @@ def ajouter_emails_envoyes(nouveaux_emails: list[str]):
         json.dump(sorted(existants), f, ensure_ascii=False, indent=2)
 
 
-# ─── Chargement / sauvegarde JSON entreprises ────────────────────────────────
+# ─── Chargement / sauvegarde des entreprises (base) ───────────────────────────
 
 from database.entreprises_db import lire_entreprises, sauvegarder_entreprises
 
@@ -169,19 +165,19 @@ def main(limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=None, user_i
     emails_deja_envoyes = charger_emails_deja_envoyes()
     nb_gmail = len(emails_deja_envoyes)
 
-    # Ajoute aussi ce qui est tracké dans le JSON (au cas où)
+    # Ajoute aussi les destinataires enregistrés en base (au cas où)
     for e in entreprises:
         if e.get("mail_envoye") and e.get("mail_destinataires"):
             for addr in e["mail_destinataires"]:
                 emails_deja_envoyes.add(addr.lower().strip())
 
     _log(f"Déduplication : {nb_gmail} emails depuis Gmail + "
-         f"{len(emails_deja_envoyes) - nb_gmail} depuis le JSON "
+         f"{len(emails_deja_envoyes) - nb_gmail} depuis la base "
          f"= {len(emails_deja_envoyes)} total")
 
     if not os.path.exists(FICHIER_EMAILS_ENVOYES):
         _log(f"  ⚠️  {FICHIER_EMAILS_ENVOYES} introuvable — "
-             f"lance fetch_envoyes_gmail.py pour initialiser la déduplication Gmail")
+             f"il sera créé au premier envoi réussi")
 
     # ── Queue ─────────────────────────────────────────────────────────────────
     a_envoyer = [
