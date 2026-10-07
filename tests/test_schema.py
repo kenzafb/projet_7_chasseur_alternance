@@ -112,3 +112,16 @@ def test_dates_stockees_en_datetime_et_rendues_en_texte():
     with engine.connect() as cx:
         types = {r[1]: r[2] for r in cx.execute(text("PRAGMA table_info(candidatures)"))}
     assert types["date_trouvee"] == "DATETIME"
+
+
+def test_alembic_refuse_une_base_non_geree(tmp_path):
+    """L'ancienne base (tables sans alembic_version) n'est jamais migrée en place."""
+    chemin = tmp_path / "ancienne.db"
+    cx = sqlite3.connect(chemin)
+    cx.execute("CREATE TABLE users (id INTEGER PRIMARY KEY)")
+    cx.commit()
+    cx.close()
+    with pytest.raises(RuntimeError, match="pas gérée par Alembic|sans être gérée"):
+        command.upgrade(config_alembic(f"sqlite:///{chemin}"), "head")
+    tables = {r[0] for r in sqlite3.connect(chemin).execute("SELECT name FROM sqlite_master")}
+    assert tables == {"users"}

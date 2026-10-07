@@ -13,6 +13,7 @@ contrainte en place ; Alembic recrée alors la table (mode batch).
 from logging.config import fileConfig
 
 from alembic import context
+from sqlalchemy import inspect
 
 from database.connexion import creer_moteur
 from database.models import Base
@@ -42,9 +43,25 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def refuser_base_non_geree(connexion) -> None:
+    """Une base qui a des tables mais pas de table alembic_version n'a pas été
+    créée par Alembic (l'ancienne data/chasseur.db par exemple) : on ne la
+    migre pas, ses données passent par scripts/importer_ancienne_base.py."""
+    tables = set(inspect(connexion).get_table_names())
+    # Clôt la transaction ouverte par l'inspection : sinon Alembic s'y
+    # imbriquerait et rien ne serait validé à la fermeture de la connexion.
+    connexion.rollback()
+    if tables and "alembic_version" not in tables:
+        raise RuntimeError(
+            f"La base {connexion.engine.url!r} contient des tables sans être gérée par Alembic "
+            "(ancienne base ?). Elle n'est pas modifiée. Pointer DATABASE_URL vers une base neuve, "
+            "puis importer les comptes avec scripts/importer_ancienne_base.py.")
+
+
 def run_migrations_online() -> None:
     moteur = creer_moteur(url)
     with moteur.connect() as connexion:
+        refuser_base_non_geree(connexion)
         context.configure(
             connection=connexion,
             target_metadata=target_metadata,

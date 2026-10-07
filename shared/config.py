@@ -40,7 +40,8 @@ def chemin_piece_jointe(relatif: str) -> Path | None:
     return chemin
 
 # Base de données : DATABASE_URL du .env si présente, sinon SQLite local
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATA_DIR / 'chasseur.db'}")
+# (une ligne "DATABASE_URL=" vide dans le .env vaut absence)
+DATABASE_URL = os.getenv("DATABASE_URL") or f"sqlite:///{DATA_DIR / 'chasseur.db'}"
 
 # ─── Sécurité ─────────────────────────────────────────────────────────────────
 LONGUEUR_MIN_SECRET_KEY = 32
