@@ -10,6 +10,7 @@ import pytest
 import main
 import spontanees.scraper_emails
 from shared.pipelines import Pipelines, RECHERCHE
+from tests.conftest import en_parallele
 
 
 def attendre(condition, delai=5.0):
@@ -154,17 +155,7 @@ def test_logs_bornes_par_utilisateur():
 def test_demarrage_atomique():
     """Vingt demandes simultanées pour le même utilisateur : une seule passe."""
     p = Pipelines()
-    depart = threading.Barrier(20)
     acceptes = []
-
-    def demander():
-        depart.wait()
-        acceptes.append(p.demarrer(RECHERCHE, 1))
-
-    fils = [threading.Thread(target=demander) for _ in range(20)]
-    for f in fils:
-        f.start()
-    for f in fils:
-        f.join()
+    assert en_parallele(lambda: acceptes.append(p.demarrer(RECHERCHE, 1)), 20) == []
     assert acceptes.count(True) == 1
     assert p.demarrer(RECHERCHE, 2) is True   # un autre utilisateur peut démarrer

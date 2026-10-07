@@ -82,10 +82,10 @@ python -m spontanees.envoyeur --user 1 --limite 10 --test
 
 ```bash
 pip install -r requirements-dev.txt
-pytest
+systemd-run --user --scope -p MemoryMax=2G venv/bin/python -m pytest -q
 ```
 
-Base SQLite temporaire créée par `alembic upgrade head`, réseau, Mistral et SMTP neutralisés, vrai `.env` ignoré.
+Base SQLite temporaire créée par `alembic upgrade head`, réseau, Mistral et SMTP neutralisés, vrai `.env` ignoré. Le plafond mémoire fait que seul pytest est tué en cas d'emballement ; chaque test est en outre limité à 30 s (`pytest-timeout`, réglé dans `pytest.ini`). Les tests à threads passent par `en_parallele` (`tests/conftest.py`) : barrière, `join` et attentes ont tous un délai.
 
 ## Licence
 

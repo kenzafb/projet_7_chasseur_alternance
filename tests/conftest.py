@@ -17,6 +17,8 @@ import os
 import shutil
 import socket
 import tempfile
+import threading
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -98,6 +100,36 @@ def pipelines_neufs(monkeypatch):
     from shared.pipelines import Pipelines
     monkeypatch.setattr(main, "pipelines", Pipelines())
     return main.pipelines
+
+
+# ─── Threads de test ──────────────────────────────────────────────────────────
+DELAI_THREADS = 10   # secondes : au-delà, un thread de test est considéré bloqué
+
+
+def en_parallele(fonction, nombre, delai=DELAI_THREADS):
+    """Lance `nombre` threads qui appellent fonction() au même moment
+    (barrière avec délai), les attend avec un délai, et échoue si l'un d'eux
+    ne s'est pas terminé. Threads démons : un thread bloqué n'empêche jamais
+    pytest de s'arrêter. Retourne les exceptions levées dans les threads."""
+    depart = threading.Barrier(nombre, timeout=delai)
+    erreurs = []
+
+    def cible():
+        try:
+            depart.wait()
+            fonction()
+        except Exception as e:
+            erreurs.append(e)
+
+    fils = [threading.Thread(target=cible, daemon=True) for _ in range(nombre)]
+    for f in fils:
+        f.start()
+    fin = time.monotonic() + delai
+    for f in fils:
+        f.join(max(0.0, fin - time.monotonic()))
+    bloques = [f.name for f in fils if f.is_alive()]
+    assert not bloques, f"threads encore vivants après {delai} s : {bloques}"
+    return erreurs
 
 
 # ─── Base ─────────────────────────────────────────────────────────────────────

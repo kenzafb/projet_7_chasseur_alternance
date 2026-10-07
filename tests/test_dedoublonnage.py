@@ -1,8 +1,6 @@
 """Dédoublonnage en base, par utilisateur : offres vues, adresses contactées,
 insertions idempotentes."""
 
-import threading
-
 import pytest
 
 import france_travail.analyseur
@@ -15,6 +13,7 @@ from database.dedup_db import (ajouter_emails_contactes, lire_emails_contactes,
 from database.entreprises_db import ajouter_entreprises, lire_entreprises, sauvegarder_enrichissement
 from database.models import Candidature, EmailContacte, OffreVue
 from france_travail.main import lancer_recherche
+from tests.conftest import en_parallele
 
 
 def _brut_ft(id_ft, titre="Développeur"):
@@ -134,21 +133,8 @@ def test_doublons_ignores(a_et_b):
 
 def test_insertions_simultanees_d_une_meme_candidature(a_et_b):
     id_a, _ = a_et_b
-    depart = threading.Barrier(8)
-    resultats, erreurs = [], []
-
-    def inserer():
-        depart.wait()
-        try:
-            resultats.append(ajouter_candidature(id_a, {"id": "SIMUL"}))
-        except Exception as e:   # pragma: no cover - c'est ce qu'on vérifie
-            erreurs.append(e)
-
-    fils = [threading.Thread(target=inserer) for _ in range(8)]
-    for f in fils:
-        f.start()
-    for f in fils:
-        f.join()
+    resultats = []
+    erreurs = en_parallele(lambda: resultats.append(ajouter_candidature(id_a, {"id": "SIMUL"})), 8)
     assert erreurs == []
     assert sorted(resultats) == [False] * 7 + [True]
     assert _compter(Candidature) == 1

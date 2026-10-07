@@ -1,6 +1,5 @@
 """Limitation commune des appels Mistral : plusieurs threads, appels espacés."""
 
-import threading
 import time
 
 import pytest
@@ -8,6 +7,7 @@ import pytest
 import shared.ia
 from france_travail.analyseur import analyser_offre
 from shared.ia import Limiteur, appeler_mistral
+from tests.conftest import en_parallele
 
 INTERVALLE = 0.15
 
@@ -28,19 +28,11 @@ def instants(mistral, monkeypatch):
 
 
 def test_appels_de_plusieurs_threads_espaces(instants):
-    depart = threading.Barrier(4)
-
     def pipeline():
-        depart.wait()
         for _ in range(3):
             appeler_mistral([{"role": "user", "content": "x"}])
 
-    fils = [threading.Thread(target=pipeline) for _ in range(4)]
-    for f in fils:
-        f.start()
-    for f in fils:
-        f.join()
-
+    assert en_parallele(pipeline, 4) == []
     assert len(instants) == 12
     ecarts = [b - a for a, b in zip(sorted(instants), sorted(instants)[1:])]
     assert min(ecarts) >= INTERVALLE - 0.01
