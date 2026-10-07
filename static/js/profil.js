@@ -5,6 +5,8 @@
    - projets : [data-projets] (liste de cartes nom/url/description)
    ============================================================================ */
 
+import { api } from "./api.js";
+
 const _tags = {};
 let _modeProfilCourant = "alternance";   // mode du profil actuellement affiché
 let _projets = [];
@@ -128,9 +130,8 @@ function rendrePiecesJointes(pieces) {
 }
 
 async function rafraichirPiecesJointes() {
-  const r = await fetch("/api/profil");
-  if (!r.ok) return;
-  const p = await r.json();
+  let p;
+  try { p = await api.profil(); } catch (_) { return; }
   rendrePiecesJointes(p.pieces_jointes || []);
 }
 
@@ -150,23 +151,19 @@ function brancherPiecesJointes() {
     if (!fichier) { alert("Choisis un fichier PDF."); return; }
     const fd = new FormData();
     fd.append("fichier", fichier);
-    const r = await fetch("/api/profil/upload", { method: "POST", body: fd });
-    const res = await r.json();
-    if (res.ok) {
+    try {
+      await api.envoyerPiece(fd);
       fileInput.value = ""; fname.textContent = "Aucun fichier";
       await rafraichirPiecesJointes();
-    } else {
-      alert(res.erreur || "Erreur lors du téléversement");
+    } catch (e) {
+      alert(e.message || "Erreur lors du téléversement");
     }
   });
 
   if (liste) liste.addEventListener("click", async e => {
     const nom = e.target.dataset.pjRm;
     if (nom && confirm(`Supprimer la pièce « ${nom} » ?`)) {
-      await fetch("/api/profil/piece/supprimer", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nom }),
-      });
+      try { await api.supprimerPiece(nom); } catch (e) { alert(e.message); }
       await rafraichirPiecesJointes();
     }
   });
@@ -177,10 +174,7 @@ async function rendreDomaines(selectionnes, selecteur = "[data-domaines-choix]")
   const c = document.querySelector(selecteur);
   if (!c) return;
   let dispo = [];
-  try {
-    const r = await fetch("/api/domaines");
-    dispo = await r.json();
-  } catch (_) { dispo = []; }
+  try { dispo = await api.domaines(); } catch (_) { dispo = []; }
   c.innerHTML = "";
   dispo.forEach(d => {
     const checked = selectionnes.includes(d.cle);
@@ -201,11 +195,7 @@ function lireDomainesCoches(selecteur = "[data-domaines-choix]") {
 /* ── Affichage des sections selon le mode (alternance/job) ─────────────── */
 async function appliquerModeProfil() {
   let mode = "alternance";
-  try {
-    const r = await fetch("/api/mode");
-    const d = await r.json();
-    mode = d.mode || "alternance";
-  } catch (_) {}
+  try { mode = (await api.mode()).mode || "alternance"; } catch (_) {}
   _modeProfilCourant = mode;
   document.querySelectorAll("[data-mode-section]").forEach(sec => {
     const m = sec.dataset.modeSection;
@@ -226,9 +216,8 @@ export const Profil = {
 
   async charger() {
     const mode = await appliquerModeProfil();
-    const r = await fetch("/api/profil");
-    if (!r.ok) return;
-    const p = await r.json();
+    let p;
+    try { p = await api.profil(); } catch (_) { return; }
 
     document.querySelectorAll("[data-profil]").forEach(el => {
       if (!_champVisible(el)) return;        // ignore les doublons masqués
@@ -298,11 +287,8 @@ export const Profil = {
     );
     data.recherche = rech;
 
-    const r = await fetch("/api/profil", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    return (await r.json()).ok === true;
+    try {
+      return (await api.sauverProfil(data)).ok === true;
+    } catch (_) { return false; }
   },
 };

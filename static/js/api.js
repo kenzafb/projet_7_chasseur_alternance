@@ -31,6 +31,18 @@ async function post(url, body) {
   return r.json();
 }
 
+/* Envoi multipart (téléversement de fichier) */
+async function postForm(url, formData) {
+  const r = await fetch(url, { method: "POST", body: formData });
+  verifierSession(r);
+  if (!r.ok) {
+    let detail = "";
+    try { detail = (await r.json()).erreur || ""; } catch (_) {}
+    throw new Error(detail || `POST ${url} → ${r.status}`);
+  }
+  return r.json();
+}
+
 /* Télécharge un fichier servi par l'API (PDF...) : vrai téléchargement
    navigateur, sous le nom donné par le serveur ou `nom` à défaut. */
 async function telecharger(url, nom) {
@@ -69,7 +81,17 @@ export const api = {
     await telecharger(r.url, r.nom);
   },
 
+  // Profil, mode, domaines
+  profil:          ()        => get("/api/profil"),
+  sauverProfil:    (donnees) => post("/api/profil", donnees),
+  mode:            ()        => get("/api/mode"),
+  domaines:        ()        => get("/api/domaines"),
+  envoyerPiece:    (fd)      => postForm("/api/profil/upload", fd),
+  supprimerPiece:  (nom)     => post("/api/profil/piece/supprimer", { nom }),
+
   // Spontanées
+  spSuivi:       ()           => get("/api/spontanees/suivi"),
+  spSuiviStatut: (id, statut) => post("/api/spontanees/suivi/statut", { id, statut }),
   spStats:    ()       => get("/api/spontanees/stats"),
   spStatut:   ()       => get("/api/spontanees/statut"),
   spFetch:    ()       => post("/api/spontanees/fetch"),

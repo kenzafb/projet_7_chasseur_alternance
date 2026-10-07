@@ -100,9 +100,7 @@ async function recharger() {
 // Met à jour le compteur "Spontanées envoyées" dans la sidebar (sans tout charger)
 async function majCompteurSuivi() {
   try {
-    const r = await fetch("/api/spontanees/suivi");
-    if (!r.ok) return;
-    const d = await r.json();
+    const d = await api.spSuivi();
     const cnt = document.querySelector('[data-count="spontanees-suivi"]');
     if (cnt) cnt.textContent = d.length;
   } catch (_) {}

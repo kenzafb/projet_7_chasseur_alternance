@@ -34,7 +34,10 @@ from database.candidatures_db import (lire_candidatures, lire_candidature, modif
 from database.profil_db import (lire_profil, sauvegarder_profil, ajouter_piece_jointe, supprimer_piece_jointe,
                                 fichiers_references)
 from database.entreprises_db import calculer_stats, lire_entreprises_envoyees, modifier_statut_suivi
-from pydantic import BaseModel
+from typing import Literal
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from shared.pipelines import Pipelines, RECHERCHE, SPONTANEES
 from database.dates import maintenant_utc
 
@@ -76,6 +79,17 @@ def non_connecte(request: Request, exc: NonConnecte):
     return RedirectResponse(url="/login", status_code=303)
 
 
+@app.exception_handler(RequestValidationError)
+def requete_invalide(request: Request, exc: RequestValidationError):
+    """Corps de requête refusé par son modèle Pydantic : 422, avec un message
+    lisible dans "erreur" (affiché par le front) et le détail habituel."""
+    erreurs = jsonable_encoder(exc.errors())
+    premiere = erreurs[0] if erreurs else {}
+    champ = ".".join(str(x) for x in premiere.get("loc", []) if x != "body")
+    message = f"Requête invalide : {champ + ' : ' if champ else ''}{premiere.get('msg', '')}"
+    return JSONResponse({"erreur": message, "detail": erreurs}, status_code=422)
+
+
 @app.exception_handler(ErreurUtilisateur)
 def erreur_utilisateur(request: Request, exc: ErreurUtilisateur):
     """Profil incomplet, lettre type invalide... : 400 avec un message lisible."""
@@ -89,9 +103,27 @@ pipelines = Pipelines()
 class OffreId(BaseModel):
     id: str
 
+# Valeurs autorisées (cf. database/models.py)
+StatutCandidature = Literal["nouveau", "en_cours", "envoye", "reponse", "entretien", "refus", "archive"]
+RaisonArchivage = Literal["manuel", "note_basse", "ecole_cfa", "hors_domaine", "public_specifique", "stage"]
+
 class MajStatut(BaseModel):
-    id: str
-    statut: str
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(min_length=1, max_length=64)
+    statut: StatutCandidature
+
+class Archivage(BaseModel):
+    """Soit {id, desarchiver: true}, soit {id, raison}."""
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(min_length=1, max_length=64)
+    desarchiver: bool = False
+    raison: RaisonArchivage | None = None
+
+    @model_validator(mode="after")
+    def une_seule_action(self):
+        if self.desarchiver == (self.raison is not None):
+            raise ValueError("indiquer soit desarchiver: true, soit une raison d'archivage")
+        return self
 
 class Sauvegarde(BaseModel):
     id: str
@@ -382,20 +414,14 @@ def api_archiver(body: OffreId, request: Request, user: User = Depends(utilisate
     return {"ok": True}
 
 @prive.post("/api/offre/archivage")
-def api_offre_archivage(request: Request, body: dict = Body(...), user: User = Depends(utilisateur_requis)):
+def api_offre_archivage(body: Archivage, request: Request, user: User = Depends(utilisateur_requis)):
     """Gère la raison d'archivage et le désarchivage d'une offre."""
-    offre_id = body.get("id")
-    if not offre_id:
-        return JSONResponse({"erreur": "id manquant"}, status_code=400)
-    modifs = {}
-    if body.get("desarchiver"):
-        modifs["statut"] = "nouveau"
-        modifs["raison_archivage"] = ""
-    elif body.get("raison") is not None:
-        modifs["raison_archivage"] = body.get("raison")
-        modifs["statut"] = "archive"   # on s'assure qu'elle reste archivée
-    if modifs:
-        modifier_candidature(user.id, offre_id, modifs, mode=mode_courant(request))
+    if body.desarchiver:
+        modifs = {"statut": "nouveau", "raison_archivage": ""}
+    else:
+        # Archive avec la raison choisie (et s'assure qu'elle reste archivée)
+        modifs = {"statut": "archive", "raison_archivage": body.raison}
+    modifier_candidature(user.id, body.id, modifs, mode=mode_courant(request))
     return {"ok": True}
 
 @prive.post("/api/sauvegarder")

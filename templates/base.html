@@ -158,11 +158,12 @@
         const choisi = btn.dataset.modeBtn;
         if (choisi === htmlMode) return;   // déjà dessus
         try {
-          await fetch("/api/mode", {
+          const r = await fetch("/api/mode", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ mode: choisi }),
           });
+          if (r.status === 401) { location.href = "/login"; return; }   // session expirée
           location.reload();   // recharge dans le nouveau mode
         } catch (_) {}
       });

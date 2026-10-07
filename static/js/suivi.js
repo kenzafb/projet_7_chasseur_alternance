@@ -2,6 +2,8 @@
    suivi.js — tableau de suivi des candidatures spontanées envoyées
    ============================================================================ */
 
+import { api } from "./api.js";
+
 const STATUTS = [
   ["envoye", "Envoyé"],
   ["a_relancer", "À relancer"],
@@ -48,9 +50,7 @@ export const Suivi = {
   _charge: false,
 
   async charger() {
-    const r = await fetch("/api/spontanees/suivi");
-    if (!r.ok) return;
-    _data = await r.json();
+    try { _data = await api.spSuivi(); } catch (_) { return; }
     rendre();
     // compteur dans la nav
     const cnt = document.querySelector('[data-count="spontanees-suivi"]');
@@ -63,11 +63,9 @@ export const Suivi = {
         const row = e.target.closest(".suivi-row");
         const id = Number(row.dataset.id);
         const statut = e.target.value;
-        const res = await fetch("/api/spontanees/suivi/statut", {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, statut }),
-        });
-        if ((await res.json()).ok) {
+        let res = { ok: false };
+        try { res = await api.spSuiviStatut(id, statut); } catch (err) { alert(err.message); }
+        if (res.ok) {
           // maj locale + couleur
           const item = _data.find(x => x._id === id);
           if (item) item.statut_suivi = statut;
