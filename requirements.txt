@@ -12,6 +12,7 @@ itsdangerous==2.2.0         # SessionMiddleware
 
 # Base de données
 SQLAlchemy==2.0.51
+alembic==1.20.0             # migrations : alembic upgrade head
 
 # Authentification (PasswordHelper de fastapi-users, hashs argon2 / bcrypt)
 fastapi-users==15.0.5

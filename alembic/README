@@ -1,0 +1,5 @@
+Migrations Alembic de la base.
+
+  alembic upgrade head                         # crée ou met à jour la base (DATABASE_URL du .env)
+  alembic revision --autogenerate -m "..."     # après une modification de database/models.py
+  alembic check                                # vérifie que les migrations reflètent models.py

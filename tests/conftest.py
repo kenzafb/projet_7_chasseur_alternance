@@ -3,8 +3,8 @@ Configuration commune des tests.
 
 Isolation complète :
   - le vrai .env n'est pas lu (CHASSEUR_ENV_FILE pointe vers un fichier absent) ;
-  - la base est un SQLite temporaire (DATABASE_URL), recréée par creer_tables()
-    avant chaque test ;
+  - la base est un SQLite temporaire (DATABASE_URL) : schéma créé une fois
+    par `alembic upgrade head` dans un modèle, recopié avant chaque test ;
   - Mistral, SMTP et tout accès réseau sont neutralisés : un appel non prévu
     fait échouer le test au lieu de partir sur Internet ;
   - PDF et pièces jointes écrits dans un dossier temporaire, jamais dans data/.
@@ -14,6 +14,7 @@ lit l'environnement à l'import.
 """
 
 import os
+import shutil
 import socket
 import tempfile
 from pathlib import Path
@@ -38,9 +39,9 @@ assert not str(config.DATABASE_URL).endswith("data/chasseur.db"), "les tests vis
 
 import main  # noqa: E402
 import shared.ia  # noqa: E402
-from database.connexion import creer_tables, engine  # noqa: E402
-from database.models import Base, User  # noqa: E402
-from database.connexion import SessionLocal  # noqa: E402
+from database.connexion import SessionLocal, engine  # noqa: E402
+from database.models import User  # noqa: E402
+from database.schema import migrer  # noqa: E402
 
 CODE = "code-invitation-de-test"
 MOT_DE_PASSE = "motdepasse-solide"
@@ -89,17 +90,28 @@ def dossiers_temporaires(monkeypatch, tmp_path):
     import functools
     monkeypatch.setattr(main, "generer_pdf_lettre",
                         functools.partial(main.generer_pdf_lettre, dossier_output=tmp_path / "pdf"))
-    monkeypatch.setattr(main, "UPLOADS_DIR", tmp_path / "uploads")
+    monkeypatch.setattr(config, "UPLOADS_DIR", tmp_path / "uploads")
 
 
 # ─── Base ─────────────────────────────────────────────────────────────────────
+_FICHIER_BASE = _TMP / "test.db"
+_MODELE_BASE = _TMP / "modele.db"
+
+
+@pytest.fixture(scope="session")
+def modele_base():
+    """Base vide au schéma Alembic (upgrade head), créée une seule fois."""
+    migrer(f"sqlite:///{_MODELE_BASE}")
+    return _MODELE_BASE
+
+
 @pytest.fixture(autouse=True)
-def base():
-    """Base vide et fraîche pour chaque test."""
-    Base.metadata.drop_all(bind=engine)
-    creer_tables()
+def base(modele_base):
+    """Base vide et fraîche pour chaque test : copie du modèle migré."""
+    engine.dispose()
+    shutil.copyfile(modele_base, _FICHIER_BASE)
     yield
-    Base.metadata.drop_all(bind=engine)
+    engine.dispose()
 
 
 # ─── Clients ──────────────────────────────────────────────────────────────────
