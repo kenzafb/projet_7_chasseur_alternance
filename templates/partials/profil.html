@@ -225,6 +225,73 @@
     <span class="field__hint">Le nom du fichier sera utilisé comme nom du document. Tu peux en ajouter plusieurs.</span>
   </div>
 
+  <!-- ─── Section 9 : Compte d'envoi (commun, un seul par utilisateur) ─── -->
+  <!-- Champs data-ce : hors du profil, enregistrés par leurs propres boutons -->
+  <div class="card profil-card" data-mode-section="commun" data-ce-carte>
+    <div class="profil-card__head">
+      <span class="profil-card__num">09</span>
+      <div>
+        <h3 class="profil-card__title">Compte d'envoi</h3>
+        <p class="profil-card__sub">L'adresse depuis laquelle partent tes candidatures spontanées. Le même compte sert aux deux modes.</p>
+      </div>
+    </div>
+
+    <div class="ce-etat" data-ce-etat>Chargement…</div>
+
+    <div data-ce-formulaire>
+      <div class="profil-aide">
+        <strong>Gmail :</strong> ton mot de passe habituel ne fonctionne pas ici. Il faut un
+        <em>mot de passe d'application</em> : active d'abord la validation en deux étapes sur ton
+        compte Google, puis crée un mot de passe d'application (Compte Google, Sécurité,
+        Mots de passe des applications) et colle ici les 16 caractères. Il est chiffré sur le
+        serveur et ne sera plus jamais affiché.
+      </div>
+
+      <div class="ce-presets">
+        <label class="ce-preset"><input type="radio" name="ce-preset" value="gmail" data-ce-preset checked> Gmail</label>
+        <label class="ce-preset"><input type="radio" name="ce-preset" value="autre" data-ce-preset> Autre serveur</label>
+      </div>
+
+      <div class="profil-grid">
+        <label class="field">
+          <span class="field__label">Adresse d'expédition</span>
+          <input class="field__input" type="email" data-ce="adresse" placeholder="prenom.nom@gmail.com" autocomplete="off">
+        </label>
+        <label class="field">
+          <span class="field__label">Nom affiché <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
+          <input class="field__input" type="text" data-ce="nom_affiche" placeholder="Prénom Nom" autocomplete="off">
+        </label>
+        <label class="field" data-ce-autre>
+          <span class="field__label">Serveur SMTP</span>
+          <input class="field__input" type="text" data-ce="serveur" placeholder="smtp.exemple.fr" autocomplete="off">
+        </label>
+        <label class="field" data-ce-autre>
+          <span class="field__label">Port et chiffrement</span>
+          <select class="field__input" data-ce="port">
+            <option value="465">465 (SSL)</option>
+            <option value="587">587 (STARTTLS)</option>
+          </select>
+        </label>
+        <label class="field" data-ce-autre>
+          <span class="field__label">Identifiant <span style="opacity:.6;font-weight:400;">(vide : l'adresse d'expédition)</span></span>
+          <input class="field__input" type="text" data-ce="identifiant" autocomplete="off">
+        </label>
+        <label class="field">
+          <span class="field__label">Mot de passe <span data-ce-mdp-aide style="opacity:.6;font-weight:400;"></span></span>
+          <input class="field__input" type="password" data-ce="mot_de_passe" autocomplete="new-password">
+        </label>
+      </div>
+
+      <div class="ce-actions">
+        <button class="btn btn--signal" type="button" data-ce-action="enregistrer">Enregistrer et tester</button>
+        <button class="btn" type="button" data-ce-action="tester">Tester la connexion</button>
+        <button class="btn" type="button" data-ce-action="mail_test">M'envoyer un mail de test</button>
+        <button class="btn btn--ghost" type="button" data-ce-action="supprimer">Supprimer le compte</button>
+      </div>
+      <div class="ce-message" data-ce-message></div>
+    </div>
+  </div>
+
   <!-- ════════ SECTIONS MODE JOB ════════ -->
 
   <!-- ─── Job A : Ce que tu as (job) ─── -->

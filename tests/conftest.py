@@ -30,7 +30,7 @@ os.environ["COOKIE_SECURE"] = "false"
 os.environ["MISTRAL_API_KEY"] = "factice"
 os.environ["MISTRAL_INTERVALLE_MIN_S"] = "0"   # pas d'attente entre appels simulés
 for _var in ("CODE_INVITATION", "FT_CLIENT_ID", "FT_CLIENT_SECRET", "LBA_API_KEY",
-             "INSEE_API_KEY", "GMAIL_SENDER", "GMAIL_APP_PASSWORD"):
+             "INSEE_API_KEY", "CLE_CHIFFREMENT", "PLAFOND_ENVOIS_JOUR"):
     os.environ.pop(_var, None)
 
 import pytest  # noqa: E402
@@ -57,11 +57,13 @@ class _ReseauInterdit(Exception):
 
 @pytest.fixture(autouse=True)
 def pas_de_reseau(monkeypatch):
-    """Toute connexion socket ou SMTP lève une erreur (le TestClient n'en ouvre pas)."""
+    """Toute connexion socket, résolution DNS ou connexion SMTP lève une
+    erreur (le TestClient n'en ouvre pas)."""
     def refuser(*args, **kwargs):
         raise _ReseauInterdit("accès réseau interdit pendant les tests")
     monkeypatch.setattr(socket.socket, "connect", refuser)
     monkeypatch.setattr(socket, "create_connection", refuser)
+    monkeypatch.setattr(socket, "getaddrinfo", refuser)
     monkeypatch.setattr("smtplib.SMTP", refuser)
     monkeypatch.setattr("smtplib.SMTP_SSL", refuser)
 
@@ -100,6 +102,106 @@ def pipelines_neufs(monkeypatch):
     from shared.pipelines import Pipelines
     monkeypatch.setattr(main, "pipelines", Pipelines())
     return main.pipelines
+
+
+# ─── Envoi de mails simulé ────────────────────────────────────────────────────
+class FauxDNS:
+    """Remplace socket.getaddrinfo : noms connus -> adresses choisies par le test."""
+
+    def __init__(self):
+        self.noms = {"smtp.gmail.com": ["142.250.27.108"], "smtp.exemple.fr": ["80.12.242.10"]}
+
+    def __call__(self, hote, port, *args, **kwargs):
+        if hote not in self.noms:
+            raise socket.gaierror(-2, "Name or service not known")
+        return [(socket.AF_INET6 if ":" in ip else socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, 0))
+                for ip in self.noms[hote]]
+
+
+class FauxServeurSmtp:
+    """Remplace la connexion de shared.smtp. Accepte les identifiants de
+    `comptes` ({identifiant: mot de passe}), enregistre connexions et mails.
+    Ses messages d'erreur contiennent volontairement le mot de passe reçu :
+    l'application ne doit jamais les relayer."""
+
+    def __init__(self):
+        self.comptes = {}
+        self.injoignable = False
+        self.refuses = set()       # destinataires refusés
+        self.connexions = []       # une entrée par login : serveur, port, ip, tls, identifiant
+        self.messages = []         # (identifiant, from_addr, to_addrs, EmailMessage)
+
+    def connexion(self, chiffrement):
+        return _FausseConnexion(self, chiffrement)
+
+
+class _FausseConnexion:
+    ip_cible = None
+
+    def __init__(self, serveur, chiffrement):
+        self.serveur, self.chiffrement, self.tls = serveur, chiffrement, chiffrement == "ssl"
+        self.identifiant = None
+
+    def connect(self, hote, port):
+        if self.serveur.injoignable:
+            raise ConnectionRefusedError(111, "Connection refused")
+        self.hote, self.port = hote, port
+        return 220, b"pret"
+
+    def ehlo(self):
+        return 250, b"ok"
+
+    def has_extn(self, nom):
+        return nom == "starttls"
+
+    def starttls(self, context=None):
+        self.tls = True
+
+    def login(self, identifiant, mot_de_passe):
+        self.serveur.connexions.append({"serveur": self.hote, "port": self.port, "ip": self.ip_cible,
+                                        "tls": self.tls, "identifiant": identifiant})
+        if self.serveur.comptes.get(identifiant) != mot_de_passe:
+            import smtplib
+            raise smtplib.SMTPAuthenticationError(535, f"refuse {identifiant} {mot_de_passe}".encode())
+        self.identifiant = identifiant
+
+    def send_message(self, message, from_addr, to_addrs):
+        import smtplib
+        refuses = [a for a in to_addrs if a in self.serveur.refuses]
+        if refuses and len(refuses) == len(to_addrs):
+            raise smtplib.SMTPRecipientsRefused({a: (550, b"inconnu") for a in refuses})
+        self.serveur.messages.append((self.identifiant, from_addr, list(to_addrs), message))
+        return {a: (550, b"inconnu") for a in refuses}
+
+    def quit(self):
+        pass
+
+    def close(self):
+        pass
+
+
+@pytest.fixture
+def cle_chiffrement(monkeypatch):
+    from cryptography.fernet import Fernet
+    cle = Fernet.generate_key().decode()
+    monkeypatch.setenv("CLE_CHIFFREMENT", cle)
+    return cle
+
+
+@pytest.fixture
+def dns(monkeypatch):
+    faux = FauxDNS()
+    monkeypatch.setattr(socket, "getaddrinfo", faux)
+    return faux
+
+
+@pytest.fixture
+def smtp_simule(monkeypatch, cle_chiffrement, dns):
+    """Clé de chiffrement posée, DNS et serveur SMTP simulés."""
+    import shared.smtp
+    serveur = FauxServeurSmtp()
+    monkeypatch.setattr(shared.smtp, "_nouvelle_connexion", serveur.connexion)
+    return serveur
 
 
 # ─── Threads de test ──────────────────────────────────────────────────────────

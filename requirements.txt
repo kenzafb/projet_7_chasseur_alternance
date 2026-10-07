@@ -19,6 +19,7 @@ fastapi-users==15.0.5
 pwdlib==0.3.0
 argon2-cffi==25.1.0
 bcrypt==5.0.0
+cryptography==46.0.6        # chiffrement des mots de passe SMTP (Fernet)
 
 # IA
 mistralai==2.4.9

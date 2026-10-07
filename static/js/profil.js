@@ -6,6 +6,7 @@
    ============================================================================ */
 
 import { api } from "./api.js";
+import { CompteEnvoi } from "./compte_envoi.js";
 
 const _tags = {};
 let _modeProfilCourant = "alternance";   // mode du profil actuellement affiché
@@ -250,6 +251,7 @@ export const Profil = {
     }
 
     rendrePiecesJointes(p.pieces_jointes || []);
+    CompteEnvoi.charger();
 
     if (!this._charge) {
       brancherTags("competences");

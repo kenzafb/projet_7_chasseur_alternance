@@ -202,6 +202,17 @@
   border-radius: 4px; padding: 1px 5px; color: var(--signal-deep);
 }
 
+/* Compte d'envoi */
+.ce-etat { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--txt-muted); }
+.ce-etat.is-ok { color: var(--vert); }
+.ce-etat.is-ko { color: var(--rouge); }
+.ce-presets { display: flex; gap: 18px; margin-bottom: 12px; font-size: 13px; }
+.ce-preset { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.ce-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.ce-message { font-size: 13px; margin-top: 10px; min-height: 1em; }
+.ce-message.is-ok { color: var(--vert); }
+.ce-message.is-ko { color: var(--rouge); }
+
 /* Pièces jointes */
 .pj-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
 .pj-item {

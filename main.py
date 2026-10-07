@@ -18,6 +18,7 @@ import secrets
 import threading
 import unicodedata
 
+from shared import config
 from shared.config import STATIC_DIR, TEMPLATES_DIR, COOKIE_SECURE, chemin_lettre_pdf, chemin_piece_jointe, secret_key
 from fastapi import FastAPI, APIRouter, Depends, Request, Body, UploadFile, File, Form
 from fastapi.openapi.docs import get_swagger_ui_html
@@ -37,7 +38,10 @@ from database.entreprises_db import calculer_stats, lire_entreprises_envoyees, m
 from typing import Literal
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
+from shared.chiffrement import ChiffrementIndisponible, raison_indisponible
+from shared import compte_envoi
+from database import compte_envoi_db
 from shared.pipelines import Pipelines, RECHERCHE, SPONTANEES
 from database.dates import maintenant_utc
 
@@ -83,7 +87,10 @@ def non_connecte(request: Request, exc: NonConnecte):
 def requete_invalide(request: Request, exc: RequestValidationError):
     """Corps de requête refusé par son modèle Pydantic : 422, avec un message
     lisible dans "erreur" (affiché par le front) et le détail habituel."""
-    erreurs = jsonable_encoder(exc.errors())
+    # Sans "input" : la valeur reçue (un mot de passe, par exemple) n'est
+    # jamais renvoyée ; "ctx" peut contenir l'exception d'origine.
+    erreurs = jsonable_encoder([{k: v for k, v in e.items() if k not in ("input", "ctx")}
+                                for e in exc.errors()])
     premiere = erreurs[0] if erreurs else {}
     champ = ".".join(str(x) for x in premiere.get("loc", []) if x != "body")
     message = f"Requête invalide : {champ + ' : ' if champ else ''}{premiere.get('msg', '')}"
@@ -94,6 +101,17 @@ def requete_invalide(request: Request, exc: RequestValidationError):
 def erreur_utilisateur(request: Request, exc: ErreurUtilisateur):
     """Profil incomplet, lettre type invalide... : 400 avec un message lisible."""
     return JSONResponse({"erreur": str(exc)}, status_code=400)
+
+
+@app.exception_handler(ChiffrementIndisponible)
+def chiffrement_indisponible(request: Request, exc: ChiffrementIndisponible):
+    """CLE_CHIFFREMENT absente ou invalide : l'app tourne, mais configuration
+    et envoi de mails sont désactivés (503, message lisible)."""
+    return JSONResponse({"erreur": str(exc)}, status_code=503)
+
+
+if raison_indisponible():
+    print(f"⚠️  {raison_indisponible()}")
 
 # ─── États, arrêts et logs des pipelines, par utilisateur ─────────────────────
 pipelines = Pipelines()
@@ -138,6 +156,23 @@ class TelechargerPdf(BaseModel):
 class Envoyer(BaseModel):
     limite: int = 10
     test: bool = False
+
+class CompteEnvoiCorps(BaseModel):
+    """Configuration du compte d'envoi. mot_de_passe : en écriture seule,
+    absent ou vide = garder celui déjà enregistré."""
+    model_config = ConfigDict(extra="forbid")
+    preset: Literal["gmail", "autre"]
+    adresse: str = Field(max_length=255)
+    nom_affiche: str = Field("", max_length=150)
+    serveur: str = Field("", max_length=255)
+    port: int | None = None
+    chiffrement: Literal["ssl", "starttls"] | None = None
+    identifiant: str = Field("", max_length=255)
+    mot_de_passe: SecretStr | None = None
+
+class MailTest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    destinataire: str | None = Field(None, max_length=255)
 
 
 # ─── Page + logs ──────────────────────────────────────────────────────────────
@@ -276,6 +311,42 @@ def api_profil_piece_get(request: Request, nom: str, user: User = Depends(utilis
         if pj.get("nom") == nom and chemin and chemin.is_file():
             return FileResponse(chemin, media_type="application/pdf")
     return JSONResponse({"erreur": "Pièce introuvable"}, status_code=404)
+
+
+# ─── Compte d'envoi (SMTP de l'utilisateur) ───────────────────────────────────
+# Le mot de passe n'est jamais renvoyé : le front ne reçoit que
+# mot_de_passe_configure et verifie_le.
+@prive.get("/api/compte_envoi")
+def api_compte_envoi(user: User = Depends(utilisateur_requis)):
+    raison = raison_indisponible()
+    return {"disponible": raison is None, "raison": raison or "",
+            "compte": compte_envoi_db.lire_compte(user.id),
+            "plafond_jour": config.PLAFOND_ENVOIS_JOUR,
+            "envois_du_jour": compte_envoi_db.envois_du_jour(user.id)}
+
+@prive.post("/api/compte_envoi")
+def api_compte_envoi_enregistrer(body: CompteEnvoiCorps, user: User = Depends(utilisateur_requis)):
+    compte_envoi.exiger_chiffrement()
+    corps = body.model_dump(exclude={"mot_de_passe"})
+    corps["mot_de_passe"] = body.mot_de_passe.get_secret_value() if body.mot_de_passe else None
+    existe = compte_envoi_db.lire_compte(user.id) is not None
+    champs, mot_de_passe = compte_envoi.preparer(corps, compte_existe=existe)
+    return {"ok": True, "compte": compte_envoi_db.enregistrer_compte(user.id, champs, mot_de_passe)}
+
+@prive.post("/api/compte_envoi/supprimer")
+def api_compte_envoi_supprimer(user: User = Depends(utilisateur_requis)):
+    # Possible même sans clé de chiffrement : rien à déchiffrer
+    return {"ok": compte_envoi_db.supprimer_compte(user.id)}
+
+@prive.post("/api/compte_envoi/tester")
+def api_compte_envoi_tester(user: User = Depends(utilisateur_requis)):
+    """Connexion + authentification puis déconnexion, aucun mail envoyé."""
+    return compte_envoi.tester(user.id)
+
+@prive.post("/api/compte_envoi/mail_test")
+def api_compte_envoi_mail_test(body: MailTest | None = None, user: User = Depends(utilisateur_requis)):
+    """Mail de test, uniquement vers l'utilisateur lui-même (défaut : son adresse de connexion)."""
+    return compte_envoi.envoyer_mail_test(user.id, user.email, body.destinataire if body else None)
 
 
 # ─── France Travail + La Bonne Alternance ────────────────────────────────────

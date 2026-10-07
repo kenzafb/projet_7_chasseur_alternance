@@ -89,6 +89,13 @@ export const api = {
   envoyerPiece:    (fd)      => postForm("/api/profil/upload", fd),
   supprimerPiece:  (nom)     => post("/api/profil/piece/supprimer", { nom }),
 
+  // Compte d'envoi (le mot de passe part au serveur, il n'en revient jamais)
+  compteEnvoi:          ()      => get("/api/compte_envoi"),
+  enregistrerCompte:    (corps) => post("/api/compte_envoi", corps),
+  supprimerCompte:      ()      => post("/api/compte_envoi/supprimer"),
+  testerCompte:         ()      => post("/api/compte_envoi/tester"),
+  mailTestCompte:       ()      => post("/api/compte_envoi/mail_test"),
+
   // Spontanées
   spSuivi:       ()           => get("/api/spontanees/suivi"),
   spSuiviStatut: (id, statut) => post("/api/spontanees/suivi/statut", { id, statut }),

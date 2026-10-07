@@ -4,6 +4,7 @@ import sqlite3
 
 import pytest
 from alembic import command
+from alembic.script import ScriptDirectory
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
@@ -142,5 +143,6 @@ def test_migration_0002_sur_une_base_en_0001(tmp_path):
     command.check(cfg)
     cx = sqlite3.connect(chemin)
     assert cx.execute("SELECT ref_offre, titre, lettre_pdf FROM candidatures").fetchall() == [("r1", "Dev", None)]
-    assert cx.execute("SELECT version_num FROM alembic_version").fetchone() == ("0002",)
+    tete = ScriptDirectory.from_config(cfg).get_current_head()
+    assert cx.execute("SELECT version_num FROM alembic_version").fetchone() == (tete,)
     cx.close()

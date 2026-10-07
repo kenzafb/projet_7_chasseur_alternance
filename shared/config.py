@@ -82,6 +82,14 @@ COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").strip().lower() in ("1", "tr
 # Lignes de log gardées en mémoire par utilisateur (les plus anciennes sont jetées)
 LOGS_MAX_PAR_UTILISATEUR = 200
 
+# ─── Envoi de mails ───────────────────────────────────────────────────────────
+# Plafond de mails envoyés par utilisateur et par jour (jour calendaire dans
+# FUSEAU_AFFICHAGE), tous lancements et mails de test confondus, en plus de
+# la limite par lancement. Surchargeable dans le .env.
+PLAFOND_ENVOIS_JOUR = int(os.getenv("PLAFOND_ENVOIS_JOUR") or 50)
+# Plafond par lancement du pipeline d'envoi (valeur maximale acceptée par la route)
+LIMITE_ENVOIS_PAR_LANCEMENT = 50
+
 # ─── IA ───────────────────────────────────────────────────────────────────────
 MODELE_MISTRAL = "mistral-large-latest"
 # Intervalle minimum entre deux appels Mistral, commun à tout le processus

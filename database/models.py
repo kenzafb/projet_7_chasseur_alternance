@@ -7,7 +7,8 @@ vérifie qu'elles le reflètent exactement.
 
 Toutes les données sont rattachées à un utilisateur via user_id, avec
 suppression en cascade : supprimer un user supprime ses profils,
-candidatures, entreprises, offres vues et emails contactés.
+candidatures, entreprises, offres vues, emails contactés, compte d'envoi
+et compteurs d'envoi.
 
 Dates : colonnes DateTime(timezone=True), valeurs en UTC. SQLite ne stocke
 pas le fuseau et relit des dates naïves : database/dates.py les considère
@@ -16,7 +17,7 @@ comme UTC. Les structures (listes, objets) sont en colonnes JSON.
 
 from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, Integer, String, Text, Boolean,
+    Column, Integer, String, Text, Boolean, Date,
     ForeignKey, DateTime, JSON, UniqueConstraint, Index, MetaData,
 )
 from sqlalchemy.orm import relationship, declarative_base
@@ -67,6 +68,9 @@ class User(Base):
     entreprises      = _relation_depuis_user("Entreprise")
     offres_vues      = _relation_depuis_user("OffreVue")
     emails_contactes = _relation_depuis_user("EmailContacte")
+    compte_envoi     = relationship("CompteEnvoi", back_populates="user", uselist=False,
+                                    cascade="all, delete-orphan", passive_deletes=True)
+    compteurs_envoi  = _relation_depuis_user("CompteurEnvoi")
 
 
 # ─── Profil (un par utilisateur et par mode) ──────────────────────────────────
@@ -219,3 +223,41 @@ class EmailContacte(Base):
     contacte_le = Column(DateTime(timezone=True), default=maintenant_utc)
 
     user = _relation_vers_user("emails_contactes")
+
+
+# ─── Compte d'envoi (SMTP de l'utilisateur, un seul par utilisateur) ──────────
+class CompteEnvoi(Base):
+    __tablename__ = "comptes_envoi"
+
+    id      = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True)
+
+    adresse      = Column(String(255), nullable=False)        # adresse d'expédition (From)
+    nom_affiche  = Column(String(150), default="")            # nom affiché devant l'adresse
+    preset       = Column(String(20), nullable=False)         # gmail | autre
+    serveur      = Column(String(255), nullable=False)        # hôte SMTP
+    port         = Column(Integer, nullable=False)            # 465 | 587
+    chiffrement  = Column(String(10), nullable=False)         # ssl | starttls
+    identifiant  = Column(String(255), nullable=False)
+    # Chiffré par Fernet (shared/chiffrement.py, clé CLE_CHIFFREMENT) ;
+    # jamais renvoyé par l'API ni écrit dans un log
+    mot_de_passe_chiffre = Column(Text, nullable=False)
+    # Dernière connexion et authentification réussies ; remis à NULL quand
+    # les paramètres de connexion changent ou que l'authentification échoue
+    verifie_le   = Column(DateTime(timezone=True))
+    modifie_le   = Column(DateTime(timezone=True), default=maintenant_utc)
+
+    user = relationship("User", back_populates="compte_envoi")
+
+
+# ─── Mails envoyés par utilisateur et par jour (plafond quotidien) ────────────
+class CompteurEnvoi(Base):
+    __tablename__ = "compteurs_envoi"
+    __table_args__ = (UniqueConstraint("user_id", "jour"),)
+
+    id      = Column(Integer, primary_key=True)
+    user_id = _user_id()
+    jour    = Column(Date, nullable=False)   # jour calendaire dans FUSEAU_AFFICHAGE
+    nombre  = Column(Integer, nullable=False, default=0)
+
+    user = _relation_vers_user("compteurs_envoi")
