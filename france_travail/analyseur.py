@@ -2,6 +2,7 @@ import time
 import json
 import re
 from shared.ia import appeler_mistral
+from shared.erreurs import exiger_profil
 
 PAUSE_MISTRAL = 10 # secondes entre chaque appel Mistral (rate limit)
 
@@ -174,10 +175,9 @@ def _analyser_offre_job(offre, profil):
         }
 
 
-def analyser_offre(offre, profil=None, mode="alternance"):
-    if profil is None:
-        from database.profil_db import lire_profil
-        profil = lire_profil(1, mode=mode)
+def analyser_offre(offre, profil, mode="alternance"):
+    # Profil obligatoire (plus de repli sur un utilisateur par défaut)
+    exiger_profil(profil)
 
     # ─── Mode JOB : prompt dédié (job court accessible) ───
     if mode == "job":
@@ -353,7 +353,7 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
             _log(f"     -> Archivée automatiquement (inéligible score {offre['score']})")
 
 
-def analyser_offres(offres, profil=None, callback=None, mode="alternance"):
+def analyser_offres(offres, profil, callback=None, mode="alternance"):
     offres_analysees = []
     for i, offre in enumerate(offres, 1):
         print(f"  [{i}/{len(offres)}] {offre['titre'][:50]}...")

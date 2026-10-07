@@ -1,7 +1,9 @@
 import re
 import json
+import string
 from datetime import datetime
 from shared.ia import appeler_mistral
+from shared.erreurs import ErreurUtilisateur, exiger_profil, CHAMPS_IDENTITE
 
 # ─── Lettre de motivation fixe ────────────────────────────────────────────────
 # Seuls {contact_entreprise} et {paragraphe_entreprise} sont générés par l'IA.
@@ -28,6 +30,38 @@ Dans l'attente de votre retour, je vous prie d'agréer, Madame, Monsieur, mes sa
 """
 
 
+# Balises permises dans une lettre type (profil.lettre_type)
+BALISES_LETTRE = ("contact_entreprise", "date", "paragraphe_entreprise")
+
+
+class LettreTypeInvalide(ErreurUtilisateur):
+    pass
+
+
+def preparer_lettre_type(modele):
+    """
+    Vérifie une lettre type avant de l'utiliser avec str.format.
+    Tolère les espaces dans les balises ("{ date }", accepté par le front),
+    refuse toute autre accolade avec un message lisible (LettreTypeInvalide).
+    Retourne le modèle normalisé.
+    """
+    modele = re.sub(r"\{\s*(" + "|".join(BALISES_LETTRE) + r")\s*\}", r"{\1}", modele)
+    permises = ", ".join("{" + b + "}" for b in BALISES_LETTRE)
+    try:
+        champs = [(champ, spec, conv) for _, champ, spec, conv in string.Formatter().parse(modele)
+                  if champ is not None]
+    except ValueError:
+        raise LettreTypeInvalide(
+            "Ta lettre type contient une accolade { ou } isolée. "
+            f"Seules les balises {permises} sont permises : corrige-la dans l'onglet Profil.")
+    for champ, spec, conv in champs:
+        if champ not in BALISES_LETTRE or spec or conv:
+            raise LettreTypeInvalide(
+                f"Ta lettre type contient une balise inconnue : {{{champ}}}. "
+                f"Seules {permises} sont permises : corrige-la dans l'onglet Profil.")
+    return modele
+
+
 def _date_du_jour():
     mois = ["janvier", "février", "mars", "avril", "mai", "juin",
             "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
@@ -50,25 +84,29 @@ def _nettoyer_contact(contact):
     return "\n".join(lignes_propres[:3]).strip()
 
 
-def generer_lettre(offre, profil=None, mode="alternance"):
+def generer_lettre(offre, profil, mode="alternance"):
     """
     Demande à Mistral uniquement :
     1. Le bloc contact de l'entreprise (coin haut gauche de la lettre)
     2. Le paragraphe de personnalisation (~3 phrases max)
 
     Assemble ensuite la lettre complète avec le template fixe.
+    Lève ProfilIncomplet ou LettreTypeInvalide (erreurs 400) AVANT tout
+    appel à Mistral.
     """
+    exiger_profil(profil, CHAMPS_IDENTITE)
+    template = preparer_lettre_type(profil.get("lettre_type") or LETTRE_TEMPLATE)
+
     nom_entreprise = offre.get("entreprise", "")
     titre_poste    = offre.get("titre", "")
     lieu           = offre.get("lieu", "")
     description    = (offre.get("description", "") or "")[:800]
 
     # Compétences réelles du candidat (depuis son profil) — pour ne PAS coder en dur l'IT
-    _profil = profil or {}
-    _comps = _profil.get("competences", []) or []
+    _comps = profil.get("competences", []) or []
     _comps_txt = ", ".join(_comps) if _comps else ""
-    _formation = (_profil.get("formation", "") or "").strip()
-    _experience = (_profil.get("experience", "") or "").strip()
+    _formation = (profil.get("formation", "") or "").strip()
+    _experience = (profil.get("experience", "") or "").strip()
     _bagage = []
     if _comps_txt:   _bagage.append(f"Compétences : {_comps_txt}")
     if _formation:   _bagage.append(f"Formation : {_formation[:200]}")
@@ -173,7 +211,6 @@ def generer_lettre(offre, profil=None, mode="alternance"):
         contact    = nom_entreprise
         paragraphe = ""
 
-    template = (profil or {}).get("lettre_type") or LETTRE_TEMPLATE
     lettre = template.format(
         contact_entreprise=contact,
         date=_date_du_jour(),

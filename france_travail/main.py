@@ -9,7 +9,7 @@ from france_travail.scraper import chercher_offres, sauvegarder_offres_vues
 from france_travail.analyseur import analyser_offres
 
 
-def lancer_recherche(analyser=True, max_analyse=999, on_offre=None, profil=None, mode="alternance"):
+def lancer_recherche(profil, analyser=True, max_analyse=999, on_offre=None, mode="alternance"):
     print("\nRecherche des offres...")
     from shared.modes import get_mode
     cfg = get_mode(mode)
@@ -17,7 +17,7 @@ def lancer_recherche(analyser=True, max_analyse=999, on_offre=None, profil=None,
     filtrer_domaines = cfg["utilise_domaines"]
     # Domaines choisis par l'utilisateur (seulement si le mode filtre par domaine)
     from shared.domaines import ft_grands_domaines
-    cles_domaines = (profil or {}).get("recherche", {}).get("domaines", [])
+    cles_domaines = profil.get("recherche", {}).get("domaines", [])
     grands_domaines = ft_grands_domaines(cles_domaines) if filtrer_domaines else None
     nouvelles_offres, offres_vues = chercher_offres(
         grands_domaines, ft_params=ft_params, filtrer_domaines=filtrer_domaines,

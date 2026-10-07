@@ -1,18 +1,21 @@
 from weasyprint import HTML as WeasyHTML
 from shared.config import BASE_DIR, LETTRES_PDF_DIR
-from database.profil_db import lire_profil
+from shared.erreurs import exiger_profil, CHAMPS_IDENTITE
 from datetime import datetime
 import os
 
 
-def generer_pdf_lettre(offre, lettre, profil=None, dossier_output=LETTRES_PDF_DIR):
+def generer_pdf_lettre(offre, lettre, profil, dossier_output=LETTRES_PDF_DIR):
+    # Profil obligatoire : lève ProfilIncomplet (400) si l'identité manque
+    exiger_profil(profil, CHAMPS_IDENTITE)
     os.makedirs(dossier_output, exist_ok=True)
-    p = profil or lire_profil(1)
+    # Les champs facultatifs absents deviennent des chaînes vides (plus de KeyError)
+    p = {c: profil.get(c) or "" for c in ("prenom", "nom", "ville", "telephone", "email", "github")}
     mois = ["janvier","février","mars","avril","mai","juin","juillet","août",
             "septembre","octobre","novembre","décembre"]
     now = datetime.now()
     date_str = f"{now.day} {mois[now.month-1]} {now.year}"
-    nom_fichier = f"Lettre_{p.get('prenom','')}_{p.get('nom','candidat')}.pdf".replace(" ", "_")
+    nom_fichier = f"Lettre_{p['prenom']}_{p['nom']}.pdf".replace(" ", "_")
     chemin_pdf = os.path.join(dossier_output, nom_fichier)
 
     # Nom entreprise

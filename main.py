@@ -27,6 +27,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from auth.routes import router as auth_router
 from auth.securite import NonConnecte, utilisateur_requis, mode_courant
 from database.models import User
+from shared.erreurs import ErreurUtilisateur, exiger_profil
 from database.candidatures_db import lire_candidatures, lire_candidature, modifier_candidature, ajouter_candidature
 from database.profil_db import lire_profil, sauvegarder_profil, ajouter_piece_jointe, supprimer_piece_jointe
 from database.entreprises_db import calculer_stats, lire_entreprises_envoyees, modifier_statut_suivi
@@ -68,6 +69,12 @@ def non_connecte(request: Request, exc: NonConnecte):
     if request.url.path.startswith("/api/"):
         return JSONResponse({"erreur": "Non connecté"}, status_code=401)
     return RedirectResponse(url="/login", status_code=303)
+
+
+@app.exception_handler(ErreurUtilisateur)
+def erreur_utilisateur(request: Request, exc: ErreurUtilisateur):
+    """Profil incomplet, lettre type invalide... : 400 avec un message lisible."""
+    return JSONResponse({"erreur": str(exc)}, status_code=400)
 
 # ─── États des pipelines ──────────────────────────────────────────────────────
 etat_recherche  = {"en_cours": False, "message": "Prêt", "pourcentage": 0}
@@ -232,6 +239,7 @@ def api_recherche(request: Request, user: User = Depends(utilisateur_requis)):
     from shared.modes import get_mode
     cfg_mode = get_mode(mode)
     profil = lire_profil(user_id, mode=mode)
+    exiger_profil(profil)   # 400 tout de suite plutôt qu'une erreur dans le thread
 
     def lancer():
         etat_recherche["en_cours"] = True
@@ -243,14 +251,14 @@ def api_recherche(request: Request, user: User = Depends(utilisateur_requis)):
 
             etat_recherche["message"] = "Recherche France Travail..."
             log("🔍 Recherche France Travail démarrée")
-            lancer_recherche(analyser=True, max_analyse=999, on_offre=ecrire_en_base, profil=profil, mode=mode)
+            lancer_recherche(profil, analyser=True, max_analyse=999, on_offre=ecrire_en_base, mode=mode)
             log("✅ France Travail terminé")
 
             if "lba" in cfg_mode["sources"]:
                 etat_recherche["message"] = "Recherche La Bonne Alternance..."
                 log("🔍 Recherche La Bonne Alternance démarrée")
                 from shared.domaines import lba_romes
-                _cles = (profil or {}).get("recherche", {}).get("domaines", [])
+                _cles = profil.get("recherche", {}).get("domaines", [])
                 offres_lba = chercher_offres_lba(lba_romes(_cles))
             else:
                 log("ℹ️  LBA ignorée (mode sans alternance)")
@@ -321,7 +329,7 @@ def api_analyser(body: OffreId, request: Request, user: User = Depends(utilisate
     if not offre:
         return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
     profil = lire_profil(user.id, mode=mode_courant(request))
-    analyse = analyser_offre(offre, profil)
+    analyse = analyser_offre(offre, profil, mode=mode_courant(request))
     modifs = {
         "score":          analyse.get("score", 5),
         "verdict":        analyse.get("verdict", "moyen"),

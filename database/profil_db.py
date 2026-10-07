@@ -76,6 +76,9 @@ def sauvegarder_profil(user_id: int, donnees: dict, mode: str = "alternance") ->
             # Profil de ce mode pas encore créé → on le crée à la volée
             p = Profil(user_id=user_id, mode=mode)
             db.add(p)
+        # Le formulaire envoie "email" (clé de lire_profil), la colonne est email_contact
+        if "email" in donnees and "email_contact" not in donnees:
+            donnees = {**donnees, "email_contact": donnees["email"]}
         for champ in champs_texte:
             if champ in donnees:
                 setattr(p, champ, donnees[champ] or "")

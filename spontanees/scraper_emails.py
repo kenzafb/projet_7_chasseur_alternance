@@ -766,7 +766,6 @@ def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None):
 
 from database.entreprises_db import lire_entreprises, sauvegarder_enrichissement
 
-# Utilisateur pour lequel le scraper travaille (1 = Kenza, surchargeable via --user)
 def charger_entreprises(user_id):
     """Lit les entreprises de l'utilisateur depuis la BASE."""
     data = lire_entreprises(user_id)
@@ -781,7 +780,7 @@ def sauvegarder(user_id, entreprises):
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
-def main(stop_event=None, log_fn=None, user_id=1, on_progress=None):
+def main(user_id, stop_event=None, log_fn=None, on_progress=None):
     _log = log_fn or print
     _log(f"Scraper Emails v15 | Mistral = {MODELE_MISTRAL} | Moteur = DDG")
     if DEBUG:
@@ -913,7 +912,7 @@ def main(stop_event=None, log_fn=None, user_id=1, on_progress=None):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--user", type=int, default=1,
-                        help="ID de l'utilisateur pour lequel scraper (défaut: 1)")
+    parser.add_argument("--user", type=int, required=True,
+                        help="ID de l'utilisateur pour lequel scraper")
     args = parser.parse_args()
     main(user_id=args.user)

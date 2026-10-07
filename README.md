@@ -46,8 +46,10 @@ Puis http://localhost:5002 (redirige vers `/login`, inscription sur `/register` 
 L'envoi des candidatures spontanées existe aussi en ligne de commande :
 
 ```bash
-python -m spontanees.envoyeur --limite 10 --test --user 1
+python -m spontanees.envoyeur --user 1 --limite 10 --test
 ```
+
+`--user` (identifiant du compte) est obligatoire pour les trois scripts : `spontanees.fetch_entreprises`, `spontanees.scraper_emails` et `spontanees.envoyeur`.
 
 ## Licence
 

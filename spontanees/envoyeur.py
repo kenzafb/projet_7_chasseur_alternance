@@ -5,8 +5,8 @@ Depuis l'application (main.py) :
   from spontanees.envoyeur import main as env_main
   env_main(limite=10, test=True, stop_event=event, log_fn=log, user_id=user_id)
 
-CLI :
-  python -m spontanees.envoyeur --limite 10 --test
+CLI (--user obligatoire) :
+  python -m spontanees.envoyeur --user 1 --limite 10 --test
 
 Système de déduplication :
   - Au démarrage : charge data/emails_deja_envoyes.json
@@ -82,8 +82,8 @@ def ajouter_emails_envoyes(nouveaux_emails: list[str]):
 
 from database.entreprises_db import lire_entreprises, sauvegarder_entreprises
 
-# Utilisateur pour lequel l'envoyeur travaille (défini au lancement).
-# 1 = Kenza (la crontab). Surchargeable via --user en CLI.
+# Utilisateur pour lequel l'envoyeur travaille : passé par l'appelant
+# (user_id de la session côté web, --user obligatoire en CLI).
 def charger_json(user_id):
     """Lit les entreprises de l'utilisateur depuis la BASE."""
     return lire_entreprises(user_id)
@@ -139,7 +139,7 @@ def envoyer_mail(destinataires: list[str], corps: str, pieces_jointes=None, log_
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
-def main(limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=None, user_id=1, on_progress=None, mode="alternance"):
+def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=None, on_progress=None, mode="alternance"):
     _log = log_fn or print
 
     _log(f"Envoyeur | limite={limite} | test={test}")
@@ -284,7 +284,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--limite", type=int, default=LIMITE_PAR_RUN)
     parser.add_argument("--test",   action="store_true")
-    parser.add_argument("--user",   type=int, default=1,
-                        help="ID de l'utilisateur pour lequel envoyer (défaut: 1)")
+    parser.add_argument("--user",   type=int, required=True,
+                        help="ID de l'utilisateur pour lequel envoyer")
     args = parser.parse_args()
     main(limite=args.limite, test=args.test, user_id=args.user)

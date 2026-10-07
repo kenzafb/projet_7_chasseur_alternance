@@ -199,7 +199,7 @@ def extraire_infos(etab):
 
 from database.entreprises_db import ajouter_entreprises
 
-def main(stop_event=None, on_progress=None, user_id=1):
+def main(user_id, stop_event=None, on_progress=None):
     if not INSEE_API_KEY:
         print("❌  INSEE_API_KEY manquante dans le .env — arrêt.")
         return
@@ -285,8 +285,13 @@ def main(stop_event=None, on_progress=None, user_id=1):
         print(f"    {naf} : {n}")
     print(f"\n  Entreprises enregistrées en base de données")
     print("=" * 60)
-    print("\n→ Lance maintenant : python scraper_emails.py")
+    print(f"\n→ Lance maintenant : python -m spontanees.scraper_emails --user {user_id}")
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--user", type=int, required=True,
+                        help="ID de l'utilisateur pour lequel récupérer les entreprises")
+    args = parser.parse_args()
+    main(user_id=args.user)
