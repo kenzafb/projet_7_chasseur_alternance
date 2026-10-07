@@ -83,8 +83,7 @@ const modal = {
   async pdf() {
     if (!this.id) return;
     try {
-      const r = await api.telechargerPdf(this.id, this.area().value);
-      alert("PDF généré :\n" + (r.chemin || "lettres_pdf/"));
+      await api.telechargerPdf(this.id, this.area().value);
     } catch (e) { alert(e.message); }
   },
 };

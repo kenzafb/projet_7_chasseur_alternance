@@ -125,3 +125,22 @@ def test_alembic_refuse_une_base_non_geree(tmp_path):
         command.upgrade(config_alembic(f"sqlite:///{chemin}"), "head")
     tables = {r[0] for r in sqlite3.connect(chemin).execute("SELECT name FROM sqlite_master")}
     assert tables == {"users"}
+
+
+def test_migration_0002_sur_une_base_en_0001(tmp_path):
+    """Cas de data/chasseur_v2.db : base en 0001 avec des données, montée en 0002."""
+    chemin = tmp_path / "v2.db"
+    cfg = config_alembic(f"sqlite:///{chemin}")
+    command.upgrade(cfg, "0001")
+    cx = sqlite3.connect(chemin)
+    cx.execute("INSERT INTO users (id, email, mot_de_passe_hash) VALUES (1, 'a@test.fr', 'x')")
+    cx.execute("INSERT INTO candidatures (user_id, mode, ref_offre, titre) VALUES (1, 'alternance', 'r1', 'Dev')")
+    cx.commit()
+    cx.close()
+
+    command.upgrade(cfg, "head")
+    command.check(cfg)
+    cx = sqlite3.connect(chemin)
+    assert cx.execute("SELECT ref_offre, titre, lettre_pdf FROM candidatures").fetchall() == [("r1", "Dev", None)]
+    assert cx.execute("SELECT version_num FROM alembic_version").fetchone() == ("0002",)
+    cx.close()

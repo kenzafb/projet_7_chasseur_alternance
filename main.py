@@ -16,7 +16,7 @@ import os
 import threading
 from datetime import datetime
 
-from shared.config import STATIC_DIR, TEMPLATES_DIR, COOKIE_SECURE, chemin_piece_jointe, secret_key
+from shared.config import STATIC_DIR, TEMPLATES_DIR, COOKIE_SECURE, chemin_lettre_pdf, chemin_piece_jointe, secret_key
 from fastapi import FastAPI, APIRouter, Depends, Request, Body, UploadFile, File, Form
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
@@ -27,7 +27,8 @@ from auth.routes import router as auth_router
 from auth.securite import NonConnecte, utilisateur_requis, mode_courant
 from database.models import User
 from shared.erreurs import ErreurUtilisateur, exiger_profil
-from database.candidatures_db import lire_candidatures, lire_candidature, modifier_candidature, ajouter_candidature
+from database.candidatures_db import (lire_candidatures, lire_candidature, modifier_candidature, ajouter_candidature,
+                                     lire_lettre_pdf, enregistrer_lettre_pdf)
 from database.profil_db import lire_profil, sauvegarder_profil, ajouter_piece_jointe, supprimer_piece_jointe
 from database.entreprises_db import calculer_stats, lire_entreprises_envoyees, modifier_statut_suivi
 from pydantic import BaseModel
@@ -37,7 +38,7 @@ from shared.pipelines import Pipelines, RECHERCHE, SPONTANEES
 from france_travail.main import lancer_recherche
 from france_travail.generateur import generer_lettre
 from france_travail.analyseur import analyser_offre, score_to_verdict, appliquer_archivage_auto
-from france_travail.pdf_generator import generer_pdf_lettre
+from france_travail.pdf_generator import generer_pdf_lettre, nom_telechargement
 from france_travail.scraper_lba import chercher_offres_lba
 
 # Documentation automatique désactivée ici : elle est servie plus bas par des
@@ -382,15 +383,39 @@ def api_sauvegarder(body: Sauvegarde, request: Request, user: User = Depends(uti
 
 @prive.post("/api/telecharger_pdf")
 def api_telecharger_pdf(body: TelechargerPdf, request: Request, user: User = Depends(utilisateur_requis)):
-    offre = lire_candidature(user.id, body.id, mode=mode_courant(request))
+    """Génère le PDF de la lettre et renvoie l'URL de téléchargement."""
+    mode = mode_courant(request)
+    offre = lire_candidature(user.id, body.id, mode=mode)
     if not offre:
         return JSONResponse({"erreur": "Non trouvé"}, status_code=404)
     lettre = body.lettre or offre.get("lettre")
     if not lettre:
         return JSONResponse({"erreur": "Vide"}, status_code=400)
-    profil = lire_profil(user.id, mode=mode_courant(request))
-    chemin = generer_pdf_lettre(offre, lettre, profil)
-    return {"ok": True, "chemin": chemin}
+    profil = lire_profil(user.id, mode=mode)
+    fichier = generer_pdf_lettre(offre, lettre, profil, user.id)
+    ancien = enregistrer_lettre_pdf(user.id, body.id, fichier, mode=mode)
+    # Le PDF précédent de cette candidature est remplacé : on le supprime
+    chemin_ancien = chemin_lettre_pdf(ancien or "")
+    if chemin_ancien and ancien != fichier:
+        try:
+            os.remove(chemin_ancien)
+        except OSError:
+            pass
+    return {"ok": True, "url": f"/api/lettre_pdf/{body.id}", "nom": nom_telechargement(offre, profil)}
+
+@prive.get("/api/lettre_pdf/{ref_offre}")
+def api_lettre_pdf(ref_offre: str, request: Request, user: User = Depends(utilisateur_requis)):
+    """Renvoie le PDF d'une candidature de l'utilisateur connecté, en pièce
+    jointe. Celui d'un autre utilisateur est introuvable (404)."""
+    mode = mode_courant(request)
+    relatif = lire_lettre_pdf(user.id, ref_offre, mode=mode)
+    chemin = chemin_lettre_pdf(relatif)
+    # Défense en profondeur : le fichier doit être dans le dossier de l'utilisateur
+    if not (chemin and relatif.startswith(f"user_{user.id}/") and chemin.is_file()):
+        return JSONResponse({"erreur": "PDF introuvable"}, status_code=404)
+    offre = lire_candidature(user.id, ref_offre, mode=mode) or {}
+    nom = nom_telechargement(offre, lire_profil(user.id, mode=mode))
+    return FileResponse(chemin, media_type="application/pdf", filename=nom)
 
 
 # ─── Spontanées — Suivi des candidatures ──────────────────────────────────────

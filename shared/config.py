@@ -28,16 +28,25 @@ LETTRES_PDF_DIR = BASE_DIR / "lettres_pdf"
 TEMPLATES_DIR   = BASE_DIR / "templates"
 STATIC_DIR      = BASE_DIR / "static"
 
-def chemin_piece_jointe(relatif: str) -> Path | None:
-    """Chemin absolu d'une pièce jointe stockée en base (relatif à UPLOADS_DIR).
-    None si le chemin est vide ou sort du dossier des pièces jointes."""
+def _chemin_sous(racine: Path, relatif: str) -> Path | None:
+    """racine / relatif, ou None si relatif est vide ou sort de racine."""
     if not relatif:
         return None
-    racine = UPLOADS_DIR.resolve()
+    racine = racine.resolve()
     chemin = (racine / relatif).resolve()
     if not chemin.is_relative_to(racine):
         return None
     return chemin
+
+def chemin_piece_jointe(relatif: str) -> Path | None:
+    """Chemin absolu d'une pièce jointe stockée en base (relatif à UPLOADS_DIR).
+    None si le chemin est vide ou sort du dossier des pièces jointes."""
+    return _chemin_sous(UPLOADS_DIR, relatif)
+
+def chemin_lettre_pdf(relatif: str) -> Path | None:
+    """Chemin absolu d'une lettre PDF stockée en base (relatif à LETTRES_PDF_DIR).
+    None si le chemin est vide ou sort du dossier des lettres."""
+    return _chemin_sous(LETTRES_PDF_DIR, relatif)
 
 # Base de données : DATABASE_URL du .env si présente, sinon SQLite local
 # (une ligne "DATABASE_URL=" vide dans le .env vaut absence)

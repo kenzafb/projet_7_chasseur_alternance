@@ -1,55 +1,88 @@
-from weasyprint import HTML as WeasyHTML
-from shared.config import BASE_DIR, LETTRES_PDF_DIR
-from shared.erreurs import exiger_profil, CHAMPS_IDENTITE
-from datetime import datetime
+"""
+france_travail/pdf_generator.py
+===============================
+Lettre de motivation -> PDF (WeasyPrint).
+
+Sécurité :
+  - tout ce qui vient de l'utilisateur ou de Mistral (lettre, profil, offre)
+    est échappé avant d'entrer dans le HTML : une balise tapée dans la lettre
+    s'imprime comme du texte, elle n'est jamais interprétée ;
+  - le gabarit n'a besoin d'aucune ressource (styles en ligne, polices du
+    système) : le url_fetcher refuse tout, fichier local comme réseau.
+
+Rangement : un fichier au nom unique par génération, dans le dossier de
+l'utilisateur (LETTRES_PDF_DIR/user_<id>/), donc aucun écrasement entre
+homonymes. Le chemin relatif est gardé en base ; le fichier est servi par
+une route qui vérifie le propriétaire.
+"""
+
+import html
 import os
+import re
+import tempfile
+import unicodedata
+import uuid
+from datetime import datetime
+from pathlib import Path
+
+from weasyprint import HTML as WeasyHTML
+
+from shared import config
+from shared.erreurs import exiger_profil, CHAMPS_IDENTITE
+
+MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
+        "septembre", "octobre", "novembre", "décembre"]
 
 
-def generer_pdf_lettre(offre, lettre, profil, dossier_output=LETTRES_PDF_DIR):
-    # Profil obligatoire : lève ProfilIncomplet (400) si l'identité manque
-    exiger_profil(profil, CHAMPS_IDENTITE)
-    os.makedirs(dossier_output, exist_ok=True)
-    # Les champs facultatifs absents deviennent des chaînes vides (plus de KeyError)
-    p = {c: profil.get(c) or "" for c in ("prenom", "nom", "ville", "telephone", "email", "github")}
-    mois = ["janvier","février","mars","avril","mai","juin","juillet","août",
-            "septembre","octobre","novembre","décembre"]
+class RessourceInterdite(ValueError):
+    """Le PDF a tenté de charger une ressource (image, feuille de style...)."""
+
+
+def refuser_ressource(url, *args, **kwargs):
+    """url_fetcher de WeasyPrint : aucune ressource n'est chargée, ni fichier
+    local ni réseau. WeasyPrint ignore la ressource et continue le rendu."""
+    raise RessourceInterdite(f"ressource externe refusée : {url[:200]}")
+
+
+def rendre_pdf(document_html: str, chemin_pdf) -> None:
+    """Rend du HTML en PDF sans aucun accès aux fichiers ni au réseau."""
+    WeasyHTML(string=document_html, base_url=None,
+              url_fetcher=refuser_ressource).write_pdf(chemin_pdf)
+
+
+def _e(valeur) -> str:
+    """Échappe un texte pour l'insérer dans le HTML."""
+    return html.escape(str(valeur or ""), quote=True)
+
+
+def _corps(lettre: str) -> str:
+    """Ne garde que le corps de la lettre (à partir de "Madame, Monsieur") :
+    l'en-tête (contact entreprise, date, objet) est déjà dans le gabarit,
+    l'inclure créerait un doublon."""
+    for marqueur in ["Madame, Monsieur", "Madame,\nMonsieur", "Madame"]:
+        if marqueur in lettre:
+            return lettre[lettre.index(marqueur):]
+    # Pas de formule d'appel : on saute les 3 premiers blocs (contact, date, objet)
+    return "\n\n".join(lettre.strip().split("\n\n")[3:])
+
+
+def construire_html(offre: dict, lettre: str, profil: dict) -> str:
+    """HTML de la lettre, chaque valeur variable échappée."""
+    p = {c: _e(profil.get(c)) for c in ("prenom", "nom", "ville", "telephone", "email", "github")}
     now = datetime.now()
-    date_str = f"{now.day} {mois[now.month-1]} {now.year}"
-    nom_fichier = f"Lettre_{p['prenom']}_{p['nom']}.pdf".replace(" ", "_")
-    chemin_pdf = os.path.join(dossier_output, nom_fichier)
+    date_str = f"{now.day} {MOIS[now.month - 1]} {now.year}"
 
-    # Nom entreprise
-    entreprise_brute = offre.get("entreprise", "")
-    if not entreprise_brute or entreprise_brute.lower() in ["inconnue", "inconnu", "", "none"]:
+    entreprise_brute = offre.get("entreprise", "") or ""
+    if entreprise_brute.lower() in ["inconnue", "inconnu", "", "none"]:
         entreprise_affichee = "À l'attention du service recrutement"
     else:
         entreprise_affichee = entreprise_brute
-    lieu_affiche = offre.get("lieu", "")
 
-    # ── Ne garder que le corps de la lettre (à partir de "Madame, Monsieur") ──
-    # L'en-tête (contact entreprise, date, objet) est déjà géré par le HTML
-    # ci-dessous — l'inclure depuis le template créerait un doublon.
-    marqueur = None
-    for candidat in ["Madame, Monsieur", "Madame,\nMonsieur", "Madame"]:
-        if candidat in lettre:
-            marqueur = candidat
-            break
+    paragraphes = "".join(
+        f"<p>{_e(para.strip()).replace(chr(10), '<br>')}</p>\n"
+        for para in _corps(lettre).strip().split("\n\n") if para.strip())
 
-    if marqueur:
-        corps_lettre = lettre[lettre.index(marqueur):]
-    else:
-        # Fallback : on saute les 3 premiers blocs (contact, date, objet)
-        blocs = lettre.strip().split("\n\n")
-        corps_lettre = "\n\n".join(blocs[3:])
-
-    # Conversion en balises <p>
-    paragraphes = ""
-    for para in corps_lettre.strip().split("\n\n"):
-        para = para.strip()
-        if para:
-            paragraphes += f"<p>{para.replace(chr(10), '<br>')}</p>\n"
-
-    html = f"""<!DOCTYPE html>
+    return f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8"/>
@@ -75,16 +108,47 @@ def generer_pdf_lettre(offre, lettre, profil, dossier_output=LETTRES_PDF_DIR):
     <div class="info">{p['ville']}<br>{p['telephone']}<br>{p['email']}<br>{p['github']}</div>
   </div>
   <div class="destinataire">
-    <div class="entreprise">{entreprise_affichee}</div>
-    <div class="info">{lieu_affiche}</div>
+    <div class="entreprise">{_e(entreprise_affichee)}</div>
+    <div class="info">{_e(offre.get("lieu"))}</div>
   </div>
 </div>
 <div class="date-lieu">Paris, le {date_str}</div>
-<div class="objet"><strong>Objet :</strong> Candidature — {offre.get('titre', 'Alternance')}</div>
+<div class="objet"><strong>Objet :</strong> Candidature — {_e(offre.get('titre') or 'Alternance')}</div>
 <div class="corps">{paragraphes}</div>
 </body>
 </html>"""
 
-    WeasyHTML(string=html).write_pdf(chemin_pdf)
-    # Chemin relatif à la racine du projet : c'est ce que le front affiche
-    return os.path.relpath(chemin_pdf, BASE_DIR)
+
+def _ascii(texte: str) -> str:
+    texte = unicodedata.normalize("NFKD", texte or "").encode("ascii", "ignore").decode()
+    return re.sub(r"[^A-Za-z0-9-]+", "_", texte).strip("_")
+
+
+def nom_telechargement(offre: dict, profil: dict) -> str:
+    """Nom proposé au navigateur : Lettre_Prenom_Nom_Entreprise.pdf (ASCII)."""
+    parties = [_ascii(profil.get("prenom")), _ascii(profil.get("nom")),
+               _ascii(offre.get("entreprise"))[:40]]
+    return "_".join(["Lettre", *[x for x in parties if x]]) + ".pdf"
+
+
+def generer_pdf_lettre(offre, lettre, profil, user_id: int, dossier_output=None) -> str:
+    """Génère le PDF dans le dossier de l'utilisateur, sous un nom unique.
+    Retourne son chemin relatif à dossier_output (défaut LETTRES_PDF_DIR),
+    à stocker en base : "user_<id>/lettre_<hex>.pdf"."""
+    # Profil obligatoire : lève ProfilIncomplet (400) si l'identité manque
+    exiger_profil(profil, CHAMPS_IDENTITE)
+    racine = Path(dossier_output or config.LETTRES_PDF_DIR)
+    relatif = f"user_{int(user_id)}/lettre_{uuid.uuid4().hex}.pdf"
+    chemin_pdf = racine / relatif
+    chemin_pdf.parent.mkdir(parents=True, exist_ok=True)
+
+    # Écriture dans un fichier temporaire puis renommage : jamais de PDF à moitié écrit
+    fd, temporaire = tempfile.mkstemp(dir=chemin_pdf.parent, suffix=".tmp")
+    os.close(fd)
+    try:
+        rendre_pdf(construire_html(offre, lettre, profil), temporaire)
+        os.replace(temporaire, chemin_pdf)
+    finally:
+        if os.path.exists(temporaire):
+            os.remove(temporaire)
+    return relatif

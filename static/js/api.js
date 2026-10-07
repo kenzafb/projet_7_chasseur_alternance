@@ -31,6 +31,26 @@ async function post(url, body) {
   return r.json();
 }
 
+/* Télécharge un fichier servi par l'API (PDF...) : vrai téléchargement
+   navigateur, sous le nom donné par le serveur ou `nom` à défaut. */
+async function telecharger(url, nom) {
+  const r = await fetch(url);
+  verifierSession(r);
+  if (!r.ok) {
+    let detail = "";
+    try { detail = (await r.json()).erreur || ""; } catch (_) {}
+    throw new Error(detail || `GET ${url} → ${r.status}`);
+  }
+  const blob = await r.blob();
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(blob);
+  lien.download = nom || "document.pdf";
+  document.body.appendChild(lien);
+  lien.click();
+  lien.remove();
+  setTimeout(() => URL.revokeObjectURL(lien.href), 10000);
+}
+
 export const api = {
   // Offres / candidatures
   candidatures:      ()        => get("/api/candidatures"),
@@ -43,7 +63,11 @@ export const api = {
   desarchiver:       (id)      => post("/api/offre/archivage", { id, desarchiver: true }),
   changerRaison:     (id, r)   => post("/api/offre/archivage", { id, raison: r }),
   sauvegarder:       (payload) => post("/api/sauvegarder", payload),
-  telechargerPdf:    (id, l)   => post("/api/telecharger_pdf", { id, lettre: l }),
+  // Génère le PDF côté serveur puis le télécharge
+  telechargerPdf:    async (id, l) => {
+    const r = await post("/api/telecharger_pdf", { id, lettre: l });
+    await telecharger(r.url, r.nom);
+  },
 
   // Spontanées
   spStats:    ()       => get("/api/spontanees/stats"),

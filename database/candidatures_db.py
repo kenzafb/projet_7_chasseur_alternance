@@ -102,3 +102,30 @@ def ajouter_candidature(user_id: int, offre: dict, mode: str = "alternance") -> 
         return n == 1
     finally:
         db.close()
+
+
+def lire_lettre_pdf(user_id: int, ref_offre: str, mode: str = "alternance") -> str:
+    """Chemin relatif de la dernière lettre PDF de cette candidature ("" si aucune).
+    Filtré par user_id : c'est la vérification du propriétaire."""
+    db = SessionLocal()
+    try:
+        c = db.query(Candidature).filter_by(user_id=user_id, ref_offre=ref_offre, mode=mode).first()
+        return (c.lettre_pdf or "") if c else ""
+    finally:
+        db.close()
+
+
+def enregistrer_lettre_pdf(user_id: int, ref_offre: str, fichier: str, mode: str = "alternance") -> str | None:
+    """Enregistre le PDF de la candidature. Retourne le chemin du PDF qu'il
+    remplace ("" si aucun), ou None si la candidature n'existe pas."""
+    db = SessionLocal()
+    try:
+        c = db.query(Candidature).filter_by(user_id=user_id, ref_offre=ref_offre, mode=mode).first()
+        if not c:
+            return None
+        ancien = c.lettre_pdf or ""
+        c.lettre_pdf = fichier
+        db.commit()
+        return ancien
+    finally:
+        db.close()

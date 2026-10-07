@@ -155,6 +155,10 @@ class Candidature(Base):
     statut            = Column(String(50), default="nouveau")
     raison_archivage  = Column(String(40), default="")   # note_basse, ecole_cfa, hors_domaine, stage, public_specifique, manuel
 
+    # Dernière lettre PDF générée : chemin relatif à LETTRES_PDF_DIR
+    # ("user_<id>/lettre_<hex>.pdf"), servie par /api/lettre_pdf/<ref_offre>
+    lettre_pdf        = Column(String(255), default="")
+
     date_trouvee     = Column(DateTime(timezone=True))
     date_candidature = Column(DateTime(timezone=True))
     notes            = Column(Text, default="")

@@ -88,9 +88,7 @@ def mistral(monkeypatch):
 @pytest.fixture(autouse=True)
 def dossiers_temporaires(monkeypatch, tmp_path):
     """PDF et pièces jointes dans tmp_path, jamais dans le projet."""
-    import functools
-    monkeypatch.setattr(main, "generer_pdf_lettre",
-                        functools.partial(main.generer_pdf_lettre, dossier_output=tmp_path / "pdf"))
+    monkeypatch.setattr(config, "LETTRES_PDF_DIR", tmp_path / "pdf")
     monkeypatch.setattr(config, "UPLOADS_DIR", tmp_path / "uploads")
 
 

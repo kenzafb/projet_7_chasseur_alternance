@@ -68,4 +68,6 @@ def test_pdf_profil_complet(ada, tmp_path):
     ada.post("/api/profil", json=PROFIL_COMPLET)
     r = ada.post("/api/telecharger_pdf", json={"id": "OFFRE-1", "lettre": "Madame, Monsieur,\n\nTexte."})
     assert r.status_code == 200
-    assert list((tmp_path / "pdf").glob("Lettre_Ada_Lovelace.pdf"))
+    assert r.json()["url"] == "/api/lettre_pdf/OFFRE-1"
+    assert r.json()["nom"] == "Lettre_Ada_Lovelace_ACME.pdf"
+    assert len(list((tmp_path / "pdf").glob("user_*/lettre_*.pdf"))) == 1
