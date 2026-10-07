@@ -1,11 +1,26 @@
-# Web
-flask==3.1.3
+# Dépendances du projet actif (archive/ exclu), versions du venv de référence.
+# WeasyPrint demande aussi les bibliothèques système Pango et Cairo.
 
-# Google / Vertex AI
-google-genai==1.70.0
-google-auth==2.49.1
-google-auth-httplib2==0.3.1
-google-auth-oauthlib==1.3.1
+# Web (FastAPI)
+fastapi==0.137.1
+starlette==1.3.1
+uvicorn==0.49.0
+pydantic==2.12.5
+Jinja2==3.1.6               # Jinja2Templates
+python-multipart==0.0.32    # Form, UploadFile
+itsdangerous==2.2.0         # SessionMiddleware
+
+# Base de données
+SQLAlchemy==2.0.51
+
+# Authentification (PasswordHelper de fastapi-users, hashs argon2 / bcrypt)
+fastapi-users==15.0.5
+pwdlib==0.3.0
+argon2-cffi==25.1.0
+bcrypt==5.0.0
+
+# IA
+mistralai==2.4.9
 
 # Scraping
 requests==2.33.1
@@ -14,9 +29,6 @@ ddgs==9.12.1
 
 # Documents
 weasyprint==68.1
-openpyxl==3.1.5
 
 # Outils
 python-dotenv==1.2.2
-
-mistralai
