@@ -542,7 +542,7 @@ def docs():
     return get_swagger_ui_html(openapi_url="/openapi.json", title=app.title + " : API")
 
 
-# Enregistré en dernier : include_router copie les routes déjà déclarées.
+# Inclus après la déclaration de toutes les routes privées
 app.include_router(prive)
 
 

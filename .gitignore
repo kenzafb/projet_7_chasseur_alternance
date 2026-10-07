@@ -14,3 +14,4 @@ _archive/
 data/
 shared/profil.py
 code_projet.md
+.pytest_cache/

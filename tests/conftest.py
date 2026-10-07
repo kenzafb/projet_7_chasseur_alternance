@@ -1,0 +1,136 @@
+"""
+Configuration commune des tests.
+
+Isolation complète :
+  - le vrai .env n'est pas lu (CHASSEUR_ENV_FILE pointe vers un fichier absent) ;
+  - la base est un SQLite temporaire (DATABASE_URL), recréée par creer_tables()
+    avant chaque test ;
+  - Mistral, SMTP et tout accès réseau sont neutralisés : un appel non prévu
+    fait échouer le test au lieu de partir sur Internet ;
+  - PDF et pièces jointes écrits dans un dossier temporaire, jamais dans data/.
+
+Ces variables doivent être posées AVANT tout import du projet : shared.config
+lit l'environnement à l'import.
+"""
+
+import os
+import socket
+import tempfile
+from pathlib import Path
+from types import SimpleNamespace
+
+_TMP = Path(tempfile.mkdtemp(prefix="chasseur_tests_"))
+os.environ["CHASSEUR_ENV_FILE"] = str(_TMP / "absent.env")
+os.environ["DATABASE_URL"] = f"sqlite:///{_TMP / 'test.db'}"
+os.environ["SECRET_KEY"] = "cle-de-test-" + "x" * 40
+os.environ["COOKIE_SECURE"] = "false"
+os.environ["MISTRAL_API_KEY"] = "factice"
+for _var in ("CODE_INVITATION", "FT_CLIENT_ID", "FT_CLIENT_SECRET", "LBA_API_KEY",
+             "INSEE_API_KEY", "GMAIL_SENDER", "GMAIL_APP_PASSWORD"):
+    os.environ.pop(_var, None)
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from shared import config  # noqa: E402
+
+assert not str(config.DATABASE_URL).endswith("data/chasseur.db"), "les tests visent la vraie base"
+
+import main  # noqa: E402
+import shared.ia  # noqa: E402
+from database.connexion import creer_tables, engine  # noqa: E402
+from database.models import Base, User  # noqa: E402
+from database.connexion import SessionLocal  # noqa: E402
+
+CODE = "code-invitation-de-test"
+MOT_DE_PASSE = "motdepasse-solide"
+
+
+# ─── Barrières réseau ─────────────────────────────────────────────────────────
+class _ReseauInterdit(Exception):
+    pass
+
+
+@pytest.fixture(autouse=True)
+def pas_de_reseau(monkeypatch):
+    """Toute connexion socket ou SMTP lève une erreur (le TestClient n'en ouvre pas)."""
+    def refuser(*args, **kwargs):
+        raise _ReseauInterdit("accès réseau interdit pendant les tests")
+    monkeypatch.setattr(socket.socket, "connect", refuser)
+    monkeypatch.setattr(socket, "create_connection", refuser)
+    monkeypatch.setattr("smtplib.SMTP", refuser)
+    monkeypatch.setattr("smtplib.SMTP_SSL", refuser)
+
+
+class FauxMistral:
+    """Remplace le client Mistral : enregistre les appels, renvoie `reponse`."""
+
+    def __init__(self):
+        self.appels = []
+        self.reponse = '{"contact_entreprise": "ACME\\n75010 Paris", "paragraphe_entreprise": "ACME, votre contexte me parle."}'
+        self.chat = SimpleNamespace(complete=self._complete)
+
+    def _complete(self, **kwargs):
+        self.appels.append(kwargs)
+        message = SimpleNamespace(content=self.reponse)
+        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
+
+
+@pytest.fixture(autouse=True)
+def mistral(monkeypatch):
+    faux = FauxMistral()
+    monkeypatch.setattr(shared.ia, "client", faux)
+    return faux
+
+
+@pytest.fixture(autouse=True)
+def dossiers_temporaires(monkeypatch, tmp_path):
+    """PDF et pièces jointes dans tmp_path, jamais dans le projet."""
+    import functools
+    monkeypatch.setattr(main, "generer_pdf_lettre",
+                        functools.partial(main.generer_pdf_lettre, dossier_output=tmp_path / "pdf"))
+    monkeypatch.setattr(main, "UPLOADS_DIR", tmp_path / "uploads")
+
+
+# ─── Base ─────────────────────────────────────────────────────────────────────
+@pytest.fixture(autouse=True)
+def base():
+    """Base vide et fraîche pour chaque test."""
+    Base.metadata.drop_all(bind=engine)
+    creer_tables()
+    yield
+    Base.metadata.drop_all(bind=engine)
+
+
+# ─── Clients ──────────────────────────────────────────────────────────────────
+@pytest.fixture
+def client():
+    with TestClient(main.app) as c:
+        yield c
+
+
+@pytest.fixture
+def code_invitation(monkeypatch):
+    monkeypatch.setenv("CODE_INVITATION", CODE)
+    return CODE
+
+
+def inscrire(email, **profil):
+    """Crée un compte via /register et renvoie (client connecté, user_id)."""
+    c = TestClient(main.app)
+    r = c.post("/register", data={"email": email, "mot_de_passe": MOT_DE_PASSE,
+                                  "code_invitation": CODE, **profil},
+               follow_redirects=False)
+    assert r.status_code == 303, r.text
+    db = SessionLocal()
+    try:
+        user_id = db.query(User).filter_by(email=email).one().id
+    finally:
+        db.close()
+    return c, user_id
+
+
+@pytest.fixture
+def utilisateur(code_invitation):
+    """Fabrique d'utilisateurs connectés : utilisateur("a@test.fr") -> (client, id)."""
+    return inscrire
