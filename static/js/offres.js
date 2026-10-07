@@ -10,7 +10,7 @@ let modeArchives = false;   // false = offres à postuler, true = archivées
 let fOffres = { source: "all", zone: "all", score: "all" };  // filtres combinables du mode normal
 const LABEL_RAISON = {
   manuel: "Manuel", note_basse: "Note basse", ecole_cfa: "École / CFA",
-  hors_it: "Hors IT", public_specifique: "Public spécifique", stage: "Stage",
+  hors_domaine: "Hors domaine", public_specifique: "Public spécifique", stage: "Stage",
 };
 
 const $list = () => document.querySelector('[data-list="offres"]');
@@ -75,7 +75,7 @@ function carte(o) {
         ${o.statut !== "archive" ? `
         <select class="archiver-select" data-archiver-select>
           <option value="">Archiver…</option>
-          ${["manuel","note_basse","ecole_cfa","hors_it","public_specifique","stage"]
+          ${["manuel","note_basse","ecole_cfa","hors_domaine","public_specifique","stage"]
             .map(r => `<option value="${r}">→ ${LABEL_RAISON[r]}</option>`).join("")}
         </select>` : ""}
       </div>
@@ -84,7 +84,7 @@ function carte(o) {
         <label class="archive-raison">
           <span>Raison :</span>
           <select data-raison-select>
-            ${["manuel","note_basse","ecole_cfa","hors_it","public_specifique","stage"]
+            ${["manuel","note_basse","ecole_cfa","hors_domaine","public_specifique","stage"]
               .map(r => `<option value="${r}"${(o.raison_archivage||"manuel")===r?" selected":""}>${LABEL_RAISON[r]}</option>`).join("")}
           </select>
         </label>

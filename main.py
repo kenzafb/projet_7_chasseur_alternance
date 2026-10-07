@@ -283,12 +283,8 @@ def api_recherche(request: Request):
                                 "domaine":        analyse.get("domaine", "Autre IT"),
                                 "resume_analyse": analyse.get("resume", ""),
                             })
-                            # Archivage auto avec raison (mêmes règles qu'analyser_offres, sans log).
-                            # ATTENTION : "Hors IT" ne correspond pas au "Hors domaine" renvoyé par
-                            # l'analyseur, la règle hors domaine ne se déclenche donc jamais ici.
-                            # Incohérence connue, conservée en phase 0 (à trancher).
-                            appliquer_archivage_auto(offre, analyse, libelle_hors_domaine="Hors IT",
-                                                     verbeux=False)
+                            # Archivage auto avec raison (mêmes règles qu'analyser_offres, sans log)
+                            appliquer_archivage_auto(offre, analyse, verbeux=False)
                         except Exception as e:
                             log(f"  ⚠️ Erreur analyse LBA {offre.get('titre', '?')[:40]} : {e}")
                         ajouter_candidature(user_id, offre, mode=mode)   # écriture base au fur et à mesure

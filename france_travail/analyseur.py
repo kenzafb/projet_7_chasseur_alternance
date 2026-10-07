@@ -310,16 +310,13 @@ def score_to_verdict(score):
     if score >= 3: return "faible"
     return "ineligible"
 
-def appliquer_archivage_auto(offre, analyse, mode="alternance",
-                             libelle_hors_domaine="Hors domaine", verbeux=True):
+def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
     """
     Règles d'archivage automatique d'une offre analysée, avec raison.
     Modifie offre en place (statut, raison_archivage).
 
-    libelle_hors_domaine : valeur de offre["domaine"] qui déclenche la raison
-    "hors_it". L'analyseur renvoie "Hors domaine" ; main.py (offres LBA)
-    passe encore "Hors IT", qui ne correspond à rien (incohérence connue,
-    conservée telle quelle en phase 0).
+    Un domaine "Hors domaine" (valeur imposée par le prompt) donne la raison
+    "hors_domaine".
     verbeux : affiche la raison de l'archivage dans la console.
     """
     _log = print if verbeux else (lambda *a, **k: None)
@@ -342,9 +339,9 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance",
         elif analyse.get("statut_auto") == "archive":
             offre["statut"] = "archive"
             offre["raison_archivage"] = "ecole_cfa"
-        elif offre.get("domaine") == libelle_hors_domaine:
+        elif offre.get("domaine") == "Hors domaine":
             offre["statut"] = "archive"
-            offre["raison_archivage"] = "hors_it"
+            offre["raison_archivage"] = "hors_domaine"
             _log(f"     -> Archivée automatiquement (hors domaine recherché)")
         elif "stage" in titre_lower:
             offre["statut"] = "archive"

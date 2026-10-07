@@ -116,7 +116,7 @@ class Candidature(Base):
     email_candidature = Column(String(255), default="")
     objet_email       = Column(String(300), default="")
     statut            = Column(String(50), default="nouveau")
-    raison_archivage  = Column(String(40), default="")   # note_basse, ecole_cfa, hors_it, stage, public_specifique, manuel
+    raison_archivage  = Column(String(40), default="")   # note_basse, ecole_cfa, hors_domaine, stage, public_specifique, manuel
 
     date_trouvee     = Column(String(20), default="")
     date_candidature = Column(String(20), default="")
