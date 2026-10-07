@@ -369,3 +369,60 @@ def test_mot_de_passe_absent_de_toute_reponse_log_et_erreur(ada, smtp_simule, ca
     tout = "\n".join(textes) + sortie.out + sortie.err + caplog.text
     assert "Authentification refusée" in tout and "injoignable" in tout   # les échecs ont bien eu lieu
     _sans_mot_de_passe(tout, mdp)
+
+
+# ─── Vraie classe de connexion (sans réseau) ─────────────────────────────────
+class _Coupe(Exception):
+    pass
+
+
+@pytest.mark.parametrize("chiffrement,port", [("ssl", 465), ("starttls", 587)])
+def test_connexion_epinglee_sur_l_ip_verifiee(monkeypatch, dns, chiffrement, port):
+    """La socket vise l'IP vérifiée (pas de seconde résolution) ; en SSL,
+    le certificat est vérifié pour le nom d'hôte."""
+    import socket
+    import ssl
+    ouvertures, verifications = [], []
+
+    class FausseSocket:
+        def makefile(self, *a, **k):
+            raise _Coupe()
+
+    class FauxServeurStarttls:
+        """Socket qui répond comme un serveur proposant STARTTLS."""
+        def __init__(self):
+            self.reponses = [b"220 pret\r\n", b"250-smtp.exemple.fr\r\n250 STARTTLS\r\n",
+                             b"220 go\r\n"]
+
+        def makefile(self, *a, **k):
+            import io
+            return io.BytesIO(b"".join(self.reponses))
+
+        def sendall(self, donnees):
+            pass
+
+        def close(self):
+            pass
+
+    def ouvrir(adresse, *args, **kwargs):
+        ouvertures.append(adresse)
+        return FausseSocket() if chiffrement == "ssl" else FauxServeurStarttls()
+
+    def envelopper(self, sock, server_hostname=None, **kwargs):
+        verifications.append((self.verify_mode, self.check_hostname, server_hostname))
+        raise _Coupe()
+
+    # conftest remplace smtplib.SMTP, que SMTP_SSL.__init__ appelle par son nom :
+    # on remet la vraie classe, le réseau reste coupé par create_connection
+    monkeypatch.setattr("smtplib.SMTP", smtp._SMTPEpingle.__mro__[2])
+    monkeypatch.setattr(socket, "create_connection", ouvrir)
+    monkeypatch.setattr(ssl.SSLContext, "wrap_socket", envelopper)
+    dns.noms["smtp.exemple.fr"] = ["80.12.242.10"]
+    conn = smtp._nouvelle_connexion(chiffrement)
+    conn.ip_cible = smtp.verifier_hote("smtp.exemple.fr")[0]
+    with pytest.raises(_Coupe):
+        conn.connect("smtp.exemple.fr", port)
+        conn.ehlo()
+        conn.starttls(context=ssl.create_default_context())
+    assert ouvertures == [("80.12.242.10", port)]
+    assert verifications == [(ssl.CERT_REQUIRED, True, "smtp.exemple.fr")]

@@ -104,9 +104,14 @@ def verifier_hote(hote: str) -> list[str]:
 
 # ─── Connexion ────────────────────────────────────────────────────────────────
 class _Epingle:
-    """Ouvre la socket vers l'IP vérifiée ; self._host (nom d'hôte, posé par
-    connect) reste celui que TLS vérifie."""
+    """Ouvre la socket vers l'IP vérifiée, et garde le nom d'hôte dans
+    self._host : c'est lui que TLS vérifie (SSL direct comme STARTTLS).
+    smtplib ne pose _host que dans __init__, d'où la surcharge de connect."""
     ip_cible = None
+
+    def connect(self, host="localhost", port=0, source_address=None):
+        self._host = host
+        return super().connect(host, port, source_address)
 
     def _get_socket(self, host, port, timeout):
         return super()._get_socket(self.ip_cible or host, port, timeout)
