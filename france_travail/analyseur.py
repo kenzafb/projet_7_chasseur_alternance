@@ -1,13 +1,8 @@
 import time
 import json
 import re
-import os
-from mistralai.client import Mistral
-from shared.config import MODELE_MISTRAL
+from shared.ia import appeler_mistral
 
-client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
-
-MODELE = MODELE_MISTRAL
 PAUSE_MISTRAL = 10 # secondes entre chaque appel Mistral (rate limit)
 
 def construire_contexte_profil(profil):
@@ -147,28 +142,18 @@ def _analyser_offre_job(offre, profil):
     )
 
     try:
-        response = None
-        for tentative in range(1, 5):
-            try:
-                response = client.chat.complete(
-                    model=MODELE,
-                    messages=[
-                        {"role": "system", "content": (
-                            "Tu es un recruteur spécialisé dans les jobs courts et missions. "
-                            "Tu reponds UNIQUEMENT en JSON valide sans backticks. "
-                            "Tu ignores totalement la date de debut et la disponibilite dans ta notation."
-                        )},
-                        {"role": "user", "content": prompt},
-                    ],
-                    response_format={"type": "json_object"},
-                )
-                break
-            except Exception as err_api:
-                msg = str(err_api).lower()
-                if ("429" in msg or "rate" in msg) and tentative < 4:
-                    time.sleep(15 * tentative)
-                else:
-                    raise
+        # Appel Mistral avec retry sur rate limit (4 tentatives, pauses 15s, 30s, 45s)
+        response = appeler_mistral(
+            [
+                {"role": "system", "content": (
+                    "Tu es un recruteur spécialisé dans les jobs courts et missions. "
+                    "Tu reponds UNIQUEMENT en JSON valide sans backticks. "
+                    "Tu ignores totalement la date de debut et la disponibilite dans ta notation."
+                )},
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+        )
         texte = response.choices[0].message.content
         texte = re.sub(r'```json\s*', '', texte)
         texte = re.sub(r'```\s*', '', texte)
@@ -282,31 +267,19 @@ def analyser_offre(offre, profil=None, mode="alternance"):
     )
 
     try:
-        # Appel Mistral avec retry sur rate limit (429)
-        response = None
-        for tentative in range(1, 5):   # 4 tentatives max
-            try:
-                response = client.chat.complete(
-                    model=MODELE,
-                    messages=[
-                        {"role": "system", "content": (
-                            "Tu es un recruteur spécialisé en alternance. Tu reponds UNIQUEMENT en JSON valide sans backticks. "
-                            "Tu ignores totalement la date de debut et la disponibilite dans ta notation."
-                        )},
-                        {"role": "user", "content": prompt},
-                    ],
-                    response_format={"type": "json_object"},
-                )
-                break  # succes -> on sort de la boucle de retry
-            except Exception as err_api:
-                msg = str(err_api).lower()
-                est_rate_limit = "429" in msg or "rate" in msg
-                if est_rate_limit and tentative < 4:
-                    attente = 15 * tentative   # 15s, 30s, 45s
-                    print(f"     Rate limit - pause {attente}s puis nouvelle tentative ({tentative}/3)")
-                    time.sleep(attente)
-                else:
-                    raise  # autre erreur, ou derniere tentative -> on abandonne
+        # Appel Mistral avec retry sur rate limit (4 tentatives, pauses 15s, 30s, 45s)
+        response = appeler_mistral(
+            [
+                {"role": "system", "content": (
+                    "Tu es un recruteur spécialisé en alternance. Tu reponds UNIQUEMENT en JSON valide sans backticks. "
+                    "Tu ignores totalement la date de debut et la disponibilite dans ta notation."
+                )},
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+            on_attente=lambda t, n, s: print(
+                f"     Rate limit - pause {s}s puis nouvelle tentative ({t}/{n - 1})"),
+        )
         texte = response.choices[0].message.content
         texte = re.sub(r'```json\s*', '', texte)
         texte = re.sub(r'```\s*', '', texte)

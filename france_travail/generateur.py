@@ -1,12 +1,7 @@
 import re
-import os
 import json
 from datetime import datetime
-from mistralai.client import Mistral
-from shared.config import MODELE_MISTRAL
-
-client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
-MODELE_LETTRE = MODELE_MISTRAL
+from shared.ia import appeler_mistral
 
 # ─── Lettre de motivation fixe ────────────────────────────────────────────────
 # Seuls {contact_entreprise} et {paragraphe_entreprise} sont générés par l'IA.
@@ -140,9 +135,10 @@ def generer_lettre(offre, profil=None, mode="alternance"):
 
 
     try:
-        response = client.chat.complete(
-            model=MODELE_LETTRE,
-            messages=[{"role": "user", "content": prompt}],
+        # Un seul essai, pas de retry (comportement historique)
+        response = appeler_mistral(
+            [{"role": "user", "content": prompt}],
+            tentatives=1,
             response_format={"type": "json_object"},
             temperature=0.6,
         )

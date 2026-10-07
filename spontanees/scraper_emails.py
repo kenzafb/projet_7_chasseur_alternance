@@ -28,12 +28,8 @@ import requests
 from bs4 import BeautifulSoup
 from ddgs import DDGS
 from ddgs.exceptions import RatelimitException
-from mistralai.client import Mistral
 from shared.config import MODELE_MISTRAL
-
-# ─── Client Mistral ───────────────────────────────────────────────────────────
-
-mistral_client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
+from shared.ia import appeler_mistral
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -377,10 +373,16 @@ def mistral_extraire_contact(texte_page, nom_entreprise, emails_bruts,
         '"contact_rh": null, "fiable": true}'
     )
 
-    def _appel_mistral():
-        return mistral_client.chat.complete(
-            model=MODELE_MISTRAL,
-            messages=[
+    MAX_RETRIES = 20
+
+    def _est_rate_limit(e):
+        err = str(e)
+        return "429" in err or "rate_limit" in err.lower() or "rate limited" in err.lower()
+
+    try:
+        # Retry sur rate limit : 20 tentatives, attente 60s doublée à chaque fois (max 300s)
+        response = appeler_mistral(
+            [
                 {"role": "system", "content": (
                     "Tu es un expert en extraction de données de contact. "
                     "Tu réponds UNIQUEMENT en JSON valide sans backticks ni markdown. "
@@ -388,31 +390,19 @@ def mistral_extraire_contact(texte_page, nom_entreprise, emails_bruts,
                 )},
                 {"role": "user", "content": prompt},
             ],
+            tentatives=MAX_RETRIES,
+            attente=lambda n: min(60 * 2 ** (n - 1), 300),
+            rate_limit=_est_rate_limit,
+            on_attente=lambda t, n, s: print(
+                f"    ⚠️  Rate limit Mistral (tentative {t}/{n}) — attente {s}s..."),
             response_format={"type": "json_object"},
         )
-
-    response    = None
-    attente     = 60
-    MAX_RETRIES = 20
-
-    for tentative in range(1, MAX_RETRIES + 1):
-        try:
-            response = _appel_mistral()
-            break
-
-        except Exception as e:
-            err = str(e)
-            if "429" in err or "rate_limit" in err.lower() or "rate limited" in err.lower():
-                print(f"    ⚠️  Rate limit Mistral (tentative {tentative}/{MAX_RETRIES}) — attente {attente}s...")
-                time.sleep(attente)
-                attente = min(attente * 2, 300)
-            else:
-                print(f"    ⚠️  Erreur Mistral non-récupérable : {e}")
-                time.sleep(PAUSE_MISTRAL)
-                return {"emails": [], "telephones": [], "contact_rh": None, "fiable": True}
-
-    if response is None:
-        print(f"    ⚠️  Mistral inaccessible après {MAX_RETRIES} tentatives — entreprise ignorée")
+    except Exception as e:
+        if _est_rate_limit(e):
+            print(f"    ⚠️  Mistral inaccessible après {MAX_RETRIES} tentatives — entreprise ignorée")
+        else:
+            print(f"    ⚠️  Erreur Mistral non-récupérable : {e}")
+            time.sleep(PAUSE_MISTRAL)
         return {"emails": [], "telephones": [], "contact_rh": None, "fiable": True}
 
     try:
