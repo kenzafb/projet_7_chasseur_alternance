@@ -252,7 +252,7 @@ def api_recherche(request: Request, user: User = Depends(utilisateur_requis)):
 
             etat_recherche["message"] = "Recherche France Travail..."
             log("🔍 Recherche France Travail démarrée")
-            lancer_recherche(profil, analyser=True, max_analyse=999, on_offre=ecrire_en_base, mode=mode)
+            lancer_recherche(user_id, profil, analyser=True, max_analyse=999, on_offre=ecrire_en_base, mode=mode)
             log("✅ France Travail terminé")
 
             if "lba" in cfg_mode["sources"]:

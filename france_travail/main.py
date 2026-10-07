@@ -3,13 +3,15 @@ france_travail/main.py
 ======================
 Pipeline "offres" : recherche France Travail, analyse IA, puis écriture
 de chaque offre via le callback on_offre (l'appelant écrit en base).
+Les offres déjà vues sont suivies en base par utilisateur et par mode
+(database/dedup_db.py).
 """
 
-from france_travail.scraper import chercher_offres, sauvegarder_offres_vues
+from france_travail.scraper import chercher_offres
 from france_travail.analyseur import analyser_offres
 
 
-def lancer_recherche(profil, analyser=True, max_analyse=999, on_offre=None, mode="alternance"):
+def lancer_recherche(user_id, profil, analyser=True, max_analyse=999, on_offre=None, mode="alternance"):
     print("\nRecherche des offres...")
     from shared.modes import get_mode
     cfg = get_mode(mode)
@@ -19,8 +21,8 @@ def lancer_recherche(profil, analyser=True, max_analyse=999, on_offre=None, mode
     from shared.domaines import ft_grands_domaines
     cles_domaines = profil.get("recherche", {}).get("domaines", [])
     grands_domaines = ft_grands_domaines(cles_domaines) if filtrer_domaines else None
-    nouvelles_offres, offres_vues = chercher_offres(
-        grands_domaines, ft_params=ft_params, filtrer_domaines=filtrer_domaines,
+    nouvelles_offres = chercher_offres(
+        user_id, grands_domaines, ft_params=ft_params, filtrer_domaines=filtrer_domaines,
         mode=mode, limite_lot=cfg.get("limite_lot"))
 
     if not nouvelles_offres:
@@ -36,9 +38,5 @@ def lancer_recherche(profil, analyser=True, max_analyse=999, on_offre=None, mode
     else:
         for offre in nouvelles_offres:
             on_offre(offre)
-
-    for offre in nouvelles_offres:
-        offres_vues.add(offre["id"])
-    sauvegarder_offres_vues(offres_vues)
 
     return nouvelles_offres

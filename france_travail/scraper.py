@@ -1,30 +1,11 @@
 import requests
-import json
 import os
 import time
 from datetime import datetime
-from shared.config import DATA_DIR, FT_REGION
+from shared.config import FT_REGION
+from database.dedup_db import lire_offres_vues, marquer_offres_vues
 from shared.offres import detecter_zone, generer_id
 from shared.domaines import ft_grands_domaines
-
-
-def _fichier_vues(mode="alternance"):
-    return str(DATA_DIR / f"offres_vues_{mode}.json")
-
-
-def charger_offres_vues(mode="alternance"):
-    fichier = _fichier_vues(mode)
-    if os.path.exists(fichier):
-        with open(fichier, "r") as f:
-            return set(json.load(f))
-    return set()
-
-
-def sauvegarder_offres_vues(vues, mode="alternance"):
-    fichier = _fichier_vues(mode)
-    os.makedirs(os.path.dirname(fichier), exist_ok=True)
-    with open(fichier, "w") as f:
-        json.dump(list(vues), f)
 
 
 _token_cache = {"token": None, "expire": 0}
@@ -184,12 +165,14 @@ def _normaliser(bruts: list) -> list:
     return offres
 
 
-def chercher_offres(grands_domaines=None, ft_params=None, filtrer_domaines=True,
-                    mode="alternance", limite_lot=None) -> tuple[list, set]:
+def chercher_offres(user_id, grands_domaines=None, ft_params=None, filtrer_domaines=True,
+                    mode="alternance", limite_lot=None) -> list:
+    """Offres FT pas encore vues par cet utilisateur dans ce mode. Les offres
+    retenues (et, hors lots, toutes celles reçues) sont marquées vues en base."""
     # ft_params : paramètres FT spécifiques au mode (E2 pour alternance, CDD pour job)
     if ft_params is None:
         ft_params = {"natureContrat": "E2"}   # défaut alternance (rétrocompat)
-    offres_vues = charger_offres_vues(mode)
+    offres_vues = lire_offres_vues(user_id, mode)
 
     bruts = []
     base_params = {"region": FT_REGION, "sort": "1", **ft_params}
@@ -223,18 +206,21 @@ def chercher_offres(grands_domaines=None, ft_params=None, filtrer_domaines=True,
     # Mode job : on traite par LOTS (ex. 100/run) pour ne pas tout analyser d'un coup
     if limite_lot:
         toutes_offres = toutes_offres[:limite_lot]
-        ids_a_marquer = {o["id"] for o in toutes_offres}
-        sauvegarder_offres_vues(offres_vues | ids_a_marquer, mode)
+        marquer_offres_vues(user_id, mode, {o["id"] for o in toutes_offres})
     else:
-        nouveaux_ids = {o["id"] for o in candidates}
-        sauvegarder_offres_vues(offres_vues | nouveaux_ids, mode)
+        marquer_offres_vues(user_id, mode, {o["id"] for o in candidates})
 
     print(f"\n{len(toutes_offres)} nouvelles offres FT trouvées (hors déjà vues) !\n")
-    return toutes_offres, offres_vues
+    return toutes_offres
 
 
 if __name__ == "__main__":
-    offres, _ = chercher_offres()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--user", type=int, required=True, help="ID de l'utilisateur")
+    parser.add_argument("--mode", default="alternance")
+    args = parser.parse_args()
+    offres = chercher_offres(args.user, mode=args.mode)
     print(f"\n-- Aperçu des 5 premières --")
     for o in offres[:5]:
         print(f"\n[{o['source']}] {o['titre']}")

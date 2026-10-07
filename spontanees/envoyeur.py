@@ -8,15 +8,16 @@ Depuis l'application (main.py) :
 CLI (--user obligatoire) :
   python -m spontanees.envoyeur --user 1 --limite 10 --test
 
-Système de déduplication :
-  - Au démarrage : charge data/emails_deja_envoyes.json
-    + les destinataires déjà enregistrés en base (mail_destinataires)
-  - À chaque envoi réussi : met à jour emails_deja_envoyes.json immédiatement
+Système de déduplication (par utilisateur, en base) :
+  - Au démarrage : charge les adresses déjà contactées par CET utilisateur
+    (table emails_contactes) + les destinataires enregistrés sur ses
+    entreprises (mail_destinataires)
+  - À chaque envoi réussi : enregistre les destinataires immédiatement
+  - L'ancien fichier global data/emails_deja_envoyes.json n'est plus lu
   - Si une entreprise a 2 emails et qu'un seul a déjà été contacté,
     le mail est envoyé uniquement à l'autre
 """
 
-import json
 import os
 import time
 import random
@@ -27,9 +28,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
-from shared.config import DATA_DIR, chemin_piece_jointe
-
-FICHIER_EMAILS_ENVOYES = str(DATA_DIR / "emails_deja_envoyes.json")
+from shared.config import chemin_piece_jointe
+from database.dedup_db import ajouter_emails_contactes, lire_emails_contactes, normaliser_email
 
 GMAIL_SENDER      = os.getenv("GMAIL_SENDER", "")
 GMAIL_PASSWORD    = os.getenv("GMAIL_APP_PASSWORD", "")
@@ -50,32 +50,6 @@ Vous trouverez mon CV en pièce jointe. Je reste à votre disposition pour tout 
 
 Cordialement,
 """
-
-
-# ─── Gestion du fichier emails_deja_envoyes.json ─────────────────────────────
-
-def charger_emails_deja_envoyes():
-    """
-    Charge le fichier de déduplication des adresses déjà contactées.
-    Retourne un set vide si le fichier n'existe pas encore.
-    """
-    if os.path.exists(FICHIER_EMAILS_ENVOYES):
-        with open(FICHIER_EMAILS_ENVOYES, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        return set(addr.lower().strip() for addr in data if addr)
-    return set()
-
-
-def ajouter_emails_envoyes(nouveaux_emails: list[str]):
-    """
-    Ajoute les nouveaux emails au fichier de déduplication.
-    Appelé après chaque envoi réussi.
-    """
-    existants = charger_emails_deja_envoyes()
-    existants.update(addr.lower().strip() for addr in nouveaux_emails if addr)
-    os.makedirs(os.path.dirname(FICHIER_EMAILS_ENVOYES), exist_ok=True)
-    with open(FICHIER_EMAILS_ENVOYES, "w", encoding="utf-8") as f:
-        json.dump(sorted(existants), f, ensure_ascii=False, indent=2)
 
 
 # ─── Chargement / sauvegarde des entreprises (base) ───────────────────────────
@@ -158,23 +132,19 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
 
     entreprises = charger_json(user_id)
 
-    # ── Déduplication : fusion fichier Gmail + champ mail_destinataires ───────
-    emails_deja_envoyes = charger_emails_deja_envoyes()
-    nb_gmail = len(emails_deja_envoyes)
+    # ── Déduplication : adresses contactées + champ mail_destinataires ───────
+    emails_deja_envoyes = lire_emails_contactes(user_id)
+    nb_contactes = len(emails_deja_envoyes)
 
-    # Ajoute aussi les destinataires enregistrés en base (au cas où)
+    # Ajoute aussi les destinataires enregistrés sur les entreprises (au cas où)
     for e in entreprises:
         if e.get("mail_envoye") and e.get("mail_destinataires"):
             for addr in e["mail_destinataires"]:
-                emails_deja_envoyes.add(addr.lower().strip())
+                emails_deja_envoyes.add(normaliser_email(addr))
 
-    _log(f"Déduplication : {nb_gmail} emails depuis Gmail + "
-         f"{len(emails_deja_envoyes) - nb_gmail} depuis la base "
+    _log(f"Déduplication : {nb_contactes} adresses déjà contactées + "
+         f"{len(emails_deja_envoyes) - nb_contactes} depuis les entreprises "
          f"= {len(emails_deja_envoyes)} total")
-
-    if not os.path.exists(FICHIER_EMAILS_ENVOYES):
-        _log(f"  ⚠️  {FICHIER_EMAILS_ENVOYES} introuvable — "
-             f"il sera créé au premier envoi réussi")
 
     # ── Queue ─────────────────────────────────────────────────────────────────
     a_envoyer = [
@@ -211,7 +181,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
         # ── Déduplication : ne garder que les emails pas encore contactés ─────
         emails_bruts = e.get("emails_trouves", [])
         emails_uniques = list(dict.fromkeys(
-            addr.lower().strip() for addr in emails_bruts
+            normaliser_email(addr) for addr in emails_bruts
             if addr and addr.strip()
         ))
         emails_nouveaux = [
@@ -247,8 +217,8 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
                 e["mail_envoye_le"]     = datetime.today().strftime("%Y-%m-%d %H:%M")
                 e["mail_destinataires"] = destinataires
 
-                # Mise à jour immédiate du fichier de déduplication
-                ajouter_emails_envoyes(destinataires)
+                # Mise à jour immédiate de la déduplication (en base)
+                ajouter_emails_contactes(user_id, destinataires)
                 for addr in destinataires:
                     emails_deja_envoyes.add(addr)
 

@@ -13,6 +13,7 @@ elle est attendue sous le nom "id" (les routes font c["id"] == body.id).
 
 from database.connexion import SessionLocal
 from database.dates import JOUR, en_texte, vers_utc
+from database.insertion import inserer_ou_ignorer
 from database.models import Candidature
 
 
@@ -53,31 +54,6 @@ def lire_candidatures(user_id: int, mode: str = "alternance") -> list[dict]:
         db.close()
 
 
-def remplacer_candidatures(user_id: int, candidatures: list[dict], mode: str = "alternance"):
-    """
-    Écrit la liste complète des candidatures d'un utilisateur.
-    Stratégie simple et sûre : on met à jour l'existant par ref_offre,
-    on insère les nouvelles. (On ne supprime rien automatiquement.)
-    """
-    db = SessionLocal()
-    try:
-        existantes = {
-            c.ref_offre: c
-            for c in db.query(Candidature).filter_by(user_id=user_id, mode=mode).all()
-        }
-        for offre in candidatures:
-            ref = offre.get("id", "")
-            c = existantes.get(ref)
-            if c is None:
-                c = Candidature(user_id=user_id, ref_offre=ref, mode=mode)
-                db.add(c)
-            for champ in _CHAMPS:
-                if champ in offre:
-                    _ecrire(c, champ, offre[champ])
-        db.commit()
-    finally:
-        db.close()
-
 def lire_candidature(user_id: int, ref_offre: str, mode: str = "alternance") -> dict | None:
     """Retourne une candidature précise (par son id/ref_offre), ou None."""
     db = SessionLocal()
@@ -110,24 +86,19 @@ def modifier_candidature(user_id: int, ref_offre: str, modifs: dict, mode: str =
 def ajouter_candidature(user_id: int, offre: dict, mode: str = "alternance") -> bool:
     """
     Ajoute UNE candidature en base si elle n'existe pas déjà (par ref_offre).
-    Utilisé par la recherche FT pour sauvegarder au fur et à mesure de l'analyse.
+    Utilisé par la recherche pour sauvegarder au fur et à mesure de l'analyse.
+    Idempotent : un doublon (même deux insertions simultanées) est ignoré.
     Retourne True si ajoutée, False si déjà présente.
     """
-    ref = offre.get("id", "")
+    ligne = {"user_id": user_id, "mode": mode, "ref_offre": offre.get("id", "")}
+    for champ in _CHAMPS:
+        if champ in offre:
+            ligne[champ] = vers_utc(offre[champ]) if champ in _DATES else offre[champ]
+    ligne["statut"] = offre.get("statut", "nouveau")
     db = SessionLocal()
     try:
-        existe = (db.query(Candidature)
-                    .filter_by(user_id=user_id, ref_offre=ref, mode=mode)
-                    .first())
-        if existe:
-            return False
-        c = Candidature(user_id=user_id, ref_offre=ref, mode=mode)
-        for champ in _CHAMPS:
-            if champ in offre:
-                _ecrire(c, champ, offre[champ])
-        c.statut = offre.get("statut", "nouveau")
-        db.add(c)
+        n = inserer_ou_ignorer(db, Candidature, [ligne], ["user_id", "mode", "ref_offre"])
         db.commit()
-        return True
+        return n == 1
     finally:
         db.close()
