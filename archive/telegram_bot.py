@@ -1,3 +1,10 @@
+# ARCHIVÉ, DÉSACTIVÉ (phase 0 de la refonte, octobre 2026).
+# Ce bot n'est plus lancé ni maintenu en attendant sa refonte multi-utilisateur :
+# il appelle l'API sans cookie de session (les routes protégées renvoient 401),
+# vise encore l'ancienne app Flask et dépend de Google Gemini (Vertex AI),
+# dépendances retirées du projet actif (requirements.txt).
+# Il n'est importé par aucun module ; le conserver ici sert de référence.
+
 """
 telegram_bot.py
 ===============
