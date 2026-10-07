@@ -5,7 +5,10 @@ Couche d'accès aux entreprises EN BASE, par utilisateur : stats, listing,
 et écritures des pipelines spontanées (fetch, scraper, envoyeur, suivi).
 """
 
+from datetime import datetime, timedelta, timezone
+
 from database.connexion import SessionLocal
+from database.dates import JOUR_HEURE, depuis_base, en_texte, vers_utc
 from database.models import Entreprise
 
 
@@ -27,7 +30,7 @@ def calculer_stats(user_id: int) -> dict:
                 "ville":  e.ville or "",
                 "email":  (e.emails_trouves or [""])[0] if e.emails_trouves else "",
                 "envoye": bool(e.mail_envoye),
-                "date":   e.mail_envoye_le or "",
+                "date":   en_texte(e.mail_envoye_le, JOUR_HEURE),
             }
             for e in recentes
         ]
@@ -62,7 +65,7 @@ def _entreprise_vers_dict(e) -> dict:
         "contact_rh":     e.contact_rh,
         "traite":         bool(e.traite),
         "mail_envoye":    bool(e.mail_envoye),
-        "mail_envoye_le": e.mail_envoye_le or "",
+        "mail_envoye_le": en_texte(e.mail_envoye_le, JOUR_HEURE),
     }
     # On remonte les champs utiles depuis extra
     for champ in _CHAMPS_EXTRA_REMONTES:
@@ -97,7 +100,7 @@ def sauvegarder_entreprises(user_id: int, liste: list[dict]):
             if not e:
                 continue
             e.mail_envoye    = bool(d.get("mail_envoye", False))
-            e.mail_envoye_le = d.get("mail_envoye_le", "") or ""
+            e.mail_envoye_le = vers_utc(d.get("mail_envoye_le"))
             # Champs qui vivent dans extra
             extra = dict(e.extra or {})
             if "mail_destinataires" in d:
@@ -203,24 +206,19 @@ def lire_entreprises_envoyees(user_id: int) -> list[dict]:
     Calcule automatiquement le statut 'a_relancer' si envoyé depuis +7 jours
     et toujours au statut 'envoye'.
     """
-    from datetime import datetime, timedelta
     db = SessionLocal()
     try:
         envoyees = (db.query(Entreprise)
                       .filter_by(user_id=user_id, mail_envoye=True)
                       .all())
-        maintenant = datetime.now()
+        maintenant = datetime.now(timezone.utc)
         resultat = []
         for e in envoyees:
             statut = e.statut_suivi or "envoye"
             # Calcul auto "à relancer" : seulement si encore au statut brut "envoye"
             if statut == "envoye" and e.mail_envoye_le:
-                try:
-                    envoye_le = datetime.strptime(e.mail_envoye_le, "%Y-%m-%d %H:%M")
-                    if maintenant - envoye_le >= timedelta(days=7):
-                        statut = "a_relancer"
-                except ValueError:
-                    pass
+                if maintenant - depuis_base(e.mail_envoye_le) >= timedelta(days=7):
+                    statut = "a_relancer"
             d = _entreprise_vers_dict(e)
             d["statut_suivi"] = statut
             resultat.append(d)

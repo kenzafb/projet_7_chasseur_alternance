@@ -1,22 +1,55 @@
 """
 database/models.py
 ==================
-Définition des 4 tables de l'app, en SQLAlchemy.
-Tout ce qui était "Kenza en dur" ou "fichier JSON global" devient
-une ligne rattachée à un utilisateur via user_id.
+Schéma de la base, seule source de vérité : les migrations Alembic
+(dossier alembic/) sont générées à partir de ce fichier, et `alembic check`
+vérifie qu'elles le reflètent exactement.
 
-Les structures (listes, objets) sont stockées en JSON dans une colonne,
-ce que SQLite gère nativement.
+Toutes les données sont rattachées à un utilisateur via user_id, avec
+suppression en cascade : supprimer un user supprime ses profils,
+candidatures, entreprises, offres vues et emails contactés.
+
+Dates : colonnes DateTime(timezone=True), valeurs en UTC. SQLite ne stocke
+pas le fuseau et relit des dates naïves : database/dates.py les considère
+comme UTC. Les structures (listes, objets) sont en colonnes JSON.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import (
-    Column, Integer, String, Text, Boolean, Float,
-    ForeignKey, DateTime, JSON, UniqueConstraint,
+    Column, Integer, String, Text, Boolean,
+    ForeignKey, DateTime, JSON, UniqueConstraint, Index, MetaData,
 )
 from sqlalchemy.orm import relationship, declarative_base
 
-Base = declarative_base()
+# Noms de contraintes explicites : indispensables aux migrations SQLite
+# (mode batch d'Alembic) et stables d'un SGBD à l'autre.
+CONVENTION = {
+    "ix": "ix_%(table_name)s_%(column_0_N_name)s",
+    "uq": "uq_%(table_name)s_%(column_0_N_name)s",
+    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s",
+    "pk": "pk_%(table_name)s",
+}
+
+Base = declarative_base(metadata=MetaData(naming_convention=CONVENTION))
+
+
+def maintenant_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _user_id():
+    """Clé étrangère vers users, supprimée avec l'utilisateur."""
+    return Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+
+def _relation_vers_user(retour: str):
+    return relationship("User", back_populates=retour)
+
+
+def _relation_depuis_user(classe: str):
+    # passive_deletes : la base supprime les lignes (ON DELETE CASCADE)
+    return relationship(classe, back_populates="user",
+                        cascade="all, delete-orphan", passive_deletes=True)
 
 
 # ─── Utilisateur (identité de connexion) ──────────────────────────────────────
@@ -26,25 +59,24 @@ class User(Base):
     id                = Column(Integer, primary_key=True)
     email             = Column(String(255), unique=True, nullable=False, index=True)
     mot_de_passe_hash = Column(String(255), nullable=False)
-    cree_le           = Column(DateTime, default=datetime.utcnow)
+    cree_le           = Column(DateTime(timezone=True), default=maintenant_utc)
 
-    # Liens vers les données de l'utilisateur
-    profil       = relationship("Profil", back_populates="user", uselist=False,
-                                cascade="all, delete-orphan")
-    candidatures = relationship("Candidature", back_populates="user",
-                                cascade="all, delete-orphan")
-    entreprises  = relationship("Entreprise", back_populates="user",
-                                cascade="all, delete-orphan")
+    # Liens vers les données de l'utilisateur (un profil par mode)
+    profils          = _relation_depuis_user("Profil")
+    candidatures     = _relation_depuis_user("Candidature")
+    entreprises      = _relation_depuis_user("Entreprise")
+    offres_vues      = _relation_depuis_user("OffreVue")
+    emails_contactes = _relation_depuis_user("EmailContacte")
 
 
-# ─── Profil (un par utilisateur — l'ancien profil.py) ─────────────────────────
+# ─── Profil (un par utilisateur et par mode) ──────────────────────────────────
 class Profil(Base):
     __tablename__ = "profils"
-    __table_args__ = (UniqueConstraint("user_id", "mode", name="uq_profil_user_mode"),)
+    __table_args__ = (UniqueConstraint("user_id", "mode"),)
 
     id      = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    mode    = Column(String(20), default="alternance", index=True)   # alternance | job
+    user_id = _user_id()
+    mode    = Column(String(20), nullable=False, default="alternance", server_default="alternance")   # alternance | job
 
     # Champs simples
     prenom           = Column(String(100), default="")
@@ -75,26 +107,31 @@ class Profil(Base):
 
     lettre_type      = Column(Text, default="")   # trame de lettre de motivation (l'IA ne fait que le paragraphe entreprise)
     email_type       = Column(Text, default="")   # trame d'email pour candidatures spontanées
-    pieces_jointes   = Column(JSON, default=list)   # [{"nom": "...", "fichier": "chemin.pdf"}, ...]
+    # [{"nom": "...", "fichier": "user_1/cv.pdf"}, ...] : chemin relatif à UPLOADS_DIR
+    pieces_jointes   = Column(JSON, default=list)
 
     # Structures → stockées en JSON
     competences = Column(JSON, default=list)   # ["Linux...", "Python...", ...]
     projets     = Column(JSON, default=list)   # [{"nom":..., "url":..., "description":...}]
     recherche   = Column(JSON, default=dict)   # {"titre_poste":[...], "localisation":..., ...}
 
-    user = relationship("User", back_populates="profil")
+    user = _relation_vers_user("profils")
 
 
-# ─── Candidature (l'ancien candidatures.json) ─────────────────────────────────
+# ─── Candidature (offres FT / LBA analysées) ──────────────────────────────────
 class Candidature(Base):
     __tablename__ = "candidatures"
+    __table_args__ = (
+        UniqueConstraint("user_id", "mode", "ref_offre"),
+        Index("ix_candidatures_user_id_mode", "user_id", "mode"),
+    )
 
     id      = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
-    mode    = Column(String(20), default="alternance", index=True)   # alternance | job
+    user_id = _user_id()
+    mode    = Column(String(20), nullable=False, default="alternance", server_default="alternance")   # alternance | job
 
-    # Identifiant métier (le hash md5 actuel) pour la déduplication
-    ref_offre = Column(String(64), index=True)
+    # Identifiant métier (hash md5 de l'offre) pour la déduplication
+    ref_offre = Column(String(64), nullable=False)
 
     titre          = Column(String(300), default="")
     entreprise     = Column(String(300), default="")
@@ -118,18 +155,20 @@ class Candidature(Base):
     statut            = Column(String(50), default="nouveau")
     raison_archivage  = Column(String(40), default="")   # note_basse, ecole_cfa, hors_domaine, stage, public_specifique, manuel
 
-    date_trouvee     = Column(String(20), default="")
-    date_candidature = Column(String(20), default="")
+    date_trouvee     = Column(DateTime(timezone=True))
+    date_candidature = Column(DateTime(timezone=True))
     notes            = Column(Text, default="")
-    user = relationship("User", back_populates="candidatures")
+
+    user = _relation_vers_user("candidatures")
 
 
-# ─── Entreprise (l'ancien entreprises_enrichies.json — spontanées) ────────────
+# ─── Entreprise (candidatures spontanées) ─────────────────────────────────────
 class Entreprise(Base):
     __tablename__ = "entreprises"
 
     id      = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    mode    = Column(String(20), nullable=False, default="alternance", server_default="alternance")   # alternance | job
 
     nom_commercial = Column(String(300), default="")
     ville          = Column(String(150), default="")
@@ -144,7 +183,35 @@ class Entreprise(Base):
 
     traite         = Column(Boolean, default=False)
     mail_envoye    = Column(Boolean, default=False)
-    mail_envoye_le = Column(String(30), default="")
+    mail_envoye_le = Column(DateTime(timezone=True))
     statut_suivi   = Column(String(30), default="envoye")   # envoye, reponse, entretien, refus, bounce ("à relancer" calculé via mail_envoye_le)
     extra          = Column(JSON, default=dict)   # champs FT/scraper non mappés (siret, dirigeant, mail_destinataires...)
-    user = relationship("User", back_populates="entreprises")
+
+    user = _relation_vers_user("entreprises")
+
+
+# ─── Offres déjà vues (dédup des recherches, par utilisateur et par mode) ─────
+class OffreVue(Base):
+    __tablename__ = "offres_vues"
+    __table_args__ = (UniqueConstraint("user_id", "mode", "ref_offre"),)
+
+    id        = Column(Integer, primary_key=True)
+    user_id   = _user_id()
+    mode      = Column(String(20), nullable=False, default="alternance", server_default="alternance")
+    ref_offre = Column(String(64), nullable=False)
+    vue_le    = Column(DateTime(timezone=True), default=maintenant_utc)
+
+    user = _relation_vers_user("offres_vues")
+
+
+# ─── Emails déjà contactés (dédup des envois spontanés, par utilisateur) ──────
+class EmailContacte(Base):
+    __tablename__ = "emails_contactes"
+    __table_args__ = (UniqueConstraint("user_id", "email"),)
+
+    id          = Column(Integer, primary_key=True)
+    user_id     = _user_id()
+    email       = Column(String(255), nullable=False)
+    contacte_le = Column(DateTime(timezone=True), default=maintenant_utc)
+
+    user = _relation_vers_user("emails_contactes")

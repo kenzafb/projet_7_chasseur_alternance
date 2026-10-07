@@ -12,6 +12,7 @@ elle est attendue sous le nom "id" (les routes font c["id"] == body.id).
 """
 
 from database.connexion import SessionLocal
+from database.dates import JOUR, en_texte, vers_utc
 from database.models import Candidature
 
 
@@ -22,11 +23,19 @@ _CHAMPS = [
     "points_faibles", "resume_analyse", "lettre", "email_candidature",
     "objet_email", "statut", "raison_archivage", "date_trouvee", "date_candidature", "notes",
 ]
+# Colonnes DateTime, échangées avec l'app sous forme "AAAA-MM-JJ"
+_DATES = {"date_trouvee", "date_candidature"}
+
+
+def _ecrire(c: Candidature, champ: str, valeur):
+    setattr(c, champ, vers_utc(valeur) if champ in _DATES else valeur)
 
 
 def _vers_dict(c: Candidature) -> dict:
     """Transforme une ligne de base en dict au format de l'ancien JSON."""
     d = {champ: getattr(c, champ) for champ in _CHAMPS}
+    for champ in _DATES:
+        d[champ] = en_texte(d[champ], JOUR)
     d["id"] = c.ref_offre          # la clé "id" attendue par l'app = ref_offre
     return d
 
@@ -64,7 +73,7 @@ def remplacer_candidatures(user_id: int, candidatures: list[dict], mode: str = "
                 db.add(c)
             for champ in _CHAMPS:
                 if champ in offre:
-                    setattr(c, champ, offre[champ])
+                    _ecrire(c, champ, offre[champ])
         db.commit()
     finally:
         db.close()
@@ -92,7 +101,7 @@ def modifier_candidature(user_id: int, ref_offre: str, modifs: dict, mode: str =
             return False
         for champ, valeur in modifs.items():
             if champ in _CHAMPS:
-                setattr(c, champ, valeur)
+                _ecrire(c, champ, valeur)
         db.commit()
         return True
     finally:
@@ -115,7 +124,7 @@ def ajouter_candidature(user_id: int, offre: dict, mode: str = "alternance") -> 
         c = Candidature(user_id=user_id, ref_offre=ref, mode=mode)
         for champ in _CHAMPS:
             if champ in offre:
-                setattr(c, champ, offre[champ])
+                _ecrire(c, champ, offre[champ])
         c.statut = offre.get("statut", "nouveau")
         db.add(c)
         db.commit()
