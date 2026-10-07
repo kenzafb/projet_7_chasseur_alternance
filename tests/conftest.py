@@ -26,6 +26,7 @@ os.environ["DATABASE_URL"] = f"sqlite:///{_TMP / 'test.db'}"
 os.environ["SECRET_KEY"] = "cle-de-test-" + "x" * 40
 os.environ["COOKIE_SECURE"] = "false"
 os.environ["MISTRAL_API_KEY"] = "factice"
+os.environ["MISTRAL_INTERVALLE_MIN_S"] = "0"   # pas d'attente entre appels simulés
 for _var in ("CODE_INVITATION", "FT_CLIENT_ID", "FT_CLIENT_SECRET", "LBA_API_KEY",
              "INSEE_API_KEY", "GMAIL_SENDER", "GMAIL_APP_PASSWORD"):
     os.environ.pop(_var, None)

@@ -71,6 +71,9 @@ LOGS_MAX_PAR_UTILISATEUR = 200
 
 # ─── IA ───────────────────────────────────────────────────────────────────────
 MODELE_MISTRAL = "mistral-large-latest"
+# Intervalle minimum entre deux appels Mistral, commun à tout le processus
+# (tous utilisateurs et pipelines confondus). Surchargeable dans le .env.
+MISTRAL_INTERVALLE_MIN_S = float(os.getenv("MISTRAL_INTERVALLE_MIN_S") or 2.0)
 
 # ─── Géographie (Île-de-France) ───────────────────────────────────────────────
 # France Travail : code région INSEE de l'Île-de-France
