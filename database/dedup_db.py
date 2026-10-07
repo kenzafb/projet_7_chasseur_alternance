@@ -3,7 +3,8 @@ database/dedup_db.py
 ====================
 Dédoublonnage EN BASE, par utilisateur :
   - offres déjà vues par les recherches (table offres_vues, par mode) ;
-  - adresses déjà contactées par les envois spontanés (table emails_contactes).
+  - adresses déjà contactées par les envois spontanés (table emails_contactes,
+    par mode : une adresse contactée pour une alternance peut l'être pour un job).
 
 Remplace les anciens fichiers globaux data/offres_vues_{mode}.json et
 data/emails_deja_envoyes.json, qui ne sont plus lus ni écrits. Une offre
@@ -47,26 +48,26 @@ def marquer_offres_vues(user_id: int, mode: str, refs) -> int:
 
 
 # ─── Adresses contactées ──────────────────────────────────────────────────────
-def lire_emails_contactes(user_id: int) -> set[str]:
-    """Adresses déjà contactées par l'utilisateur (en minuscules)."""
+def lire_emails_contactes(user_id: int, mode: str) -> set[str]:
+    """Adresses déjà contactées par l'utilisateur dans ce mode (en minuscules)."""
     db = SessionLocal()
     try:
-        lignes = db.query(EmailContacte.email).filter_by(user_id=user_id).all()
+        lignes = db.query(EmailContacte.email).filter_by(user_id=user_id, mode=mode).all()
         return {email for (email,) in lignes}
     finally:
         db.close()
 
 
-def ajouter_emails_contactes(user_id: int, adresses) -> int:
-    """Enregistre des adresses contactées ; celles déjà connues sont ignorées.
-    Retourne le nombre de nouvelles lignes."""
+def ajouter_emails_contactes(user_id: int, mode: str, adresses) -> int:
+    """Enregistre des adresses contactées dans ce mode ; celles déjà connues
+    (même mode) sont ignorées. Retourne le nombre de nouvelles lignes."""
     adresses = sorted({normaliser_email(a) for a in adresses} - {""})
     db = SessionLocal()
     try:
         n = inserer_ou_ignorer(
             db, EmailContacte,
-            [{"user_id": user_id, "email": a} for a in adresses],
-            ["user_id", "email"])
+            [{"user_id": user_id, "mode": mode, "email": a} for a in adresses],
+            ["user_id", "mode", "email"])
         db.commit()
         return n
     finally:

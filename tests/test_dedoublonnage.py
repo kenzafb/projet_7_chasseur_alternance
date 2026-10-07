@@ -91,7 +91,7 @@ def envoi_simule(a_et_b, smtp_simule):
 
 def test_adresse_contactee_par_a_ne_bloque_pas_b(a_et_b, envoi_simule):
     id_a, id_b = a_et_b
-    ajouter_emails_contactes(id_a, ["RH@acme.fr"])
+    ajouter_emails_contactes(id_a, "alternance", ["RH@acme.fr"])
     _entreprise_avec_email(id_a, "rh@acme.fr")
     _entreprise_avec_email(id_b, "rh@acme.fr")
 
@@ -101,8 +101,8 @@ def test_adresse_contactee_par_a_ne_bloque_pas_b(a_et_b, envoi_simule):
 
     envoyeur.main(id_b, limite=5)
     assert envoi_simule() == [["rh@acme.fr"]]
-    assert lire_emails_contactes(id_b) == {"rh@acme.fr"}
-    assert lire_emails_contactes(id_a) == {"rh@acme.fr"}
+    assert lire_emails_contactes(id_b, "alternance") == {"rh@acme.fr"}
+    assert lire_emails_contactes(id_a, "alternance") == {"rh@acme.fr"}
 
 
 # ─── Doublons ignorés sans erreur ─────────────────────────────────────────────
@@ -125,8 +125,8 @@ def test_doublons_ignores(a_et_b):
     assert marquer_offres_vues(id_a, "alternance", ["R2", "R3", "R3"]) == 1
     assert _compter(OffreVue) == 3
 
-    assert ajouter_emails_contactes(id_a, ["x@a.fr", " X@A.FR ", ""]) == 1
-    assert ajouter_emails_contactes(id_a, ["x@a.fr"]) == 0
+    assert ajouter_emails_contactes(id_a, "alternance", ["x@a.fr", " X@A.FR ", ""]) == 1
+    assert ajouter_emails_contactes(id_a, "alternance", ["x@a.fr"]) == 0
     assert _compter(EmailContacte) == 1
 
 
@@ -137,3 +137,33 @@ def test_insertions_simultanees_d_une_meme_candidature(a_et_b):
     assert erreurs == []
     assert sorted(resultats) == [False] * 7 + [True]
     assert _compter(Candidature) == 1
+
+
+# ─── Adresses contactées : par mode ───────────────────────────────────────────
+def test_adresses_contactees_par_mode(a_et_b):
+    id_a, _ = a_et_b
+    assert ajouter_emails_contactes(id_a, "alternance", ["rh@acme.fr"]) == 1
+    assert ajouter_emails_contactes(id_a, "job", ["RH@acme.fr"]) == 1          # autre mode : acceptée
+    assert ajouter_emails_contactes(id_a, "alternance", ["rh@acme.fr"]) == 0   # même mode : ignorée
+    assert lire_emails_contactes(id_a, "alternance") == {"rh@acme.fr"}
+    assert lire_emails_contactes(id_a, "job") == {"rh@acme.fr"}
+    assert _compter(EmailContacte) == 2
+
+
+def test_envoi_alternance_puis_job_puis_alternance(a_et_b, envoi_simule, monkeypatch):
+    """Adresse contactée en alternance : acceptée en job, refusée une seconde fois en alternance."""
+    id_a, _ = a_et_b
+    monkeypatch.setattr(envoyeur, "PAUSE_ENTRE_MAILS", (0, 0))
+    ajouter_entreprises(id_a, [{"siret": f"S{i}", "nom": f"Ent {i}"} for i in range(3)])
+    liste = lire_entreprises(id_a)
+    for e in liste:
+        e["emails_trouves"] = ["rh@acme.fr"]
+    sauvegarder_enrichissement(id_a, liste)
+
+    envoyeur.main(id_a, limite=1, mode="alternance")
+    assert envoi_simule() == [["rh@acme.fr"]]
+    envoyeur.main(id_a, limite=1, mode="job")
+    assert envoi_simule() == [["rh@acme.fr"], ["rh@acme.fr"]]
+    envoyeur.main(id_a, limite=1, mode="alternance")
+    assert envoi_simule() == [["rh@acme.fr"], ["rh@acme.fr"]]   # rien de plus
+    assert lire_entreprises(id_a)[2]["mail_note"].startswith("skip")

@@ -146,3 +146,32 @@ def test_migration_0002_sur_une_base_en_0001(tmp_path):
     tete = ScriptDirectory.from_config(cfg).get_current_head()
     assert cx.execute("SELECT version_num FROM alembic_version").fetchone() == (tete,)
     cx.close()
+
+
+def test_migration_0004_emails_contactes_par_mode(tmp_path):
+    """Base en 0003 avec des adresses contactées : elles passent en mode
+    alternance, et l'unicité devient (user_id, mode, email)."""
+    chemin = tmp_path / "v3.db"
+    cfg = config_alembic(f"sqlite:///{chemin}")
+    command.upgrade(cfg, "0003")
+    cx = sqlite3.connect(chemin)
+    cx.execute("INSERT INTO users (id, email, mot_de_passe_hash) VALUES (1, 'a@test.fr', 'x')")
+    cx.execute("INSERT INTO emails_contactes (user_id, email) VALUES (1, 'rh@acme.fr')")
+    cx.commit()
+    cx.close()
+
+    command.upgrade(cfg, "0004")
+    command.check(cfg)
+    cx = sqlite3.connect(chemin)
+    assert cx.execute("SELECT user_id, mode, email FROM emails_contactes").fetchall() == [(1, "alternance", "rh@acme.fr")]
+    cx.execute("INSERT INTO emails_contactes (user_id, mode, email) VALUES (1, 'job', 'rh@acme.fr')")
+    with pytest.raises(sqlite3.IntegrityError):
+        cx.execute("INSERT INTO emails_contactes (user_id, mode, email) VALUES (1, 'alternance', 'rh@acme.fr')")
+    cx.commit()
+    cx.close()
+
+    # Retour arrière : une seule ligne par (user_id, email) est gardée
+    command.downgrade(cfg, "0003")
+    cx = sqlite3.connect(chemin)
+    assert cx.execute("SELECT user_id, email FROM emails_contactes").fetchall() == [(1, "rh@acme.fr")]
+    cx.close()

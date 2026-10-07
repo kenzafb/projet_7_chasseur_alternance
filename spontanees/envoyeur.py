@@ -19,10 +19,12 @@ Garde-fous :
   - identifiants refusés ou serveur injoignable : arrêt immédiat
     (EnvoiInterrompu), sans essayer les entreprises suivantes.
 
-Système de déduplication (par utilisateur, en base) :
+Système de déduplication (par utilisateur et par mode, en base) :
   - Au démarrage : charge les adresses déjà contactées par CET utilisateur
-    (table emails_contactes) + les destinataires enregistrés sur ses
-    entreprises (mail_destinataires)
+    dans CE mode (table emails_contactes) + les destinataires enregistrés
+    sur ses entreprises du même mode (mail_destinataires). Une adresse
+    contactée pour une alternance peut l'être pour un job, pas deux fois
+    pour une alternance
   - À chaque envoi réussi : enregistre les destinataires immédiatement
   - L'ancien fichier global data/emails_deja_envoyes.json n'est plus lu
   - Si une entreprise a 2 emails et qu'un seul a déjà été contacté,
@@ -112,7 +114,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
     _log = log_fn or print
     plafond = config.PLAFOND_ENVOIS_JOUR
 
-    _log(f"Envoyeur | limite={limite} | plafond du jour={plafond} | test={test}")
+    _log(f"Envoyeur | mode={mode} | limite={limite} | plafond du jour={plafond} | test={test}")
 
     # Compte d'envoi de CET utilisateur, configuré et vérifié (sinon : erreur)
     compte = exiger_compte_verifie(user_id)
@@ -130,12 +132,12 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
     entreprises = charger_json(user_id)
 
     # ── Déduplication : adresses contactées + champ mail_destinataires ───────
-    emails_deja_envoyes = lire_emails_contactes(user_id)
+    emails_deja_envoyes = lire_emails_contactes(user_id, mode)
     nb_contactes = len(emails_deja_envoyes)
 
-    # Ajoute aussi les destinataires enregistrés sur les entreprises (au cas où)
+    # Ajoute aussi les destinataires enregistrés sur les entreprises du mode (au cas où)
     for e in entreprises:
-        if e.get("mail_envoye") and e.get("mail_destinataires"):
+        if e.get("mode") == mode and e.get("mail_envoye") and e.get("mail_destinataires"):
             for addr in e["mail_destinataires"]:
                 emails_deja_envoyes.add(normaliser_email(addr))
 
@@ -244,7 +246,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
                 e["mail_destinataires"] = destinataires
 
                 # Mise à jour immédiate de la déduplication (en base)
-                ajouter_emails_contactes(user_id, destinataires)
+                ajouter_emails_contactes(user_id, mode, destinataires)
                 for addr in destinataires:
                     emails_deja_envoyes.add(addr)
 

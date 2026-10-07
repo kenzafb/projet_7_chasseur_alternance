@@ -212,13 +212,14 @@ class OffreVue(Base):
     user = _relation_vers_user("offres_vues")
 
 
-# ─── Emails déjà contactés (dédup des envois spontanés, par utilisateur) ──────
+# ─── Emails déjà contactés (dédup des envois spontanés, par user et par mode) ─
 class EmailContacte(Base):
     __tablename__ = "emails_contactes"
-    __table_args__ = (UniqueConstraint("user_id", "email"),)
+    __table_args__ = (UniqueConstraint("user_id", "mode", "email"),)
 
     id          = Column(Integer, primary_key=True)
     user_id     = _user_id()
+    mode        = Column(String(20), nullable=False, default="alternance", server_default="alternance")
     email       = Column(String(255), nullable=False)
     contacte_le = Column(DateTime(timezone=True), default=maintenant_utc)
 

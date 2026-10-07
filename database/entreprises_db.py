@@ -56,6 +56,7 @@ def _entreprise_vers_dict(e) -> dict:
     """Une ligne Entreprise → dict au format attendu par l'envoyeur (comme l'ancien JSON)."""
     extra = e.extra or {}
     d = {
+        "mode":           e.mode,
         "nom_commercial": e.nom_commercial,
         "ville":          e.ville,
         "code_postal":    e.code_postal,

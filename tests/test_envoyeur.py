@@ -239,5 +239,5 @@ def test_destinataire_refuse_passe_a_la_suivante(a_et_b, smtp_simule):
     smtp_simule.refuses.add("rh0@ent0.fr")
     bilan = envoyeur.main(id_a, limite=10)
     assert bilan == {"envoyes": 2, "echecs": 1, "arret": None}
-    assert lire_emails_contactes(id_a) == {"rh1@ent1.fr", "rh2@ent2.fr"}
+    assert lire_emails_contactes(id_a, "alternance") == {"rh1@ent1.fr", "rh2@ent2.fr"}
     assert compte_envoi_db.envois_du_jour(id_a) == 2
