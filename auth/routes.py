@@ -13,12 +13,13 @@ from fastapi import APIRouter, Request, Form
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from shared.config import TEMPLATES_DIR
 from database.connexion import SessionLocal
 from database.models import User, Profil
 from auth.securite import authentifier, hacher_mot_de_passe
 
 router = APIRouter()
-templates = Jinja2Templates(directory="templates")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 
 # ─── Connexion ────────────────────────────────────────────────────────────────

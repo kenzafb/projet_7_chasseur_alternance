@@ -29,14 +29,11 @@ from bs4 import BeautifulSoup
 from ddgs import DDGS
 from ddgs.exceptions import RatelimitException
 from mistralai.client import Mistral
-from dotenv import load_dotenv
-
-load_dotenv()
+from shared.config import MODELE_MISTRAL
 
 # ─── Client Mistral ───────────────────────────────────────────────────────────
 
 mistral_client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
-MODELE_MISTRAL = "mistral-large-latest"
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 

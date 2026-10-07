@@ -4,14 +4,9 @@ import time
 import hashlib
 import re
 from datetime import datetime
-from dotenv import load_dotenv
-
-load_dotenv()
+from shared.config import LBA_LATITUDE, LBA_LONGITUDE, LBA_RAYON_KM
 
 LBA_URL    = "https://api.apprentissage.beta.gouv.fr/api/job/v1/search"
-IDF_LAT    = 48.8566
-IDF_LNG    = 2.3522
-IDF_RADIUS = 60
 
 ALL_CODES_ROME_IT = [
     "M1801","M1802","M1803","M1804","M1805","M1806","M1807","M1808","M1809","M1810",
@@ -138,9 +133,9 @@ def chercher_offres_lba(codes_rome=None) -> list:
     for batch in _batches(codes_rome, 20):
         params = {
             "romes":     ",".join(batch),
-            "latitude":  IDF_LAT,
-            "longitude": IDF_LNG,
-            "radius":    IDF_RADIUS,
+            "latitude":  LBA_LATITUDE,
+            "longitude": LBA_LONGITUDE,
+            "radius":    LBA_RAYON_KM,
             "partners_to_exclude": "France Travail",
         }
 

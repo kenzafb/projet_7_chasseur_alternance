@@ -3,13 +3,11 @@ import json
 import re
 import os
 from mistralai.client import Mistral
-from dotenv import load_dotenv
-
-load_dotenv()
+from shared.config import MODELE_MISTRAL
 
 client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
 
-MODELE = "mistral-large-latest"
+MODELE = MODELE_MISTRAL
 PAUSE_MISTRAL = 10 # secondes entre chaque appel Mistral (rate limit)
 
 def construire_contexte_profil(profil):

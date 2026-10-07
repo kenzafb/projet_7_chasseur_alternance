@@ -3,12 +3,10 @@ import os
 import json
 from datetime import datetime
 from mistralai.client import Mistral
-from dotenv import load_dotenv
-
-load_dotenv()
+from shared.config import MODELE_MISTRAL
 
 client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
-MODELE_LETTRE = "mistral-large-latest"
+MODELE_LETTRE = MODELE_MISTRAL
 
 # ─── Lettre de motivation fixe ────────────────────────────────────────────────
 # Seuls {contact_entreprise} et {paragraphe_entreprise} sont générés par l'IA.

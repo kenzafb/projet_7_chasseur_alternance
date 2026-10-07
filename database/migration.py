@@ -16,14 +16,15 @@ import json
 import os
 import getpass
 
+from shared.config import DATA_DIR
 from database.connexion import SessionLocal, creer_tables
 from database.models import User, Profil, Candidature, Entreprise
 
 # fastapi-users fournit le même hachage que celui utilisé au login
 from fastapi_users.password import PasswordHelper
 
-FICHIER_CANDIDATURES = "data/candidatures.json"
-FICHIER_ENTREPRISES  = "data/entreprises_enrichies.json"
+FICHIER_CANDIDATURES = str(DATA_DIR / "candidatures.json")
+FICHIER_ENTREPRISES  = str(DATA_DIR / "entreprises_enrichies.json")
 
 # Champs entreprises qu'on garde dans la colonne "extra" (non mappés en dur)
 CHAMPS_EXTRA = [

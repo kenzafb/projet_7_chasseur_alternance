@@ -9,17 +9,12 @@ Le jour du déploiement : il suffira de changer DATABASE_URL
 C'est tout l'intérêt de SQLAlchemy.
 """
 
-import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from database.models import Base
-
-# Chemin du fichier base. Surchargé par la variable d'env DATABASE_URL si présente
+# shared.config charge le .env : DATABASE_URL y est surchargeable
 # (ce qui permettra de basculer sur PostgreSQL sans toucher au code).
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite:///data/chasseur.db",
-)
+from shared.config import DATABASE_URL
 
 # check_same_thread=False : nécessaire car FastAPI peut accéder à la base
 # depuis plusieurs threads (tes pipelines tournent en threads).

@@ -1,10 +1,11 @@
 from weasyprint import HTML as WeasyHTML
+from shared.config import BASE_DIR, LETTRES_PDF_DIR
 from database.profil_db import lire_profil
 from datetime import datetime
 import os
 
 
-def generer_pdf_lettre(offre, lettre, profil=None, dossier_output="lettres_pdf"):
+def generer_pdf_lettre(offre, lettre, profil=None, dossier_output=LETTRES_PDF_DIR):
     os.makedirs(dossier_output, exist_ok=True)
     p = profil or lire_profil(1)
     mois = ["janvier","février","mars","avril","mai","juin","juillet","août",
@@ -82,4 +83,5 @@ def generer_pdf_lettre(offre, lettre, profil=None, dossier_output="lettres_pdf")
 </html>"""
 
     WeasyHTML(string=html).write_pdf(chemin_pdf)
-    return chemin_pdf
+    # Chemin relatif à la racine du projet : c'est ce que le front affiche
+    return os.path.relpath(chemin_pdf, BASE_DIR)

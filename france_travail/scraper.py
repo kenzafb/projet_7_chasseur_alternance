@@ -4,9 +4,7 @@ import os
 import time
 import hashlib
 from datetime import datetime
-from dotenv import load_dotenv
-
-load_dotenv()
+from shared.config import DATA_DIR, FT_REGION
 
 DEPTS_IDF = {"75", "77", "78", "91", "92", "93", "94", "95"}
 
@@ -25,7 +23,7 @@ def detecter_zone(lieu):
 
 
 def _fichier_vues(mode="alternance"):
-    return f"data/offres_vues_{mode}.json"
+    return str(DATA_DIR / f"offres_vues_{mode}.json")
 
 
 def charger_offres_vues(mode="alternance"):
@@ -212,7 +210,7 @@ def chercher_offres(grands_domaines=None, ft_params=None, filtrer_domaines=True,
     offres_vues = charger_offres_vues(mode)
 
     bruts = []
-    base_params = {"region": "11", "sort": "1", **ft_params}
+    base_params = {"region": FT_REGION, "sort": "1", **ft_params}
 
     if filtrer_domaines:
         # Mode alternance : on filtre par grand domaine (1 requête par domaine)

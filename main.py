@@ -17,6 +17,7 @@ import threading
 import collections
 from datetime import datetime
 
+from shared.config import BASE_DIR, STATIC_DIR, TEMPLATES_DIR, UPLOADS_DIR
 from fastapi import FastAPI, Request, Body, UploadFile, File, Form
 from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -28,7 +29,6 @@ from database.candidatures_db import lire_candidatures, lire_candidature, modifi
 from database.profil_db import lire_profil, sauvegarder_profil, ajouter_piece_jointe, supprimer_piece_jointe
 from database.entreprises_db import calculer_stats, lire_entreprises_envoyees, modifier_statut_suivi
 from pydantic import BaseModel
-from dotenv import load_dotenv
 
 # ─── Modules métier ───────────────────────────────────────────────
 from france_travail.main import lancer_recherche
@@ -37,11 +37,9 @@ from france_travail.analyseur import analyser_offre, score_to_verdict
 from france_travail.pdf_generator import generer_pdf_lettre
 from france_travail.scraper_lba import chercher_offres_lba
 
-load_dotenv()
-
 app = FastAPI(title="Chasseur d'Alternance", version="15")
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
 # Sessions signées (cookie de connexion). La clé vient du .env en prod.
 app.add_middleware(
@@ -155,9 +153,7 @@ def api_post_profil(request: Request, body: dict = Body(...)):
 
 # ─── Pièces jointes du profil ─────────────────────────────────────────────────
 import re as _re
-from pathlib import Path
 
-DOSSIER_UPLOADS = Path("data/uploads")
 TAILLE_MAX_PJ = 5 * 1024 * 1024  # 5 Mo
 
 def _nom_fichier_sur(nom: str) -> str:
@@ -185,13 +181,14 @@ async def api_profil_upload(request: Request,
     if len(contenu) > TAILLE_MAX_PJ:
         return JSONResponse({"erreur": "Fichier trop volumineux (max 5 Mo)"}, status_code=400)
     # Stockage dans le dossier de l'utilisateur
-    dossier = DOSSIER_UPLOADS / f"user_{user.id}"
+    dossier = UPLOADS_DIR / f"user_{user.id}"
     dossier.mkdir(parents=True, exist_ok=True)
     nom_fichier = _nom_fichier_sur(fichier.filename)
     chemin = dossier / nom_fichier
     with open(chemin, "wb") as out:
         out.write(contenu)
-    ajouter_piece_jointe(user.id, nom, str(chemin), mode=mode_courant(request))
+    # Chemin stocké en relatif à la racine du projet (format historique en base)
+    ajouter_piece_jointe(user.id, nom, str(chemin.relative_to(BASE_DIR)), mode=mode_courant(request))
     return {"ok": True, "nom": nom, "fichier": nom_fichier}
 
 @app.post("/api/profil/piece/supprimer")

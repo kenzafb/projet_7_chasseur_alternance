@@ -19,9 +19,8 @@ Ce que la v7 apporte :
 import requests
 import time
 import os
-from dotenv import load_dotenv
+from shared.config import SIRENE_DEPARTEMENTS
 
-load_dotenv()
 INSEE_API_KEY = os.getenv("INSEE_API_KEY")
 
 BASE_URL = "https://api.insee.fr/api-sirene/3.11/siret"
@@ -31,18 +30,9 @@ HEADERS = {
     "Accept": "application/json",
 }
 
-# ─── Départements IDF ─────────────────────────────────────────────────────────
+# ─── Départements interrogés ──────────────────────────────────────────────────
 
-DEPARTEMENTS = [
-    "75",   # Paris
-#   "77",   # Seine-et-Marne
-#   "78",   # Yvelines
-#   "91",   # Essonne
-    "92",   # Hauts-de-Seine
-    "93",   # Seine-Saint-Denis
-    "94",   # Val-de-Marne
-#   "95",   # Val-d'Oise
-]
+DEPARTEMENTS = SIRENE_DEPARTEMENTS
 
 # ─── Tranches d'effectifs ─────────────────────────────────────────────────────
 
