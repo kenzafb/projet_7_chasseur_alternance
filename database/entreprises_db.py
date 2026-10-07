@@ -8,7 +8,9 @@ et écritures des pipelines spontanées (fetch, scraper, envoyeur, suivi).
 from datetime import datetime, timedelta, timezone
 
 from database.connexion import SessionLocal
-from database.dates import JOUR_HEURE, depuis_base, en_texte, vers_utc
+from database.dates import JOUR_HEURE, depuis_base, en_texte, maintenant_utc, vers_utc
+
+_TRES_ANCIEN = datetime.min.replace(tzinfo=timezone.utc)
 from database.models import Entreprise
 
 
@@ -100,7 +102,11 @@ def sauvegarder_entreprises(user_id: int, liste: list[dict]):
             if not e:
                 continue
             e.mail_envoye    = bool(d.get("mail_envoye", False))
-            e.mail_envoye_le = vers_utc(d.get("mail_envoye_le"))
+            # Une date relue (texte en heure d'affichage) et non modifiée n'est
+            # pas réécrite : seule une nouvelle valeur (datetime) l'est.
+            date = d.get("mail_envoye_le")
+            if not (isinstance(date, str) and date and date == en_texte(e.mail_envoye_le, JOUR_HEURE)):
+                e.mail_envoye_le = vers_utc(date)
             # Champs qui vivent dans extra
             extra = dict(e.extra or {})
             if "mail_destinataires" in d:
@@ -211,7 +217,7 @@ def lire_entreprises_envoyees(user_id: int) -> list[dict]:
         envoyees = (db.query(Entreprise)
                       .filter_by(user_id=user_id, mail_envoye=True)
                       .all())
-        maintenant = datetime.now(timezone.utc)
+        maintenant = maintenant_utc()
         resultat = []
         for e in envoyees:
             statut = e.statut_suivi or "envoye"
@@ -221,10 +227,10 @@ def lire_entreprises_envoyees(user_id: int) -> list[dict]:
                     statut = "a_relancer"
             d = _entreprise_vers_dict(e)
             d["statut_suivi"] = statut
-            resultat.append(d)
-        # Tri : les plus récemment envoyées en premier
-        resultat.sort(key=lambda x: x.get("mail_envoye_le", ""), reverse=True)
-        return resultat
+            resultat.append((depuis_base(e.mail_envoye_le) or _TRES_ANCIEN, d))
+        # Tri sur l'instant UTC (pas sur le texte affiché) : les plus récentes en premier
+        resultat.sort(key=lambda paire: paire[0], reverse=True)
+        return [d for _, d in resultat]
     finally:
         db.close()
 

@@ -22,11 +22,11 @@ import re
 import tempfile
 import unicodedata
 import uuid
-from datetime import datetime
 from pathlib import Path
 
 from weasyprint import HTML as WeasyHTML
 
+from database.dates import maintenant_affichage
 from shared import config
 from shared.erreurs import exiger_profil, CHAMPS_IDENTITE
 
@@ -69,7 +69,7 @@ def _corps(lettre: str) -> str:
 def construire_html(offre: dict, lettre: str, profil: dict) -> str:
     """HTML de la lettre, chaque valeur variable échappée."""
     p = {c: _e(profil.get(c)) for c in ("prenom", "nom", "ville", "telephone", "email", "github")}
-    now = datetime.now()
+    now = maintenant_affichage()
     date_str = f"{now.day} {MOIS[now.month - 1]} {now.year}"
 
     entreprise_brute = offre.get("entreprise", "") or ""

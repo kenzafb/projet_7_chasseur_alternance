@@ -96,8 +96,8 @@ def test_dates_stockees_en_datetime_et_rendues_en_texte():
         uid = _user(db)
     finally:
         db.close()
-    candidatures_db.ajouter_candidature(uid, {"id": "r1", "date_trouvee": "2026-10-01"})
-    candidatures_db.modifier_candidature(uid, "r1", {"date_candidature": "2026-10-07"})
+    candidatures_db.ajouter_candidature(uid, {"id": "r1", "date_trouvee": "2026-10-01T08:00:00Z"})
+    candidatures_db.modifier_candidature(uid, "r1", {"date_candidature": "2026-10-07T15:00:00+00:00"})
     c = candidatures_db.lire_candidature(uid, "r1")
     assert (c["date_trouvee"], c["date_candidature"]) == ("2026-10-01", "2026-10-07")
 

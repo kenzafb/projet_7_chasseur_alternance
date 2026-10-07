@@ -23,7 +23,7 @@ import time
 import random
 import smtplib
 import argparse
-from datetime import datetime
+from database.dates import maintenant_utc
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
@@ -193,7 +193,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
             _log(f"  ⏭️  {nom} — tous les emails déjà contactés, skip")
             # Marquer quand même comme traité pour ne plus y revenir
             e["mail_envoye"]        = True
-            e["mail_envoye_le"]     = datetime.today().strftime("%Y-%m-%d %H:%M")
+            e["mail_envoye_le"]     = maintenant_utc()
             e["mail_destinataires"] = []
             e["mail_note"]          = "skip — tous emails déjà contactés"
             continue
@@ -214,7 +214,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
             _log(f"  ✅ Envoyé à {len(destinataires)} adresse(s)")
             if not test:
                 e["mail_envoye"]        = True
-                e["mail_envoye_le"]     = datetime.today().strftime("%Y-%m-%d %H:%M")
+                e["mail_envoye_le"]     = maintenant_utc()
                 e["mail_destinataires"] = destinataires
 
                 # Mise à jour immédiate de la déduplication (en base)

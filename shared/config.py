@@ -52,6 +52,10 @@ def chemin_lettre_pdf(relatif: str) -> Path | None:
 # (une ligne "DATABASE_URL=" vide dans le .env vaut absence)
 DATABASE_URL = os.getenv("DATABASE_URL") or f"sqlite:///{DATA_DIR / 'chasseur.db'}"
 
+# Fuseau dans lequel les dates sont AFFICHÉES (elles sont stockées en UTC).
+# Le fuseau du serveur n'intervient jamais.
+FUSEAU_AFFICHAGE = os.getenv("FUSEAU_AFFICHAGE") or "Europe/Paris"
+
 # ─── Sécurité ─────────────────────────────────────────────────────────────────
 LONGUEUR_MIN_SECRET_KEY = 32
 

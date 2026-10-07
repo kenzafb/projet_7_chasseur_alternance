@@ -2,7 +2,7 @@ import requests
 import os
 import time
 import re
-from datetime import datetime
+from database.dates import instant_depuis_api
 from shared.config import DEPTS_IDF, DEPTS_PETITE_COURONNE, LBA_LATITUDE, LBA_LONGITUDE, LBA_RAYON_KM
 from shared.offres import detecter_zone, generer_id
 from shared.domaines import lba_romes
@@ -69,9 +69,7 @@ def _normaliser_offre_lba(offre: dict) -> dict | None:
 
     # --- Date ---
     publication = offer.get("publication", {}) or {}
-    date_str    = (publication.get("creation", "") or "")[:10]
-    if not date_str:
-        date_str = datetime.now().strftime("%Y-%m-%d")
+    date_trouvee = instant_depuis_api(publication.get("creation"))
 
     return {
         "id":           offre_id,
@@ -83,7 +81,7 @@ def _normaliser_offre_lba(offre: dict) -> dict | None:
         "lien":         lien,
         "source":       "La Bonne Alternance",
         "description":  description[:5000],
-        "date_trouvee": date_str,
+        "date_trouvee": date_trouvee,
         "score":        0,
         "lettre":       "",
         "statut":       "nouveau",

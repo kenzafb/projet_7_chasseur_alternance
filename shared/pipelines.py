@@ -16,8 +16,8 @@ Limite connue : tout est en mémoire du processus. Un redémarrage (ou le
 
 import collections
 import threading
-from datetime import datetime
 
+from database.dates import maintenant_affichage
 from shared.config import LOGS_MAX_PAR_UTILISATEUR
 
 RECHERCHE = "recherche"
@@ -83,7 +83,7 @@ class Pipelines:
 
     # ─── Logs ─────────────────────────────────────────────────────────────────
     def log(self, user_id: int, msg: str):
-        ligne = {"t": datetime.now().strftime("%H:%M:%S"), "msg": msg}
+        ligne = {"t": maintenant_affichage().strftime("%H:%M:%S"), "msg": msg}
         with self._verrou:
             journal = self._logs.setdefault(user_id, collections.deque(maxlen=self._logs_max))
             journal.append(ligne)

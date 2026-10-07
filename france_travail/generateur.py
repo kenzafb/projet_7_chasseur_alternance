@@ -1,7 +1,7 @@
 import re
 import json
 import string
-from datetime import datetime
+from database.dates import maintenant_affichage
 from shared.ia import appeler_mistral
 from shared.erreurs import ErreurUtilisateur, exiger_profil, CHAMPS_IDENTITE
 
@@ -65,7 +65,7 @@ def preparer_lettre_type(modele):
 def _date_du_jour():
     mois = ["janvier", "février", "mars", "avril", "mai", "juin",
             "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
-    today = datetime.today()
+    today = maintenant_affichage()
     return f"{today.day} {mois[today.month - 1]} {today.year}"
 
 

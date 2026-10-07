@@ -17,7 +17,6 @@ import re
 import secrets
 import threading
 import unicodedata
-from datetime import datetime
 
 from shared.config import STATIC_DIR, TEMPLATES_DIR, COOKIE_SECURE, chemin_lettre_pdf, chemin_piece_jointe, secret_key
 from fastapi import FastAPI, APIRouter, Depends, Request, Body, UploadFile, File, Form
@@ -37,6 +36,7 @@ from database.profil_db import (lire_profil, sauvegarder_profil, ajouter_piece_j
 from database.entreprises_db import calculer_stats, lire_entreprises_envoyees, modifier_statut_suivi
 from pydantic import BaseModel
 from shared.pipelines import Pipelines, RECHERCHE, SPONTANEES
+from database.dates import maintenant_utc
 
 # ─── Modules métier ───────────────────────────────────────────────
 from france_travail.main import lancer_recherche
@@ -372,7 +372,7 @@ def api_maj_statut(body: MajStatut, request: Request, user: User = Depends(utili
     if body.statut in ["envoye", "reponse", "entretien", "refus"]:
         offre = lire_candidature(user.id, body.id, mode=mode_courant(request))
         if offre and not offre.get("date_candidature"):
-            modifs["date_candidature"] = datetime.now().strftime("%Y-%m-%d")
+            modifs["date_candidature"] = maintenant_utc()
     modifier_candidature(user.id, body.id, modifs, mode=mode_courant(request))
     return {"ok": True}
 

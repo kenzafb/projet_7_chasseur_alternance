@@ -1,8 +1,8 @@
 import requests
 import os
 import time
-from datetime import datetime
 from shared.config import FT_REGION
+from database.dates import instant_depuis_api
 from database.dedup_db import lire_offres_vues, marquer_offres_vues
 from shared.offres import detecter_zone, generer_id
 from shared.domaines import ft_grands_domaines
@@ -153,7 +153,7 @@ def _normaliser(bruts: list) -> list:
             "lien":         lien,
             "source":       "France Travail",
             "description":  desc[:10000],
-            "date_trouvee": (offre.get("dateCreation") or "")[:10] or datetime.now().strftime("%Y-%m-%d"),
+            "date_trouvee": instant_depuis_api(offre.get("dateCreation")),
             "score":        0,
             "lettre":       "",
             "statut":       "nouveau",
