@@ -28,6 +28,17 @@ LETTRES_PDF_DIR = BASE_DIR / "lettres_pdf"
 TEMPLATES_DIR   = BASE_DIR / "templates"
 STATIC_DIR      = BASE_DIR / "static"
 
+def chemin_piece_jointe(relatif: str) -> Path | None:
+    """Chemin absolu d'une pièce jointe stockée en base (relatif à UPLOADS_DIR).
+    None si le chemin est vide ou sort du dossier des pièces jointes."""
+    if not relatif:
+        return None
+    racine = UPLOADS_DIR.resolve()
+    chemin = (racine / relatif).resolve()
+    if not chemin.is_relative_to(racine):
+        return None
+    return chemin
+
 # Base de données : DATABASE_URL du .env si présente, sinon SQLite local
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DATA_DIR / 'chasseur.db'}")
 

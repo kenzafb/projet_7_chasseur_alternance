@@ -17,7 +17,7 @@ import threading
 import collections
 from datetime import datetime
 
-from shared.config import BASE_DIR, STATIC_DIR, TEMPLATES_DIR, UPLOADS_DIR, COOKIE_SECURE, secret_key
+from shared.config import STATIC_DIR, TEMPLATES_DIR, COOKIE_SECURE, chemin_piece_jointe, secret_key
 from fastapi import FastAPI, APIRouter, Depends, Request, Body, UploadFile, File, Form
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
@@ -193,15 +193,14 @@ async def api_profil_upload(request: Request,
     contenu = await fichier.read()
     if len(contenu) > TAILLE_MAX_PJ:
         return JSONResponse({"erreur": "Fichier trop volumineux (max 5 Mo)"}, status_code=400)
-    # Stockage dans le dossier de l'utilisateur
-    dossier = UPLOADS_DIR / f"user_{user.id}"
-    dossier.mkdir(parents=True, exist_ok=True)
+    # Stockage dans le dossier de l'utilisateur ; en base, chemin relatif à UPLOADS_DIR
     nom_fichier = _nom_fichier_sur(fichier.filename)
-    chemin = dossier / nom_fichier
+    relatif = f"user_{user.id}/{nom_fichier}"
+    chemin = chemin_piece_jointe(relatif)
+    chemin.parent.mkdir(parents=True, exist_ok=True)
     with open(chemin, "wb") as out:
         out.write(contenu)
-    # Chemin stocké en relatif à la racine du projet (format historique en base)
-    ajouter_piece_jointe(user.id, nom, str(chemin.relative_to(BASE_DIR)), mode=mode_courant(request))
+    ajouter_piece_jointe(user.id, nom, relatif, mode=mode_courant(request))
     return {"ok": True, "nom": nom, "fichier": nom_fichier}
 
 @prive.post("/api/profil/piece/supprimer")
@@ -210,9 +209,10 @@ def api_profil_piece_supprimer(request: Request, body: dict = Body(...), user: U
     # Retrouve le chemin pour supprimer le fichier du disque
     prof = lire_profil(user.id, mode=mode_courant(request))
     for pj in prof.get("pieces_jointes", []):
-        if pj.get("nom") == nom and pj.get("fichier"):
+        chemin = chemin_piece_jointe(pj.get("fichier", ""))
+        if pj.get("nom") == nom and chemin:
             try:
-                os.remove(pj["fichier"])
+                os.remove(chemin)
             except OSError:
                 pass
     supprimer_piece_jointe(user.id, nom, mode=mode_courant(request))
@@ -222,8 +222,9 @@ def api_profil_piece_supprimer(request: Request, body: dict = Body(...), user: U
 def api_profil_piece_get(request: Request, nom: str, user: User = Depends(utilisateur_requis)):
     prof = lire_profil(user.id, mode=mode_courant(request))
     for pj in prof.get("pieces_jointes", []):
-        if pj.get("nom") == nom and pj.get("fichier") and os.path.exists(pj["fichier"]):
-            return FileResponse(pj["fichier"], media_type="application/pdf")
+        chemin = chemin_piece_jointe(pj.get("fichier", ""))
+        if pj.get("nom") == nom and chemin and chemin.is_file():
+            return FileResponse(chemin, media_type="application/pdf")
     return JSONResponse({"erreur": "Pièce introuvable"}, status_code=404)
 
 

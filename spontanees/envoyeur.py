@@ -27,7 +27,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
-from shared.config import DATA_DIR
+from shared.config import DATA_DIR, chemin_piece_jointe
 
 FICHIER_EMAILS_ENVOYES = str(DATA_DIR / "emails_deja_envoyes.json")
 
@@ -117,10 +117,9 @@ def envoyer_mail(destinataires: list[str], corps: str, pieces_jointes=None, log_
     msg.attach(MIMEText(corps, "plain", "utf-8"))
 
     # Joindre les pièces jointes du profil de l'utilisateur
-    import os as _os
     for pj in (pieces_jointes or []):
-        chemin = pj.get("fichier", "")
-        if not chemin or not _os.path.exists(chemin):
+        chemin = chemin_piece_jointe(pj.get("fichier", ""))
+        if not chemin or not chemin.is_file():
             log_fn(f"    [!] Pièce '{pj.get('nom','?')}' introuvable — ignorée")
             continue
         base = (pj.get("nom", "document") or "document").strip().replace(" ", "_")
