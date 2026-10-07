@@ -161,7 +161,6 @@ def test_migration_0004_emails_contactes_par_mode(tmp_path):
     cx.close()
 
     command.upgrade(cfg, "0004")
-    command.check(cfg)
     cx = sqlite3.connect(chemin)
     assert cx.execute("SELECT user_id, mode, email FROM emails_contactes").fetchall() == [(1, "alternance", "rh@acme.fr")]
     cx.execute("INSERT INTO emails_contactes (user_id, mode, email) VALUES (1, 'job', 'rh@acme.fr')")

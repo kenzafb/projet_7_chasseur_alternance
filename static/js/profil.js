@@ -59,7 +59,7 @@ function rendreProjets() {
       <span class="projet__rm" data-projet-rm="${i}">Retirer</span>
       <div class="projet__grid">
         <label class="field"><span class="field__label">Nom du projet</span>
-          <input class="field__input" data-pj="${i}:nom" type="text" value="${echap(p.nom)}" placeholder="Grabber"></label>
+          <input class="field__input" data-pj="${i}:nom" type="text" value="${echap(p.nom)}" placeholder="Mon projet"></label>
         <label class="field"><span class="field__label">Lien (GitHub…)</span>
           <input class="field__input" data-pj="${i}:url" type="text" value="${echap(p.url)}" placeholder="github.com/..."></label>
         <label class="field field--full"><span class="field__label">Description</span>

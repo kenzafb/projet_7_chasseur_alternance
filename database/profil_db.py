@@ -4,7 +4,7 @@ database/profil_db.py
 Lecture du profil d'un utilisateur depuis la base, au format dict
 (mêmes clés que l'ancien shared/profil.py PROFIL).
 Permet à l'analyseur et au générateur de fonctionner pour n'importe
-quel utilisateur, pas seulement Kenza.
+quel utilisateur.
 """
 
 from database.connexion import SessionLocal
@@ -45,6 +45,7 @@ def lire_profil(user_id: int, mode: str = "alternance") -> dict:
             "projets": p.projets or [],
             "recherche": p.recherche or {},
             "lettre_type": p.lettre_type or "",
+            "email_objet": p.email_objet or "",
             "email_type": p.email_type or "",
             "pieces_jointes": p.pieces_jointes or [],
         }
@@ -64,7 +65,7 @@ def sauvegarder_profil(user_id: int, donnees: dict, mode: str = "alternance") ->
         "paragraphe_perso", "niveau_vise", "formation_apporte", "criteres_eviter",
         "niveau_etudes", "duree_souhaitee", "dispo_horaires", "mobilite",
         "types_jobs_ok", "types_jobs_eviter", "localisation_pref",
-        "lettre_type", "email_type",
+        "lettre_type", "email_objet", "email_type",
     ]
     # Champs structurés (listes/dicts stockés en JSON)
     champs_json = ["competences", "projets", "recherche"]

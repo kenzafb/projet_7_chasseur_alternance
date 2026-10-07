@@ -7,9 +7,11 @@ from shared.erreurs import ErreurUtilisateur, exiger_profil, CHAMPS_IDENTITE
 
 # ─── Lettre de motivation fixe ────────────────────────────────────────────────
 # Seuls {contact_entreprise} et {paragraphe_entreprise} sont générés par l'IA.
-# Tout le reste est rédigé par Kenza et ne change jamais.
+# Trame par défaut de chaque mode, utilisée quand le profil n'a pas sa propre
+# lettre type : générique, sans date, sans diplôme, sans accord de genre.
 
-LETTRE_TEMPLATE = """\
+LETTRES_PAR_DEFAUT = {
+    "alternance": """\
 {contact_entreprise}
 
 Le {date}
@@ -22,12 +24,36 @@ Actuellement en formation et à la recherche d'une alternance, je vous adresse m
 
 {paragraphe_entreprise}
 
-Mon parcours et ma motivation m'amènent à vouloir mettre mes compétences au service de votre structure, dans le cadre de mon alternance. Sérieux(se), impliqué(e) et désireux(se) d'apprendre, je m'investirai pleinement dans les missions qui me seront confiées.
+Mon parcours et ma motivation m'amènent à vouloir mettre mes compétences au service de votre structure, dans le cadre de mon alternance. Avec sérieux, implication et l'envie d'apprendre, je m'investirai pleinement dans les missions qui me seront confiées.
 
-Je serais ravi(e) de vous présenter mon parcours plus en détail lors d'un entretien.
+Un entretien serait l'occasion de vous présenter mon parcours plus en détail.
 
 Dans l'attente de votre retour, je vous prie d'agréer, Madame, Monsieur, mes salutations distinguées.
-"""
+""",
+    "job": """\
+{contact_entreprise}
+
+Le {date}
+
+Objet : Candidature
+
+Madame, Monsieur,
+
+Je vous adresse ma candidature pour le poste que vous proposez.
+
+{paragraphe_entreprise}
+
+Le sérieux, la ponctualité et l'esprit d'équipe guident ma façon de travailler, et je prends vite mes repères sur un nouveau poste comme avec de nouvelles consignes. Mes disponibilités figurent dans mon CV.
+
+Un entretien serait l'occasion d'en parler plus en détail.
+
+Dans l'attente de votre retour, je vous prie d'agréer, Madame, Monsieur, mes salutations distinguées.
+""",
+}
+
+
+def lettre_par_defaut(mode: str) -> str:
+    return LETTRES_PAR_DEFAUT.get(mode, LETTRES_PAR_DEFAUT["alternance"])
 
 
 # Balises permises dans une lettre type (profil.lettre_type)
@@ -95,14 +121,14 @@ def generer_lettre(offre, profil, mode="alternance"):
     appel à Mistral.
     """
     exiger_profil(profil, CHAMPS_IDENTITE)
-    template = preparer_lettre_type(profil.get("lettre_type") or LETTRE_TEMPLATE)
+    template = preparer_lettre_type(profil.get("lettre_type") or lettre_par_defaut(mode))
 
     nom_entreprise = offre.get("entreprise", "")
     titre_poste    = offre.get("titre", "")
     lieu           = offre.get("lieu", "")
     description    = (offre.get("description", "") or "")[:800]
 
-    # Compétences réelles du candidat (depuis son profil) — pour ne PAS coder en dur l'IT
+    # Bagage réel de la personne (depuis son profil) : rien n'est codé en dur
     _comps = profil.get("competences", []) or []
     _comps_txt = ", ".join(_comps) if _comps else ""
     _formation = (profil.get("formation", "") or "").strip()
@@ -111,7 +137,15 @@ def generer_lettre(offre, profil, mode="alternance"):
     if _comps_txt:   _bagage.append(f"Compétences : {_comps_txt}")
     if _formation:   _bagage.append(f"Formation : {_formation[:200]}")
     if _experience:  _bagage.append(f"Expérience : {_experience[:200]}")
-    bagage_candidat = "\n".join(_bagage) if _bagage else "Voir le profil du candidat."
+    bagage_candidat = ("\n".join(_bagage) if _bagage else
+                       "Rien de renseigné : reste sur l'intérêt pour l'entreprise, sans inventer de compétence.")
+
+    # Règle commune : la lettre est écrite à la première personne par
+    # quelqu'un dont on ne connaît pas le genre
+    neutre = (
+        "- Écris de façon neutre : aucun adjectif ni participe accordé au genre de la personne "
+        "candidate (préfère 'j'ai le sens de la rigueur' à un adjectif comme 'je suis rigoureux').\n"
+    )
 
     # L'élément 2 (paragraphe entreprise) dépend du mode
     if mode == "job":
@@ -123,13 +157,18 @@ def generer_lettre(offre, profil, mode="alternance"):
             "- Montre un intérêt concret pour CETTE entreprise ou ce poste (secteur, mission, contexte).\n"
             "- Mets en avant les QUALITÉS HUMAINES adaptées à un job court : fiabilité, sérieux, "
             "polyvalence, sens du contact, rigueur, capacité à apprendre vite et à s'intégrer dans une équipe.\n"
-            "- N'utilise PAS de compétences techniques pointues (Docker, Python, Linux, scripting...) "
-            "SAUF si le poste les demande EXPLICITEMENT (ex. saisie informatique, support). "
-            "Pour un poste manuel, de vente, d'accueil ou de manutention, ne parle PAS d'informatique.\n"
-            "- Ton simple, direct et sincère, sans superlatifs ('passionnée', 'incroyable').\n"
+            "- Appuie-toi sur le bagage réel de la personne (ci-dessous) quand il éclaire le poste ; "
+            "n'invente rien.\n"
+            f"  Bagage de la personne :\n{bagage_candidat}\n"
+            "- N'utilise PAS de compétences techniques pointues SAUF si le poste les demande "
+            "EXPLICITEMENT (ex. saisie informatique, support). Pour un poste manuel, de vente, "
+            "d'accueil ou de manutention, ne parle PAS d'informatique.\n"
+            "- Ton simple, direct et sincère, sans superlatifs ('incroyable', 'idéal', 'parfait').\n"
+            f"{neutre}"
             "- Ne mentionne PAS la formation ni la disponibilité (déjà dans le corps de la lettre).\n"
-            "Exemple (manutention) : \"Votre entreprise recherche des profils fiables et rapides ; "
-            "rigoureuse et habituée au travail en équipe, je m'investis pleinement dans les missions confiées.\"\n\n"
+            "Exemple de forme (manutention), à ne pas recopier : \"Votre entreprise recherche des "
+            "profils fiables et rapides ; le travail en équipe et la rigueur font partie de mes "
+            "habitudes, et je m'investis pleinement dans les missions confiées.\"\n\n"
         )
     else:
         element2 = (
@@ -138,19 +177,20 @@ def generer_lettre(offre, profil, mode="alternance"):
             "Règles impératives :\n"
             "- NE commence PAS par 'Je'. Commence par le nom de l'entreprise, 'Votre', 'C'est', etc.\n"
             "- Montre un intérêt spécifique pour cette entreprise (secteur, missions, taille, contexte).\n"
-            "- Relie les compétences RÉELLES de la candidate (ci-dessous) au contexte du poste. "
-            "N'invente PAS de compétences qu'elle n'a pas.\n"
-            f"  Bagage du candidat :\n{bagage_candidat}\n"
-            "- Ton direct et professionnel, sans superlatifs ('passionnée', 'incroyable', 'parfaite').\n"
+            "- Relie les compétences RÉELLES de la personne candidate (ci-dessous) au contexte du poste. "
+            "N'invente AUCUNE compétence ni expérience absente de ce bagage.\n"
+            f"  Bagage de la personne :\n{bagage_candidat}\n"
+            "- Ton direct et professionnel, sans superlatifs ('incroyable', 'idéal', 'parfait').\n"
+            f"{neutre}"
             "- Ne mentionne PAS la formation, les projets personnels, ni la disponibilité "
             "(déjà dans le corps de la lettre).\n"
-            "Exemple : \"ORMA INFORMATIQUE, votre spécialisation en infrastructures correspond "
-            "à mes compétences en administration Linux et Docker, consolidées lors de mon stage "
-            "au Garage Numérique.\"\n\n"
+            "Structure attendue, à remplir avec l'offre et le bagage réels (ne pas recopier les "
+            "crochets) : \"[Entreprise], votre [activité ou projet précis tiré de l'offre] rejoint "
+            "[compétence réelle du bagage], [mise en pratique lors de telle expérience réelle du bagage].\"\n\n"
         )
 
     prompt = (
-        "Tu aides une candidate à personnaliser sa lettre de motivation.\n"
+        "Tu aides une personne candidate à personnaliser sa lettre de motivation.\n"
         "Génère UNIQUEMENT ces 2 éléments en JSON valide, sans backticks ni texte autour.\n\n"
 
         "=== OFFRE ===\n"

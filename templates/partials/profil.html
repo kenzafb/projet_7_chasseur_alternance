@@ -23,11 +23,11 @@
     <div class="profil-grid">
       <label class="field">
         <span class="field__label">Prénom</span>
-        <input class="field__input" type="text" data-profil="prenom" placeholder="Kenza">
+        <input class="field__input" type="text" data-profil="prenom" placeholder="Camille">
       </label>
       <label class="field">
         <span class="field__label">Nom</span>
-        <input class="field__input" type="text" data-profil="nom" placeholder="Filali-Bouami">
+        <input class="field__input" type="text" data-profil="nom" placeholder="Martin">
       </label>
       <label class="field">
         <span class="field__label">Email de contact</span>
@@ -39,7 +39,7 @@
       </label>
       <label class="field">
         <span class="field__label">Ville</span>
-        <input class="field__input" type="text" data-profil="ville" placeholder="Paris 9e">
+        <input class="field__input" type="text" data-profil="ville" placeholder="Ville ou arrondissement">
       </label>
       <label class="field">
         <span class="field__label">LinkedIn</span>
@@ -66,31 +66,31 @@
       <label class="field field--full">
         <span class="field__label">Formation</span>
         <textarea class="field__area" data-profil="formation" rows="5"
-          placeholder="- DSP DevOps (Bac+1), CNAM Paris (2025-2026)&#10;- DEUST IOSI en alternance (rentrée 2026)&#10;..."></textarea>
+          placeholder="- Diplôme en cours (niveau), établissement (années)&#10;- Diplôme préparé en alternance (niveau), établissement&#10;..."></textarea>
         <span class="field__hint">Une ligne par diplôme. Indique le niveau, l'intitulé, l'établissement et les dates.</span>
       </label>
       <label class="field field--full">
         <span class="field__label">Niveau d'études visé</span>
         <input class="field__input" type="text" data-profil="niveau_vise"
-          placeholder="Bac+2 (DEUST Informatique) — ce que le contrat prépare">
+          placeholder="Ex. Bac+2, Bac+3… ce que le contrat prépare">
         <span class="field__hint">Le diplôme que cette alternance prépare. Sert à écarter les offres demandant un niveau trop élevé.</span>
       </label>
       <label class="field field--full">
         <span class="field__label">Ce que ta formation va t'apporter</span>
         <textarea class="field__area" data-profil="formation_apporte" rows="3"
-          placeholder="Java, sécurité, bases de données, POO… (ou pour l'immobilier : droit immobilier, gestion locative, négociation…)"></textarea>
+          placeholder="Ce que prévoit le programme : bases de données, comptabilité, droit immobilier, négociation…"></textarea>
         <span class="field__hint">Les compétences que tu vas acquérir pendant ta formation. Évite d'être pénalisé sur ce que tu apprends justement.</span>
       </label>
       <label class="field field--full">
         <span class="field__label">Ce que tu préfères éviter <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
         <textarea class="field__area" data-profil="criteres_eviter" rows="2"
-          placeholder="Ex. postes 100% Windows/Active Directory, déplacements fréquents…"></textarea>
+          placeholder="Ex. déplacements fréquents, horaires de nuit…"></textarea>
         <span class="field__hint">Types de postes ou missions que tu préfères éviter. Laisse vide si tu n'as pas de préférence.</span>
       </label>
       <label class="field field--full">
         <span class="field__label">Expérience professionnelle</span>
         <textarea class="field__area" data-profil="experience" rows="5"
-          placeholder="- Stage technicien au Garage Numérique (2026) : maintenance, Linux, support&#10;..."></textarea>
+          placeholder="- Stage ou job (entreprise, année) : missions principales&#10;..."></textarea>
         <span class="field__hint">Stages, jobs, missions. Décris brièvement les tâches techniques.</span>
       </label>
       <label class="field field--full">
@@ -113,7 +113,7 @@
 
     <div class="tags" data-tags="competences"></div>
     <input class="field__input tags__input" data-tags-input="competences"
-           type="text" placeholder="Tape une compétence et appuie sur Entrée (ex. Linux, Docker, Python…)">
+           type="text" placeholder="Tape une compétence et appuie sur Entrée (ex. Excel, Python, accueil client…)">
   </div>
 
   <!-- ─── Section 4 : Projets (alternance) ─── -->
@@ -156,10 +156,16 @@
       <span class="profil-card__num">06</span>
       <div>
         <h3 class="profil-card__title">Email de candidature spontanée</h3>
-        <p class="profil-card__sub">Le message envoyé aux entreprises lors des candidatures spontanées.</p>
+        <p class="profil-card__sub">Le message envoyé aux entreprises lors des candidatures spontanées, propre à ce mode. Laissé vide, un message générique adapté au mode est envoyé, signé de ton nom, ton téléphone et ton email.</p>
       </div>
     </div>
     <label class="field field--full">
+      <span class="field__label">Objet</span>
+      <input class="field__input" type="text" data-profil="email_objet" maxlength="300"
+        placeholder="Ex. Candidature spontanée">
+    </label>
+    <label class="field field--full">
+      <span class="field__label">Message</span>
       <textarea class="field__area" data-profil="email_type" rows="12"
         placeholder="Bonjour,&#10;&#10;Je me permets de vous contacter pour une candidature spontanée...&#10;&#10;Cordialement,&#10;Prénom Nom"></textarea>
       <span class="field__hint">Texte simple, sans placeholder. Termine par tes coordonnées (nom, téléphone, liens).</span>
@@ -191,7 +197,7 @@
       </label>
       <label class="field field--full">
         <span class="field__label">Disponibilité</span>
-        <input class="field__input" type="text" data-rech="disponibilite" placeholder="septembre 2026">
+        <input class="field__input" type="text" data-rech="disponibilite" placeholder="Ex. dès la rentrée">
       </label>
     </div>
 
@@ -307,13 +313,13 @@
       <label class="field field--full">
         <span class="field__label">Niveau d'études obtenu</span>
         <input class="field__input" type="text" data-profil="niveau_etudes"
-          placeholder="Ex. Bac + Bac+1 DevOps (CNAM)">
+          placeholder="Ex. Bac, Bac+2…">
         <span class="field__hint">Ton niveau actuel. Les offres exigeant un diplôme que tu n'as pas seront écartées.</span>
       </label>
       <label class="field field--full">
         <span class="field__label">Expérience professionnelle</span>
         <textarea class="field__area" data-profil="experience" rows="4"
-          placeholder="- 1 mois en relation client / télécom&#10;- petits jobs, stages…"></textarea>
+          placeholder="- 1 mois en relation client&#10;- petits jobs, stages…"></textarea>
         <span class="field__hint">Tout ce que tu as fait, même court. Les offres exigeant plus d'expérience que la tienne seront écartées.</span>
       </label>
       <label class="field field--full">
@@ -395,7 +401,7 @@
       <label class="field field--full">
         <span class="field__label">Localisation préférée <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
         <input class="field__input" type="text" data-profil="localisation_pref"
-          placeholder="Ex. Paris 9e de préférence, plus on s'éloigne moins ça me va">
+          placeholder="Ex. près de chez moi de préférence, plus c'est loin moins ça me va">
         <span class="field__hint">La recherche reste en Île-de-France. Ceci influence seulement le tri des offres.</span>
       </label>
     </div>

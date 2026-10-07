@@ -52,6 +52,9 @@ def construire_contexte_profil_job(profil):
     jobs_ok         = (profil.get("types_jobs_ok", "") or "").strip()
     jobs_eviter     = (profil.get("types_jobs_eviter", "") or "").strip()
     loc_pref        = (profil.get("localisation_pref", "") or "").strip()
+    from shared.domaines import DOMAINES
+    _cles = (profil.get("recherche", {}) or {}).get("domaines", []) or []
+    domaines_pref   = ", ".join(DOMAINES[c]["label"] for c in _cles if c in DOMAINES)
 
     parties = [f"Candidat : {nom}" + (f", {ville}." if ville else ".")]
     if niveau_etudes:  parties.append(f"NIVEAU D'ÉTUDES OBTENU : {niveau_etudes}")
@@ -65,6 +68,7 @@ def construire_contexte_profil_job(profil):
     if jobs_ok:        parties.append(f"TYPES DE JOBS QUI CONVIENNENT : {jobs_ok}")
     if jobs_eviter:    parties.append(f"TYPES DE JOBS À ÉVITER : {jobs_eviter}")
     if loc_pref:       parties.append(f"LOCALISATION PRÉFÉRÉE (optionnel) : {loc_pref}")
+    if domaines_pref:  parties.append(f"DOMAINES PRÉFÉRÉS (optionnel) : {domaines_pref}")
     return "\n\n".join(parties)
 
 
@@ -96,36 +100,41 @@ def _analyser_offre_job(offre, profil):
         "- Le poste correspond clairement à ce que le candidat veut ÉVITER.\n\n"
 
         "=== SCORING (1-10) — UTILISE TOUTE L'ÉCHELLE, NE METS PAS TOUT À 7 ===\n"
-        "Le critère N°1 est la PÉNIBILITÉ du poste (juge-la depuis la description). "
-        "Le candidat préfère AVANT TOUT les jobs CALMES, peu physiques, avec peu de tâches "
-        "(surveillance, gardiennage, accueil, billetterie, loge, saisie...). "
-        "Plus un poste est tranquille et peu fatigant, plus la note est haute. "
-        "Plus il est physique/pénible/répétitif, plus elle baisse.\n\n"
+        "Le critère N°1 est l'ADÉQUATION AUX PRÉFÉRENCES DU CANDIDAT telles qu'il les a écrites "
+        "dans son profil : types de jobs qui lui conviennent, types de jobs à éviter, disponibilité "
+        "horaire, mobilité, durée souhaitée, localisation et domaines préférés. Juge la nature réelle "
+        "du poste (rythme, effort physique, contact client, horaires, tâches) depuis la description "
+        "et compare-la à ces préférences. N'applique AUCUNE préférence que le profil n'exprime pas.\n\n"
         "Barème (sois DISCRIMINANT, écarte vraiment les notes) :\n"
-        "9-10 : job CALME et peu fatigant (surveillance, gardiennage, agent d'accueil/sécurité, "
-        "loge, billetterie, hôte(sse), poste où l'on 'veille' surtout) ET proche de la localisation "
-        "préférée. Le top du candidat.\n"
-        "7-8 : bon job accessible — débutant accepté, pas d'expérience exigée, OU dans son domaine "
-        "(relation client / téléconseil / saisie). Peut demander du travail et de la polyvalence "
-        "(ex. employé polyvalent restauration rapide, vente, libre-service). Job 'standard correct'.\n"
-        "5-6 : accessible MAIS avec un vrai bémol : assez physique/fatigant, OU loin de la "
-        "localisation préférée, OU éloigné des types de jobs souhaités.\n"
-        "3-4 : peu adapté : poste physique/pénible marqué, proche de ce que le candidat veut éviter, "
-        "ou cumul de défauts (loin + fatigant).\n"
+        "9-10 : le poste correspond clairement à un type de job qui convient au candidat, rien ne "
+        "contredit ses contraintes (horaires, durée, mobilité) ET il est proche de sa localisation "
+        "préférée s'il en a une. Le top du candidat.\n"
+        "7-8 : bon job accessible (débutant accepté, pas d'expérience exigée) et compatible avec ses "
+        "préférences sans y correspondre exactement, OU dans un de ses domaines préférés. "
+        "Job 'standard correct'.\n"
+        "5-6 : accessible MAIS avec un vrai bémol : horaires peu compatibles avec sa disponibilité "
+        "horaire, OU loin de sa localisation préférée, OU éloigné des types de jobs qui lui conviennent.\n"
+        "3-4 : peu adapté : proche de ce que le candidat veut éviter, ou cumul de défauts "
+        "(loin + horaires incompatibles + hors de ses types de jobs).\n"
         "1-2 : inéligible (voir section inéligibilité).\n\n"
         "Principes IMPORTANTS :\n"
-        "- PÉNIBILITÉ = critère prioritaire. Un poste calme passe DEVANT un poste physique, "
-        "même si les deux sont accessibles. Ne mets pas la même note à un agent de surveillance "
-        "et à un préparateur de commandes : le premier est plus haut.\n"
+        "- PRÉFÉRENCES = critère prioritaire. Deux postes également accessibles ne doivent PAS avoir "
+        "la même note si l'un correspond mieux aux types de jobs souhaités ou s'éloigne moins de ce "
+        "que le candidat veut éviter : départage-les nettement.\n"
+        "- Si le profil ne précise ni types de jobs souhaités ni types à éviter, juge surtout "
+        "l'accessibilité et la compatibilité pratique (horaires, durée, trajet).\n"
         "- DURÉE : si la durée MINIMALE du contrat dépasse nettement le maximum du candidat "
-        "(ex. CDD 6 mois alors qu'il veut 2,5 mois max), ce n'est pas qu'un détail : BAISSE la note "
-        "de plusieurs points (plafonne autour de 4-5 même si le job est sympa). Une durée plus "
-        "courte ou flexible (intérim, saisonnier) est au contraire un BON point.\n"
-        "- LOCALISATION : plus c'est proche de la localisation préférée, mieux c'est. Un job dans "
-        "l'arrondissement préféré ou juste à côté mérite un bonus ; un job en grande couronne loin "
-        "perd des points (sans être éliminé).\n"
-        "- DOMAINE : un job dans le domaine du candidat (relation client, téléconseil, accueil, "
-        "informatique légère) est un bon point.\n"
+        "(ex. un CDD de plusieurs mois pour quelqu'un qui ne peut travailler que quelques semaines), "
+        "ce n'est pas qu'un détail : BAISSE la note de plusieurs points (plafonne autour de 4-5 même "
+        "si le job est sympa). Une durée plus courte ou flexible (intérim, saisonnier) est au "
+        "contraire un BON point.\n"
+        "- HORAIRES : compare les horaires de l'offre (nuit, week-end, coupures, temps partiel...) à "
+        "la disponibilité horaire du candidat ; une incompatibilité nette coûte plusieurs points.\n"
+        "- LOCALISATION : si une localisation préférée est indiquée, plus c'est proche, mieux c'est ; "
+        "un poste juste à côté mérite un bonus, un poste loin perd des points (sans être éliminé). "
+        "Sans localisation préférée, ne note pas la distance.\n"
+        "- DOMAINE : un job dans un des domaines préférés du candidat, ou proche de son expérience, "
+        "est un bon point.\n"
         "- Un job qui ne demande NI diplôme NI expérience est ACCESSIBLE : bon point de base (~7).\n"
         "- Ne JAMAIS pénaliser pour la date de début ou la disponibilité.\n"
         "- Tenir compte de la mobilité (pas de permis → privilégier accessible en transports).\n\n"

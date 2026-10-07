@@ -42,7 +42,7 @@ DOMAINES = {
     },
 }
 
-# Domaine par défaut si l'utilisateur n'a rien choisi (rétrocompat Kenza)
+# Domaine par défaut si l'utilisateur n'a rien choisi (comportement historique)
 DOMAINE_DEFAUT = "informatique"
 
 

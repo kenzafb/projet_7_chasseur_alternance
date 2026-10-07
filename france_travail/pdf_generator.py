@@ -71,6 +71,10 @@ def construire_html(offre: dict, lettre: str, profil: dict) -> str:
     p = {c: _e(profil.get(c)) for c in ("prenom", "nom", "ville", "telephone", "email", "github")}
     now = maintenant_affichage()
     date_str = f"{now.day} {MOIS[now.month - 1]} {now.year}"
+    # Lieu : la ville du profil (rien de codé en dur) ; objet : le titre de l'offre
+    lieu_date = f"{p['ville']}, le {date_str}" if p["ville"] else f"Le {date_str}"
+    titre = (offre.get("titre") or "").strip()
+    objet = f"Candidature — {_e(titre)}" if titre else "Candidature"
 
     entreprise_brute = offre.get("entreprise", "") or ""
     if entreprise_brute.lower() in ["inconnue", "inconnu", "", "none"]:
@@ -112,8 +116,8 @@ def construire_html(offre: dict, lettre: str, profil: dict) -> str:
     <div class="info">{_e(offre.get("lieu"))}</div>
   </div>
 </div>
-<div class="date-lieu">Paris, le {date_str}</div>
-<div class="objet"><strong>Objet :</strong> Candidature — {_e(offre.get('titre') or 'Alternance')}</div>
+<div class="date-lieu">{lieu_date}</div>
+<div class="objet"><strong>Objet :</strong> {objet}</div>
 <div class="corps">{paragraphes}</div>
 </body>
 </html>"""

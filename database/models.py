@@ -97,7 +97,7 @@ class Profil(Base):
     langues          = Column(Text, default="")
     disponibilite    = Column(Text, default="")
     paragraphe_perso = Column(Text, default="")
-    niveau_vise       = Column(Text, default="")   # diplôme préparé par le contrat (ex. "Bac+2 DEUST Info")
+    niveau_vise       = Column(Text, default="")   # diplôme préparé par le contrat (ex. "Bac+2")
     formation_apporte = Column(Text, default="")   # compétences que la formation va apporter
     criteres_eviter   = Column(Text, default="")   # ce que la personne préfère éviter
     # Champs spécifiques au mode JOB
@@ -110,6 +110,7 @@ class Profil(Base):
     localisation_pref = Column(Text, default="")   # localisation préférée (job, optionnel)
 
     lettre_type      = Column(Text, default="")   # trame de lettre de motivation (l'IA ne fait que le paragraphe entreprise)
+    email_objet      = Column(String(300), default="")   # objet du mail de candidature spontanée
     email_type       = Column(Text, default="")   # trame d'email pour candidatures spontanées
     # [{"nom": "...", "fichier": "user_1/cv.pdf"}, ...] : chemin relatif à UPLOADS_DIR
     pieces_jointes   = Column(JSON, default=list)

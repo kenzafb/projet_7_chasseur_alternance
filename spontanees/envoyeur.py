@@ -43,22 +43,56 @@ from shared.erreurs import ErreurUtilisateur
 from database.compte_envoi_db import liberer_envoi, marquer_verification, reserver_envoi
 from database.dedup_db import ajouter_emails_contactes, lire_emails_contactes, normaliser_email
 
-SUJET_FIXE        = "Candidature spontanée en alternance"
 LIMITE_PAR_RUN    = config.LIMITE_ENVOIS_PAR_LANCEMENT
 PAUSE_ENTRE_MAILS = (30, 90)
 SAUVEGARDE_TOUS   = 10
 
-MAIL_TEMPLATE = """\
+# Objet et trame par défaut de chaque mode, quand le profil du mode n'en a
+# pas : génériques, sans date, sans diplôme, sans accord de genre.
+OBJETS_PAR_DEFAUT = {
+    "alternance": "Candidature spontanée en alternance",
+    "job":        "Candidature spontanée",
+}
+
+TRAMES_PAR_DEFAUT = {
+    "alternance": """\
 Bonjour,
 
-Je me permets de vous adresser une candidature spontanée en alternance à partir de la rentrée 2026.
+Je me permets de vous adresser ma candidature spontanée pour un contrat en alternance au sein de votre entreprise.
 
 Actuellement en formation, je recherche une entreprise où mettre en pratique mes compétences et m'investir sur la durée. Mon parcours et ma motivation m'amènent à vouloir contribuer concrètement au sein de votre équipe.
 
 Vous trouverez mon CV en pièce jointe. Je reste à votre disposition pour tout échange.
 
 Cordialement,
-"""
+""",
+    "job": """\
+Bonjour,
+
+Je me permets de vous adresser ma candidature spontanée pour un emploi au sein de votre entreprise, en contrat court, en intérim ou en renfort saisonnier.
+
+Le sérieux, la ponctualité et le travail en équipe font partie de mes habitudes, et je prends vite mes repères sur un nouveau poste.
+
+Vous trouverez mon CV en pièce jointe, avec mes disponibilités. Je reste à votre disposition pour tout échange.
+
+Cordialement,
+""",
+}
+
+
+def objet_et_corps(profil: dict, mode: str) -> tuple[str, str]:
+    """Objet et corps du mail : ceux du profil du mode, sinon ceux par défaut
+    du mode, signés avec l'identité du profil."""
+    from shared.modes import MODE_DEFAUT
+    cle = mode if mode in OBJETS_PAR_DEFAUT else MODE_DEFAUT
+    objet = (profil.get("email_objet") or "").strip() or OBJETS_PAR_DEFAUT[cle]
+    corps = (profil.get("email_type") or "").strip()
+    if not corps:
+        nom = f"{profil.get('prenom', '')} {profil.get('nom', '')}".strip()
+        signature = [x for x in (nom, (profil.get("telephone") or "").strip(),
+                                 (profil.get("email") or "").strip()) if x]
+        corps = TRAMES_PAR_DEFAUT[cle] + "\n".join(signature)
+    return objet, corps
 
 
 # ─── Chargement / sauvegarde des entreprises (base) ───────────────────────────
@@ -120,11 +154,10 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
     compte = exiger_compte_verifie(user_id)
     _log(f"Compte d'envoi : {compte['adresse']}")
 
-    # Profil de l'utilisateur : son mail type (fallback sur MAIL_TEMPLATE)
+    # Profil du mode : objet et trame du mail (défauts du mode sinon)
     from database.profil_db import lire_profil
     _profil = lire_profil(user_id, mode=mode)
-    corps_mail = (_profil.get("email_type") or "").strip() or MAIL_TEMPLATE
-    objet_mail = SUJET_FIXE
+    objet_mail, corps_mail = objet_et_corps(_profil, mode)
     pieces = charger_pieces_jointes(_profil.get("pieces_jointes", []), log_fn=_log)
 
     bilan = {"envoyes": 0, "echecs": 0, "arret": None}
@@ -284,8 +317,10 @@ if __name__ == "__main__":
     parser.add_argument("--test",   action="store_true")
     parser.add_argument("--user",   type=int, required=True,
                         help="ID de l'utilisateur pour lequel envoyer")
+    parser.add_argument("--mode",   choices=sorted(OBJETS_PAR_DEFAUT), default="alternance",
+                        help="profil (objet, trame, pièces jointes) et dédoublonnage utilisés")
     args = parser.parse_args()
     try:
-        main(limite=args.limite, test=args.test, user_id=args.user)
+        main(limite=args.limite, test=args.test, user_id=args.user, mode=args.mode)
     except (ErreurUtilisateur, ChiffrementIndisponible, EnvoiInterrompu) as e:
         raise SystemExit(f"❌ {e}")
