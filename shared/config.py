@@ -65,6 +65,10 @@ def code_invitation() -> str:
 # Cookie de session réservé à HTTPS : true en production, false en local (http)
 COOKIE_SECURE = os.getenv("COOKIE_SECURE", "false").strip().lower() in ("1", "true", "oui", "yes")
 
+# ─── Pipelines ────────────────────────────────────────────────────────────────
+# Lignes de log gardées en mémoire par utilisateur (les plus anciennes sont jetées)
+LOGS_MAX_PAR_UTILISATEUR = 200
+
 # ─── IA ───────────────────────────────────────────────────────────────────────
 MODELE_MISTRAL = "mistral-large-latest"
 

@@ -93,6 +93,14 @@ def dossiers_temporaires(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "UPLOADS_DIR", tmp_path / "uploads")
 
 
+@pytest.fixture(autouse=True)
+def pipelines_neufs(monkeypatch):
+    """États, arrêts et logs des pipelines vides à chaque test."""
+    from shared.pipelines import Pipelines
+    monkeypatch.setattr(main, "pipelines", Pipelines())
+    return main.pipelines
+
+
 # ─── Base ─────────────────────────────────────────────────────────────────────
 _FICHIER_BASE = _TMP / "test.db"
 _MODELE_BASE = _TMP / "modele.db"

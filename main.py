@@ -14,7 +14,6 @@ threads avec stop_event : les fonctions métier sont synchrones.
 
 import os
 import threading
-import collections
 from datetime import datetime
 
 from shared.config import STATIC_DIR, TEMPLATES_DIR, COOKIE_SECURE, chemin_piece_jointe, secret_key
@@ -32,6 +31,7 @@ from database.candidatures_db import lire_candidatures, lire_candidature, modifi
 from database.profil_db import lire_profil, sauvegarder_profil, ajouter_piece_jointe, supprimer_piece_jointe
 from database.entreprises_db import calculer_stats, lire_entreprises_envoyees, modifier_statut_suivi
 from pydantic import BaseModel
+from shared.pipelines import Pipelines, RECHERCHE, SPONTANEES
 
 # ─── Modules métier ───────────────────────────────────────────────
 from france_travail.main import lancer_recherche
@@ -76,17 +76,8 @@ def erreur_utilisateur(request: Request, exc: ErreurUtilisateur):
     """Profil incomplet, lettre type invalide... : 400 avec un message lisible."""
     return JSONResponse({"erreur": str(exc)}, status_code=400)
 
-# ─── États des pipelines ──────────────────────────────────────────────────────
-etat_recherche  = {"en_cours": False, "message": "Prêt", "pourcentage": 0}
-etat_spontanees = {"en_cours": False, "etape": None, "message": "Prêt", "pourcentage": 0}
-_stop_event     = threading.Event()
-
-# ─── Logs ─────────────────────────────────────────────────────────────────────
-_logs = collections.deque(maxlen=80)
-
-def log(msg):
-    _logs.append({"t": datetime.now().strftime("%H:%M:%S"), "msg": msg})
-    print(msg)
+# ─── États, arrêts et logs des pipelines, par utilisateur ─────────────────────
+pipelines = Pipelines()
 
 
 # ─── Modèles de requête ───────────────────────────────────────────────────────
@@ -119,8 +110,8 @@ def index(request: Request):
     return templates.TemplateResponse(request, "base.html", {"mode": mode_courant(request)})
 
 @prive.get("/api/logs")
-def api_logs():
-    return list(_logs)
+def api_logs(user: User = Depends(utilisateur_requis)):
+    return pipelines.logs(user.id)
 
 @prive.get("/api/candidatures")
 def api_candidatures(request: Request, user: User = Depends(utilisateur_requis)):
@@ -232,9 +223,6 @@ def api_profil_piece_get(request: Request, nom: str, user: User = Depends(utilis
 
 @prive.post("/api/recherche")
 def api_recherche(request: Request, user: User = Depends(utilisateur_requis)):
-    if etat_recherche["en_cours"]:
-        return JSONResponse({"erreur": "Recherche déjà en cours"}, status_code=400)
-
     user_id = user.id   # capturé AVANT le thread (le thread n'a pas accès à request)
     mode = mode_courant(request)   # idem : capturé avant le thread
     from shared.modes import get_mode
@@ -242,21 +230,28 @@ def api_recherche(request: Request, user: User = Depends(utilisateur_requis)):
     profil = lire_profil(user_id, mode=mode)
     exiger_profil(profil)   # 400 tout de suite plutôt qu'une erreur dans le thread
 
+    if not pipelines.demarrer(RECHERCHE, user_id, message="Démarrage..."):
+        return JSONResponse({"erreur": "Recherche déjà en cours"}, status_code=400)
+
+    def etat(**champs):
+        pipelines.maj(RECHERCHE, user_id, **champs)
+
+    def log(msg):
+        pipelines.log(user_id, msg)
+
     def lancer():
-        etat_recherche["en_cours"] = True
-        etat_recherche["pourcentage"] = 0
         try:
             # Callback : chaque offre FT analysée est écrite en base au fur et à mesure
             def ecrire_en_base(offre):
                 ajouter_candidature(user_id, offre, mode=mode)
 
-            etat_recherche["message"] = "Recherche France Travail..."
+            etat(message="Recherche France Travail...")
             log("🔍 Recherche France Travail démarrée")
             lancer_recherche(user_id, profil, analyser=True, max_analyse=999, on_offre=ecrire_en_base, mode=mode)
             log("✅ France Travail terminé")
 
             if "lba" in cfg_mode["sources"]:
-                etat_recherche["message"] = "Recherche La Bonne Alternance..."
+                etat(message="Recherche La Bonne Alternance...")
                 log("🔍 Recherche La Bonne Alternance démarrée")
                 from shared.domaines import lba_romes
                 _cles = profil.get("recherche", {}).get("domaines", [])
@@ -272,12 +267,13 @@ def api_recherche(request: Request, user: User = Depends(utilisateur_requis)):
                 log(f"  {len(nouvelles_lba)} nouvelles offres LBA (hors doublons FT)")
 
                 if nouvelles_lba:
-                    etat_recherche["message"] = f"Analyse de {len(nouvelles_lba)} offres LBA..."
+                    etat(message=f"Analyse de {len(nouvelles_lba)} offres LBA...")
                     log("🧠 Analyse des offres LBA...")
                     for i, offre in enumerate(nouvelles_lba, 1):
                         try:
-                            etat_recherche["message"] = f"Analyse LBA {i}/{len(nouvelles_lba)}..."
-                            etat_recherche["pourcentage"] = 40 + round(i / len(nouvelles_lba) * 60)
+                            etat(message=f"Analyse LBA {i}/{len(nouvelles_lba)}...",
+                                 pourcentage=40 + round(i / len(nouvelles_lba) * 60))
+                            # Pas de pause ici : shared.ia espace déjà les appels Mistral
                             analyse = analyser_offre(offre, profil)
                             score = analyse.get("score", 5)
                             offre.update({
@@ -298,21 +294,20 @@ def api_recherche(request: Request, user: User = Depends(utilisateur_requis)):
             else:
                 log("ℹ️  Aucune offre LBA récupérée")
 
-            etat_recherche["pourcentage"] = 100
-            etat_recherche["message"] = "Terminé !"
+            etat(pourcentage=100, message="Terminé !")
             log("✅ Recherche complète terminée")
         except Exception as e:
-            etat_recherche["message"] = f"Erreur : {e}"
+            etat(message=f"Erreur : {e}")
             log(f"❌ Erreur recherche : {e}")
         finally:
-            etat_recherche["en_cours"] = False
+            pipelines.terminer(RECHERCHE, user_id)
 
     threading.Thread(target=lancer, daemon=True).start()
     return {"status": "démarré"}
 
 @prive.get("/api/statut_recherche")
-def api_statut_recherche():
-    return etat_recherche
+def api_statut_recherche(user: User = Depends(utilisateur_requis)):
+    return pipelines.etat(RECHERCHE, user.id)
 
 @prive.post("/api/generer_lettre")
 def api_generer_lettre(body: OffreId, request: Request, user: User = Depends(utilisateur_requis)):
@@ -416,121 +411,99 @@ def api_spontanees_statut(request: Request, body: dict = Body(...), user: User =
 def api_spontanees_stats(request: Request, user: User = Depends(utilisateur_requis)):
     # Lecture des stats depuis la base
     stats = calculer_stats(user.id)
-    # On ajoute l'état du pipeline, géré en mémoire
-    stats["en_cours"] = etat_spontanees["en_cours"]
-    stats["etape"]    = etat_spontanees["etape"]
-    stats["message"]  = etat_spontanees["message"]
-    stats["pourcentage"] = etat_spontanees.get("pourcentage", 0)
+    # On ajoute l'état du pipeline de l'utilisateur, géré en mémoire
+    etat = pipelines.etat(SPONTANEES, user.id)
+    stats.update({cle: etat[cle] for cle in ("en_cours", "etape", "message", "pourcentage")})
     return stats
 
 @prive.post("/api/spontanees/stop")
-def api_spontanees_stop():
-    _stop_event.set()
-    etat_spontanees["message"] = "Arrêt demandé — sauvegarde en cours..."
-    log("⏹️  Arrêt demandé par l'utilisateur")
-    return {"ok": True}
+def api_spontanees_stop(user: User = Depends(utilisateur_requis)):
+    """Arrête le pipeline spontané de l'utilisateur connecté, et lui seul."""
+    en_cours = pipelines.demander_arret(user.id)
+    if en_cours:
+        pipelines.log(user.id, "⏹️  Arrêt demandé par l'utilisateur")
+    return {"ok": True, "en_cours": en_cours}
+
+
+def _lancer_spontanees(user_id: int, etape: str, message: str, debut_log: str,
+                       travail, fin_message: str, fin_log: str, nom_erreur: str):
+    """Lance une étape du pipeline spontané dans un thread, pour cet utilisateur.
+    travail(stop_event, log_fn, on_progress) fait le vrai travail.
+    Retourne une réponse 400 si un pipeline spontané de l'utilisateur tourne déjà."""
+    if not pipelines.demarrer(SPONTANEES, user_id, etape=etape, message=message):
+        return JSONResponse({"erreur": "Pipeline déjà en cours"}, status_code=400)
+    arret = pipelines.evenement_arret(user_id)
+
+    def log(msg):
+        pipelines.log(user_id, msg)
+
+    def on_progress(pct, message=None):
+        champs = {"pourcentage": pct}
+        if message:
+            champs["message"] = message
+        pipelines.maj(SPONTANEES, user_id, **champs)
+
+    def lancer():
+        log(debut_log)
+        try:
+            travail(arret, log, on_progress)
+            if arret.is_set():
+                pipelines.maj(SPONTANEES, user_id, message="Arrêté — données sauvegardées")
+            else:
+                pipelines.maj(SPONTANEES, user_id, message=fin_message)
+                log(fin_log)
+        except Exception as e:
+            pipelines.maj(SPONTANEES, user_id, message=f"Erreur {nom_erreur} : {e}")
+            log(f"❌ Erreur {nom_erreur} : {e}")
+        finally:
+            pipelines.terminer(SPONTANEES, user_id, etape=None)
+
+    threading.Thread(target=lancer, daemon=True).start()
+    return {"status": "démarré"}
+
 
 @prive.post("/api/spontanees/fetch")
-def api_spontanees_fetch(request: Request, user: User = Depends(utilisateur_requis)):
+def api_spontanees_fetch(user: User = Depends(utilisateur_requis)):
     user_id = user.id
-    if etat_spontanees["en_cours"]:
-        return JSONResponse({"erreur": "Pipeline déjà en cours"}, status_code=400)
 
-    def lancer():
-        _stop_event.clear()
-        etat_spontanees.update({"en_cours": True, "etape": "fetch",
-                                "message": "Récupération des entreprises IT IDF...",
-                                "pourcentage": 0})
-        log("▶ Fetch entreprises démarré")
-        def on_progress(pct, message=None):
-            etat_spontanees["pourcentage"] = pct
-            if message:
-                etat_spontanees["message"] = message
-        try:
-            from spontanees.fetch_entreprises import main as fetch_main
-            fetch_main(stop_event=_stop_event, on_progress=on_progress, user_id=user_id)
-            etat_spontanees["message"] = "Fetch terminé !"
-            log("✅ Fetch terminé")
-        except Exception as e:
-            etat_spontanees["message"] = f"Erreur fetch : {e}"
-            log(f"❌ Erreur fetch : {e}")
-        finally:
-            etat_spontanees.update({"en_cours": False, "etape": None})
+    def travail(arret, log, on_progress):
+        from spontanees.fetch_entreprises import main as fetch_main
+        fetch_main(stop_event=arret, on_progress=on_progress, user_id=user_id)
 
-    threading.Thread(target=lancer, daemon=True).start()
-    return {"status": "démarré"}
+    return _lancer_spontanees(user_id, "fetch", "Récupération des entreprises IT IDF...",
+                              "▶ Fetch entreprises démarré", travail,
+                              "Fetch terminé !", "✅ Fetch terminé", "fetch")
 
 @prive.post("/api/spontanees/scraper")
-def api_spontanees_scraper(request: Request, user: User = Depends(utilisateur_requis)):
+def api_spontanees_scraper(user: User = Depends(utilisateur_requis)):
     user_id = user.id
-    if etat_spontanees["en_cours"]:
-        return JSONResponse({"erreur": "Pipeline déjà en cours"}, status_code=400)
 
-    def lancer():
-        _stop_event.clear()
-        etat_spontanees.update({"en_cours": True, "etape": "scraper",
-                                "message": "Scraping des emails...",
-                                "pourcentage": 0})
-        log("▶ Scraper emails démarré")
-        def on_progress(pct, message=None):
-            etat_spontanees["pourcentage"] = pct
-            if message:
-                etat_spontanees["message"] = message
-        try:
-            from spontanees.scraper_emails import main as scraper_main
-            scraper_main(stop_event=_stop_event, log_fn=log, user_id=user_id, on_progress=on_progress)
-            if _stop_event.is_set():
-                etat_spontanees["message"] = "Arrêté — données sauvegardées"
-            else:
-                etat_spontanees["message"] = "Scraping terminé !"
-                log("✅ Scraping terminé")
-        except Exception as e:
-            etat_spontanees["message"] = f"Erreur scraper : {e}"
-            log(f"❌ Erreur scraper : {e}")
-        finally:
-            etat_spontanees.update({"en_cours": False, "etape": None})
+    def travail(arret, log, on_progress):
+        from spontanees.scraper_emails import main as scraper_main
+        scraper_main(stop_event=arret, log_fn=log, user_id=user_id, on_progress=on_progress)
 
-    threading.Thread(target=lancer, daemon=True).start()
-    return {"status": "démarré"}
+    return _lancer_spontanees(user_id, "scraper", "Scraping des emails...",
+                              "▶ Scraper emails démarré", travail,
+                              "Scraping terminé !", "✅ Scraping terminé", "scraper")
 
 @prive.post("/api/spontanees/envoyer")
-def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends(utilisateur_requis)):
+def api_spontanees_envoyer(body: Envoyer, user: User = Depends(utilisateur_requis)):
     user_id = user.id
-    if etat_spontanees["en_cours"]:
-        return JSONResponse({"erreur": "Pipeline déjà en cours"}, status_code=400)
-
     # Plafond de sécurité : jamais plus de 50 mails par run (réputation Gmail)
     limite = max(1, min(int(body.limite or 10), 50))
-    def lancer():
-        _stop_event.clear()
-        etat_spontanees.update({"en_cours": True, "etape": "envoyer",
-                                "message": f"Envoi en cours (limite: {limite})...",
-                                "pourcentage": 0})
-        log(f"▶ Envoi démarré — limite {limite} {'[TEST]' if body.test else ''}")
-        def on_progress(pct, message=None):
-            etat_spontanees["pourcentage"] = pct
-            if message:
-                etat_spontanees["message"] = message
-        try:
-            from spontanees.envoyeur import main as env_main
-            env_main(limite=limite, test=body.test, stop_event=_stop_event, log_fn=log, user_id=user_id, on_progress=on_progress)
-            if _stop_event.is_set():
-                etat_spontanees["message"] = "Arrêté — données sauvegardées"
-            else:
-                etat_spontanees["message"] = "Envoi terminé !"
-                log("✅ Envoi terminé")
-        except Exception as e:
-            etat_spontanees["message"] = f"Erreur envoi : {e}"
-            log(f"❌ Erreur envoi : {e}")
-        finally:
-            etat_spontanees.update({"en_cours": False, "etape": None})
 
-    threading.Thread(target=lancer, daemon=True).start()
-    return {"status": "démarré"}
+    def travail(arret, log, on_progress):
+        from spontanees.envoyeur import main as env_main
+        env_main(limite=limite, test=body.test, stop_event=arret, log_fn=log,
+                 user_id=user_id, on_progress=on_progress)
+
+    return _lancer_spontanees(user_id, "envoyer", f"Envoi en cours (limite: {limite})...",
+                              f"▶ Envoi démarré — limite {limite} {'[TEST]' if body.test else ''}",
+                              travail, "Envoi terminé !", "✅ Envoi terminé", "envoi")
 
 @prive.get("/api/spontanees/statut")
-def api_spontanees_etat():
-    return etat_spontanees
+def api_spontanees_etat(user: User = Depends(utilisateur_requis)):
+    return pipelines.etat(SPONTANEES, user.id)
 
 
 # ─── Documentation de l'API (connecté uniquement) ─────────────────────────────
