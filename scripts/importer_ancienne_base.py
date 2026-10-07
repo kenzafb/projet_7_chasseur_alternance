@@ -50,6 +50,9 @@ from database.schema import migrer  # noqa: E402
 
 USERS_A_IMPORTER = (1, 3, 4)
 
+# Préfixe des chemins de pièces jointes dans l'ancienne base (relatifs à la racine)
+ANCIEN_PREFIXE = PurePosixPath("data/uploads")
+
 # Colonnes de profils à reprendre : celles du nouveau schéma, hors clé technique
 COLONNES_PROFIL = [c.name for c in Profil.__table__.columns if c.name != "id"]
 COLONNES_JSON_PROFIL = {c.name for c in Profil.__table__.columns
@@ -160,9 +163,8 @@ def chemin_relatif_uploads(ancien: str) -> str:
         except ValueError:
             return str(chemin)
     # Format historique : relatif à la racine du projet ("data/uploads/...")
-    prefixe = PurePosixPath(uploads.relative_to(config.BASE_DIR).as_posix())
-    if chemin.parts[:len(prefixe.parts)] == prefixe.parts:
-        return PurePosixPath(*chemin.parts[len(prefixe.parts):]).as_posix()
+    if chemin.parts[:len(ANCIEN_PREFIXE.parts)] == ANCIEN_PREFIXE.parts:
+        return PurePosixPath(*chemin.parts[len(ANCIEN_PREFIXE.parts):]).as_posix()
     return chemin.as_posix()
 
 
