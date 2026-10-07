@@ -310,6 +310,52 @@ def score_to_verdict(score):
     if score >= 3: return "faible"
     return "ineligible"
 
+def appliquer_archivage_auto(offre, analyse, mode="alternance",
+                             libelle_hors_domaine="Hors domaine", verbeux=True):
+    """
+    Règles d'archivage automatique d'une offre analysée, avec raison.
+    Modifie offre en place (statut, raison_archivage).
+
+    libelle_hors_domaine : valeur de offre["domaine"] qui déclenche la raison
+    "hors_it". L'analyseur renvoie "Hors domaine" ; main.py (offres LBA)
+    passe encore "Hors IT", qui ne correspond à rien (incohérence connue,
+    conservée telle quelle en phase 0).
+    verbeux : affiche la raison de l'archivage dans la console.
+    """
+    _log = print if verbeux else (lambda *a, **k: None)
+    titre_lower = offre.get("titre", "").lower()
+    desc_lower  = offre.get("description", "").lower()
+
+    offre["raison_archivage"] = ""
+    if mode == "job":
+        # Mode job : on archive seulement les inéligibles (niveau/exp/durée non compatibles)
+        if not offre.get("eligible", True) and offre.get("score", 10) <= 2:
+            offre["statut"] = "archive"
+            offre["raison_archivage"] = "note_basse"
+            _log(f"     -> Archivée automatiquement (inéligible score {offre['score']})")
+    else:
+        # Mode alternance : règles complètes
+        if "boeth" in desc_lower or "maazi" in desc_lower or "situation de handicap" in desc_lower:
+            offre["statut"] = "archive"
+            offre["raison_archivage"] = "public_specifique"
+            _log(f"     -> Archivée automatiquement (réservé public spécifique / BOETH)")
+        elif analyse.get("statut_auto") == "archive":
+            offre["statut"] = "archive"
+            offre["raison_archivage"] = "ecole_cfa"
+        elif offre.get("domaine") == libelle_hors_domaine:
+            offre["statut"] = "archive"
+            offre["raison_archivage"] = "hors_it"
+            _log(f"     -> Archivée automatiquement (hors domaine recherché)")
+        elif "stage" in titre_lower:
+            offre["statut"] = "archive"
+            offre["raison_archivage"] = "stage"
+            _log(f"     -> Archivée automatiquement (stage détecté)")
+        elif not offre.get("eligible", True) and offre.get("score", 10) <= 2:
+            offre["statut"] = "archive"
+            offre["raison_archivage"] = "note_basse"
+            _log(f"     -> Archivée automatiquement (inéligible score {offre['score']})")
+
+
 def analyser_offres(offres, profil=None, callback=None, mode="alternance"):
     offres_analysees = []
     for i, offre in enumerate(offres, 1):
@@ -326,38 +372,8 @@ def analyser_offres(offres, profil=None, callback=None, mode="alternance"):
         })
         offre["verdict"] = score_to_verdict(offre["score"])
 
-        titre_lower = offre.get("titre", "").lower()
-        desc_lower  = offre.get("description", "").lower()
-
         # Archivage auto avec raison — dépend du mode
-        offre["raison_archivage"] = ""
-        if mode == "job":
-            # Mode job : on archive seulement les inéligibles (niveau/exp/durée non compatibles)
-            if not offre.get("eligible", True) and offre.get("score", 10) <= 2:
-                offre["statut"] = "archive"
-                offre["raison_archivage"] = "note_basse"
-                print(f"     -> Archivée automatiquement (inéligible score {offre['score']})")
-        else:
-            # Mode alternance : règles complètes
-            if "boeth" in desc_lower or "maazi" in desc_lower or "situation de handicap" in desc_lower:
-                offre["statut"] = "archive"
-                offre["raison_archivage"] = "public_specifique"
-                print(f"     -> Archivée automatiquement (réservé public spécifique / BOETH)")
-            elif analyse.get("statut_auto") == "archive":
-                offre["statut"] = "archive"
-                offre["raison_archivage"] = "ecole_cfa"
-            elif offre.get("domaine") == "Hors domaine":
-                offre["statut"] = "archive"
-                offre["raison_archivage"] = "hors_it"
-                print(f"     -> Archivée automatiquement (hors domaine recherché)")
-            elif "stage" in titre_lower:
-                offre["statut"] = "archive"
-                offre["raison_archivage"] = "stage"
-                print(f"     -> Archivée automatiquement (stage détecté)")
-            elif not offre.get("eligible", True) and offre.get("score", 10) <= 2:
-                offre["statut"] = "archive"
-                offre["raison_archivage"] = "note_basse"
-                print(f"     -> Archivée automatiquement (inéligible score {offre['score']})")
+        appliquer_archivage_auto(offre, analyse, mode=mode)
         eligible_str = "eligible" if offre["eligible"] else "INELIGIBLE"
         print(f"     Score : {offre['score']}/10 — {offre['verdict']} — {eligible_str}")
         offres_analysees.append(offre)

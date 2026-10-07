@@ -33,7 +33,7 @@ from pydantic import BaseModel
 # ─── Modules métier ───────────────────────────────────────────────
 from france_travail.main import lancer_recherche
 from france_travail.generateur import generer_lettre
-from france_travail.analyseur import analyser_offre, score_to_verdict
+from france_travail.analyseur import analyser_offre, score_to_verdict, appliquer_archivage_auto
 from france_travail.pdf_generator import generer_pdf_lettre
 from france_travail.scraper_lba import chercher_offres_lba
 
@@ -283,20 +283,12 @@ def api_recherche(request: Request):
                                 "domaine":        analyse.get("domaine", "Autre IT"),
                                 "resume_analyse": analyse.get("resume", ""),
                             })
-                            # Archivage auto avec raison (même logique que analyser_offres)
-                            titre_l = offre.get("titre", "").lower()
-                            desc_l  = offre.get("description", "").lower()
-                            offre["raison_archivage"] = ""
-                            if "boeth" in desc_l or "maazi" in desc_l or "situation de handicap" in desc_l:
-                                offre["statut"] = "archive"; offre["raison_archivage"] = "public_specifique"
-                            elif analyse.get("statut_auto") == "archive":
-                                offre["statut"] = "archive"; offre["raison_archivage"] = "ecole_cfa"
-                            elif offre.get("domaine") == "Hors IT":
-                                offre["statut"] = "archive"; offre["raison_archivage"] = "hors_it"
-                            elif "stage" in titre_l:
-                                offre["statut"] = "archive"; offre["raison_archivage"] = "stage"
-                            elif not offre.get("eligible", True) and score <= 2:
-                                offre["statut"] = "archive"; offre["raison_archivage"] = "note_basse"
+                            # Archivage auto avec raison (mêmes règles qu'analyser_offres, sans log).
+                            # ATTENTION : "Hors IT" ne correspond pas au "Hors domaine" renvoyé par
+                            # l'analyseur, la règle hors domaine ne se déclenche donc jamais ici.
+                            # Incohérence connue, conservée en phase 0 (à trancher).
+                            appliquer_archivage_auto(offre, analyse, libelle_hors_domaine="Hors IT",
+                                                     verbeux=False)
                         except Exception as e:
                             log(f"  ⚠️ Erreur analyse LBA {offre.get('titre', '?')[:40]} : {e}")
                         ajouter_candidature(user_id, offre, mode=mode)   # écriture base au fur et à mesure
