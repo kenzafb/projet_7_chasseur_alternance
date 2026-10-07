@@ -213,7 +213,7 @@ def main(user_id, stop_event=None, on_progress=None):
     print(f"  Domaines du profil : {_cles_domaines or '(défaut)'} → {len(codes_naf)} codes NAF")
 
     print("=" * 60)
-    print("  Chasseur d'Alternance — Fetch Entreprises IT IDF v7")
+    print("  Chasseur — Fetch Entreprises IDF v7")
     print(f"  API : INSEE Sirene 3.11 (curseur — pas de limite)")
     print(f"  {len(DEPARTEMENTS)} départements | {len(codes_naf)} codes NAF")
     print(f"  Filtres : siège actif | ≥10 sal. | employeur déclaré")

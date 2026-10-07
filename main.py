@@ -618,7 +618,7 @@ def api_spontanees_fetch(user: User = Depends(utilisateur_requis)):
         from spontanees.fetch_entreprises import main as fetch_main
         fetch_main(stop_event=arret, on_progress=on_progress, user_id=user_id)
 
-    return _lancer_spontanees(user_id, "fetch", "Récupération des entreprises IT IDF...",
+    return _lancer_spontanees(user_id, "fetch", "Récupération des entreprises en Île-de-France...",
                               "▶ Fetch entreprises démarré", travail,
                               "Fetch terminé !", "✅ Fetch terminé", "fetch")
 

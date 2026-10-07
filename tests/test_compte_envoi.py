@@ -321,3 +321,51 @@ def test_preset_gmail_ignore_un_serveur_fourni(ada, smtp_simule):
     client, _ = ada
     r = client.post("/api/compte_envoi", json={**GMAIL, "serveur": "127.0.0.1", "port": 25})
     assert r.status_code == 200 and r.json()["compte"]["serveur"] == "smtp.gmail.com"
+
+
+# ─── Balayage complet ─────────────────────────────────────────────────────────
+def test_mot_de_passe_absent_de_toute_reponse_log_et_erreur(ada, smtp_simule, capsys, caplog, pipelines_neufs):
+    """Un même mot de passe suivi à travers tous les parcours, échecs compris."""
+    import time
+    from database.entreprises_db import ajouter_entreprises, lire_entreprises, sauvegarder_enrichissement
+    caplog.set_level(logging.DEBUG)
+    client, user_id = ada
+    mdp = "Mdp-Unique-7f3a9c"
+    textes = []
+
+    def appel(methode, url, **kw):
+        r = getattr(client, methode)(url, **kw)
+        textes.append(r.text)
+        return r
+
+    appel("post", "/api/compte_envoi", json={**AUTRE, "mot_de_passe": mdp})
+    appel("get", "/api/compte_envoi")
+    appel("post", "/api/compte_envoi/tester")                    # identifiants refusés
+    smtp_simule.comptes["ada"] = mdp
+    appel("post", "/api/compte_envoi/tester")                    # réussi
+    appel("post", "/api/compte_envoi", json={**AUTRE, "mot_de_passe": mdp, "port": 25})
+    appel("post", "/api/compte_envoi", json={**AUTRE, "mot_de_passe": mdp, "serveur": "10.0.0.1"})
+    appel("post", "/api/compte_envoi", json={**AUTRE, "mot_de_passe": mdp, "inconnu": 1})
+    appel("post", "/api/compte_envoi/mail_test", json={"destinataire": "autre@x.fr"})
+    smtp_simule.injoignable = True
+    appel("post", "/api/compte_envoi/mail_test")                 # serveur injoignable
+    appel("post", "/api/compte_envoi/tester")
+    smtp_simule.injoignable = False
+
+    ajouter_entreprises(user_id, [{"siret": "S1", "nom": "ACME"}])
+    liste = lire_entreprises(user_id)
+    liste[0]["emails_trouves"] = ["rh@acme.fr"]
+    sauvegarder_enrichissement(user_id, liste)
+    smtp_simule.comptes["ada"] = "change-cote-serveur"
+    appel("post", "/api/spontanees/envoyer", json={"limite": 1})  # échec d'authentification en route
+    fin = time.monotonic() + 5
+    while pipelines_neufs.etat("spontanees", user_id)["en_cours"] and time.monotonic() < fin:
+        time.sleep(0.01)
+    appel("get", "/api/logs")
+    appel("get", "/api/spontanees/statut")
+    appel("get", "/api/compte_envoi")
+
+    sortie = capsys.readouterr()
+    tout = "\n".join(textes) + sortie.out + sortie.err + caplog.text
+    assert "Authentification refusée" in tout and "injoignable" in tout   # les échecs ont bien eu lieu
+    _sans_mot_de_passe(tout, mdp)
