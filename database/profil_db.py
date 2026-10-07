@@ -91,8 +91,10 @@ def sauvegarder_profil(user_id: int, donnees: dict, mode: str = "alternance") ->
         db.close()
 
 
-def ajouter_piece_jointe(user_id: int, nom: str, chemin_fichier: str, mode: str = "alternance") -> bool:
-    """Ajoute (ou remplace par nom) une pièce jointe dans le profil."""
+def ajouter_piece_jointe(user_id: int, nom: str, chemin_fichier: str, mode: str = "alternance") -> list[str]:
+    """Ajoute (ou remplace par nom) une pièce jointe dans le profil.
+    Retourne les fichiers des pièces remplacées (à supprimer du disque s'ils
+    ne sont plus référencés, cf. fichiers_references)."""
     db = SessionLocal()
     try:
         p = db.query(Profil).filter_by(user_id=user_id, mode=mode).first()
@@ -101,24 +103,39 @@ def ajouter_piece_jointe(user_id: int, nom: str, chemin_fichier: str, mode: str 
             db.add(p)
         pieces = list(p.pieces_jointes or [])
         # Remplace si une pièce du même nom existe déjà, sinon ajoute
+        remplacees = [pj.get("fichier", "") for pj in pieces if pj.get("nom") == nom]
         pieces = [pj for pj in pieces if pj.get("nom") != nom]
         pieces.append({"nom": nom, "fichier": chemin_fichier})
         p.pieces_jointes = pieces
         db.commit()
-        return True
+        return [f for f in remplacees if f and f != chemin_fichier]
     finally:
         db.close()
 
 
-def supprimer_piece_jointe(user_id: int, nom: str, mode: str = "alternance") -> bool:
-    """Retire une pièce jointe du profil (par son nom)."""
+def supprimer_piece_jointe(user_id: int, nom: str, mode: str = "alternance") -> list[str]:
+    """Retire une pièce jointe du profil (par son nom). Retourne les fichiers
+    retirés (à supprimer du disque s'ils ne sont plus référencés)."""
     db = SessionLocal()
     try:
         p = db.query(Profil).filter_by(user_id=user_id, mode=mode).first()
         if not p:
-            return False
-        p.pieces_jointes = [pj for pj in (p.pieces_jointes or []) if pj.get("nom") != nom]
+            return []
+        pieces = p.pieces_jointes or []
+        retirees = [pj.get("fichier", "") for pj in pieces if pj.get("nom") == nom]
+        p.pieces_jointes = [pj for pj in pieces if pj.get("nom") != nom]
         db.commit()
-        return True
+        return [f for f in retirees if f]
+    finally:
+        db.close()
+
+
+def fichiers_references(user_id: int) -> set[str]:
+    """Fichiers de pièces jointes encore référencés par un profil de
+    l'utilisateur, tous modes confondus (un même fichier peut servir aux deux)."""
+    db = SessionLocal()
+    try:
+        profils = db.query(Profil).filter_by(user_id=user_id).all()
+        return {pj.get("fichier", "") for p in profils for pj in (p.pieces_jointes or [])} - {""}
     finally:
         db.close()

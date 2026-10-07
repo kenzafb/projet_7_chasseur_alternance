@@ -13,7 +13,10 @@ threads avec stop_event : les fonctions métier sont synchrones.
 """
 
 import os
+import re
+import secrets
 import threading
+import unicodedata
 from datetime import datetime
 
 from shared.config import STATIC_DIR, TEMPLATES_DIR, COOKIE_SECURE, chemin_lettre_pdf, chemin_piece_jointe, secret_key
@@ -29,7 +32,8 @@ from database.models import User
 from shared.erreurs import ErreurUtilisateur, exiger_profil
 from database.candidatures_db import (lire_candidatures, lire_candidature, modifier_candidature, ajouter_candidature,
                                      lire_lettre_pdf, enregistrer_lettre_pdf)
-from database.profil_db import lire_profil, sauvegarder_profil, ajouter_piece_jointe, supprimer_piece_jointe
+from database.profil_db import (lire_profil, sauvegarder_profil, ajouter_piece_jointe, supprimer_piece_jointe,
+                                fichiers_references)
 from database.entreprises_db import calculer_stats, lire_entreprises_envoyees, modifier_statut_suivi
 from pydantic import BaseModel
 from shared.pipelines import Pipelines, RECHERCHE, SPONTANEES
@@ -159,15 +163,50 @@ def api_post_profil(request: Request, body: dict = Body(...), user: User = Depen
 
 
 # ─── Pièces jointes du profil ─────────────────────────────────────────────────
-import re as _re
-
 TAILLE_MAX_PJ = 5 * 1024 * 1024  # 5 Mo
+LONGUEUR_MAX_NOM_PJ = 60          # caractères, hors suffixe unique et extension
 
-def _nom_fichier_sur(nom: str) -> str:
-    """Nettoie un nom de fichier (anti path-traversal)."""
+
+def _base_nom_fichier(nom: str) -> str:
+    """Nom d'origine -> base sûre : sans dossier ni extension, ASCII,
+    [A-Za-z0-9_-] seulement, raccourcie (anti path-traversal)."""
     nom = nom.replace("\\", "/").split("/")[-1]
-    nom = _re.sub(r"[^A-Za-z0-9._-]", "_", nom)
-    return nom[:80] or "fichier.pdf"
+    base = re.sub(r"\.[^.]*$", "", nom)   # extension retirée (splitext garde "....pdf")
+    base = unicodedata.normalize("NFKD", base).encode("ascii", "ignore").decode()
+    base = re.sub(r"[^A-Za-z0-9_-]+", "_", base).strip("_-")
+    return base[:LONGUEUR_MAX_NOM_PJ].rstrip("_-") or "document"
+
+
+def _ecrire_piece_jointe(user_id: int, nom_origine: str, contenu: bytes) -> str:
+    """Écrit le fichier sous un nom unique (base_<hex>.pdf) dans le dossier de
+    l'utilisateur, sans jamais écraser un fichier existant. Retourne le chemin
+    relatif à UPLOADS_DIR stocké en base."""
+    base = _base_nom_fichier(nom_origine)
+    while True:
+        relatif = f"user_{user_id}/{base}_{secrets.token_hex(4)}.pdf"
+        chemin = chemin_piece_jointe(relatif)
+        chemin.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with open(chemin, "xb") as out:   # "x" : échoue si le fichier existe
+                out.write(contenu)
+            return relatif
+        except FileExistsError:
+            continue
+
+
+def _supprimer_si_orpheline(user_id: int, fichiers: list[str]):
+    """Supprime du disque les fichiers qu'aucun profil de l'utilisateur
+    (tous modes confondus) ne référence plus (bug 9)."""
+    encore_utilises = fichiers_references(user_id)
+    for relatif in fichiers:
+        chemin = chemin_piece_jointe(relatif)
+        if relatif in encore_utilises or not chemin:
+            continue
+        try:
+            os.remove(chemin)
+        except OSError:
+            pass
+
 
 @prive.post("/api/profil/upload")
 async def api_profil_upload(request: Request,
@@ -180,34 +219,21 @@ async def api_profil_upload(request: Request,
     # Si pas de nom fourni : utiliser le nom du fichier (sans extension)
     nom = (nom or "").strip()
     if not nom:
-        import os as _os
-        nom = _os.path.splitext(fichier.filename or "Document")[0]
+        nom = os.path.splitext(fichier.filename or "Document")[0]
     contenu = await fichier.read()
     if len(contenu) > TAILLE_MAX_PJ:
         return JSONResponse({"erreur": "Fichier trop volumineux (max 5 Mo)"}, status_code=400)
     # Stockage dans le dossier de l'utilisateur ; en base, chemin relatif à UPLOADS_DIR
-    nom_fichier = _nom_fichier_sur(fichier.filename)
-    relatif = f"user_{user.id}/{nom_fichier}"
-    chemin = chemin_piece_jointe(relatif)
-    chemin.parent.mkdir(parents=True, exist_ok=True)
-    with open(chemin, "wb") as out:
-        out.write(contenu)
-    ajouter_piece_jointe(user.id, nom, relatif, mode=mode_courant(request))
-    return {"ok": True, "nom": nom, "fichier": nom_fichier}
+    relatif = _ecrire_piece_jointe(user.id, fichier.filename, contenu)
+    remplacees = ajouter_piece_jointe(user.id, nom, relatif, mode=mode_courant(request))
+    _supprimer_si_orpheline(user.id, remplacees)
+    return {"ok": True, "nom": nom, "fichier": relatif.split("/", 1)[1]}
 
 @prive.post("/api/profil/piece/supprimer")
 def api_profil_piece_supprimer(request: Request, body: dict = Body(...), user: User = Depends(utilisateur_requis)):
-    nom = body.get("nom", "")
-    # Retrouve le chemin pour supprimer le fichier du disque
-    prof = lire_profil(user.id, mode=mode_courant(request))
-    for pj in prof.get("pieces_jointes", []):
-        chemin = chemin_piece_jointe(pj.get("fichier", ""))
-        if pj.get("nom") == nom and chemin:
-            try:
-                os.remove(chemin)
-            except OSError:
-                pass
-    supprimer_piece_jointe(user.id, nom, mode=mode_courant(request))
+    retirees = supprimer_piece_jointe(user.id, body.get("nom", ""), mode=mode_courant(request))
+    # Le fichier n'est effacé que si l'autre mode ne s'en sert plus
+    _supprimer_si_orpheline(user.id, retirees)
     return {"ok": True}
 
 @prive.get("/api/profil/piece")
