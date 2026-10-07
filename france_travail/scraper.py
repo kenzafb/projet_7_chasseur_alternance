@@ -2,24 +2,10 @@ import requests
 import json
 import os
 import time
-import hashlib
 from datetime import datetime
 from shared.config import DATA_DIR, FT_REGION
-
-DEPTS_IDF = {"75", "77", "78", "91", "92", "93", "94", "95"}
-
-
-def detecter_zone(lieu):
-    if not lieu:
-        return None
-    dept = lieu.split(" - ")[0].strip().lstrip("0")
-    if dept not in DEPTS_IDF:
-        return None
-    if dept == "75" or "paris" in lieu.lower():
-        return "Paris"
-    if dept in {"92", "93", "94"}:
-        return "Petite couronne"
-    return "Grande couronne"
+from shared.offres import detecter_zone, generer_id
+from shared.domaines import ft_grands_domaines
 
 
 def _fichier_vues(mode="alternance"):
@@ -39,10 +25,6 @@ def sauvegarder_offres_vues(vues, mode="alternance"):
     os.makedirs(os.path.dirname(fichier), exist_ok=True)
     with open(fichier, "w") as f:
         json.dump(list(vues), f)
-
-
-def generer_id(texte):
-    return hashlib.md5(texte.encode()).hexdigest()
 
 
 _token_cache = {"token": None, "expire": 0}
@@ -215,7 +197,7 @@ def chercher_offres(grands_domaines=None, ft_params=None, filtrer_domaines=True,
     if filtrer_domaines:
         # Mode alternance : on filtre par grand domaine (1 requête par domaine)
         if not grands_domaines:
-            grands_domaines = ["M18"]
+            grands_domaines = ft_grands_domaines([])   # domaine par défaut (M18)
         print(f"Recherche FT (IDF, domaines: {', '.join(grands_domaines)}, params: {ft_params})...\n")
         for gd in grands_domaines:
             bruts += _paginer({**base_params, "grandDomaine": gd})

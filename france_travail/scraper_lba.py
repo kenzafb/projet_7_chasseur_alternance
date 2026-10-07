@@ -1,36 +1,13 @@
 import requests
 import os
 import time
-import hashlib
 import re
 from datetime import datetime
-from shared.config import LBA_LATITUDE, LBA_LONGITUDE, LBA_RAYON_KM
+from shared.config import DEPTS_IDF, DEPTS_PETITE_COURONNE, LBA_LATITUDE, LBA_LONGITUDE, LBA_RAYON_KM
+from shared.offres import detecter_zone, generer_id
+from shared.domaines import lba_romes
 
 LBA_URL    = "https://api.apprentissage.beta.gouv.fr/api/job/v1/search"
-
-ALL_CODES_ROME_IT = [
-    "M1801","M1802","M1803","M1804","M1805","M1806","M1807","M1808","M1809","M1810",
-]
-
-DEPTS_IDF = {"75","77","78","91","92","93","94","95"}
-
-
-def generer_id(texte: str) -> str:
-    return hashlib.md5(texte.encode()).hexdigest()
-
-
-def detecter_zone(lieu: str) -> str | None:
-    if not lieu:
-        return None
-    dept = lieu.split(" - ")[0].strip().lstrip("0")
-    if dept not in DEPTS_IDF:
-        return None
-    if dept == "75" or "paris" in lieu.lower():
-        return "Paris"
-    if dept in {"92", "93", "94"}:
-        return "Petite couronne"
-    return "Grande couronne"
-
 
 def _get_headers() -> dict:
     token = os.getenv("LBA_API_KEY")
@@ -61,7 +38,7 @@ def _normaliser_offre_lba(offre: dict) -> dict | None:
         dept = code_postal[:2]
         if dept not in DEPTS_IDF:
             return None
-        zone = "Paris" if dept == "75" else ("Petite couronne" if dept in {"92","93","94"} else "Grande couronne")
+        zone = "Paris" if dept == "75" else ("Petite couronne" if dept in DEPTS_PETITE_COURONNE else "Grande couronne")
     else:
         zone = detecter_zone(address_str)
         if zone is None:
@@ -114,9 +91,9 @@ def _normaliser_offre_lba(offre: dict) -> dict | None:
 
 
 def chercher_offres_lba(codes_rome=None) -> list:
-    # Par défaut les codes IT (rétrocompat)
+    # Par défaut les codes ROME du domaine par défaut (informatique)
     if not codes_rome:
-        codes_rome = ALL_CODES_ROME_IT
+        codes_rome = lba_romes([])
     print(f"Recherche LBA (La Bonne Alternance) — {len(codes_rome)} codes ROME...")
 
     try:
