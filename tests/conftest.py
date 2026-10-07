@@ -204,6 +204,19 @@ def smtp_simule(monkeypatch, cle_chiffrement, dns):
     return serveur
 
 
+def compte_verifie(serveur, user_id, adresse, mot_de_passe=None):
+    """Enregistre un compte d'envoi Gmail vérifié pour user_id, que le faux
+    serveur `serveur` accepte. Retourne le mot de passe."""
+    from database import compte_envoi_db
+    mot_de_passe = mot_de_passe or f"mdp-de-{adresse}"
+    compte_envoi_db.enregistrer_compte(user_id, {
+        "preset": "gmail", "adresse": adresse, "nom_affiche": "", "serveur": "smtp.gmail.com",
+        "port": 465, "chiffrement": "ssl", "identifiant": adresse}, mot_de_passe)
+    compte_envoi_db.marquer_verification(user_id, True)
+    serveur.comptes[adresse] = mot_de_passe
+    return mot_de_passe
+
+
 # ─── Threads de test ──────────────────────────────────────────────────────────
 DELAI_THREADS = 10   # secondes : au-delà, un thread de test est considéré bloqué
 

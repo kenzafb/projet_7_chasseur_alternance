@@ -635,15 +635,22 @@ def api_spontanees_scraper(user: User = Depends(utilisateur_requis)):
                               "Scraping terminé !", "✅ Scraping terminé", "scraper")
 
 @prive.post("/api/spontanees/envoyer")
-def api_spontanees_envoyer(body: Envoyer, user: User = Depends(utilisateur_requis)):
+def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends(utilisateur_requis)):
     user_id = user.id
-    # Plafond de sécurité : jamais plus de 50 mails par run (réputation Gmail)
-    limite = max(1, min(int(body.limite or 10), 50))
+    mode = mode_courant(request)   # capturé avant le thread
+    # Plafond de sécurité par lancement (réputation du compte d'envoi)
+    limite = max(1, min(int(body.limite or 10), config.LIMITE_ENVOIS_PAR_LANCEMENT))
+    # Refus clair AVANT tout lancement : pas de clé (503), pas de compte ou
+    # compte jamais vérifié (400), plafond du jour déjà atteint (400)
+    compte_envoi.exiger_compte_verifie(user_id)
+    if compte_envoi_db.envois_du_jour(user_id) >= config.PLAFOND_ENVOIS_JOUR:
+        raise ErreurUtilisateur(f"Plafond de {config.PLAFOND_ENVOIS_JOUR} mails par jour atteint : "
+                                "les envois reprendront demain.")
 
     def travail(arret, log, on_progress):
         from spontanees.envoyeur import main as env_main
         env_main(limite=limite, test=body.test, stop_event=arret, log_fn=log,
-                 user_id=user_id, on_progress=on_progress)
+                 user_id=user_id, on_progress=on_progress, mode=mode)
 
     return _lancer_spontanees(user_id, "envoyer", f"Envoi en cours (limite: {limite})...",
                               f"▶ Envoi démarré — limite {limite} {'[TEST]' if body.test else ''}",

@@ -13,7 +13,7 @@ from database.dedup_db import (ajouter_emails_contactes, lire_emails_contactes,
 from database.entreprises_db import ajouter_entreprises, lire_entreprises, sauvegarder_enrichissement
 from database.models import Candidature, EmailContacte, OffreVue
 from france_travail.main import lancer_recherche
-from tests.conftest import en_parallele
+from tests.conftest import compte_verifie, en_parallele
 
 
 def _brut_ft(id_ft, titre="Développeur"):
@@ -80,14 +80,13 @@ def _entreprise_avec_email(user_id, email):
 
 
 @pytest.fixture
-def envoi_simule(monkeypatch):
-    """SMTP remplacé : enregistre (destinataires) au lieu d'envoyer."""
-    envois = []
-    monkeypatch.setattr(envoyeur, "GMAIL_SENDER", "expediteur@test.fr")
-    monkeypatch.setattr(envoyeur, "GMAIL_PASSWORD", "factice")
-    monkeypatch.setattr(envoyeur, "envoyer_mail",
-                        lambda dest, corps, pieces_jointes=None, log_fn=print: envois.append(list(dest)) or True)
-    return envois
+def envoi_simule(a_et_b, smtp_simule):
+    """SMTP simulé, chacun son compte vérifié. Retourne une fonction qui
+    donne les destinataires de chaque mail envoyé."""
+    id_a, id_b = a_et_b
+    compte_verifie(smtp_simule, id_a, "a@gmail.com")
+    compte_verifie(smtp_simule, id_b, "b@gmail.com")
+    return lambda: [to for _, _, to, _ in smtp_simule.messages]
 
 
 def test_adresse_contactee_par_a_ne_bloque_pas_b(a_et_b, envoi_simule):
@@ -97,11 +96,11 @@ def test_adresse_contactee_par_a_ne_bloque_pas_b(a_et_b, envoi_simule):
     _entreprise_avec_email(id_b, "rh@acme.fr")
 
     envoyeur.main(id_a, limite=5)
-    assert envoi_simule == []   # A l'a déjà contactée
+    assert envoi_simule() == []   # A l'a déjà contactée
     assert lire_entreprises(id_a)[0]["mail_note"].startswith("skip")
 
     envoyeur.main(id_b, limite=5)
-    assert envoi_simule == [["rh@acme.fr"]]
+    assert envoi_simule() == [["rh@acme.fr"]]
     assert lire_emails_contactes(id_b) == {"rh@acme.fr"}
     assert lire_emails_contactes(id_a) == {"rh@acme.fr"}
 

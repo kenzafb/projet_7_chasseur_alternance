@@ -8,6 +8,17 @@ Depuis l'application (main.py) :
 CLI (--user obligatoire) :
   python -m spontanees.envoyeur --user 1 --limite 10 --test
 
+Compte d'envoi : uniquement celui de l'utilisateur qui lance le pipeline
+(table comptes_envoi), configuré ET vérifié, sinon rien ne part. Aucun
+compte commun dans le .env.
+
+Garde-fous :
+  - limite par lancement (paramètre limite) ;
+  - plafond par utilisateur et par jour (PLAFOND_ENVOIS_JOUR), tous
+    lancements et mails de test confondus : arrêt propre en l'atteignant ;
+  - identifiants refusés ou serveur injoignable : arrêt immédiat
+    (EnvoiInterrompu), sans essayer les entreprises suivantes.
+
 Système de déduplication (par utilisateur, en base) :
   - Au démarrage : charge les adresses déjà contactées par CET utilisateur
     (table emails_contactes) + les destinataires enregistrés sur ses
@@ -18,24 +29,20 @@ Système de déduplication (par utilisateur, en base) :
     le mail est envoyé uniquement à l'autre
 """
 
-import os
 import time
 import random
-import smtplib
 import argparse
 from database.dates import maintenant_utc
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
+from shared import config, smtp
 from shared.config import chemin_piece_jointe
+from shared.chiffrement import ChiffrementIndisponible
+from shared.compte_envoi import exiger_compte_verifie
+from shared.erreurs import ErreurUtilisateur
+from database.compte_envoi_db import liberer_envoi, marquer_verification, reserver_envoi
 from database.dedup_db import ajouter_emails_contactes, lire_emails_contactes, normaliser_email
 
-GMAIL_SENDER      = os.getenv("GMAIL_SENDER", "")
-GMAIL_PASSWORD    = os.getenv("GMAIL_APP_PASSWORD", "")
-
 SUJET_FIXE        = "Candidature spontanée en alternance"
-LIMITE_PAR_RUN    = 50
+LIMITE_PAR_RUN    = config.LIMITE_ENVOIS_PAR_LANCEMENT
 PAUSE_ENTRE_MAILS = (30, 90)
 SAUVEGARDE_TOUS   = 10
 
@@ -70,27 +77,14 @@ def sauvegarder_json(user_id, data):
 
 # ─── Envoi mail ───────────────────────────────────────────────────────────────
 
-def joindre_pdf(msg, path, filename):
-    try:
-        with open(path, "rb") as f:
-            part = MIMEBase("application", "pdf")
-            part.set_payload(f.read())
-        encoders.encode_base64(part)
-        part.add_header("Content-Disposition", "attachment", filename=filename)
-        msg.attach(part)
-        return True
-    except FileNotFoundError:
-        return False
+class EnvoiInterrompu(Exception):
+    """Arrêt du pipeline sur un problème de compte (identifiants refusés,
+    serveur injoignable) : message sûr, sans mot de passe."""
 
 
-def envoyer_mail(destinataires: list[str], corps: str, pieces_jointes=None, log_fn=print) -> bool:
-    msg = MIMEMultipart()
-    msg["From"]    = GMAIL_SENDER
-    msg["To"]      = ", ".join(destinataires)
-    msg["Subject"] = SUJET_FIXE
-    msg.attach(MIMEText(corps, "plain", "utf-8"))
-
-    # Joindre les pièces jointes du profil de l'utilisateur
+def charger_pieces_jointes(pieces_jointes, log_fn=print) -> list[tuple[str, bytes]]:
+    """Pièces jointes du profil lues une fois : [(nom affiché, octets)]."""
+    pieces = []
     for pj in (pieces_jointes or []):
         chemin = chemin_piece_jointe(pj.get("fichier", ""))
         if not chemin or not chemin.is_file():
@@ -98,37 +92,40 @@ def envoyer_mail(destinataires: list[str], corps: str, pieces_jointes=None, log_
             continue
         base = (pj.get("nom", "document") or "document").strip().replace(" ", "_")
         nom_affiche = base if base.lower().endswith(".pdf") else base + ".pdf"
-        joindre_pdf(msg, chemin, nom_affiche)
+        pieces.append((nom_affiche, chemin.read_bytes()))
+    return pieces
 
-    try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-            server.login(GMAIL_SENDER, GMAIL_PASSWORD)
-            server.sendmail(GMAIL_SENDER, destinataires, msg.as_string())
-        return True
-    except Exception as e:
-        log_fn(f"    [❌] Erreur SMTP : {e}")
-        return False
+
+def envoyer_mail(compte: dict, destinataires: list[str], objet: str, corps: str, pieces=()):
+    """Envoie un mail avec le compte de l'utilisateur. Lève smtp.ErreurSmtp."""
+    message = smtp.construire_message(compte, destinataires, objet, corps, pieces)
+    smtp.envoyer_message(compte, message, destinataires)
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=None, on_progress=None, mode="alternance"):
+    """Envoie les candidatures spontanées de l'utilisateur avec SON compte.
+    Retourne {"envoyes", "echecs", "arret"} ; arret vaut None (file vidée),
+    "limite", "plafond" ou "stop". Lève EnvoiInterrompu sur un problème
+    de compte, ErreurUtilisateur ou ChiffrementIndisponible avant tout envoi."""
     _log = log_fn or print
+    plafond = config.PLAFOND_ENVOIS_JOUR
 
-    _log(f"Envoyeur | limite={limite} | test={test}")
+    _log(f"Envoyeur | limite={limite} | plafond du jour={plafond} | test={test}")
+
+    # Compte d'envoi de CET utilisateur, configuré et vérifié (sinon : erreur)
+    compte = exiger_compte_verifie(user_id)
+    _log(f"Compte d'envoi : {compte['adresse']}")
 
     # Profil de l'utilisateur : son mail type (fallback sur MAIL_TEMPLATE)
     from database.profil_db import lire_profil
     _profil = lire_profil(user_id, mode=mode)
     corps_mail = (_profil.get("email_type") or "").strip() or MAIL_TEMPLATE
-    pieces_profil = _profil.get("pieces_jointes", [])
+    objet_mail = SUJET_FIXE
+    pieces = charger_pieces_jointes(_profil.get("pieces_jointes", []), log_fn=_log)
 
-    if not GMAIL_PASSWORD:
-        _log("❌ GMAIL_APP_PASSWORD manquant dans .env")
-        return
-    if not GMAIL_SENDER:
-        _log("❌ GMAIL_SENDER manquant dans .env")
-        return
+    bilan = {"envoyes": 0, "echecs": 0, "arret": None}
 
     entreprises = charger_json(user_id)
 
@@ -157,20 +154,25 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
 
     if not a_envoyer:
         _log("✅ Rien à envoyer.")
-        return
+        return bilan
 
     envoyes = 0
     echecs  = 0
     traites = 0
 
+    def bilan_final(arret):
+        bilan.update(envoyes=envoyes, echecs=echecs, arret=arret)
+        return bilan
+
     for e in entreprises:
         if stop_event and stop_event.is_set():
             _log("⏹️  Arrêt — sauvegarde en cours...")
             sauvegarder_json(user_id, entreprises)
-            return
+            return bilan_final("stop")
 
         if envoyes >= limite:
             _log(f"⏹️  Limite de {limite} mails atteinte.")
+            bilan["arret"] = "limite"
             break
 
         if not e.get("emails_trouves") or e.get("mail_envoye"):
@@ -202,13 +204,37 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
         if nb_ignores > 0:
             _log(f"  ℹ️  {nb_ignores} email(s) ignoré(s) (déjà contactés)")
 
-        destinataires = [GMAIL_SENDER] if test else emails_nouveaux
+        destinataires = [compte["adresse"]] if test else emails_nouveaux
+
+        # Plafond quotidien : réservé avant l'envoi, rendu si le mail ne part pas
+        jour = reserver_envoi(user_id, plafond)
+        if jour is None:
+            _log(f"⏹️  Plafond de {plafond} mails par jour atteint : arrêt, "
+                 "les envois reprendront demain.")
+            bilan["arret"] = "plafond"
+            break
 
         idx   = deja_envoyes + traites + 1
         total = deja_envoyes + len(a_envoyer)
         _log(f"[{idx}/{total}] {nom} → {', '.join(destinataires)}")
 
-        ok = envoyer_mail(destinataires, corps_mail, pieces_jointes=pieces_profil, log_fn=_log)
+        try:
+            envoyer_mail(compte, destinataires, objet_mail, corps_mail, pieces)
+            ok = True
+        except smtp.ErreurSmtp as erreur:
+            liberer_envoi(user_id, jour)
+            if erreur.categorie != smtp.MESSAGE:
+                # Problème de compte ou de serveur : inutile d'essayer les suivantes
+                if erreur.categorie == smtp.AUTH:
+                    marquer_verification(user_id, False)
+                sauvegarder_json(user_id, entreprises)
+                bilan_final("erreur")
+                conseil = (" Vérifie le compte d'envoi dans ton profil, puis relance "
+                           "« Tester la connexion »." if erreur.categorie == smtp.AUTH else "")
+                _log(f"⏹️  Envoi arrêté après {envoyes} mail(s) : problème de compte ou de serveur.")
+                raise EnvoiInterrompu(f"{erreur}{conseil}") from None
+            _log(f"    [❌] {erreur}")
+            ok = False
 
         if ok:
             _log(f"  ✅ Envoyé à {len(destinataires)} adresse(s)")
@@ -247,6 +273,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
     sauvegarder_json(user_id, entreprises)
     _log(f"✅ Envoi terminé — {envoyes} envoyés, {echecs} échecs")
     _log(f"   Emails dans la base de dédup : {len(emails_deja_envoyes)}")
+    return bilan_final(bilan["arret"])
 
 
 if __name__ == "__main__":
@@ -256,4 +283,7 @@ if __name__ == "__main__":
     parser.add_argument("--user",   type=int, required=True,
                         help="ID de l'utilisateur pour lequel envoyer")
     args = parser.parse_args()
-    main(limite=args.limite, test=args.test, user_id=args.user)
+    try:
+        main(limite=args.limite, test=args.test, user_id=args.user)
+    except (ErreurUtilisateur, ChiffrementIndisponible, EnvoiInterrompu) as e:
+        raise SystemExit(f"❌ {e}")

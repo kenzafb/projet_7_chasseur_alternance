@@ -36,6 +36,7 @@ Dans `.env` :
 - `SECRET_KEY` est obligatoire (32 caractères minimum, l'application refuse de démarrer sinon) : `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
 - `DATABASE_URL` désigne la base. Pour un fichier SQLite, chemin absolu avec quatre barres obliques : `DATABASE_URL=sqlite:////home/moi/chasseur_alternance/data/chasseur_v2.db`. Vide ou absente : `data/chasseur.db`, l'ancienne base, que la nouvelle version ne sait pas lire.
 - `CODE_INVITATION` ouvre l'inscription : sans lui, `/register` est fermé. `COOKIE_SECURE=true` en production derrière HTTPS.
+- `CLE_CHIFFREMENT` chiffre les mots de passe SMTP des comptes d'envoi : `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Sans elle, l'application démarre mais l'envoi de mails est désactivé. La changer rend illisibles les mots de passe déjà enregistrés (chacun devra ressaisir le sien). `PLAFOND_ENVOIS_JOUR` (50 par défaut) borne les mails envoyés par utilisateur et par jour.
 
 Puis créer la base (ou la mettre à jour après un `git pull`) :
 
@@ -70,7 +71,7 @@ uvicorn main:app --reload --port 5002
 
 Puis http://localhost:5002 (redirige vers `/login`, inscription sur `/register` avec le code d'invitation). Documentation de l'API, une fois connecté : http://localhost:5002/docs.
 
-L'envoi des candidatures spontanées existe aussi en ligne de commande :
+Chaque utilisateur envoie ses candidatures spontanées depuis son propre compte, configuré dans Profil, section Compte d'envoi (Gmail avec un mot de passe d'application, ou un autre serveur SMTP sur le port 465 ou 587), puis vérifié par « Tester la connexion ». Sans compte vérifié, l'envoi est refusé. L'envoi existe aussi en ligne de commande, avec le compte de l'utilisateur désigné :
 
 ```bash
 python -m spontanees.envoyeur --user 1 --limite 10 --test
