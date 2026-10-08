@@ -79,6 +79,12 @@ python -m spontanees.envoyeur --user 1 --limite 10 --test
 
 `--user` (identifiant du compte) est obligatoire pour les trois scripts : `spontanees.fetch_entreprises`, `spontanees.scraper_emails` et `spontanees.envoyeur`.
 
+**Mode test.** Une case du compte d'envoi redirige toutes les candidatures spontanées vers l'adresse d'expédition de l'utilisateur, le vrai destinataire dans l'objet (`[TEST → rh@entreprise.fr] ...`) ; rien n'est enregistré comme contacté ni marqué envoyé. Un bandeau le signale sur la page Spontanées, et les logs du pipeline le répètent à chaque mail. `--test` en ligne de commande a le même effet pour un lancement.
+
+**Limites par lancement**, réglées dans l'interface au moment de lancer, bornées par le serveur (`LIMITES_LANCEMENT` dans `shared/config.py`) : offres analysées par Mistral (30 par défaut, 200 au plus, France Travail et LBA ensemble), nouvelles entreprises récupérées (200, 5000), entreprises scrapées (20, 200), mails envoyés (10, 50).
+
+Procédure de test réel de bout en bout : `docs/RECETTE.md`. Décisions prises hors du code : `docs/DECISIONS.md`.
+
 ## Tests
 
 ```bash

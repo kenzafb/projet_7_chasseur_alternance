@@ -330,8 +330,9 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
                 time.sleep(pause)
 
     sauvegarder_json(user_id, entreprises)
-    _log(f"✅ Envoi terminé — {envoyes} envoyés, {echecs} échecs"
-         + (" (🧪 mode test : tous vers l'adresse d'expédition, rien enregistré)" if test else ""))
+    _log(f"✅ Envoi terminé — {envoyes} envoyés, {echecs} échecs")
+    if test:
+        _log("🧪 Mode test : tous les mails sont partis vers l'adresse d'expédition, rien n'est enregistré.")
     _log(f"   Emails dans la base de dédup : {len(emails_deja_envoyes)}")
     return bilan_final(bilan["arret"])
 

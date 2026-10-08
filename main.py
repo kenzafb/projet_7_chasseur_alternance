@@ -432,11 +432,11 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
                 ajouter_candidature(user_id, offre, mode=mode)
 
             etat(message="Recherche France Travail...")
-            log(f"🔍 Recherche France Travail démarrée — {max_analyses} offres analysées au plus")
+            log(f"🔍 Recherche France Travail démarrée (au plus {max_analyses} offres analysées)")
             analysees = lancer_recherche(user_id, profil, analyser=True, max_analyse=max_analyses,
                                          on_offre=ecrire_en_base, mode=mode) or []
             reste = max_analyses - len(analysees)
-            log(f"✅ France Travail terminé — {len(analysees)} offres analysées")
+            log(f"✅ France Travail terminé : {len(analysees)} offres analysées")
 
             if "lba" in cfg_mode["sources"] and reste <= 0:
                 log(f"ℹ️  LBA ignorée : limite de {max_analyses} offres analysées atteinte")
@@ -699,7 +699,7 @@ def api_spontanees_fetch(body: Fetch | None = None, user: User = Depends(utilisa
 
     return _avec_limite(_lancer_spontanees(
         user_id, "fetch", "Récupération des entreprises en Île-de-France...",
-        f"▶ Fetch entreprises démarré — {maximum} nouvelles entreprises au plus", travail,
+        f"▶ Fetch entreprises démarré (au plus {maximum} nouvelles entreprises)", travail,
         "Fetch terminé !", "✅ Fetch terminé", "fetch"), max_entreprises=maximum)
 
 @prive.post("/api/spontanees/scraper")
@@ -714,7 +714,7 @@ def api_spontanees_scraper(body: Scraper | None = None, user: User = Depends(uti
 
     return _avec_limite(_lancer_spontanees(
         user_id, "scraper", "Scraping des emails...",
-        f"▶ Scraper emails démarré — {maximum} entreprises au plus", travail,
+        f"▶ Scraper emails démarré (au plus {maximum} entreprises)", travail,
         "Scraping terminé !", "✅ Scraping terminé", "scraper"), max_scrapees=maximum)
 
 @prive.post("/api/spontanees/envoyer")
@@ -733,10 +733,10 @@ def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends
     test = bool(body.test or compte["mode_test"])
     if test:
         message = f"🧪 MODE TEST : envoi vers {compte['adresse']} (limite : {limite})..."
-        debut = f"▶ Envoi démarré — limite {limite} — 🧪 MODE TEST, tout part vers {compte['adresse']}"
+        debut = f"▶ Envoi démarré, limite {limite}. 🧪 MODE TEST : tout part vers {compte['adresse']}"
     else:
         message = f"Envoi en cours (limite : {limite})..."
-        debut = f"▶ Envoi démarré — limite {limite}"
+        debut = f"▶ Envoi démarré, limite {limite}"
 
     def travail(arret, log, on_progress):
         from spontanees.envoyeur import main as env_main
