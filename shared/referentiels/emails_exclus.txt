@@ -1,0 +1,100 @@
+# Adresses email techniques ou factices, jamais enregistrées (décision D47).
+# Une règle par ligne, casse ignorée ; tout ce qui suit un # est un commentaire.
+#
+#   @domaine.fr       toute adresse de ce domaine ET de ses sous-domaines
+#                     (@sentry.io écarte x@o45.ingest.us.sentry.io)
+#   local@            cette partie locale, quel que soit le domaine
+#                     (votre@ écarte votre@societe.fr)
+#   local@domaine.fr  cette adresse exactement
+#
+# Essai réel du 9 octobre 2026 : une adresse de suivi d'erreurs
+# (…@o4506196830715904.ingest.us.sentry.io) et votre@email.com retenues.
+
+# ── Services techniques (suivi d'erreurs, hébergeurs, gabarits de site) ─────
+@sentry.io
+@sentry-next.wixpress.com
+@wixpress.com
+@ingest.sentry.io
+@bugsnag.com
+@raygun.io
+@rollbar.com
+@trackjs.com
+@logrocket.com
+@datadoghq.com
+@newrelic.com
+@hotjar.com
+@sentry.wixpress.com
+@w3.org
+@schema.org
+@cloudflare.com
+@godaddy.com
+@squarespace.com
+@jimdo.com
+@webflow.io
+@shopify.com
+@mailchimp.com
+@sendgrid.net
+@mandrillapp.com
+
+# ── Domaines réservés aux exemples ou de remplissage ──────────────────────────
+@example.com
+@example.org
+@example.net
+@example.fr
+@exemple.com
+@exemple.fr
+@domain.com
+@domaine.com
+@domaine.fr
+@mondomaine.fr
+@mondomaine.com
+@votredomaine.fr
+@votredomaine.com
+@yourdomain.com
+@mydomain.com
+@monsite.fr
+@monsite.com
+@votresite.fr
+@votresite.com
+@test.com
+@test.fr
+@email.tld
+@domain.tld
+
+# ── Parties locales de formulaire ou d'exemple ────────────────────────────────
+votre@
+vous@
+your@
+you@
+nom@
+prenom@
+prenom.nom@
+nom.prenom@
+name@
+firstname@
+firstname.lastname@
+first.last@
+jean.dupont@
+john.doe@
+jane.doe@
+email@
+votre.email@
+votreemail@
+youremail@
+your.email@
+user@
+utilisateur@
+username@
+exemple@
+example@
+xxx@
+xx@
+test@
+adresse@
+monadresse@
+votreadresse@
+
+# ── Adresses exactes vues dans des formulaires ────────────────────────────────
+votre@email.com
+email@exemple.fr
+nom@domaine.fr

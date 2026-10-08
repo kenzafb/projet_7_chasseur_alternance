@@ -55,6 +55,12 @@ def test_sirene_note_sa_source_sur_une_entreprise_lba(utilisateur):
     assert [e["sources"] for e in lire_entreprises(uid)] == [["lba", "sirene"], ["lba"]]
 
 
+def test_email_lba_factice_ecarte(utilisateur):
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    b = ajouter_entreprises_lba(uid, [_norm(1, email="votre@email.com")])
+    assert b["avec_email"] == 0 and lire_entreprises(uid)[0]["emails_trouves"] == []
+
+
 def test_limite_d_entreprises_lba(utilisateur):
     _, uid = utilisateur("a@test.fr", prenom="Alice")
     b = ajouter_entreprises_lba(uid, [_norm(i) for i in range(5)], maximum=2)

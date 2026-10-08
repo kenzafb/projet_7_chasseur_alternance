@@ -13,6 +13,7 @@ from database.dates import JOUR_HEURE, depuis_base, en_texte, maintenant_utc, ve
 
 _TRES_ANCIEN = datetime.min.replace(tzinfo=timezone.utc)
 from database.models import Entreprise
+from shared.emails_exclus import email_exclu, filtrer as filtrer_emails_exclus
 
 
 LONGUEUR_CONTACT_RH = 200   # taille de la colonne entreprises.contact_rh
@@ -286,7 +287,8 @@ def sauvegarder_enrichissement(user_id: int, liste: list[dict]):
             if not e:
                 continue
             if "emails_trouves" in d:
-                e.emails_trouves = d["emails_trouves"] or []
+                # Dernier rempart : aucune adresse technique ou factice enregistrée (D47)
+                e.emails_trouves = filtrer_emails_exclus(d["emails_trouves"])
             if "telephones" in d:
                 e.telephones = d["telephones"] or []
             if "site_web" in d:
@@ -415,6 +417,7 @@ def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None
         for d in liste:
             infos_lba = {k: d.get(k, "") for k in ("identifiant", "candidature_id", "candidature_url", "libelle_naf")}
             email = d.get("email") or ""
+            email = "" if email_exclu(email) else email
             e = (par_siret.get(d["siret"]) if d.get("siret") else None) or \
                 (par_identifiant.get(infos_lba["identifiant"]) if infos_lba["identifiant"] else None)
             if e is not None:

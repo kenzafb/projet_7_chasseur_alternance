@@ -25,6 +25,8 @@ import random
 from urllib.parse import urljoin, urlparse
 
 import requests
+
+from shared.emails_exclus import email_exclu
 from bs4 import BeautifulSoup
 from ddgs import DDGS
 from ddgs.exceptions import RatelimitException
@@ -249,6 +251,10 @@ def est_email_valide(email):
         return False
     domaine = email.split("@")[-1]
     if domaine in DOMAINES_IGNORES or est_annuaire(domaine):
+        return False
+    # Adresses techniques ou factices (shared/referentiels/emails_exclus.txt)
+    if email_exclu(email):
+        dbg(f"Adresse technique ou factice écartée : {email}")
         return False
     if any(x in email for x in ["noreply", "no-reply", "donotreply", "bounce",
                                   "postmaster", "mailer", "daemon", "abuse"]):
