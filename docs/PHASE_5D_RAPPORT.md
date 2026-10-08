@@ -93,3 +93,23 @@ API simulée `tests/faux_sirene.py` : établissements filtrés par le sous-ensem
 6. **Dédoublonnage par SIREN** en plus du SIRET, pour ne pas garder un établissement LBA et le siège Sirene de la même entreprise.
 7. **Division entière en NAF 2025** : toutes les cibles officielles de ses sous-classes, qui peuvent sortir de la division (la division 68 amène 55.90Y par 68.20A).
 8. **Départements pour les entreprises LBA** : le choix du profil ne s'applique qu'à Sirene ; LBA cherche toujours dans toute l'Île-de-France.
+
+## Suite : vérification de l'API et points tranchés
+
+Décisions D54 à D62 de `docs/DECISIONS.md`. Points 1, 2 et 5 validés tels quels ; 3, 4, 6, 7 et 8 mis en œuvre :
+- **D54.** Valeurs du script reportées : 120 codes NAF et 8 départements par requête (M18 sans taille : 2 recherches au lieu de 192), variable NAF 2025 vérifiée, syntaxe d'absence de tranche, pagination toujours par curseur (`debut` plafonné à 10000).
+- **D55, D56.** NN est une unité non employeuse (documentation des variables Sirene), pas un effectif inconnu : nouvelle taille « Sans salarié » (alternance), non cochée, gardée seulement si elle est cochée ; « 0-0 » de LBA rangé avec elle ; effectif inconnu : tranche absente.
+- **D57.** Division en NAF 2025 : cible hors division gardée seulement si l'ancien code n'en a qu'une.
+- **D58.** Départements du profil appliqués aux entreprises LBA.
+- **D59.** Dédoublonnage par SIREN, dans les deux sens (LBA puis Sirene, Sirene puis LBA).
+- **D60.** Migration 0010 : profils d'alternance existants sans choix pré-cochés avec l'ancien réglage (10 salariés et plus ; 75, 92, 93, 94). Elle touche aussi le filtre de taille des offres France Travail en alternance, même champ.
+- **D62.** Nettoyage des adresses exclues déjà en base, à lancer :
+
+```bash
+venv/bin/python scripts/nettoyer_emails_exclus.py              # liste seulement
+venv/bin/python scripts/nettoyer_emails_exclus.py --appliquer  # écrit en base
+```
+
+Avant la recette : `venv/bin/alembic upgrade head` (migrations 0008 à 0010). Tests : 659 passed.
+
+Point d'interprétation : « non cochée par défaut » est lu comme « gardée seulement si cochée ». Rien de coché veut donc dire toutes les tailles sauf « sans salarié » ; sans cela, 85 % des résultats Sirene seraient des unités non employeuses.

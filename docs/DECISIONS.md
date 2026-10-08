@@ -212,8 +212,9 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 1 et 2), validées par l'humai
 - **Étape « Récupérer ».** LBA a droit à la moitié de la limite de nouvelles entreprises (arrondie au-dessus), Sirene au reste, plus ce que LBA n'a pas utilisé.
 - **Migration.** Les entreprises existantes reçoivent leur source d'avant ; celles passées de Sirene à « lba » sous D41 ne gardent que « lba ».
 
-### D45. Effectif LBA « 0-0 » : inconnu
+### D45. Effectif LBA « 0-0 » : inconnu (remplacée par D56)
 - **Décision.** « 0-0 » (`parametres_lba.TAILLES_INCONNUES`) est traité comme un effectif inconnu : l'entreprise est gardée ou écartée selon l'option « inclure les effectifs inconnus » du profil.
+- **Remplacée** par D56 : « 0-0 » est zéro salarié.
 
 ### D46. La recherche d'offres n'ajoute aucune entreprise
 - **Décision.** Seule l'étape « Récupérer » des spontanées ajoute des entreprises LBA, avec sa limite. La recherche d'offres ignore les entreprises à fort potentiel (ni lues, ni redécoupées, ni signalées).
@@ -238,7 +239,7 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 4 et 7), validées par l'humai
 - **Décision.** `shared.config.nomenclature_naf()` vaut `NAFRev2` jusqu'au 31 décembre 2026 et `NAF2025` à partir du 1er janvier 2027 (jour de Paris), relue à chaque recherche ; `NOMENCLATURE_NAF` du `.env` force l'une ou l'autre. Tant que le nom de la variable NAF 2025 de l'API n'est pas vérifié, une recherche en NAF 2025 se fait en NAF rév. 2, avec un message.
 
 ### D51. Filtres Sirene du profil (remplace D29 pour Sirene)
-- **Tailles.** Celles du profil (communes avec France Travail et LBA), converties en tranches INSEE de l'unité légale (spec 4.2) ; option « effectifs inconnus » (tranche NN). Le « au moins 10 salariés » écrit en dur disparaît.
+- **Tailles.** Celles du profil (communes avec France Travail et LBA), converties en tranches INSEE de l'unité légale (spec 4.2). Le « au moins 10 salariés » écrit en dur disparaît. NN et « effectifs inconnus » : corrigé par D55 ; profils existants : D60.
 - **Départements.** Nouveau champ du profil d'alternance, choix multiple parmi les 8 départements d'Île-de-France ; remplace `SIRENE_DEPARTEMENTS`.
 - **Secteurs.** Profil indifférent ou domaine sans correspondance : les secteurs choisis dans le profil (divisions NAF, le même champ que le filtre « secteur de l'employeur » de France Travail) sont cherchés, toutes leurs sous-classes. Plus de défaut « informatique » ; sans domaine couvert ni secteur, Sirene n'est pas interrogé, avec un message au lancement.
 - **Sièges actifs**, pagination par curseur, requêtes et durée dans les logs.
@@ -250,3 +251,37 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 4 et 7), validées par l'humai
 - **Décision.** Variables de la requête, nombre de codes NAF et de départements par requête, syntaxe des unités sans tranche, taille de page et pauses sont lus dans `spontanees/parametres_sirene.py`, et nulle part ailleurs. `scripts/verifier_sirene.py`, lancé par l'humain, affiche les valeurs à y reporter.
 - **En attendant.** Valeurs prudentes : un code NAF et un département par requête (comme avant), tranche « NN » seulement pour les inconnus, variable NAF 2025 inconnue.
 - **À reconsidérer** dès que le script a tourné.
+
+## Phase 5d, résultats de la vérification et points tranchés (9 octobre 2026)
+
+`scripts/verifier_sirene.py` lancé par l'humain le 9 octobre 2026 (57 requêtes), détail dans `docs/referentiels/insee/verification_api.json`.
+
+### D54. Valeurs de `parametres_sirene.py` vérifiées
+- **Décision.** `NAF_PAR_REQUETE` 120 (OU exact sur 2 et 10 codes, 120 acceptés, 250 refusés en 414), `DEPARTEMENTS_PAR_REQUETE` 8 (OU exact), variable NAF 2025 `activitePrincipaleNAF25UniteLegale` (filtre, remplie dans toutes les réponses dès 2026 ; les autres noms essayés sont refusés). Absence de tranche : `-trancheEffectifsUniteLegale:*` acceptée (aucun résultat : les 19717 unités de la référence ont une tranche). Pagination toujours par curseur : `debut` est plafonné à 10000. La catégorie n'existe que sur l'unité légale.
+
+### D55. NN : « sans salarié », distinct de « moins de 10 » (corrige D51)
+- **Constat.** 857 sièges sur 1000 (Paris, 62.01Z) ont la tranche NN. Documentation des variables Sirene : « NN : Unité non employeuse (pas de salarié au cours de l'année de référence et pas d'effectif au 31/12) », distincte de 00 (salariés dans l'année, aucun au 31 décembre).
+- **Décision.** Nouvelle taille « Sans salarié » (tranche NN), avec la mention « freelances, micro-entreprises, quasiment jamais d'alternant », proposée en alternance seulement. Elle n'est gardée que si elle est cochée : rien de coché veut dire toutes les tailles sauf elle. « Effectif inconnu » ne concerne plus que l'absence de tranche.
+
+### D56. LBA « 0-0 » : sans salarié (remplace D45)
+- **Constat.** LBA écrit les bornes de la tranche INSEE (« 6-9 » pour la tranche 03) ; « 0-0 » est donc zéro salarié. Les données versées ne comptent que 2 entreprises LBA (une « 0-0 », une « 6-9 ») : la lecture vient du format, pas d'un comptage.
+- **Décision.** « 0-0 » (`parametres_lba.TAILLES_SANS_SALARIE`) est rangé en « sans salarié » ; effectif inconnu : taille absente.
+
+### D57. Division en NAF 2025 : cible hors division seulement si unique
+- **Décision.** Pour un secteur choisi (division rév. 2), une cible NAF 2025 hors de la division n'est gardée que si l'ancien code n'a qu'une cible (68.20A vers 55.90Y écarté ; 41.10A vers 68.12Y gardé).
+
+### D58. Départements du profil appliqués aux entreprises LBA
+- **Décision.** Le choix de départements des candidatures spontanées s'applique aussi aux entreprises à fort potentiel de LBA, d'après leur code postal.
+
+### D59. Dédoublonnage par SIREN en plus du SIRET
+- **Décision.** Un autre établissement d'une entreprise déjà en base (même SIREN), qu'il vienne de LBA ou de Sirene, n'est pas ajouté ; la source est notée sur l'entreprise existante. Complète D52.
+
+### D60. Profils existants : ancien réglage de Sirene pré-coché
+- **Décision.** Aucune taille cochée : toutes (sauf « sans salarié », D55) ; aucun département coché : les 8. Les profils d'alternance existants sans choix reçoivent l'ancien réglage par la migration 0010 : 10 salariés et plus, départements 75, 92, 93, 94.
+- **Conséquence.** Les tailles servent aussi au filtre des offres France Travail en alternance (D25) : ces profils ne gardent plus que les offres de 10 salariés et plus (et celles sans information si l'option est cochée).
+
+### D61. Correspondance NAF et secteurs : validés
+- **Décision.** Validés tels quels : cibles NAF 2025 des correspondances multiples (60.20H, 26.40Y, 55.90Y écartées), cibles uniques qui élargissent (46.50Y, 95.10Y, 71.12Y, 68.12Y), secteurs choisis utilisés seulement pour l'indifférent et les domaines sans correspondance.
+
+### D62. Nettoyage des adresses exclues déjà en base : par l'humain
+- **Décision.** `scripts/nettoyer_emails_exclus.py` applique les règles de D47 aux entreprises déjà en base (liste seulement, `--appliquer` pour écrire). Lancé par l'humain.
