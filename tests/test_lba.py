@@ -39,7 +39,8 @@ def api(monkeypatch):
 
 def profil(domaines=("M18",), niveau="", tailles=(), inconnue=True):
     return {"niveau_vise": niveau,
-            "recherche": {"domaines": list(domaines), "tailles": list(tailles), "taille_inconnue": inconnue}}
+            "recherche": {"domaines": list(domaines), "tailles_spontanees": list(tailles),
+                          "taille_inconnue_spontanees": inconnue}}
 
 
 def autour(n, cote_km=6.0, centre=PARIS):

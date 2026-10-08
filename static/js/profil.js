@@ -257,8 +257,10 @@ function lireDomainesCoches(selecteur = "[data-domaines-choix]") {
   return [...lettres, ...domaines];
 }
 
-/* ── Options de recherche : taille, thèmes (job), secteurs employeur ──────
-   Rien de coché : aucun filtre. Taille filtrée après récupération des offres. */
+/* ── Options de recherche : taille des offres, taille des candidatures
+   spontanées (alternance, réglage distinct, D63), thèmes (job), départements,
+   secteurs employeur. Rien de coché : aucun filtre (spontanées : tout sauf
+   « sans salarié »). Taille des offres filtrée après récupération. */
 async function rendreOptions(rech, mode) {
   const c = document.querySelector(`[data-options-recherche="${mode}"]`);
   if (!c) return;
@@ -266,6 +268,7 @@ async function rendreOptions(rech, mode) {
   try { o = await api.criteresOptions(); } catch (_) { c.innerHTML = ""; return; }
   const tailles = new Set(rech.tailles || []), secteurs = new Set(rech.secteurs || []);
   const themes = new Set(rech.themes || []), departements = new Set(rech.departements || []);
+  const taillesSp = new Set(rech.tailles_spontanees || []);
   const caseOption = (attribut, valeur, libelle, coche, extra = "") => `
     <label class="domaine-case domaine-case--petit">
       <input type="checkbox" value="${esc(valeur)}" ${attribut} ${coche ? "checked" : ""}>
@@ -273,18 +276,31 @@ async function rendreOptions(rech, mode) {
     </label>`;
   c.innerHTML = `
     <div class="options-bloc">
-      <span class="field__label">Taille de l'entreprise</span>
-      <p class="profil-card__sub" style="margin:4px 0 10px;">Rien de coché : toutes les tailles${mode === "alternance" ? " sauf « sans salarié »" : ""}. France Travail indique en général l'effectif de l'établissement qui recrute${mode === "alternance" ? " ; pour les candidatures spontanées, c'est l'effectif de l'entreprise entière (Sirene, La Bonne Alternance)" : ""}.</p>
-      <div class="domaines-choix">${o.tailles.filter(t => mode === "alternance" || t.cle !== "sans_salarie").map(t => caseOption("data-taille-case", t.cle, t.libelle, tailles.has(t.cle),
-        t.avertissement && mode === "alternance" ? ` <small class="options-avert">(${esc(t.avertissement)})</small>` : "")).join("")}
+      <span class="field__label">Taille de l'entreprise${mode === "alternance" ? " (offres)" : ""}</span>
+      <p class="profil-card__sub" style="margin:4px 0 10px;">Rien de coché : toutes les tailles. France Travail indique en général l'effectif de l'établissement qui recrute.${mode === "alternance" ? " Une petite entreprise qui publie une offre veut recruter : mieux vaut ne rien cocher ici." : ""}</p>
+      <div class="domaines-choix">${o.tailles.filter(t => t.cle !== "sans_salarie").map(t => caseOption("data-taille-case", t.cle, t.libelle, tailles.has(t.cle))).join("")}
       </div>
       <div class="domaines-choix" style="margin-top:8px;">
         <label class="domaine-case domaine-case--petit">
           <input type="checkbox" data-taille-inconnue ${rech.taille_inconnue !== false ? "checked" : ""}>
-          <span>Garder les offres${mode === "alternance" ? " et entreprises" : ""} dont l'effectif est inconnu</span>
+          <span>Garder les offres dont l'effectif est inconnu</span>
         </label>
       </div>
     </div>
+    ${mode === "alternance" ? `
+    <div class="options-bloc">
+      <span class="field__label">Taille de l'entreprise (candidatures spontanées)</span>
+      <p class="profil-card__sub" style="margin:4px 0 10px;">Entreprises de Sirene et de La Bonne Alternance, effectif de l'entreprise entière. Rien de coché : toutes les tailles sauf « sans salarié ».</p>
+      <div class="domaines-choix">${o.tailles.map(t => caseOption("data-taille-sp-case", t.cle, t.libelle, taillesSp.has(t.cle),
+        t.avertissement ? ` <small class="options-avert">(${esc(t.avertissement)})</small>` : "")).join("")}
+      </div>
+      <div class="domaines-choix" style="margin-top:8px;">
+        <label class="domaine-case domaine-case--petit">
+          <input type="checkbox" data-taille-inconnue-sp ${rech.taille_inconnue_spontanees !== false ? "checked" : ""}>
+          <span>Garder les entreprises dont l'effectif est inconnu</span>
+        </label>
+      </div>
+    </div>` : ""}
     ${mode === "job" ? `
     <div class="options-bloc">
       <span class="field__label">Thèmes <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
@@ -321,7 +337,11 @@ function lireOptions(mode) {
     secteurs: coches("data-secteur-case"),
   };
   if (mode === "job") out.themes = coches("data-theme-case");
-  if (mode === "alternance") out.departements = coches("data-departement-case");
+  if (mode === "alternance") {
+    out.departements = coches("data-departement-case");
+    out.tailles_spontanees = coches("data-taille-sp-case");
+    out.taille_inconnue_spontanees = c.querySelector("[data-taille-inconnue-sp]").checked;
+  }
   return out;
 }
 

@@ -7,6 +7,9 @@ Critères de recherche du profil (profils.recherche, colonne JSON) :
     secteurs_activites), [] pour tous ;
   - tailles : tailles d'entreprise (shared.tailles), [] pour toutes ;
     taille_inconnue : garder les offres sans information (vrai par défaut) ;
+  - tailles_spontanees, taille_inconnue_spontanees : les mêmes pour les
+    entreprises des candidatures spontanées (Sirene, LBA), réglage distinct
+    des offres (décision D63) ;
   - themes : thèmes France Travail du mode job (13 saisonniers, 17 sans
     diplôme ni expérience), décochés par défaut ;
   - departements : départements d'Île-de-France des candidatures
@@ -56,6 +59,10 @@ def normaliser_recherche(recherche) -> dict:
         out["tailles"] = _liste(out["tailles"], set(CLES_TAILLES))
     if "taille_inconnue" in out:
         out["taille_inconnue"] = out["taille_inconnue"] is not False
+    if "tailles_spontanees" in out:
+        out["tailles_spontanees"] = _liste(out["tailles_spontanees"], set(CLES_TAILLES))
+    if "taille_inconnue_spontanees" in out:
+        out["taille_inconnue_spontanees"] = out["taille_inconnue_spontanees"] is not False
     if "themes" in out:
         out["themes"] = _liste(out["themes"], set(THEMES_PROPOSES))
     if "departements" in out:

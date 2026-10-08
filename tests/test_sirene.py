@@ -22,8 +22,8 @@ class Journal(list):
 
 
 def profil(domaines=("M18",), secteurs=(), tailles=(), inconnue=True, departements=()):
-    return {"recherche": {"domaines": list(domaines), "secteurs": list(secteurs), "tailles": list(tailles),
-                          "taille_inconnue": inconnue, "departements": list(departements)}}
+    return {"recherche": {"domaines": list(domaines), "secteurs": list(secteurs), "tailles_spontanees": list(tailles),
+                          "taille_inconnue_spontanees": inconnue, "departements": list(departements)}}
 
 
 TOUTES_SAUF_NN = "00 OR 01 OR 02 OR 03 OR 11 OR 12 OR 21 OR 22 OR 31 OR 32 OR 41 OR 42 OR 51 OR 52 OR 53"
@@ -239,6 +239,8 @@ def test_erreur_d_une_recherche_n_arrete_pas_les_autres(utilisateur, sirene, mon
 
 # ─── Migration 0010 : ancien réglage pré-coché (D60) ──────────────────────────
 def test_migration_0010_ancien_reglage(tmp_path):
+    """D60, D63 : seules les tailles des spontanées sont pré-cochées ; celles
+    des offres ne sont jamais touchées."""
     import json
     import sqlite3
     from alembic import command
@@ -248,24 +250,46 @@ def test_migration_0010_ancien_reglage(tmp_path):
     command.upgrade(cfg, "0009")
     cx = sqlite3.connect(chemin)
     cx.execute("INSERT INTO users (id, email, mot_de_passe_hash) VALUES (1, 'a@test.fr', 'x'), (2, 'b@test.fr', 'x')")
-    cx.execute("INSERT INTO profils (user_id, mode, recherche) VALUES (1, 'alternance', ?)",
-               (json.dumps({"domaines": ["M18"]}),))
-    cx.execute("INSERT INTO profils (user_id, mode, recherche) VALUES (2, 'alternance', ?)",
-               (json.dumps({"tailles": ["moins_10"], "departements": []}),))
-    cx.execute("INSERT INTO profils (user_id, mode, recherche) VALUES (1, 'job', ?)", (json.dumps({}),))
+    for user, mode, recherche in ((1, "alternance", {"domaines": ["M18"]}),
+                                  (2, "alternance", {"tailles": ["moins_10"], "tailles_spontanees": ["50_249"],
+                                                     "departements": []}),
+                                  (1, "job", {})):
+        cx.execute("INSERT INTO profils (user_id, mode, recherche) VALUES (?, ?, ?)", (user, mode, json.dumps(recherche)))
     cx.commit()
     cx.close()
+
+    def lire():
+        cx = sqlite3.connect(chemin)
+        lignes = [json.loads(r) for (r,) in cx.execute("SELECT recherche FROM profils ORDER BY id")]
+        cx.close()
+        return lignes
     command.upgrade(cfg, "0010")
-    cx = sqlite3.connect(chemin)
-    lignes = [json.loads(r) for (r,) in cx.execute("SELECT recherche FROM profils ORDER BY id")]
-    cx.close()
-    assert lignes[0] == {"domaines": ["M18"], "tailles": ["10_49", "50_249", "250_4999", "5000_plus"],
-                         "departements": ["75", "92", "93", "94"]}
-    assert lignes[1] == {"tailles": ["moins_10"], "departements": ["75", "92", "93", "94"]}   # choix gardé
+    lignes = lire()
+    assert lignes[0] == {"domaines": ["M18"], "tailles_spontanees": ["10_49", "50_249", "250_4999", "5000_plus"],
+                         "departements": ["75", "92", "93", "94"]}             # aucune taille d'offre ajoutée
+    assert lignes[1] == {"tailles": ["moins_10"], "tailles_spontanees": ["50_249"],
+                         "departements": ["75", "92", "93", "94"]}             # choix gardés
     assert lignes[2] == {}                                                # mode job : inchangé
     command.downgrade(cfg, "0009")
-    cx = sqlite3.connect(chemin)
-    lignes = [json.loads(r) for (r,) in cx.execute("SELECT recherche FROM profils ORDER BY id")]
-    cx.close()
-    assert lignes[0] == {"domaines": ["M18"], "tailles": [], "departements": []}
-    assert lignes[1] == {"tailles": ["moins_10"], "departements": []}
+    lignes = lire()
+    assert lignes[0] == {"domaines": ["M18"], "tailles_spontanees": [], "departements": []}
+    assert lignes[1] == {"tailles": ["moins_10"], "tailles_spontanees": ["50_249"], "departements": []}
+
+
+def test_tailles_des_offres_et_des_spontanees_separees(utilisateur, sirene):
+    """D63 : les tailles des spontanées ne filtrent pas les offres, et
+    inversement."""
+    from shared.criteres import criteres_france_travail
+    p = {"recherche": {"domaines": ["M18"], "tailles": ["5000_plus"], "taille_inconnue": False,
+                       "tailles_spontanees": ["10_49"], "taille_inconnue_spontanees": False,
+                       "departements": ["75"]}}
+    c = criteres_france_travail(p, "alternance")
+    assert c["tailles"] == ["5000_plus"] and c["taille_inconnue"] is False
+    assert "trancheEffectifsUniteLegale:(11 OR 12)" in fetch.plan_sirene(p, Journal())[0][1]
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    sirene(FausseSirene(_jeu()))
+    sauvegarder_profil(uid, p)
+    fetch.main(uid, log_fn=Journal())
+    assert _sirets(uid) == [1]
+    assert normaliser_recherche({"tailles_spontanees": ["10_49", "x"], "taille_inconnue_spontanees": 0}) == {
+        "tailles_spontanees": ["10_49"], "taille_inconnue_spontanees": True}

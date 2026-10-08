@@ -6,10 +6,8 @@ salarié ») et toute l'Île-de-France ; les profils existants sans choix
 reçoivent donc l'ancien réglage pour ne pas changer de comportement.
 Pas de changement de schéma, seulement des données.
 
-Les tailles sont aussi le filtre de taille des offres France Travail en
-alternance (même champ, D25) : un profil existant sans taille ne garde
-plus que les offres de 10 salariés et plus (et celles sans information,
-si l'option est cochée).
+Seules les tailles des candidatures spontanées (tailles_spontanees) sont
+pré-cochées ; celles des offres (tailles) restent à toutes (D63).
 
 Retour arrière : les listes égales à l'ancien réglage sont vidées.
 
@@ -32,7 +30,7 @@ depends_on: Union[str, Sequence[str], None] = None
 
 # Figé ici : la migration ne dépend pas du code de l'application
 ANCIEN_REGLAGE = {
-    "tailles": ["10_49", "50_249", "250_4999", "5000_plus"],
+    "tailles_spontanees": ["10_49", "50_249", "250_4999", "5000_plus"],
     "departements": ["75", "92", "93", "94"],
 }
 

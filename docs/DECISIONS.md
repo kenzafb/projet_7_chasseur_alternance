@@ -277,11 +277,15 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 4 et 7), validées par l'humai
 - **Décision.** Un autre établissement d'une entreprise déjà en base (même SIREN), qu'il vienne de LBA ou de Sirene, n'est pas ajouté ; la source est notée sur l'entreprise existante. Complète D52.
 
 ### D60. Profils existants : ancien réglage de Sirene pré-coché
-- **Décision.** Aucune taille cochée : toutes (sauf « sans salarié », D55) ; aucun département coché : les 8. Les profils d'alternance existants sans choix reçoivent l'ancien réglage par la migration 0010 : 10 salariés et plus, départements 75, 92, 93, 94.
-- **Conséquence.** Les tailles servent aussi au filtre des offres France Travail en alternance (D25) : ces profils ne gardent plus que les offres de 10 salariés et plus (et celles sans information si l'option est cochée).
+- **Décision.** Aucune taille cochée : toutes (sauf « sans salarié », D55) ; aucun département coché : les 8. Les profils d'alternance existants sans choix reçoivent l'ancien réglage par la migration 0010 : 10 salariés et plus pour les tailles des candidatures spontanées (D63), départements 75, 92, 93, 94. Les tailles des offres ne sont pas touchées.
 
 ### D61. Correspondance NAF et secteurs : validés
 - **Décision.** Validés tels quels : cibles NAF 2025 des correspondances multiples (60.20H, 26.40Y, 55.90Y écartées), cibles uniques qui élargissent (46.50Y, 95.10Y, 71.12Y, 68.12Y), secteurs choisis utilisés seulement pour l'indifférent et les domaines sans correspondance.
 
 ### D62. Nettoyage des adresses exclues déjà en base : par l'humain
 - **Décision.** `scripts/nettoyer_emails_exclus.py` applique les règles de D47 aux entreprises déjà en base (liste seulement, `--appliquer` pour écrire). Lancé par l'humain.
+
+### D63. Tailles des offres et tailles des candidatures spontanées séparées
+- **Constat.** Un seul réglage de taille filtrait à la fois les offres et les entreprises des spontanées ; or une petite entreprise qui publie une offre d'alternance veut recruter, l'écarter serait une perte.
+- **Décision.** Deux réglages dans le profil d'alternance : tailles des offres (`tailles`, `taille_inconnue` ; France Travail, toutes par défaut, aucune pré-coche par migration) et tailles des candidatures spontanées (`tailles_spontanees`, `taille_inconnue_spontanees` ; Sirene et entreprises LBA, « sans salarié » proposée ici seulement, pré-cochées à 10 salariés et plus pour les profils existants par la migration 0010). Lecture de D55 validée : rien de coché dans les spontanées veut dire toutes les tailles sauf « sans salarié ».
+

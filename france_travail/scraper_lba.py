@@ -402,11 +402,12 @@ def filtrer_niveau(offres: list[dict], niveau: int | None) -> tuple[list[dict], 
 
 
 def filtre_entreprise(profil: dict):
-    """Prédicat sur les entreprises : tailles du profil (D40, D55, D56) et
+    """Prédicat sur les entreprises : tailles des spontanées (D40, D55, D56, D63) et
     départements des candidatures spontanées d'après le code postal (D58).
     None si aucun filtre."""
     rech = normaliser_recherche((profil or {}).get("recherche") or {})
-    tailles, inconnue = rech.get("tailles") or [], rech.get("taille_inconnue", True)
+    tailles = rech.get("tailles_spontanees") or []
+    inconnue = rech.get("taille_inconnue_spontanees", True)
     departements = set(rech.get("departements") or [])
 
     def garder(e):

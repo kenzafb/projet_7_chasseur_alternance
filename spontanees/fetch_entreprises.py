@@ -108,7 +108,9 @@ def plan_sirene(profil: dict, log=print) -> list[tuple[str, str]]:
             "recherche en NAF rév. 2")
         codes = secteurs_sirene(domaines, secteurs, "NAFRev2")
         variable = P.VARIABLE_NAF["NAFRev2"]
-    tailles, inconnue = rech.get("tailles") or [], rech.get("taille_inconnue", True)
+    # Tailles des candidatures spontanées, distinctes de celles des offres (D63)
+    tailles = rech.get("tailles_spontanees") or []
+    inconnue = rech.get("taille_inconnue_spontanees", True)
     departements = rech.get("departements") or sorted(DEPTS_IDF)
     groupes = [("cœurs", codes["coeurs"], filtre_tailles(tailles, inconnue)),
                ("secteurs", codes["secteurs"], filtre_tailles(tailles, inconnue))]

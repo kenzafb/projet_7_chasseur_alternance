@@ -102,7 +102,7 @@ Décisions D54 à D62 de `docs/DECISIONS.md`. Points 1, 2 et 5 validés tels que
 - **D57.** Division en NAF 2025 : cible hors division gardée seulement si l'ancien code n'en a qu'une.
 - **D58.** Départements du profil appliqués aux entreprises LBA.
 - **D59.** Dédoublonnage par SIREN, dans les deux sens (LBA puis Sirene, Sirene puis LBA).
-- **D60.** Migration 0010 : profils d'alternance existants sans choix pré-cochés avec l'ancien réglage (10 salariés et plus ; 75, 92, 93, 94). Elle touche aussi le filtre de taille des offres France Travail en alternance, même champ.
+- **D60, D63.** Migration 0010 : profils d'alternance existants sans choix pré-cochés avec l'ancien réglage (10 salariés et plus pour les tailles des candidatures spontanées ; 75, 92, 93, 94). Les tailles des offres sont un réglage distinct, jamais pré-coché : une petite entreprise qui publie une offre n'est pas écartée.
 - **D62.** Nettoyage des adresses exclues déjà en base, à lancer :
 
 ```bash
@@ -110,6 +110,6 @@ venv/bin/python scripts/nettoyer_emails_exclus.py              # liste seulement
 venv/bin/python scripts/nettoyer_emails_exclus.py --appliquer  # écrit en base
 ```
 
-Avant la recette : `venv/bin/alembic upgrade head` (migrations 0008 à 0010). Tests : 659 passed.
+Avant la recette : `venv/bin/alembic upgrade head` (migrations 0008 à 0010).
 
-Point d'interprétation : « non cochée par défaut » est lu comme « gardée seulement si cochée ». Rien de coché veut donc dire toutes les tailles sauf « sans salarié » ; sans cela, 85 % des résultats Sirene seraient des unités non employeuses.
+Lecture validée (D63) : rien de coché dans les tailles des spontanées veut dire toutes les tailles sauf « sans salarié ». Tests : 660 passed.
