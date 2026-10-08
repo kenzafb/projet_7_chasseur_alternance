@@ -780,7 +780,9 @@ def sauvegarder(user_id, entreprises):
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
-def main(user_id, stop_event=None, log_fn=None, on_progress=None):
+def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=None):
+    """Cherche site, emails et contact des entreprises pas encore traitées,
+    au plus max_scrapees par lancement (None : toutes)."""
     _log = log_fn or print
     _log(f"Scraper Emails v15 | Mistral = {MODELE_MISTRAL} | Moteur = DDG")
     if DEBUG:
@@ -801,6 +803,10 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None):
 
     _log(f"Total : {total} | Déjà traités : {deja_traites} | Avec emails : {deja_emails} | Envoyés : {deja_envoyes}")
     _log(f"Queue : {len(a_traiter)} à traiter")
+    if max_scrapees and len(a_traiter) > max_scrapees:
+        _log(f"Limite du lancement : {max_scrapees} entreprises, les autres au prochain lancement")
+        a_traiter = a_traiter[:max_scrapees]
+    ids_a_traiter = {id(e) for e in a_traiter}
 
     if not a_traiter:
         _log("✅ Tout traité !")
@@ -815,8 +821,8 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None):
                 sauvegarder(user_id, entreprises)
                 return
 
-            if e.get("mail_envoye") or e.get("emails_trouves") or e.get("traite"):
-                continue
+            if id(e) not in ids_a_traiter:
+                continue   # déjà traitée, ou au-delà de la limite du lancement
 
             nom       = (e.get("nom_commercial") or e.get("nom", "?"))[:50]
             dirigeant = e.get("dirigeant", "")

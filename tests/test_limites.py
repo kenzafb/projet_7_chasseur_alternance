@@ -1,0 +1,228 @@
+"""Limites par lancement : valeurs par défaut, plafonds côté serveur, et
+limites respectées par la recherche, le fetch, le scraper et l'envoi."""
+
+import itertools
+from types import SimpleNamespace
+
+import pytest
+
+import france_travail.analyseur
+import france_travail.scraper as scraper
+import main
+import spontanees.envoyeur as envoyeur
+import spontanees.fetch_entreprises as fetch
+import spontanees.scraper_emails as scraper_emails
+from database.candidatures_db import lire_candidatures
+from database.dedup_db import lire_offres_vues
+from database.entreprises_db import ajouter_entreprises, lire_entreprises
+from shared import config
+from tests.conftest import compte_verifie
+from tests.test_envoyeur import attendre, entreprises
+
+ANALYSE = ('{"score": 8, "eligible": true, "points_forts": [], "points_faibles": [], '
+           '"domaine": "Informatique", "resume": "ok"}')
+
+
+# ─── Règle commune ───────────────────────────────────────────────────────────
+@pytest.mark.parametrize("cle", sorted(config.LIMITES_LANCEMENT))
+def test_defaut_et_plafond(cle):
+    regle = config.LIMITES_LANCEMENT[cle]
+    assert 1 <= regle["defaut"] <= regle["max"]
+    assert config.limite_lancement(cle, None) == regle["defaut"]
+    assert config.limite_lancement(cle, 0) == 1
+    assert config.limite_lancement(cle, -7) == 1
+    assert config.limite_lancement(cle, 10**9) == regle["max"]
+    assert config.limite_lancement(cle, 1) == 1
+
+
+def test_plafond_des_mails_inchange():
+    assert config.LIMITES_LANCEMENT["mails"]["max"] == config.LIMITE_ENVOIS_PAR_LANCEMENT == 50
+
+
+def test_interface_reprend_defauts_et_plafonds(utilisateur):
+    client, _ = utilisateur("a@test.fr", prenom="Alice")
+    page = client.get("/").text
+    for cle, regle in config.LIMITES_LANCEMENT.items():
+        assert f'data-limite="{cle}" value="{regle["defaut"]}"' in page
+        assert f'max="{regle["max"]}"' in page
+
+
+# ─── Recherche d'offres ──────────────────────────────────────────────────────
+def _brut_ft(i):
+    return {"id": f"FT{i}", "intitule": f"Poste {i}", "lieuTravail": {"libelle": "75 - Paris 10e"},
+            "entreprise": {"nom": "ACME"}, "dateCreation": "2026-10-01T08:00:00.000Z"}
+
+
+def _lba(i):
+    return {"id": f"LBA{i}", "titre": f"Alternance {i}", "entreprise": "LBA SA", "lieu": "75012 PARIS",
+            "zone": "Paris", "source": "La Bonne Alternance", "lien": "", "description": "..."}
+
+
+@pytest.fixture
+def sources(monkeypatch, mistral):
+    """France Travail et LBA simulés : nb_ft et nb_lba offres à chaque appel."""
+    nombres = {"ft": 0, "lba": 0}
+    monkeypatch.setattr(scraper, "_paginer",
+                        lambda params: [_brut_ft(i) for i in range(nombres["ft"])])
+    monkeypatch.setattr(main, "chercher_offres_lba", lambda romes: [_lba(i) for i in range(nombres["lba"])])
+    monkeypatch.setattr(france_travail.analyseur, "PAUSE_MISTRAL", 0)
+    mistral.reponse = ANALYSE
+    return nombres
+
+
+def _rechercher(client, user_id, pipelines, **corps):
+    r = client.post("/api/recherche", json=corps or None)
+    assert r.status_code == 200, r.text
+    attendre(lambda: not pipelines.etat("recherche", user_id)["en_cours"])
+    return r.json()
+
+
+def test_recherche_limite_france_travail_et_lba_ensemble(utilisateur, sources, mistral, pipelines_neufs):
+    client, user_id = utilisateur("a@test.fr", prenom="Alice")
+    sources.update(ft=3, lba=10)
+    assert _rechercher(client, user_id, pipelines_neufs, max_analyses=5)["max_analyses"] == 5
+    assert len(mistral.appels) == 5
+    refs = {c["id"] for c in lire_candidatures(user_id)}
+    assert len(refs) == 5 and sorted(r for r in refs if r.startswith("LBA")) == ["LBA0", "LBA1"]
+    assert "limite" in client.get("/api/logs").text.lower()
+
+
+def test_offres_au_dela_de_la_limite_reproposees(utilisateur, sources, mistral, pipelines_neufs):
+    client, user_id = utilisateur("a@test.fr", prenom="Alice")
+    sources.update(ft=10)
+    _rechercher(client, user_id, pipelines_neufs, max_analyses=4)
+    assert len(mistral.appels) == 4
+    assert len(lire_offres_vues(user_id, "alternance")) == 4   # les 6 autres ne sont pas perdues
+    assert len(lire_candidatures(user_id)) == 4
+    _rechercher(client, user_id, pipelines_neufs, max_analyses=100)
+    assert len(lire_candidatures(user_id)) == 10
+
+
+def test_recherche_lba_ignoree_quand_france_travail_epuise_la_limite(utilisateur, sources, mistral,
+                                                                     pipelines_neufs):
+    client, user_id = utilisateur("a@test.fr", prenom="Alice")
+    sources.update(ft=6, lba=4)
+    _rechercher(client, user_id, pipelines_neufs, max_analyses=6)
+    assert len(mistral.appels) == 6
+    assert "LBA ignorée" in client.get("/api/logs").text
+
+
+def test_recherche_defaut_et_plafond_serveur(utilisateur, sources, pipelines_neufs, monkeypatch):
+    client, user_id = utilisateur("a@test.fr", prenom="Alice")
+    assert _rechercher(client, user_id, pipelines_neufs)["max_analyses"] == 30
+    assert _rechercher(client, user_id, pipelines_neufs, max_analyses=10**6)["max_analyses"] == 200
+    assert client.post("/api/recherche", json={"max_analyses": 5, "autre": 1}).status_code == 422
+
+
+def test_limite_du_mode_job_reste_un_plafond(utilisateur, sources, mistral, pipelines_neufs):
+    client, user_id = utilisateur("a@test.fr", prenom="Alice")
+    client.post("/api/mode", json={"mode": "job"})
+    client.post("/api/profil", json={"prenom": "Alice"})
+    sources.update(ft=8)
+    _rechercher(client, user_id, pipelines_neufs, max_analyses=3)
+    assert len(mistral.appels) == 3
+
+
+# ─── Fetch des entreprises ───────────────────────────────────────────────────
+class FausseSirene:
+    """API Sirene simulée : 3 établissements nouveaux par page, 2 pages par requête."""
+
+    def __init__(self):
+        self.numeros = itertools.count()
+        self.appels = 0
+
+    def get(self, url, headers=None, params=None, timeout=None):
+        self.appels += 1
+        etabs = []
+        for _ in range(3):
+            n = next(self.numeros)
+            etabs.append({"siret": f"{n:014d}", "uniteLegale": {"denominationUniteLegale": f"Ent {n}",
+                                                                  "siren": f"{n:09d}"},
+                          "adresseEtablissement": {"codePostalEtablissement": "75010"},
+                          "periodesEtablissement": [{"dateFin": None}]})
+        suivant = None if params["curseur"] != "*" else "page2"
+        donnees = {"header": {"total": 6, "curseurSuivant": suivant}, "etablissements": etabs}
+        return SimpleNamespace(status_code=200, raise_for_status=lambda: None, json=lambda: donnees)
+
+
+@pytest.fixture
+def sirene(monkeypatch):
+    faux = FausseSirene()
+    monkeypatch.setattr(fetch, "INSEE_API_KEY", "factice")
+    monkeypatch.setattr(fetch.requests, "get", faux.get)
+    monkeypatch.setattr(fetch.time, "sleep", lambda s: None)
+    return faux
+
+
+def test_fetch_s_arrete_a_la_limite(utilisateur, sirene):
+    _, user_id = utilisateur("a@test.fr", prenom="Alice")
+    ajouter_entreprises(user_id, [{"siret": "DEJA1", "nom": "Ancienne"}])
+    logs = []
+    fetch.main(user_id, max_entreprises=5, log_fn=logs.append)
+    assert len(lire_entreprises(user_id)) == 1 + 5   # les anciennes ne comptent pas
+    assert sirene.appels == 2                         # plus aucune requête une fois la limite atteinte
+    assert any("5 nouvelles entreprises ajoutées" in l for l in logs)
+
+
+def test_fetch_sans_limite_parcourt_tout(utilisateur, sirene):
+    _, user_id = utilisateur("a@test.fr", prenom="Alice")
+    fetch.main(user_id)
+    assert len(lire_entreprises(user_id)) == sirene.appels * 3 > 5
+
+
+def test_route_fetch_borne_la_limite(utilisateur, monkeypatch, pipelines_neufs):
+    client, user_id = utilisateur("a@test.fr", prenom="Alice")
+    recues = []
+    monkeypatch.setattr(fetch, "main", lambda **kw: recues.append(kw["max_entreprises"]))
+    for demande, attendu in ((None, 200), (12, 12), (10**6, 5000), (0, 1)):
+        r = client.post("/api/spontanees/fetch", json={} if demande is None else {"max_entreprises": demande})
+        assert r.json()["max_entreprises"] == attendu
+        attendre(lambda: not pipelines_neufs.etat("spontanees", user_id)["en_cours"])
+    assert recues == [200, 12, 5000, 1]
+
+
+# ─── Scraper ─────────────────────────────────────────────────────────────────
+def test_scraper_traite_au_plus_la_limite(utilisateur, monkeypatch):
+    _, user_id = utilisateur("a@test.fr", prenom="Alice")
+    ajouter_entreprises(user_id, [{"siret": f"S{i}", "nom": f"Ent {i}"} for i in range(5)])
+    monkeypatch.setattr(scraper_emails, "chercher_site", lambda e, url_exclue=None: ("https://ent.fr", "ddg"))
+    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda url, nom, dirigeant=None: {
+        "emails": ["rh@ent.fr"], "telephones": [], "contact_rh": None, "url_finale": url, "fiable": True})
+    scraper_emails.main(user_id, max_scrapees=2, log_fn=lambda m: None)
+    assert sum(e["traite"] for e in lire_entreprises(user_id)) == 2
+    scraper_emails.main(user_id, max_scrapees=2, log_fn=lambda m: None)
+    assert sum(e["traite"] for e in lire_entreprises(user_id)) == 4
+
+
+def test_route_scraper_borne_la_limite(utilisateur, monkeypatch, pipelines_neufs):
+    client, user_id = utilisateur("a@test.fr", prenom="Alice")
+    recues = []
+    monkeypatch.setattr(scraper_emails, "main", lambda **kw: recues.append(kw["max_scrapees"]))
+    for demande in (None, 7, 10**6):
+        r = client.post("/api/spontanees/scraper", json={} if demande is None else {"max_scrapees": demande})
+        assert r.status_code == 200
+        attendre(lambda: not pipelines_neufs.etat("spontanees", user_id)["en_cours"])
+    assert recues == [20, 7, 200]
+
+
+# ─── Envoi ───────────────────────────────────────────────────────────────────
+def test_route_envoi_borne_la_limite(utilisateur, smtp_simule, monkeypatch, pipelines_neufs):
+    client, user_id = utilisateur("a@test.fr", prenom="Alice")
+    compte_verifie(smtp_simule, user_id, "alice@gmail.com")
+    monkeypatch.setattr(envoyeur, "PAUSE_ENTRE_MAILS", (0, 0))
+    recues = []
+    monkeypatch.setattr(envoyeur, "main", lambda **kw: recues.append(kw["limite"]))
+    for demande in (None, 3, 999):
+        r = client.post("/api/spontanees/envoyer", json={} if demande is None else {"limite": demande})
+        assert r.status_code == 200
+        attendre(lambda: not pipelines_neufs.etat("spontanees", user_id)["en_cours"])
+    assert recues == [10, 3, 50]
+
+
+def test_envoi_respecte_la_limite(utilisateur, smtp_simule, monkeypatch):
+    _, user_id = utilisateur("a@test.fr", prenom="Alice")
+    compte_verifie(smtp_simule, user_id, "alice@gmail.com")
+    monkeypatch.setattr(envoyeur, "PAUSE_ENTRE_MAILS", (0, 0))
+    entreprises(user_id, 5)
+    assert envoyeur.main(user_id, limite=2)["envoyes"] == 2
+    assert len(smtp_simule.messages) == 2

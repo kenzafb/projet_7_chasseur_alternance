@@ -9,6 +9,15 @@ function verifierSession(r) {
   if (r.status === 401) window.location.href = "/login";
 }
 
+/* Limite saisie dans un champ [data-limite="cle"], bornée par ses min et max
+   (le serveur la borne aussi) ; champ absent ou vide : défaut du serveur */
+export function limite(cle) {
+  const champ = document.querySelector(`[data-limite="${cle}"]`);
+  const n = parseInt(champ?.value, 10);
+  if (!champ || Number.isNaN(n)) return undefined;
+  return Math.max(parseInt(champ.min, 10) || 1, Math.min(n, parseInt(champ.max, 10) || n));
+}
+
 async function get(url) {
   const r = await fetch(url);
   verifierSession(r);
@@ -66,7 +75,7 @@ async function telecharger(url, nom) {
 export const api = {
   // Offres / candidatures
   candidatures:      ()        => get("/api/candidatures"),
-  recherche:         ()        => post("/api/recherche"),
+  recherche:         (max)     => post("/api/recherche", { max_analyses: max }),
   statutRecherche:   ()        => get("/api/statut_recherche"),
   analyser:          (id)      => post("/api/analyser", { id }),
   genererLettre:     (id)      => post("/api/generer_lettre", { id }),
@@ -102,8 +111,8 @@ export const api = {
   spSuiviStatut: (id, statut) => post("/api/spontanees/suivi/statut", { id, statut }),
   spStats:    ()       => get("/api/spontanees/stats"),
   spStatut:   ()       => get("/api/spontanees/statut"),
-  spFetch:    ()       => post("/api/spontanees/fetch"),
-  spScraper:  ()       => post("/api/spontanees/scraper"),
+  spFetch:    (max)    => post("/api/spontanees/fetch", { max_entreprises: max }),
+  spScraper:  (max)    => post("/api/spontanees/scraper", { max_scrapees: max }),
   spEnvoyer:  (limite, test = false) => post("/api/spontanees/envoyer", { limite, test }),
   spStop:     ()       => post("/api/spontanees/stop"),
 

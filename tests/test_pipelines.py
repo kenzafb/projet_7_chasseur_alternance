@@ -42,7 +42,7 @@ def faux_travaux(monkeypatch):
         demarres.setdefault(("recherche", user_id), threading.Event()).set()
         liberer.wait(5)
 
-    def faux_scraper(user_id, stop_event=None, log_fn=print, on_progress=None):
+    def faux_scraper(user_id, stop_event=None, log_fn=print, on_progress=None, **_):
         log_fn(f"scraper de {user_id}")
         on_progress(10, f"progression de {user_id}")
         demarres.setdefault(("scraper", user_id), threading.Event()).set()

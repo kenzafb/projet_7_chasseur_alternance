@@ -63,10 +63,11 @@ def construire_query(code_naf, departement):
 
 # ─── Fetch avec pagination par curseur ────────────────────────────────────────
 
-def fetch_toutes_pages(code_naf, departement, entreprises, stats_dept, stats_naf):
+def fetch_toutes_pages(code_naf, departement, entreprises, stats_dept, stats_naf, plafond=None):
     """
     Pagine la totalité des résultats pour une combinaison NAF+dept
     via le mécanisme de curseur de l'API Sirene (pas de limite à 10 000).
+    plafond : taille de `entreprises` à ne pas dépasser (limite du lancement).
     """
     query   = construire_query(code_naf, departement)
     curseur = "*"   # Premier appel
@@ -109,6 +110,8 @@ def fetch_toutes_pages(code_naf, departement, entreprises, stats_dept, stats_naf
         nouvelles_cette_page = 0
 
         for etab in etablissements:
+            if plafond is not None and len(entreprises) >= plafond:
+                break
             infos = extraire_infos(etab)
             siret = infos["siret"]
             if siret and siret not in entreprises:
@@ -122,8 +125,11 @@ def fetch_toutes_pages(code_naf, departement, entreprises, stats_dept, stats_naf
 
         # (sauvegardes intermédiaires retirées : insertion en base à la fin)
 
-        # Fin de pagination : plus de curseur suivant, ou identique au précédent
+        # Fin de pagination : plus de curseur suivant, identique au précédent,
+        # ou limite du lancement atteinte
         if not suivant or suivant == curseur:
+            break
+        if plafond is not None and len(entreprises) >= plafond:
             break
 
         curseur = suivant
@@ -199,9 +205,11 @@ def extraire_infos(etab):
 
 from database.entreprises_db import ajouter_entreprises
 
-def main(user_id, stop_event=None, on_progress=None):
+def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_fn=None):
+    """Ajoute en base au plus max_entreprises NOUVELLES entreprises (None : toutes)."""
+    _log = log_fn or print
     if not INSEE_API_KEY:
-        print("❌  INSEE_API_KEY manquante dans le .env — arrêt.")
+        _log("❌  INSEE_API_KEY manquante dans le .env — arrêt.")
         return
 
     # Codes NAF selon le domaine de l'utilisateur (lu depuis son profil)
@@ -235,9 +243,15 @@ def main(user_id, stop_event=None, on_progress=None):
     total_combos = len(DEPARTEMENTS) * len(codes_naf)
     combos_faits = 0
     print(f"  Total de requêtes : {total_combos} (vs 512+ en v6)\n")
+    plafond = total_au_depart + max_entreprises if max_entreprises else None
 
     for dept in DEPARTEMENTS:
+        if plafond is not None and len(entreprises) >= plafond:
+            break
         for naf in codes_naf:
+            if plafond is not None and len(entreprises) >= plafond:
+                _log(f"⏹️  Limite de {max_entreprises} nouvelles entreprises atteinte.")
+                break
             if stop_event and stop_event.is_set():
                 print("⏹️  Arrêt — sauvegarde en cours...")
                 n = ajouter_entreprises(user_id, [e for e in entreprises.values() if not e.get('_deja_en_base')])
@@ -247,7 +261,7 @@ def main(user_id, stop_event=None, on_progress=None):
             print(f"\n[Sirene] Dept {dept} | NAF {naf}")
             avant = len(entreprises)
 
-            fetch_toutes_pages(naf, dept, entreprises, stats_dept, stats_naf)
+            fetch_toutes_pages(naf, dept, entreprises, stats_dept, stats_naf, plafond=plafond)
 
             apres = len(entreprises)
             print(f"  ✔  {dept}/{naf} — +{apres - avant} entreprises")
@@ -259,7 +273,7 @@ def main(user_id, stop_event=None, on_progress=None):
 
     # ── Sauvegarde finale (en base) ───────────────────────────────────────────
     nb_ajoutees = ajouter_entreprises(user_id, [e for e in entreprises.values() if not e.get('_deja_en_base')])
-    print(f"  {nb_ajoutees} nouvelles entreprises ajoutées en base")
+    _log(f"  {nb_ajoutees} nouvelles entreprises ajoutées en base")
 
     # ── Stats ─────────────────────────────────────────────────────────────────
     total_nouvelles = len(entreprises) - total_au_depart

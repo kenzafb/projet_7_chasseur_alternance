@@ -442,6 +442,12 @@
   font-size: 14px; color: var(--txt); width: 100%;
 }
 .pipe__nombre input:focus { border-color: var(--signal); outline: none; }
+/* Limite de la recherche d'offres, réglée avant de lancer */
+.limite-lancement { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-size: 13px; color: var(--txt-muted); }
+.limite-lancement input {
+  width: 90px; padding: 6px 9px; border-radius: var(--r-sm);
+  border: 1px solid var(--hair-strong); background: var(--surface); font-size: 14px; color: var(--txt);
+}
 
 /* Cases à cocher des domaines (profil) */
 .domaines-choix { display: flex; flex-wrap: wrap; gap: 10px; }

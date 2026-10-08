@@ -5,6 +5,12 @@
     <span class="guide__x" data-guide-close="offres">×</span>
   </div>
 
+  <label class="limite-lancement">
+    <span>Offres analysées au plus par lancement (max {{ limites.analyses.max }})</span>
+    <input type="number" data-limite="analyses" value="{{ limites.analyses.defaut }}"
+           min="1" max="{{ limites.analyses.max }}">
+  </label>
+
   <div class="kpis kpis--4">
     <div class="kpi">
       <div class="kpi__label">Nouvelles</div>

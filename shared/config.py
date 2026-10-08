@@ -90,6 +90,23 @@ PLAFOND_ENVOIS_JOUR = int(os.getenv("PLAFOND_ENVOIS_JOUR") or 50)
 # Plafond par lancement du pipeline d'envoi (valeur maximale acceptée par la route)
 LIMITE_ENVOIS_PAR_LANCEMENT = 50
 
+# ─── Limites par lancement ────────────────────────────────────────────────────
+# Choisies dans l'interface au moment de lancer. Valeur absente : défaut ;
+# inférieure à 1 : 1 ; au-delà du plafond : ramenée au plafond (côté serveur).
+LIMITES_LANCEMENT = {
+    "analyses":    {"defaut": 30,  "max": 200},    # offres analysées par Mistral (France Travail + LBA)
+    "entreprises": {"defaut": 200, "max": 5000},   # nouvelles entreprises récupérées (Sirene)
+    "scrapees":    {"defaut": 20,  "max": 200},    # entreprises dont on cherche le site et les emails
+    "mails":       {"defaut": 10,  "max": LIMITE_ENVOIS_PAR_LANCEMENT},   # mails envoyés
+}
+
+def limite_lancement(cle: str, demandee) -> int:
+    """Limite effective d'un lancement : défaut si absente, bornée à [1, plafond]."""
+    regle = LIMITES_LANCEMENT[cle]
+    if demandee is None:
+        return regle["defaut"]
+    return max(1, min(int(demandee), regle["max"]))
+
 # ─── IA ───────────────────────────────────────────────────────────────────────
 MODELE_MISTRAL = "mistral-large-latest"
 # Intervalle minimum entre deux appels Mistral, commun à tout le processus

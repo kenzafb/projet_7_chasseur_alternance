@@ -153,8 +153,21 @@ class TelechargerPdf(BaseModel):
     id: str
     lettre: str | None = None
 
+# Limites d'un lancement : absentes = défaut, bornées par config.limite_lancement
+class Recherche(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    max_analyses: int | None = None
+
+class Fetch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    max_entreprises: int | None = None
+
+class Scraper(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    max_scrapees: int | None = None
+
 class Envoyer(BaseModel):
-    limite: int = 10
+    limite: int | None = None
     test: bool = False
 
 class CompteEnvoiCorps(BaseModel):
@@ -183,7 +196,8 @@ class MailTest(BaseModel):
 
 @prive.get("/")
 def index(request: Request):
-    return templates.TemplateResponse(request, "base.html", {"mode": mode_courant(request)})
+    return templates.TemplateResponse(request, "base.html", {"mode": mode_courant(request),
+                                                             "limites": config.LIMITES_LANCEMENT})
 
 @prive.get("/api/logs")
 def api_logs(user: User = Depends(utilisateur_requis)):
@@ -365,8 +379,10 @@ def api_compte_envoi_mail_test(body: MailTest | None = None, user: User = Depend
 # ─── France Travail + La Bonne Alternance ────────────────────────────────────
 
 @prive.post("/api/recherche")
-def api_recherche(request: Request, user: User = Depends(utilisateur_requis)):
+def api_recherche(request: Request, body: Recherche | None = None, user: User = Depends(utilisateur_requis)):
     user_id = user.id   # capturé AVANT le thread (le thread n'a pas accès à request)
+    # Offres analysées par Mistral au plus, France Travail et LBA confondues
+    max_analyses = config.limite_lancement("analyses", body.max_analyses if body else None)
     mode = mode_courant(request)   # idem : capturé avant le thread
     from shared.modes import get_mode
     cfg_mode = get_mode(mode)
@@ -389,11 +405,16 @@ def api_recherche(request: Request, user: User = Depends(utilisateur_requis)):
                 ajouter_candidature(user_id, offre, mode=mode)
 
             etat(message="Recherche France Travail...")
-            log("🔍 Recherche France Travail démarrée")
-            lancer_recherche(user_id, profil, analyser=True, max_analyse=999, on_offre=ecrire_en_base, mode=mode)
-            log("✅ France Travail terminé")
+            log(f"🔍 Recherche France Travail démarrée — {max_analyses} offres analysées au plus")
+            analysees = lancer_recherche(user_id, profil, analyser=True, max_analyse=max_analyses,
+                                         on_offre=ecrire_en_base, mode=mode) or []
+            reste = max_analyses - len(analysees)
+            log(f"✅ France Travail terminé — {len(analysees)} offres analysées")
 
-            if "lba" in cfg_mode["sources"]:
+            if "lba" in cfg_mode["sources"] and reste <= 0:
+                log(f"ℹ️  LBA ignorée : limite de {max_analyses} offres analysées atteinte")
+                offres_lba = []
+            elif "lba" in cfg_mode["sources"]:
                 etat(message="Recherche La Bonne Alternance...")
                 log("🔍 Recherche La Bonne Alternance démarrée")
                 from shared.domaines import lba_romes
@@ -408,6 +429,10 @@ def api_recherche(request: Request, user: User = Depends(utilisateur_requis)):
                 ids_existants = {c["id"] for c in lire_candidatures(user_id, mode=mode)}
                 nouvelles_lba = [o for o in offres_lba if o["id"] not in ids_existants]
                 log(f"  {len(nouvelles_lba)} nouvelles offres LBA (hors doublons FT)")
+                if len(nouvelles_lba) > reste:
+                    # Les suivantes ne sont pas en base : proposées au prochain lancement
+                    log(f"  Limite : {reste} offres LBA analysées sur {len(nouvelles_lba)}")
+                    nouvelles_lba = nouvelles_lba[:reste]
 
                 if nouvelles_lba:
                     etat(message=f"Analyse de {len(nouvelles_lba)} offres LBA...")
@@ -446,7 +471,7 @@ def api_recherche(request: Request, user: User = Depends(utilisateur_requis)):
             pipelines.terminer(RECHERCHE, user_id)
 
     threading.Thread(target=lancer, daemon=True).start()
-    return {"status": "démarré"}
+    return {"status": "démarré", "max_analyses": max_analyses}
 
 @prive.get("/api/statut_recherche")
 def api_statut_recherche(user: User = Depends(utilisateur_requis)):
@@ -623,36 +648,48 @@ def _lancer_spontanees(user_id: int, etape: str, message: str, debut_log: str,
     return {"status": "démarré"}
 
 
+def _avec_limite(reponse, **limite):
+    """Ajoute la limite effective à la réponse d'un lancement réussi."""
+    if isinstance(reponse, dict):
+        reponse.update(limite)
+    return reponse
+
 @prive.post("/api/spontanees/fetch")
-def api_spontanees_fetch(user: User = Depends(utilisateur_requis)):
+def api_spontanees_fetch(body: Fetch | None = None, user: User = Depends(utilisateur_requis)):
     user_id = user.id
+    maximum = config.limite_lancement("entreprises", body.max_entreprises if body else None)
 
     def travail(arret, log, on_progress):
         from spontanees.fetch_entreprises import main as fetch_main
-        fetch_main(stop_event=arret, on_progress=on_progress, user_id=user_id)
+        fetch_main(stop_event=arret, on_progress=on_progress, user_id=user_id,
+                   max_entreprises=maximum, log_fn=log)
 
-    return _lancer_spontanees(user_id, "fetch", "Récupération des entreprises en Île-de-France...",
-                              "▶ Fetch entreprises démarré", travail,
-                              "Fetch terminé !", "✅ Fetch terminé", "fetch")
+    return _avec_limite(_lancer_spontanees(
+        user_id, "fetch", "Récupération des entreprises en Île-de-France...",
+        f"▶ Fetch entreprises démarré — {maximum} nouvelles entreprises au plus", travail,
+        "Fetch terminé !", "✅ Fetch terminé", "fetch"), max_entreprises=maximum)
 
 @prive.post("/api/spontanees/scraper")
-def api_spontanees_scraper(user: User = Depends(utilisateur_requis)):
+def api_spontanees_scraper(body: Scraper | None = None, user: User = Depends(utilisateur_requis)):
     user_id = user.id
+    maximum = config.limite_lancement("scrapees", body.max_scrapees if body else None)
 
     def travail(arret, log, on_progress):
         from spontanees.scraper_emails import main as scraper_main
-        scraper_main(stop_event=arret, log_fn=log, user_id=user_id, on_progress=on_progress)
+        scraper_main(stop_event=arret, log_fn=log, user_id=user_id, on_progress=on_progress,
+                     max_scrapees=maximum)
 
-    return _lancer_spontanees(user_id, "scraper", "Scraping des emails...",
-                              "▶ Scraper emails démarré", travail,
-                              "Scraping terminé !", "✅ Scraping terminé", "scraper")
+    return _avec_limite(_lancer_spontanees(
+        user_id, "scraper", "Scraping des emails...",
+        f"▶ Scraper emails démarré — {maximum} entreprises au plus", travail,
+        "Scraping terminé !", "✅ Scraping terminé", "scraper"), max_scrapees=maximum)
 
 @prive.post("/api/spontanees/envoyer")
 def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends(utilisateur_requis)):
     user_id = user.id
     mode = mode_courant(request)   # capturé avant le thread
     # Plafond de sécurité par lancement (réputation du compte d'envoi)
-    limite = max(1, min(int(body.limite or 10), config.LIMITE_ENVOIS_PAR_LANCEMENT))
+    limite = config.limite_lancement("mails", body.limite)
     # Refus clair AVANT tout lancement : pas de clé (503), pas de compte ou
     # compte jamais vérifié (400), plafond du jour déjà atteint (400)
     compte = compte_envoi.exiger_compte_verifie(user_id)
@@ -676,9 +713,7 @@ def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends
     reponse = _lancer_spontanees(user_id, "envoyer", message, debut, travail,
                                  "Envoi de test terminé !" if test else "Envoi terminé !",
                                  "✅ Envoi terminé", "envoi", mode_test=test)
-    if isinstance(reponse, dict):
-        reponse["mode_test"] = test
-    return reponse
+    return _avec_limite(reponse, limite=limite, mode_test=test)
 
 @prive.get("/api/spontanees/statut")
 def api_spontanees_etat(user: User = Depends(utilisateur_requis)):

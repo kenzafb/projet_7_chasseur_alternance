@@ -3,7 +3,7 @@
    Navigation par onglets · topbar contextuelle · modale lettre ·
    polling de l'état des pipelines. Tout le reste vit dans les modules dédiés.
    ============================================================================ */
-import { api }           from "./api.js";
+import { api, limite }   from "./api.js";
 import { Offres }        from "./offres.js";
 import { Candidatures }  from "./candidatures.js";
 import { Spontanees }    from "./spontanees.js";
@@ -12,7 +12,7 @@ import { Suivi }         from "./suivi.js";
 
 /* Contenu contextuel de la topbar selon la page */
 const TOPBAR = {
-  offres:       { title: "Offres d'alternance",   action: "Lancer la recherche", run: () => api.recherche() },
+  offres:       { title: "Offres d'alternance",   action: "Lancer la recherche", run: () => api.recherche(limite("analyses")) },
   candidatures: { title: "Mes candidatures",      action: "Actualiser",          run: () => recharger() },
   spontanees:   { title: "Candidatures spontanées", action: "Récupérer",         run: () => Spontanees.action("fetch") },
   profil:       { title: "Mon profil",            action: "Enregistrer",         run: () => sauvegarderProfil() },
