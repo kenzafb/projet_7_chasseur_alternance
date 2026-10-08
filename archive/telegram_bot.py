@@ -63,11 +63,11 @@ gemini_client = genai.Client(
 # ─── Prompt Gemini ─────────────────────────────────────────────────────────────
 
 SYSTEM_PROMPT = """\
-Tu es l'assistant personnel de Kenza qui contrôle son outil de recherche d'alternance depuis Telegram.
+Tu es l'assistant de la personne qui contrôle son outil de recherche d'alternance depuis Telegram.
 
 Contexte du projet :
-- Kenza scrape des milliers d'entreprises IT en Île-de-France pour trouver leurs emails
-- Elle envoie ensuite des candidatures spontanées (DevOps / Sysadmin, alternance septembre 2026)
+- L'outil récupère des milliers d'entreprises en Île-de-France et cherche leurs emails
+- Il envoie ensuite des candidatures spontanées, selon le profil de la personne
 - Le pipeline a 3 étapes : fetch (récupère les entreprises) → scraper (trouve les emails) → envoyeur (envoie les mails)
 - Les données sont dans des fichiers JSON locaux
 
