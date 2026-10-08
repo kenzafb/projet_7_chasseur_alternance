@@ -2,7 +2,7 @@
 filtres par mode, découpage adaptatif au-delà de 3150 offres, dédoublonnage,
 taille d'entreprise filtrée après récupération, options du profil."""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -44,7 +44,10 @@ def recuperer(mode="alternance", **recherche):
 
 
 # ─── Filtres par mode ─────────────────────────────────────────────────────────
-def test_requetes_alternance_e2_et_fs_sans_qualification():
+def test_requetes_alternance_e2_et_fs_sans_qualification(monkeypatch):
+    reqs = scraper.requetes_initiales(**{k: criteres()[k] for k in ("filtres", "domaines")})
+    assert reqs == [{"region": "11", "sort": "1", "natureContrat": "E2,FS"}]   # liste acceptée (vérifié)
+    monkeypatch.setitem(parametres_api.VALEURS_PAR_REQUETE, "natureContrat", 1)
     reqs = scraper.requetes_initiales(**{k: criteres()[k] for k in ("filtres", "domaines")})
     assert reqs == [{"region": "11", "sort": "1", "natureContrat": "E2"},
                     {"region": "11", "sort": "1", "natureContrat": "FS"}]
@@ -52,18 +55,18 @@ def test_requetes_alternance_e2_et_fs_sans_qualification():
 
 def test_requetes_job_sans_qualification_ni_theme_par_defaut():
     reqs = scraper.requetes_initiales(**{k: criteres("job")[k] for k in ("filtres", "domaines")})
-    assert [r["typeContrat"] for r in reqs] == ["CDD", "MIS", "SAI"]
+    assert [r["typeContrat"] for r in reqs] == ["CDD,MIS,SAI"]
     assert all("qualification" not in r and "theme" not in r and "natureContrat" not in r for r in reqs)
 
 
 def test_requetes_avec_options_et_domaines(monkeypatch):
     c = criteres("job", domaines=["C", "M18"], themes=["13", "17"], secteurs=["62"])
     reqs = scraper.requetes_initiales(c["filtres"], c["domaines"])
-    assert len(reqs) == 3 * 2 * 2          # 3 types, 2 thèmes, 2 groupes de domaine
+    assert len(reqs) == 1 * 2 * 2          # types en une liste, 2 thèmes (liste refusée), 2 groupes de domaine
     assert {r.get("grandDomaine") for r in reqs} == {"C", None}
     assert {r.get("domaine") for r in reqs} == {"M18", None}
-    assert all(r["secteurActivite"] == "62" for r in reqs)
-    # Valeurs multiples acceptées par l'API : regroupées
+    assert all(r["secteurActivite"] == "62" and r["typeContrat"] == "CDD,MIS,SAI" for r in reqs)
+    # Paquets de la taille acceptée par l'API
     monkeypatch.setitem(parametres_api.VALEURS_PAR_REQUETE, "typeContrat", 2)
     monkeypatch.setitem(parametres_api.VALEURS_PAR_REQUETE, "theme", None)
     reqs = scraper.requetes_initiales(c["filtres"], c["domaines"])
@@ -107,57 +110,78 @@ def _plages_valides(api):
         assert fin - debut + 1 <= 150 and debut <= 3000
 
 
-def test_decoupage_par_departement(api):
-    api.offres = [offre(n, dept=DEPTS[n % 8], jours=n % 50) for n in range(3313)]
-    offres, log = recuperer()
-    assert len(offres) == 3313
-    _plages_valides(api)
-    assert any("departement" in r for r in api.recherches)
-    assert "⚠️" not in log.texte()
-    assert "3313 offres distinctes" in log.texte()
+def _sans_decoupage_geo_ni_domaine(api):
+    for r in api.recherches:
+        assert not {"departement", "grandDomaine", "domaine"} & set(r), r
 
 
-def test_decoupage_jusqu_aux_domaines_puis_aux_dates(api):
-    # Paris seul dépasse : grands domaines, puis domaines de M, puis fenêtres de dates pour M18
-    api.offres = ([offre(n, dept="75", domaine="M18", jours=n % 200) for n in range(3400)]
-                  + [offre(10000 + n, dept="75", domaine="M13") for n in range(100)]
-                  + [offre(20000 + n, dept="92", domaine="C15") for n in range(50)])
+def test_decoupage_par_dates_seulement_retrouve_tout(api):
+    """Offres sans département ni domaine comprises : le découpage par
+    département ou domaine les perdait (vérification du 8 octobre 2026)."""
+    api.offres = ([offre(n, dept=DEPTS[n % 8], domaine="M18" if n % 3 else "J11", jours=n % 50)
+                   for n in range(3313)]
+                  + [offre(5000 + n, dept="11", domaine="", jours=n % 5) for n in range(40)])
     offres, log = recuperer()
-    assert len(offres) == 3550
+    assert len(offres) == 3353
     _plages_valides(api)
-    assert any(r.get("grandDomaine") == "M" for r in api.recherches)
-    assert any(r.get("domaine") == "M18" and "minCreationDate" in r for r in api.recherches)
+    _sans_decoupage_geo_ni_domaine(api)
+    assert any("minCreationDate" in r for r in api.recherches)
+    assert "3353 annoncées par l'API, 3353 récupérées, écart 0" in log.texte()
     assert "⚠️" not in log.texte()
 
 
-def test_valeurs_multiples_eclatees_avant_les_dates(api, monkeypatch):
-    monkeypatch.setitem(parametres_api.VALEURS_PAR_REQUETE, "natureContrat", 2)
-    api.offres = [offre(n, dept="75", domaine="M18", nature="E2" if n % 2 else "FS", jours=n % 30)
-                  for n in range(3300)]
-    offres, log = recuperer(domaines=["M18"])
-    assert len(offres) == 3300
-    assert any(r.get("natureContrat") == "E2" for r in api.recherches)
+def test_pas_de_bilan_sans_decoupage(api):
+    api.offres = [offre(n) for n in range(10)]
+    _, log = recuperer()
+    assert "annoncées par l'API" not in log.texte()
+
+
+def test_marge_de_fuseau(api, monkeypatch):
+    """L'API lit les dates en heure de Paris : sans marge, les dernières
+    heures d'offres manquent ; avec la marge, l'union retrouve le total."""
+    api.decalage_heures = 2
+    maintenant = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(scraper, "_maintenant", lambda: maintenant)
+    api.offres = [offre(n, jours=n % 40) for n in range(3300)]
+    for n, o in enumerate(api.offres[:60]):          # publiées dans la dernière heure
+        o["dateCreation"] = (maintenant - timedelta(minutes=n % 59)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    offres, log = recuperer()
+    assert len(offres) == 3300 and "écart 0" in log.texte()
+    monkeypatch.setattr(parametres_api, "MARGE_FIN_FENETRE_HEURES", 0)
+    limite = (maintenant - timedelta(hours=2)).strftime("%Y-%m-%dT%H:%M:%S")
+    perdues = sum(1 for o in api.offres if o["dateCreation"][:19] > limite)
+    assert perdues >= 60
+    offres, log = recuperer()
+    assert len(offres) == 3300 - perdues
+    assert f"3300 annoncées par l'API, {3300 - perdues} récupérées, écart {perdues}" in log.texte()
+
+
+def test_bornes_communes_dedoublonnees(api):
+    """Deux moitiés partagent leur borne : une offre publiée pile à cette
+    seconde est lue deux fois et comptée une seule."""
+    api.offres = [offre(n, jours=n % 60) for n in range(3300)]
+    offres, log = recuperer()
+    assert len(offres) == len({o["id"] for o in offres}) == 3300
 
 
 def test_rien_tronque_en_silence(api):
-    """Même date, même lieu, même domaine : plus aucun découpage possible."""
+    """Même heure de publication : plus aucun découpage possible."""
     api.offres = [offre(n, dept="75", domaine="M18") for n in range(3200)]
     for o in api.offres:
         o["dateCreation"] = "2026-09-30T08:00:00.000Z"
     offres, log = recuperer(domaines=["M18"])
     assert len(offres) == 3150
-    assert "aucun découpage possible : 50 non récupérées" in log.texte()
+    assert "découpage impossible : 50 non récupérées" in log.texte()
+    assert "3200 annoncées par l'API, 3150 récupérées, écart 50" in log.texte()
     assert "50 non récupérées (plafond)" in log.texte()
+    # Découpé jusqu'à l'heure, pas plus fin
+    fenetres = [(r["minCreationDate"], r["maxCreationDate"]) for r in api.recherches if "minCreationDate" in r]
+    plus_courte = min(scraper._date(b) - scraper._date(a) for a, b in fenetres)
+    assert timedelta(minutes=30) < plus_courte <= timedelta(hours=1)
 
 
-def test_couverture_incomplete_signalee(api):
-    """Offres rattachées à la région sans département : le découpage les perd, c'est dit."""
-    api.offres = [offre(n, dept=DEPTS[n % 8]) for n in range(3200)] + [offre(9000 + n, dept="11") for n in range(10)]
-    _, log = recuperer()
-    assert "Découpage par département : 3200 offres retrouvées sur 3210" in log.texte()
-
-
-def test_erreur_d_une_requete_n_arrete_pas_les_autres(api):
+def test_erreur_d_une_requete_n_arrete_pas_les_autres(api, monkeypatch):
+    monkeypatch.setitem(parametres_api.VALEURS_PAR_REQUETE, "natureContrat", 1)
     api.offres = [offre(1, nature="E2"), offre(2, nature="FS")]
     rechercher = api.rechercher
     api.rechercher = lambda p: Reponse(500, {"message": "panne"}) if p.get("natureContrat") == "E2" else rechercher(p)
@@ -218,23 +242,11 @@ def test_options_et_profil_par_l_api(utilisateur):
     assert (rech["secteurs"], rech["tailles"], rech["taille_inconnue"]) == (["62"], ["50_249"], False)
 
 
-def test_parametre_ignore_par_l_api_sans_explosion(api):
-    """Si l'API ignore grandDomaine et domaine (parametres_api.py faux), le
-    découpage par domaine est abandonné avec un message, sans multiplier
-    les requêtes ; les dates prennent le relais."""
-    api.params_reconnus -= {"grandDomaine", "domaine"}
-    api.offres = [offre(n, dept="75", domaine="M18", jours=n % 100) for n in range(3300)]
-    offres, log = recuperer()
-    assert len(offres) == 3300
-    assert "Découpage par domaine sans effet" in log.texte()
-    assert len(api.recherches) < 150
-
-
 def test_dates_ignorees_tronque_avec_message(api):
     api.params_reconnus -= {"grandDomaine", "domaine", "minCreationDate", "maxCreationDate"}
     api.offres = [offre(n, dept="75", domaine="M18", jours=n % 100) for n in range(3300)]
     offres, log = recuperer(domaines=["M18"])
     assert len(offres) == 3150
-    assert "Découpage par date de publication sans effet" in log.texte()
+    assert "Découpage par date sans effet" in log.texte()
     assert "150 non récupérées" in log.texte()
     assert len(api.recherches) < 100

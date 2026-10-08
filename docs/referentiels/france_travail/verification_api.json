@@ -1,0 +1,433 @@
+{
+  "verifie_le": "2026-10-08T21:13:49+00:00",
+  "plage_de_comptage": "0-0",
+  "domaine": {
+    "base": {
+      "params": {
+        "region": "11"
+      },
+      "statut": 206,
+      "total": 66929
+    },
+    "essais": [
+      {
+        "params": {
+          "region": "11",
+          "domaine": "M18"
+        },
+        "statut": 206,
+        "total": 3142,
+        "effet": "filtre"
+      },
+      {
+        "params": {
+          "region": "11",
+          "grandDomaine": "M18"
+        },
+        "statut": 206,
+        "total": 3142,
+        "effet": "filtre"
+      },
+      {
+        "params": {
+          "region": "11",
+          "grandDomaine": "M"
+        },
+        "statut": 206,
+        "total": 3207,
+        "effet": "filtre"
+      },
+      {
+        "params": {
+          "region": "11",
+          "domaine": "M"
+        },
+        "statut": 400,
+        "total": null,
+        "message": "Valeur du paramètre « domaine » incorrecte.",
+        "effet": "refusé (400)"
+      },
+      {
+        "params": {
+          "region": "11",
+          "codeROME": "M1805"
+        },
+        "statut": 206,
+        "total": 66,
+        "effet": "filtre"
+      },
+      {
+        "params": {
+          "region": "11",
+          "domaine": "Z99"
+        },
+        "statut": 400,
+        "total": null,
+        "message": "Valeur du paramètre « domaine » incorrecte.",
+        "effet": "refusé (400)"
+      },
+      {
+        "params": {
+          "region": "11",
+          "grandDomaine": "Z"
+        },
+        "statut": 400,
+        "total": null,
+        "message": "Format du paramètre « grandDomaine » incorrect. A, B, C, C15, D, E, F, G, H, I, J, K, L, L14, M15, M18, M, M16, M17, M13, M14 ou N attendu.",
+        "effet": "refusé (400)"
+      }
+    ],
+    "param_domaine": "domaine",
+    "param_grand_domaine": "grandDomaine",
+    "grand_domaine_contient_domaine": true,
+    "couverture": {
+      "grands_domaines": {
+        "totaux": {
+          "A": 805,
+          "B": 128,
+          "C": 1025,
+          "D": 7191,
+          "E": 526,
+          "F": 5110,
+          "G": 3920,
+          "H": 5995,
+          "I": 5315,
+          "J": 8056,
+          "K": 11661,
+          "L": 186,
+          "M": 3207,
+          "N": 3854
+        },
+        "somme": 56979,
+        "total_sans_filtre": 66929
+      },
+      "departements": {
+        "totaux": {
+          "75": 14352,
+          "77": 7705,
+          "78": 8199,
+          "91": 6730,
+          "92": 10190,
+          "93": 5517,
+          "94": 5933,
+          "95": 5405
+        },
+        "somme": 64031,
+        "total_sans_filtre": 66929
+      }
+    }
+  },
+  "multiples": {
+    "natureContrat": {
+      "liste": {
+        "params": {
+          "region": "11",
+          "natureContrat": "E2,FS"
+        },
+        "statut": 206,
+        "total": 3313
+      },
+      "refuse": false,
+      "max": 2,
+      "verdict": "acceptée, OU des valeurs (3313, somme des valeurs seules 3313)",
+      "seules": {
+        "E2": 2541,
+        "FS": 772
+      }
+    },
+    "typeContrat": {
+      "liste": {
+        "params": {
+          "region": "11",
+          "typeContrat": "CDD,MIS,SAI"
+        },
+        "statut": 206,
+        "total": 21642
+      },
+      "refuse": false,
+      "max": 3,
+      "verdict": "acceptée, OU des valeurs (21642, somme des valeurs seules 21642)",
+      "seules": {
+        "CDD": 10797,
+        "MIS": 10798,
+        "SAI": 47
+      }
+    },
+    "theme": {
+      "liste": {
+        "params": {
+          "region": "11",
+          "theme": "13,17"
+        },
+        "statut": 400,
+        "total": null,
+        "message": "Valeur du paramètre « theme » incorrecte."
+      },
+      "refuse": true,
+      "max": null,
+      "verdict": "liste refusée (400) : Valeur du paramètre « theme » incorrecte.",
+      "seules": {
+        "13": 1201,
+        "17": 8535
+      }
+    },
+    "grandDomaine": {
+      "liste": {
+        "params": {
+          "region": "11",
+          "grandDomaine": "M,C,J,D,H"
+        },
+        "statut": 206,
+        "total": 25474
+      },
+      "refuse": false,
+      "max": 5,
+      "verdict": "acceptée, OU des valeurs (25474, somme des valeurs seules 25474)",
+      "seules": {
+        "M": 3207,
+        "C": 1025,
+        "J": 8056,
+        "D": 7191,
+        "H": 5995
+      }
+    },
+    "domaine": {
+      "liste": {
+        "params": {
+          "region": "11",
+          "domaine": "M18,C15,M13,J11,D12"
+        },
+        "statut": 400,
+        "total": null,
+        "message": "Valeur du paramètre « domaine » incorrecte."
+      },
+      "refuse": true,
+      "max": null,
+      "verdict": "liste refusée (400) : Valeur du paramètre « domaine » incorrecte.",
+      "essai_deux_valeurs": {
+        "liste": {
+          "params": {
+            "region": "11",
+            "domaine": "M18,C15"
+          },
+          "statut": 400,
+          "total": null,
+          "message": "Valeur du paramètre « domaine » incorrecte."
+        },
+        "refuse": true,
+        "max": null,
+        "verdict": "liste refusée (400) : Valeur du paramètre « domaine » incorrecte."
+      },
+      "seules": {
+        "M18": 3142,
+        "C15": 1940,
+        "M13": 145,
+        "J11": 1715,
+        "D12": 1518
+      }
+    },
+    "secteurActivite": {
+      "liste": {
+        "params": {
+          "region": "11",
+          "secteurActivite": "62,68,86,47,41"
+        },
+        "statut": 400,
+        "total": null,
+        "message": "Format du paramètre « secteurActivite » incorrect. 2 chaînes de caractères séparées par des virgules maximum."
+      },
+      "refuse": true,
+      "max": null,
+      "verdict": "liste refusée (400) : Format du paramètre « secteurActivite » incorrect. 2 chaînes de caractères séparées par des virgules",
+      "essai_deux_valeurs": {
+        "liste": {
+          "params": {
+            "region": "11",
+            "secteurActivite": "62,68"
+          },
+          "statut": 206,
+          "total": 1289
+        },
+        "refuse": false,
+        "max": null,
+        "verdict": "incohérent (1289 ; valeurs seules {'62': 614, '68': 675, '86': 1034, '47': 1870, '41': 133})"
+      },
+      "seules": {
+        "62": 614,
+        "68": 675,
+        "86": 1034,
+        "47": 1870,
+        "41": 133
+      }
+    }
+  },
+  "tranche_effectif": {
+    "offres_lues": 300,
+    "champs": {
+      "trancheEffectifEtab": {
+        "presence": 287,
+        "sur": 300,
+        "valeurs_frequentes": [
+          [
+            "10 à 19 salariés",
+            60
+          ],
+          [
+            "20 à 49 salariés",
+            44
+          ],
+          [
+            "6 à 9 salariés",
+            32
+          ],
+          [
+            "1 ou 2 salariés",
+            30
+          ],
+          [
+            "3 à 5 salariés",
+            24
+          ],
+          [
+            "50 à 99 salariés",
+            23
+          ],
+          [
+            "100 à 199 salariés",
+            20
+          ],
+          [
+            "0 salarié (n'ayant pas d'effectif au 31/12 mais ayant employé des salariés au cours de l'année de référence)",
+            20
+          ],
+          [
+            "250 à 499 salariés",
+            14
+          ],
+          [
+            "200 à 249 salariés",
+            6
+          ],
+          [
+            "500 à 999 salariés",
+            5
+          ],
+          [
+            "2000 à 4999 salariés",
+            3
+          ],
+          [
+            "Non employeur (pas de salarié au cours de l'année de référence et pas d'effectif au 31/12)",
+            3
+          ],
+          [
+            "5000 à 9999 salariés",
+            2
+          ],
+          [
+            "1000 à 1999 salariés",
+            1
+          ]
+        ],
+        "reconnues": 287,
+        "non_reconnues": []
+      }
+    },
+    "champ_propose": "trancheEffectifEtab",
+    "cles_des_offres": {
+      "id": 300,
+      "intitule": 300,
+      "description": 300,
+      "dateCreation": 300,
+      "dateActualisation": 300,
+      "lieuTravail": 300,
+      "romeCode": 300,
+      "romeLibelle": 300,
+      "appellationlibelle": 300,
+      "entreprise": 300,
+      "typeContrat": 300,
+      "typeContratLibelle": 300,
+      "natureContrat": 300,
+      "experienceExige": 300,
+      "experienceLibelle": 300,
+      "salaire": 300,
+      "alternance": 300,
+      "contact": 300,
+      "agence": 300,
+      "nombrePostes": 300,
+      "qualificationCode": 300,
+      "qualificationLibelle": 300,
+      "origineOffre": 300,
+      "contexteTravail": 300,
+      "entrepriseAdaptee": 300,
+      "employeurHandiEngage": 300,
+      "codeNAF": 299,
+      "secteurActivite": 299,
+      "secteurActiviteLibelle": 299,
+      "offresManqueCandidats": 295,
+      "dureeTravailLibelle": 290,
+      "dureeTravailLibelleConverti": 290,
+      "trancheEffectifEtab": 287,
+      "competences": 271,
+      "qualitesProfessionnelles": 189,
+      "deplacementLibelle": 165,
+      "deplacementCode": 160,
+      "accessibleTH": 88,
+      "formations": 63,
+      "permis": 60,
+      "langues": 51,
+      "experienceCommentaire": 12
+    },
+    "cles_entreprise": {
+      "entrepriseAdaptee": 295,
+      "nom": 258,
+      "description": 37,
+      "url": 13,
+      "logo": 11
+    }
+  },
+  "decoupage": {
+    "departement=75": {
+      "params": {
+        "departement": "75"
+      },
+      "statut": 206,
+      "total": 14352,
+      "effet": "filtre"
+    },
+    "fenetre_7_jours": {
+      "params": {
+        "region": "11",
+        "minCreationDate": "2026-10-01T21:13:47Z",
+        "maxCreationDate": "2026-10-08T21:13:47Z"
+      },
+      "statut": 206,
+      "total": 17458,
+      "effet": "filtre"
+    },
+    "fenetre_complete": {
+      "params": {
+        "region": "11",
+        "minCreationDate": "2000-01-01T00:00:00Z",
+        "maxCreationDate": "2026-10-08T21:13:47Z"
+      },
+      "statut": 206,
+      "total": 66709,
+      "effet": "filtre"
+    },
+    "fenetre_complete_couvre_tout": false
+  },
+  "propositions": {
+    "PARAM_GRAND_DOMAINE": "grandDomaine",
+    "PARAM_DOMAINE": "domaine",
+    "VALEURS_PAR_REQUETE": {
+      "natureContrat": 2,
+      "typeContrat": 3,
+      "grandDomaine": 5,
+      "domaine": 1,
+      "secteurActivite": 1,
+      "theme": 1
+    },
+    "CHAMP_TRANCHE_EFFECTIF": "trancheEffectifEtab"
+  }
+}

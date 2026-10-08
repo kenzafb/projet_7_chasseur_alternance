@@ -67,8 +67,8 @@ def test_parametre_ignore_et_premiere_valeur_seulement(api, tmp_path):
     essais = {f"{k}={v}": e for e in res["domaine"]["essais"] for k, v in e["params"].items() if k != "region"}
     assert essais["domaine=M18"]["effet"] == "ignoré (total inchangé)"
     assert res["domaine"]["param_domaine"] == "grandDomaine"   # grandDomaine=M18 filtre
-    assert res["multiples"]["natureContrat"]["max"] == 1
-    assert "première valeur" in res["multiples"]["natureContrat"]["verdict"]
+    assert res["multiples"]["natureContrat=E2,FS"]["max"] == 1
+    assert "première valeur" in res["multiples"]["natureContrat=E2,FS"]["verdict"]
     assert res["propositions"]["VALEURS_PAR_REQUETE"]["natureContrat"] == 1
     assert res["propositions"]["VALEURS_PAR_REQUETE"]["typeContrat"] == 3
 
@@ -76,7 +76,7 @@ def test_parametre_ignore_et_premiere_valeur_seulement(api, tmp_path):
 def test_liste_refusee(api, tmp_path):
     api.multiples, api.multiples_refuses = set(), True
     _, _, res = lancer(api, tmp_path)
-    assert res["multiples"]["typeContrat"]["refuse"] is True
+    assert res["multiples"]["typeContrat=CDD,MIS,SAI"]["refuse"] is True
     assert res["propositions"]["VALEURS_PAR_REQUETE"]["typeContrat"] == 1
 
 
@@ -91,11 +91,51 @@ def test_tranche_effectif(api, tmp_path):
     assert "trancheEffectifEtab : présent dans" in sortie
 
 
+def test_secteur_limite_a_deux_valeurs(api, tmp_path):
+    """Liste de cinq refusée (« 2 chaînes séparées par des virgules ») :
+    l'essai à exactement deux valeurs tranche."""
+    api.max_valeurs = {"secteurActivite": 2}
+    _, sortie, res = lancer(api, tmp_path)
+    assert res["multiples"]["secteurActivite=62,68,86,47,41"]["refuse"] is True
+    deux = res["multiples"]["secteurActivite=62,68"]
+    assert deux["max"] == 2 and "acceptée" in deux["verdict"]
+    assert res["propositions"]["VALEURS_PAR_REQUETE"]["secteurActivite"] == 2
+    assert "secteurActivite=62,68 : acceptée" in sortie
+
+
+def test_liste_comparee_a_ses_seules_valeurs(api, tmp_path):
+    """Régression : l'essai à deux valeurs était comparé aux totaux des
+    cinq, et jugé « incohérent » (1289 = 614 + 675 le 8 octobre 2026)."""
+    api.max_valeurs = {"secteurActivite": 2}
+    _, _, res = lancer(api, tmp_path)
+    essai = res["multiples"]["secteurActivite=62,68,86,47,41"]["essai_deux_valeurs"]
+    assert essai["max"] == 2 and set(essai["liste"]["params"]["secteurActivite"].split(",")) == {"62", "68"}
+
+
 def test_decoupage(api, tmp_path):
     _, sortie, res = lancer(api, tmp_path)
     d = res["decoupage"]
     assert d["departement=75"]["total"] == 7
     assert d["fenetre_7_jours"]["statut"] in (200, 204, 206)
+    assert d["fenetre_complete_couvre_tout"] is True
+    assert d["fenetre_complete"]["total"] == d["total_sans_dates"]["total"] == 56
+    assert d["moities_moins_complete"] == 0
+
+
+def test_decalage_de_fuseau_visible(api, tmp_path):
+    """L'API lit les dates en heure de Paris : la fin « maintenant » perd
+    les dernières heures, la fin avec marge retrouve tout."""
+    from datetime import datetime, timedelta, timezone
+    recentes = [offre(900 + n) for n in range(5)]
+    for n, o in enumerate(recentes):
+        o["dateCreation"] = (datetime.now(timezone.utc) - timedelta(minutes=10 + n)).strftime(
+            "%Y-%m-%dT%H:%M:%S.000Z")
+    api.offres += recentes
+    api.decalage_heures = 2
+    _, sortie, res = lancer(api, tmp_path)
+    d = res["decoupage"]
+    assert d["fenetre_fin_maintenant"]["total"] == 56
+    assert d["fenetre_fin_plus_3h"]["total"] == d["fenetre_complete"]["total"] == 61
     assert d["fenetre_complete_couvre_tout"] is True
 
 

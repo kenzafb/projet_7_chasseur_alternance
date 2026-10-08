@@ -12,8 +12,8 @@ dans le .env) :
 
 puis reporter ici les valeurs que le script affiche à la fin.
 
-Valeurs actuelles : choix prudents en attendant la vérification (une
-requête par valeur ; c'est toujours juste, au prix de plus de requêtes).
+Valeurs vérifiées sur la vraie API le 8 octobre 2026 (détail dans
+docs/referentiels/france_travail/verification_api.json).
 """
 
 # Paramètre de recherche d'un grand domaine (lettre A à N). None : l'API
@@ -27,12 +27,12 @@ PARAM_DOMAINE = "domaine"
 # pour chaque paramètre à valeurs multiples. 1 : une requête par valeur
 # (résultats réunis et dédoublonnés) ; None : sans limite.
 VALEURS_PAR_REQUETE = {
-    "natureContrat":   1,
-    "typeContrat":     1,
-    "grandDomaine":    1,
-    "domaine":         1,
-    "secteurActivite": 1,
-    "theme":           1,
+    "natureContrat":   2,   # E2,FS : OU des deux (3313)
+    "typeContrat":     3,   # CDD,MIS,SAI : OU des trois (21642)
+    "grandDomaine":    5,   # cinq lettres : OU (25474)
+    "domaine":         1,   # liste refusée (400)
+    "secteurActivite": 1,   # liste de cinq refusée : « 2 chaînes séparées par des virgules » (à revérifier)
+    "theme":           1,   # liste refusée (400)
 }
 
 # Champ d'une offre qui porte la tranche d'effectif de l'établissement,
@@ -42,9 +42,19 @@ VALEURS_PAR_REQUETE = {
 # inconnue ».
 CHAMP_TRANCHE_EFFECTIF = "trancheEffectifEtab"
 
-# Début de la fenêtre de publication quand le découpage descend jusqu'aux
-# dates (minCreationDate, maxCreationDate).
+# Fenêtre de publication du découpage (minCreationDate, maxCreationDate).
+# Début : avant toute offre encore en ligne.
 DATE_PLUS_ANCIENNE = "2000-01-01T00:00:00Z"
+# Fin : maintenant plus cette marge. Le 8 octobre 2026, la fenêtre
+# [2000, maintenant en UTC] ramenait 66709 offres sur 66929 : il manquait
+# environ deux heures d'offres (17458 en 7 jours, soit une centaine par
+# heure), l'écart de l'heure de Paris en été. L'API lit sans doute les
+# dates en heure de Paris malgré le « Z ». Une marge d'un jour couvre tout
+# décalage de fuseau ; scripts/verifier_france_travail.py le contrôle.
+MARGE_FIN_FENETRE_HEURES = 24
+# Plus petite fenêtre découpée : au-delà, la tranche est récupérée jusqu'au
+# plafond et le reste signalé (une heure compte une centaine d'offres en IDF)
+FENETRE_MIN_HEURES = 1
 
 
 def valeurs_par_requete(param: str) -> int | None:

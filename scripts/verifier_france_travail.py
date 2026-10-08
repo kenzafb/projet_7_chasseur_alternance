@@ -21,9 +21,10 @@ ses identifiants (FT_CLIENT_ID, FT_CLIENT_SECRET du .env) :
    apprentissage), chaque champ dont le nom contient « effectif » ou
    « tranche », sa présence, ses valeurs les plus fréquentes et la part
    reconnue par shared.tailles.taille_depuis_tranche.
-4. Découpage : paramètre departement, fenêtre de publication
-   (minCreationDate, maxCreationDate) sur 7 jours et depuis
-   DATE_PLUS_ANCIENNE.
+4. Découpage par date (décision D31) : fenêtre depuis DATE_PLUS_ANCIENNE
+   jusqu'à maintenant, maintenant plus 3 h, maintenant plus la marge de
+   parametres_api.py, comparées au total sans dates ; deux moitiés
+   jointives comparées à la fenêtre complète (bornes incluses ou non).
 
 Résultat détaillé dans docs/referentiels/france_travail/verification_api.json
 (--sortie pour un autre dossier), sans identifiant ni token. À la fin, les
@@ -66,9 +67,15 @@ ESSAIS_MULTIPLES = [
     ("<grand domaine>", ["M", "C", "J", "D", "H"]),
     ("<domaine>", ["M18", "C15", "M13", "J11", "D12"]),
     ("secteurActivite", ["62", "68", "86", "47", "41"]),
+    # Message de l'API sur la liste de cinq : « 2 chaînes de caractères
+    # séparées par des virgules » ; exactement deux valeurs
+    ("secteurActivite", ["62", "68"]),
 ]
 MOTS_TAILLE = ("effectif", "tranche")
 FORMAT_DATE = "%Y-%m-%dT%H:%M:%SZ"
+# Écart toléré entre la fenêtre complète et le total sans dates : offres
+# publiées ou retirées entre les deux requêtes
+ECART_TOLERE = 5
 
 
 def _chemins(valeur, prefixe=""):
@@ -165,7 +172,7 @@ class Verificateur:
         for nom, valeurs in ESSAIS_MULTIPLES:
             param = roles.get(nom, nom)
             if not param:
-                resultats[nom] = {"verdict": "non testé : paramètre de domaine introuvable"}
+                resultats[nom] = {"param": None, "verdict": "non testé : paramètre de domaine introuvable"}
                 self.afficher(f"  {nom} : non testé (paramètre introuvable)")
                 continue
             seules = {v: self.compter({**BASE, param: v})["total"] for v in valeurs}
@@ -175,13 +182,14 @@ class Verificateur:
                 essai.update(max=essai2["max"], essai_deux_valeurs=essai2)
                 if essai2["max"]:
                     essai["verdict"] += " ; deux valeurs acceptées"
-            essai["seules"] = seules
-            resultats[param] = essai
+            essai.update(param=param, seules=seules)
+            resultats[f"{param}={','.join(valeurs)}"] = essai
             self.afficher(f"  {param}={','.join(valeurs)} : {essai['verdict']}")
         return resultats
 
     def _liste(self, param, valeurs, seules) -> dict:
         e = self.compter({**BASE, param: ",".join(valeurs)})
+        seules = {v: seules.get(v) for v in valeurs}   # seulement les valeurs de la liste
         connus = [t for t in seules.values() if t is not None]
         plus_grand, somme = max(connus, default=0), sum(connus)
         if e["total"] is None:
@@ -237,21 +245,44 @@ class Verificateur:
 
     # ── 4. Paramètres du découpage ──
     def decoupage(self, total_base) -> dict:
+        """Fenêtres de dates du découpage (décision D31) : avec quelle fin
+        l'union retrouve le total, et ce que donnent deux moitiés."""
         maintenant = datetime.now(timezone.utc).replace(microsecond=0)
+        avec_marge = maintenant + timedelta(hours=parametres_api.MARGE_FIN_FENETRE_HEURES)
+        milieu = maintenant - timedelta(days=3)
+
+        def fenetre(debut, fin):
+            return self.compter({**BASE, "minCreationDate": debut if isinstance(debut, str) else
+                                 debut.strftime(FORMAT_DATE), "maxCreationDate": fin.strftime(FORMAT_DATE)})
+
+        debut = parametres_api.DATE_PLUS_ANCIENNE
         essais = {
             "departement=75": self.compter({"departement": "75"}),
-            "fenetre_7_jours": self.compter({**BASE, "minCreationDate": (maintenant - timedelta(days=7))
-                                             .strftime(FORMAT_DATE),
-                                             "maxCreationDate": maintenant.strftime(FORMAT_DATE)}),
-            "fenetre_complete": self.compter({**BASE, "minCreationDate": parametres_api.DATE_PLUS_ANCIENNE,
-                                              "maxCreationDate": maintenant.strftime(FORMAT_DATE)}),
+            "fenetre_7_jours": fenetre(maintenant - timedelta(days=7), maintenant),
+            "fenetre_fin_maintenant": fenetre(debut, maintenant),
+            "fenetre_fin_plus_3h": fenetre(debut, maintenant + timedelta(hours=3)),
+            "fenetre_complete": fenetre(debut, avec_marge),
+            "moitie_avant": fenetre(debut, milieu),
+            "moitie_apres": fenetre(milieu, avec_marge),
         }
+        # Total sans dates mesuré juste après, la base du début ayant pu bouger
+        essais["total_sans_dates"] = self.compter(BASE)
+        reference = essais["total_sans_dates"]["total"] or total_base
         for nom, e in essais.items():
-            e["effet"] = self._effet(e, total_base)
+            e["effet"] = self._effet(e, reference)
             self.afficher(f"  {nom} : {e['total']} ({e['statut']})"
                           + (f" {e.get('message', '')[:100]}" if e["total"] is None else ""))
         complete = essais["fenetre_complete"]["total"]
-        essais["fenetre_complete_couvre_tout"] = complete is not None and complete == total_base
+        essais["fenetre_complete_couvre_tout"] = (complete is not None and reference is not None
+                                                  and abs(complete - reference) <= ECART_TOLERE)
+        moities = [essais[k]["total"] for k in ("moitie_avant", "moitie_apres")]
+        if None not in moities and complete is not None:
+            essais["moities_moins_complete"] = sum(moities) - complete
+            self.afficher(f"  deux moitiés : {sum(moities)} pour {complete} "
+                          f"({sum(moities) - complete:+d} : offres à la borne commune, comptées deux fois "
+                          "si les bornes sont incluses)")
+        self.afficher(f"  fenêtre complète (fin + {parametres_api.MARGE_FIN_FENETRE_HEURES} h) : "
+                      f"{complete} pour {reference} sans dates")
         return essais
 
 
@@ -260,10 +291,17 @@ def propositions(resultat: dict) -> dict:
     dom = resultat["domaine"]
     valeurs = {"PARAM_GRAND_DOMAINE": dom["param_grand_domaine"], "PARAM_DOMAINE": dom["param_domaine"]}
     par_requete = dict(parametres_api.VALEURS_PAR_REQUETE)
-    for param, essai in resultat["multiples"].items():
-        if param in par_requete and essai.get("max"):
-            par_requete[param] = essai["max"]
-        elif param in par_requete and essai.get("refuse"):
+    acceptes, refuses = {}, set()
+    for essai in resultat["multiples"].values():
+        param = essai.get("param")
+        if essai.get("max"):
+            acceptes[param] = max(acceptes.get(param, 0), essai["max"])
+        elif essai.get("refuse"):
+            refuses.add(param)
+    for param in par_requete:
+        if param in acceptes:
+            par_requete[param] = acceptes[param]
+        elif param in refuses:
             par_requete[param] = 1
     valeurs["VALEURS_PAR_REQUETE"] = par_requete
     valeurs["CHAMP_TRANCHE_EFFECTIF"] = resultat["tranche_effectif"]["champ_propose"]
@@ -289,7 +327,7 @@ def resume(resultat: dict, afficher=print):
     if resultat["domaine"].get("grand_domaine_contient_domaine") is False:
         afficher("⚠️  Le grand domaine M compte moins d'offres que M18 : paramètres à revoir.")
     if not resultat["decoupage"]["fenetre_complete_couvre_tout"]:
-        afficher("⚠️  La fenêtre depuis DATE_PLUS_ANCIENNE ne retrouve pas le total : "
+        afficher("⚠️  La fenêtre complète (avec la marge de fin) ne retrouve pas le total sans dates : "
                  "voir « decoupage » dans le fichier.")
 
 

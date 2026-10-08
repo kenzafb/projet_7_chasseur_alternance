@@ -58,7 +58,8 @@ def _date(texte):
 class FausseAPI:
     """Remplace requests.get / requests.post (ou une session) pour France Travail."""
 
-    def __init__(self, offres=(), params_reconnus=None, multiples=None, multiples_refuses=False):
+    def __init__(self, offres=(), params_reconnus=None, multiples=None, multiples_refuses=False,
+                 max_valeurs=None, decalage_heures=0):
         self.offres = list(offres)
         # Paramètres de filtre compris par l'API simulée ; les autres sont ignorés
         self.params_reconnus = set(params_reconnus if params_reconnus is not None else (
@@ -68,6 +69,10 @@ class FausseAPI:
         # ou 400 si multiples_refuses
         self.multiples = set(multiples if multiples is not None else self.params_reconnus)
         self.multiples_refuses = multiples_refuses
+        # Nombre maximal de valeurs par paramètre (400 au-delà), ex. {"secteurActivite": 2}
+        self.max_valeurs = dict(max_valeurs or {})
+        # Dates reçues lues en heure locale (Paris en été : 2) malgré le « Z »
+        self.decalage_heures = decalage_heures
         self.recherches = []
         self.token = Reponse(200, {"access_token": "token-de-test", "expires_in": 1499})
 
@@ -111,12 +116,16 @@ class FausseAPI:
         if dates & set(params):
             if not ("minCreationDate" in params and "maxCreationDate" in params):
                 raise ValueError("les deux dates sont exigées")
-            debut, fin = _date(params["minCreationDate"]), _date(params["maxCreationDate"])
+            decalage = timedelta(hours=self.decalage_heures)
+            debut = _date(params["minCreationDate"]) - decalage
+            fin = _date(params["maxCreationDate"]) - decalage
             offres = [o for o in offres if debut <= _date(o["dateCreation"][:19] + "Z") <= fin]
         for param, brut in params.items():
             if param in ("range", "sort", "minCreationDate", "maxCreationDate") or param not in self.params_reconnus:
                 continue
             valeurs = str(brut).split(",")
+            if len(valeurs) > self.max_valeurs.get(param, len(valeurs)):
+                raise ValueError(f"Format du paramètre « {param} » incorrect.")
             if len(valeurs) > 1 and param not in self.multiples:
                 if self.multiples_refuses:
                     raise ValueError(f"{param} : une seule valeur")

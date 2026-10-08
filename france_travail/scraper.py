@@ -6,12 +6,14 @@ selon les critères du profil et du mode (shared.criteres).
 
 Plafond de l'API (mesuré le 8 octobre 2026) : 150 offres par page, début de
 plage au plus 3000, donc au plus 3150 offres par requête. Rien n'est tronqué
-en silence : une requête qui dépasse est redécoupée (SPEC_SOURCES 2.2), par
-département d'Île-de-France, puis par domaine, puis par valeur des autres
-filtres, puis par fenêtre de publication ; les offres sont dédoublonnées par
-identifiant. Ce qui dépend encore de la vérification de l'API (noms des
-paramètres de domaine, valeurs multiples, champ de tranche d'effectif) est
-lu dans france_travail/parametres_api.py.
+en silence : une requête qui dépasse est redécoupée par date de création
+seulement (décision D31), en coupant la période en deux tant qu'une tranche
+dépasse, jusqu'à l'heure ; les offres sont dédoublonnées par identifiant.
+Départements et domaines ne servent qu'aux filtres choisis par l'utilisateur :
+découper par eux perdait les offres sans département ou sans domaine. Ce qui
+dépend du comportement de l'API (paramètres de domaine, valeurs multiples,
+champ de tranche d'effectif, fenêtre de dates) est lu dans
+france_travail/parametres_api.py.
 """
 
 import itertools
@@ -24,9 +26,9 @@ import requests
 from database.dates import instant_depuis_api
 from database.dedup_db import lire_offres_vues, marquer_offres_vues
 from france_travail import parametres_api
-from shared.config import DEPTS_IDF, FT_REGION
+from shared.config import FT_REGION
 from shared.criteres import criteres_france_travail
-from shared.domaines import domaines_du_grand_domaine, est_grand_domaine, grands_domaines
+from shared.domaines import domaines_du_grand_domaine, est_grand_domaine
 from shared.offres import detecter_zone, generer_id
 from shared.tailles import garder_selon_taille, taille_depuis_tranche
 
@@ -37,7 +39,6 @@ PLAFOND_REQUETE = DEBUT_MAX + TAILLE_PAGE      # 3150 offres au plus par requêt
 PAUSE_S = 0.4                                  # entre deux requêtes
 ATTENTE_429_S = 5                              # une nouvelle tentative sur 429
 FORMAT_DATE = "%Y-%m-%dT%H:%M:%SZ"
-FENETRE_MIN = timedelta(minutes=1)             # en deçà, plus de découpage par date
 
 
 _token_cache = {"token": None, "expire": 0}
@@ -100,53 +101,9 @@ def _decrire(params: dict) -> str:
     return ", ".join(f"{k}={v}" for k, v in params.items() if k != "sort")
 
 
-# ─── Découpage (SPEC_SOURCES 2.2) ─────────────────────────────────────────────
-# Chaque étape renvoie les sous-requêtes d'une requête trop volumineuse, ou
-# None si elle ne sait pas la découper ; une étape peut s'appliquer plusieurs
-# fois (grand domaine, puis domaine ; fenêtre, puis demi-fenêtre).
-def _sans(params: dict, *cles) -> dict:
-    return {k: v for k, v in params.items() if k not in cles}
-
-
-def _par_departement(params):
-    if "region" not in params:
-        return None
-    return [{**_sans(params, "region"), "departement": d} for d in sorted(DEPTS_IDF)]
-
-
-def _eclater(params, param):
-    """Une sous-requête par valeur d'un paramètre à valeurs multiples."""
-    valeurs = str(params.get(param, "")).split(",")
-    if len(valeurs) < 2:
-        return None
-    return [{**params, param: v} for v in valeurs]
-
-
-def _par_domaine(params):
-    p_grand, p_dom = parametres_api.PARAM_GRAND_DOMAINE, parametres_api.PARAM_DOMAINE
-    for p in (p_grand, p_dom):
-        if p and (sous := _eclater(params, p)):
-            return sous
-    if p_grand and p_grand in params:
-        valeur = params[p_grand]
-    elif p_dom and p_dom in params:
-        valeur = params[p_dom]
-    else:   # aucun filtre de domaine : grands domaines, ou domaines à défaut
-        if p_grand:
-            return [{**params, p_grand: g["code"]} for g in grands_domaines()]
-        return [{**params, p_dom: d["code"]} for g in grands_domaines() for d in g["domaines"]]
-    if est_grand_domaine(valeur) and p_dom:
-        return [{**_sans(params, p_grand), p_dom: d} for d in domaines_du_grand_domaine(valeur)]
-    return None
-
-
-def _par_valeur(params):
-    domaine = {parametres_api.PARAM_GRAND_DOMAINE, parametres_api.PARAM_DOMAINE}
-    for param in params:
-        if param not in domaine and param not in ("minCreationDate", "maxCreationDate"):
-            if sous := _eclater(params, param):
-                return sous
-    return None
+# ─── Découpage par date de création (décision D31) ────────────────────────────
+def _date(texte: str) -> datetime:
+    return datetime.strptime(texte, FORMAT_DATE).replace(tzinfo=timezone.utc)
 
 
 def _maintenant() -> datetime:
@@ -154,21 +111,22 @@ def _maintenant() -> datetime:
 
 
 def _par_fenetre(params):
+    """Les deux moitiés de la fenêtre de création de params (au départ :
+    DATE_PLUS_ANCIENNE à maintenant plus la marge de fuseau), None sous
+    une heure. Les moitiés partagent leur borne : une offre publiée à cette
+    seconde-là est lue deux fois (dédoublonnée) plutôt que zéro, que l'API
+    traite les bornes comme incluses ou exclues."""
     if "minCreationDate" in params:
-        debut = datetime.strptime(params["minCreationDate"], FORMAT_DATE).replace(tzinfo=timezone.utc)
-        fin = datetime.strptime(params["maxCreationDate"], FORMAT_DATE).replace(tzinfo=timezone.utc)
+        debut, fin = _date(params["minCreationDate"]), _date(params["maxCreationDate"])
     else:
-        debut = datetime.strptime(parametres_api.DATE_PLUS_ANCIENNE, FORMAT_DATE).replace(tzinfo=timezone.utc)
-        fin = _maintenant().replace(microsecond=0) + timedelta(minutes=1)
-    if fin - debut < FENETRE_MIN:
+        debut = _date(parametres_api.DATE_PLUS_ANCIENNE)
+        fin = (_maintenant().replace(microsecond=0)
+               + timedelta(hours=parametres_api.MARGE_FIN_FENETRE_HEURES))
+    if fin - debut <= timedelta(hours=parametres_api.FENETRE_MIN_HEURES):
         return None
     milieu = (debut + (fin - debut) / 2).replace(microsecond=0)
     return [{**params, "minCreationDate": a.strftime(FORMAT_DATE), "maxCreationDate": b.strftime(FORMAT_DATE)}
-            for a, b in ((debut, milieu), (milieu + timedelta(seconds=1), fin))]
-
-
-DECOUPAGES = [("département", _par_departement), ("domaine", _par_domaine),
-              ("valeur", _par_valeur), ("date de publication", _par_fenetre)]
+            for a, b in ((debut, milieu), (milieu, fin))]
 
 
 class Collecte:
@@ -179,7 +137,7 @@ class Collecte:
         self.log = log
         self.offres = {}          # identifiant -> offre brute
         self.requetes = 0
-        self.non_recuperees = 0   # au-delà du plafond, aucun découpage possible
+        self.non_recuperees = 0   # tranches d'une heure encore au-delà du plafond
         self.erreurs = 0
 
     def _page(self, params, debut):
@@ -187,10 +145,6 @@ class Collecte:
             time.sleep(PAUSE_S)
         self.requetes += 1
         return _page(params, debut, self.token)
-
-    def _ajouter(self, resultats):
-        for o in resultats:
-            self.offres.setdefault(o.get("id") or id(o), o)
 
     def _premiere_page(self, params):
         """(total, offres) de la première page, None si la requête échoue."""
@@ -201,37 +155,42 @@ class Collecte:
             self.log(f"  ⚠️  France Travail, requête abandonnée ({_decrire(params)}) : {e}")
             return None
 
-    def recuperer(self, params: dict, etape: int = 0, premiere_page=None) -> int:
-        """Récupère toutes les offres de params ; renvoie le nombre couvert."""
-        page = premiere_page or self._premiere_page(params)
+    def recuperer(self, params: dict) -> None:
+        """Récupère toutes les offres de params. Si la requête a dû être
+        découpée, écrit le total annoncé par l'API, le nombre d'offres
+        distinctes récupérées et l'écart."""
+        page = self._premiere_page(params)
         if page is None:
-            return 0
+            return
+        ids = set()
+        if page[0] <= PLAFOND_REQUETE:
+            self._recuperer(params, page, ids)
+            return
+        self._recuperer(params, page, ids)
+        ecart = page[0] - len(ids)
+        self.log(f"  Recherche découpée par date ({_decrire(params)}) : {page[0]} annoncées par l'API, "
+                 f"{len(ids)} récupérées, écart {ecart}"
+                 + (" (offres publiées ou retirées pendant la recherche si l'écart est faible)" if ecart else ""))
+
+    def _recuperer(self, params: dict, page, ids: set) -> None:
         total, premiere = page
         if total > PLAFOND_REQUETE:
-            for i in range(etape, len(DECOUPAGES)):
-                nom, decouper = DECOUPAGES[i]
-                sous = decouper(params)
-                if not sous:
-                    continue
-                # Garde-fou : si les deux premières sous-requêtes ont chacune le
-                # total entier, le paramètre est ignoré par l'API (point de
-                # parametres_api.py faux) ; continuer multiplierait les requêtes
-                pages = [self._premiere_page(s) for s in sous[:2]]
-                if len(sous) > 1 and all(p and p[0] == total for p in pages):
-                    self.log(f"  ⚠️  Découpage par {nom} sans effet ({_decrire(sous[0])} renvoie les {total} "
-                             "offres) : paramètre ignoré par l'API ? Voir scripts/verifier_france_travail.py")
-                    continue
-                print(f"  {total} offres ({_decrire(params)}) : découpage par {nom} en {len(sous)}")
-                couvert = sum(self.recuperer(s, i, p) for s, p in zip(sous, pages) if p)
-                couvert += sum(self.recuperer(s, i) for s in sous[2:])
-                if couvert < total:
-                    self.log(f"  ⚠️  Découpage par {nom} : {couvert} offres retrouvées sur {total} "
-                             f"({_decrire(params)})")
-                return couvert
+            sous = _par_fenetre(params)
+            if sous:
+                pages = [self._premiere_page(s) for s in sous]
+                # Garde-fou : deux moitiés qui ont chacune le total entier =
+                # dates ignorées par l'API ; continuer multiplierait les requêtes
+                if not all(p and p[0] == total for p in pages):
+                    for s, p in zip(sous, pages):
+                        if p:
+                            self._recuperer(s, p, ids)
+                    return
+                self.log(f"  ⚠️  Découpage par date sans effet ({_decrire(sous[0])} renvoie les {total} "
+                         "offres) : dates ignorées par l'API ? Voir scripts/verifier_france_travail.py")
             self.non_recuperees += total - PLAFOND_REQUETE
-            self.log(f"  ⚠️  {total} offres ({_decrire(params)}), aucun découpage possible : "
+            self.log(f"  ⚠️  {total} offres ({_decrire(params)}), découpage impossible : "
                      f"{total - PLAFOND_REQUETE} non récupérées")
-        self._ajouter(premiere)
+        self._ajouter(premiere, ids)
         debut = TAILLE_PAGE
         while debut < min(total, PLAFOND_REQUETE) and len(premiere) == TAILLE_PAGE:
             try:
@@ -240,11 +199,16 @@ class Collecte:
                 self.erreurs += 1
                 self.log(f"  ⚠️  France Travail, page {debut} abandonnée ({_decrire(params)}) : {e}")
                 break
-            self._ajouter(resultats)
+            self._ajouter(resultats, ids)
             if len(resultats) < TAILLE_PAGE:
                 break
             debut += TAILLE_PAGE
-        return total
+
+    def _ajouter(self, resultats, ids: set):
+        for o in resultats:
+            cle = o.get("id") or id(o)
+            ids.add(cle)
+            self.offres.setdefault(cle, o)
 
 
 def _paquets(valeurs: list, taille: int | None) -> list[str]:
