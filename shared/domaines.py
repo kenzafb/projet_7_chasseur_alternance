@@ -13,9 +13,7 @@ versionnés (shared.referentiels), jamais du code.
 
 LBA cherche par codes métiers (5 caractères, référentiel metiers), qui
 commencent par le code de leur domaine : codes_metiers les en déduit.
-Sirene n'est pas encore passé à ce modèle (phase 5d) : sa correspondance
-d'avant la phase 5b est gardée telle quelle, rangée sous les nouveaux
-codes (naf_codes).
+Sirene cherche par codes NAF : correspondance dans shared.naf.
 """
 
 from functools import lru_cache
@@ -96,64 +94,3 @@ def codes_metiers(codes) -> list[str]:
     if not prefixes:
         return []
     return [m for m in _metiers() if m.startswith(prefixes)]
-
-
-# ─── Sirene, pas encore refondu : correspondance d'avant la phase 5b ──────────
-# Phase 5d : codes NAF. Un profil « indifférent » garde l'ancien défaut
-# (informatique) ; un domaine sans correspondance n'est pas cherché.
-DOMAINE_DEFAUT_SOURCES = "M18"
-
-_SIRENE_NAF = {
-    "M18": [
-        "62.01Z", "62.02A", "62.02B", "62.03Z", "62.09Z", "63.11Z",
-        "58.21Z", "58.29A", "58.29B", "58.29C",
-        "61.10Z", "61.20Z", "61.90Z",
-        "70.22Z", "71.12B", "74.90B",
-    ],
-    "C15": [
-        "68.31Z",   # Agences immobilières
-        "68.32A",   # Administration d'immeubles et autres biens immobiliers (syndic, gestion copro)
-        "68.32B",   # Supports juridiques de gestion de patrimoine immobilier
-        "68.20A",   # Location de logements
-        "68.20B",   # Location de terrains et autres biens immobiliers
-        "68.10Z",   # Marchands de biens immobiliers
-        "41.10A",   # Promotion immobilière de logements (promoteurs)
-    ],
-}
-
-
-def _correspondance(table: dict, codes) -> list[str]:
-    codes = normaliser_domaines(codes) or [DOMAINE_DEFAUT_SOURCES]
-    out = []
-    for c in codes:
-        for valeur in table.get(c, []):
-            if valeur not in out:
-                out.append(valeur)
-    return out
-
-
-def naf_codes(codes) -> list[str]:
-    """Codes NAF cherchés sur Sirene ; vide si aucun domaine choisi n'a de correspondance."""
-    return _correspondance(_SIRENE_NAF, codes)
-
-
-NOMS_SOURCES = {"sirene": "Sirene (candidatures spontanées)"}
-
-
-def avertissement_non_couverts(codes, source: str) -> str:
-    """Message pour l'interface au lancement (décision D27), vide si tout est couvert."""
-    manquants = domaines_sans_correspondance(codes, source)
-    if not manquants:
-        return ""
-    libelles = _libelles()
-    noms = ", ".join(f"{libelles[c]} ({c})" for c in manquants)
-    suite = ("aucun domaine du profil n'y est encore couvert, cette source est ignorée"
-             if not _correspondance({"sirene": _SIRENE_NAF}[source], codes)
-             else "ils n'y sont pas cherchés pour l'instant")
-    return f"Domaines pas encore couverts par {NOMS_SOURCES[source]} : {noms} ; {suite}."
-
-
-def domaines_sans_correspondance(codes, source: str) -> list[str]:
-    """Domaines choisis qu'une source pas encore refondue ne sait pas chercher."""
-    table = {"sirene": _SIRENE_NAF}[source]
-    return [c for c in normaliser_domaines(codes) if c not in table]

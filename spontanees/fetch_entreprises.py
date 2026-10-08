@@ -1,40 +1,44 @@
 """
-fetch_entreprises.py v7
-=======================
-Réécriture complète sur l'API Sirene INSEE directe
-(https://api.insee.fr/api-sirene/3.11/siret)
+spontanees/fetch_entreprises.py
+===============================
+Étape « Récupérer » des candidatures spontanées : entreprises à fort
+potentiel de La Bonne Alternance, puis entreprises de l'API Sirene de
+l'INSEE (3.11), sans priorité de l'une sur l'autre (décision D44).
 
-Pourquoi on quitte recherche-entreprises.api.gouv.fr :
-  - Cette API cappait tout à 10 000 résultats et ignorait les filtres fins
-  - Aucun filtre (categorie, caractereEmployeur, tranche) ne fonctionnait réellement
+Sirene (SPEC_SOURCES section 4, phase 5d) :
+  - codes NAF du profil (shared.naf) : secteurs cœurs des domaines, toutes
+    les tailles choisies ; secteurs choisis directement pour un profil
+    indifférent ou un domaine sans correspondance ; secteurs transverses
+    pour les unités légales de 250 salariés et plus seulement (tranche, ou
+    catégorie ETI ou GE) ;
+  - tailles du profil converties en tranches INSEE de l'unité légale, avec
+    l'option « effectifs inconnus » ; rien de coché : toutes les tailles
+    (le « au moins 10 salariés » écrit en dur avant la phase disparaît) ;
+  - départements du profil (rien de coché : toute l'Île-de-France) ;
+  - sièges actifs ; nomenclature NAF de shared.config.nomenclature_naf ;
+  - pagination par curseur, sans plafond de résultats ;
+  - une entreprise déjà en base (même SIRET, LBA comprise) n'est pas
+    dupliquée : Sirene ajoute seulement sa source.
 
-Ce que la v7 apporte :
-  - Requêtes Lucene précises : NAF + dept + tranche + employeur + actif en UN seul appel
-  - Pagination par curseur → aucune limite de résultats (plus de saturation possible)
-  - Micro-entreprises et boîtes sans salarié exclues DÈS la requête (pas en post-traitement)
-  - 64 requêtes au total (4 depts × 16 NAFs) au lieu de 512+ avec splits
-  - Source officielle INSEE = données plus fiables
+Ce qui dépend du comportement de l'API est lu dans
+spontanees/parametres_sirene.py (vérifié par scripts/verifier_sirene.py).
 """
 
-import requests
-import time
 import os
-from shared.config import SIRENE_DEPARTEMENTS
+import time
 
-INSEE_API_KEY = os.getenv("INSEE_API_KEY")
+import requests
 
-BASE_URL = "https://api.insee.fr/api-sirene/3.11/siret"
+from database.entreprises_db import ajouter_entreprises, noter_source
+from shared.config import DEPTS_IDF
+from shared.criteres import normaliser_recherche
+from shared.domaines import domaines_du_profil
+from shared.naf import avertissement_sirene, secteurs_sirene
+from shared.tailles import TAILLES_250_PLUS, tranches_insee
+from spontanees import parametres_sirene as P
 
-HEADERS = {
-    "X-INSEE-Api-Key-Integration": INSEE_API_KEY,
-    "Accept": "application/json",
-}
-
-# ─── Départements interrogés ──────────────────────────────────────────────────
-
-DEPARTEMENTS = SIRENE_DEPARTEMENTS
-
-# ─── Tranches d'effectifs ─────────────────────────────────────────────────────
+# Catégorie d'entreprise de chaque taille de 250 salariés et plus
+CATEGORIES_PAR_TAILLE = {"250_4999": "ETI", "5000_plus": "GE"}
 
 TRANCHES_EFFECTIF = {
     "NN": "0", "00": "0", "01": "1-2", "02": "3-5", "03": "6-9",
@@ -43,99 +47,148 @@ TRANCHES_EFFECTIF = {
     "51": "2000-4999", "52": "5000-9999", "53": "10000+",
 }
 
-# Tranches cibles (≥ 10 salariés) — intégrées directement dans la requête Sirene
-TRANCHES_CIBLES = "11 OR 12 OR 21 OR 22 OR 31 OR 32 OR 41 OR 42 OR 51 OR 52 OR 53"
-
-# Résultats par page (max 1000 sur l'API Sirene)
-PER_PAGE = 1000
 
 
-# ─── Construction de la requête Lucene ────────────────────────────────────────
+def _cle() -> str:
+    return os.getenv("INSEE_API_KEY", "")
 
-def construire_query(code_naf, departement):
-    return (
-        f"etablissementSiege:true "
-        f"AND etatAdministratifUniteLegale:A "
-        f"AND trancheEffectifsUniteLegale:({TRANCHES_CIBLES}) "
-        f"AND activitePrincipaleUniteLegale:{code_naf} "
-        f"AND codePostalEtablissement:{departement}*"
-    )
 
-# ─── Fetch avec pagination par curseur ────────────────────────────────────────
+# ─── Requêtes ─────────────────────────────────────────────────────────────────
+def _ou(variable: str, valeurs) -> str:
+    valeurs = list(valeurs)
+    return f"{variable}:{valeurs[0]}" if len(valeurs) == 1 else f"{variable}:({' OR '.join(valeurs)})"
 
-def fetch_toutes_pages(code_naf, departement, entreprises, stats_dept, stats_naf, plafond=None):
-    """
-    Pagine la totalité des résultats pour une combinaison NAF+dept
-    via le mécanisme de curseur de l'API Sirene (pas de limite à 10 000).
-    plafond : taille de `entreprises` à ne pas dépasser (limite du lancement).
-    """
-    query   = construire_query(code_naf, departement)
-    curseur = "*"   # Premier appel
-    page    = 0
 
-    while True:
-        params = {
-            "q":       query,
-            "nombre":  PER_PAGE,
-            "curseur": curseur,
-        }
+def _paquets(valeurs: list, taille: int | None) -> list[list]:
+    taille = taille or len(valeurs) or 1
+    return [valeurs[i:i + taille] for i in range(0, len(valeurs), taille)]
 
-        try:
-            r = requests.get(BASE_URL, headers=HEADERS, params=params, timeout=30)
 
-            # 404 = aucun résultat pour cette combinaison (normal)
-            if r.status_code == 404:
-                print(f"  (aucun résultat)")
-                return
+def filtre_tailles(tailles, inconnue: bool) -> str | None:
+    """Clause de taille des secteurs cœurs, None : toutes les tailles."""
+    tranches = tranches_insee(tailles)
+    if not tranches:
+        return None
+    clause = _ou(P.VARIABLE_TRANCHE, tranches + ([P.TRANCHE_NON_RENSEIGNEE] if inconnue else []))
+    if inconnue and P.ABSENTS_PAR:
+        clause = f"({clause} OR {P.ABSENTS_PAR})"
+    return clause
 
-            # 429 = rate limit
-            if r.status_code == 429:
-                print(f"  ⚠️  Rate limit — pause 10s")
-                time.sleep(10)
+
+def filtre_grandes(tailles) -> str | None:
+    """Clause des secteurs transverses : 250 salariés et plus (tranche) ou
+    catégorie ETI ou GE, restreint aux tailles choisies ; None si le profil
+    n'en choisit aucune de 250 salariés et plus."""
+    grandes = [t for t in TAILLES_250_PLUS if not tailles or t in tailles]
+    if not grandes:
+        return None
+    return (f"({_ou(P.VARIABLE_TRANCHE, tranches_insee(grandes))} OR "
+            f"{_ou(P.VARIABLE_CATEGORIE, [CATEGORIES_PAR_TAILLE[t] for t in grandes])})")
+
+
+def construire_query(codes, departements, variable_naf: str, filtre: str | None = None) -> str:
+    clauses = ["etablissementSiege:true", "etatAdministratifUniteLegale:A", _ou(variable_naf, codes),
+               _ou(P.VARIABLE_CODE_POSTAL, [f"{d}*" for d in departements])]
+    return " AND ".join(clauses + ([filtre] if filtre else []))
+
+
+def plan_sirene(profil: dict, log=print) -> list[tuple[str, str]]:
+    """(groupe, requête) à faire pour un profil : groupes « cœurs »,
+    « secteurs », « transverses ». Vide si rien n'est à chercher (raison
+    écrite dans les logs)."""
+    rech = normaliser_recherche((profil or {}).get("recherche") or {})
+    domaines, secteurs = domaines_du_profil(profil or {}), rech.get("secteurs") or []
+    if avertissement := avertissement_sirene(domaines, secteurs):
+        log(f"ℹ️  {avertissement}")
+    codes = secteurs_sirene(domaines, secteurs)
+    variable = P.VARIABLE_NAF.get(codes["nomenclature"])
+    if not variable:
+        log(f"⚠️  Sirene : variable du code {codes['nomenclature']} inconnue (scripts/verifier_sirene.py), "
+            "recherche en NAF rév. 2")
+        codes = secteurs_sirene(domaines, secteurs, "NAFRev2")
+        variable = P.VARIABLE_NAF["NAFRev2"]
+    tailles, inconnue = rech.get("tailles") or [], rech.get("taille_inconnue", True)
+    departements = rech.get("departements") or sorted(DEPTS_IDF)
+    groupes = [("cœurs", codes["coeurs"], filtre_tailles(tailles, inconnue)),
+               ("secteurs", codes["secteurs"], filtre_tailles(tailles, inconnue))]
+    if codes["transverses"]:
+        grandes = filtre_grandes(tailles)
+        if grandes:
+            groupes.append(("transverses", codes["transverses"], grandes))
+        else:
+            log("ℹ️  Sirene : secteurs transverses non cherchés (aucune taille de 250 salariés et plus choisie)")
+    plan = [(nom, construire_query(paquet, depts, variable, filtre))
+            for nom, liste, filtre in groupes if liste
+            for paquet in _paquets(liste, P.NAF_PAR_REQUETE)
+            for depts in _paquets(departements, P.DEPARTEMENTS_PAR_REQUETE)]
+    log(f"  Sirene ({codes['nomenclature']}) : "
+        f"{len(codes['coeurs'])} codes cœurs, {len(codes['secteurs'])} codes de secteurs choisis, "
+        f"{len(codes['transverses'])} codes transverses ; départements {', '.join(departements)} ; "
+        f"tailles {', '.join(tailles) or 'toutes'}{' et inconnues' if tailles and inconnue else ''} ; "
+        f"{len(plan)} recherches")
+    return plan
+
+
+# ─── Pagination ───────────────────────────────────────────────────────────────
+class ErreurSirene(Exception):
+    pass
+
+
+class Collecte:
+    def __init__(self, cle: str, log=print):
+        self.cle, self.log = cle, log
+        self.requetes = 0
+        self.erreurs = 0
+
+    def _page(self, q: str, curseur: str) -> dict | None:
+        """Corps d'une page, None si aucun résultat (404)."""
+        for essai in (1, 2):
+            if self.requetes:
+                time.sleep(P.PAUSE_S)
+            self.requetes += 1
+            try:
+                r = requests.get(P.URL_RECHERCHE, params={"q": q, "nombre": P.PAR_PAGE, "curseur": curseur},
+                                 headers={P.ENTETE_CLE: self.cle, "Accept": "application/json"}, timeout=30)
+            except requests.RequestException as e:
+                raise ErreurSirene(f"Sirene injoignable ({type(e).__name__})") from None
+            if r.status_code == 429 and essai == 1:
+                time.sleep(P.ATTENTE_429_S)
                 continue
-
-            r.raise_for_status()
-            data = r.json()
-
-        except Exception as e:
-            print(f"  [ERREUR] NAF {code_naf} / Dept {departement} : {e}")
-            return
-
-        header      = data.get("header", {})
-        total       = header.get("total", 0)
-        suivant     = header.get("curseurSuivant", None)
-        etablissements = data.get("etablissements", [])
-
-        page += 1
-        nouvelles_cette_page = 0
-
-        for etab in etablissements:
-            if plafond is not None and len(entreprises) >= plafond:
-                break
-            infos = extraire_infos(etab)
-            siret = infos["siret"]
-            if siret and (entreprises.get(siret) or {}).get("_deja_en_base"):
-                entreprises[siret]["_vue_par_sirene"] = True   # trace des deux sources (D44)
-            if siret and siret not in entreprises:
-                entreprises[siret]      = infos
-                nouvelles_cette_page   += 1
-                stats_dept[departement] = stats_dept.get(departement, 0) + 1
-                stats_naf[code_naf]     = stats_naf.get(code_naf, 0) + 1
-
-        print(f"  Page {page} [{len(etablissements)} résultats / {total} total] "
-              f"— +{nouvelles_cette_page} nouvelles | Total base : {len(entreprises)}")
-
-        # (sauvegardes intermédiaires retirées : insertion en base à la fin)
-
-        # Fin de pagination : plus de curseur suivant, identique au précédent,
-        # ou limite du lancement atteinte
-        if not suivant or suivant == curseur:
             break
-        if plafond is not None and len(entreprises) >= plafond:
-            break
+        if r.status_code == 404:
+            return None
+        if r.status_code in (401, 403):
+            raise ErreurSirene(f"clé refusée ({r.status_code}), vérifier INSEE_API_KEY dans .env")
+        if r.status_code != 200:
+            raise ErreurSirene(f"Sirene {r.status_code} : {r.text[:200]}")
+        try:
+            return r.json()
+        except ValueError:
+            raise ErreurSirene("réponse illisible") from None
 
-        curseur = suivant
-        time.sleep(0.5)   # Respect rate limit INSEE
+    def recuperer(self, q: str, entreprises: dict, plafond=None) -> int:
+        """Toutes les pages d'une requête (curseur) ; nouvelles entreprises
+        ajoutées à entreprises (SIRET -> infos). Les SIRET déjà en base sont
+        notés vus par Sirene (D44). Retourne le nombre de nouvelles."""
+        curseur, nouvelles = "*", 0
+        while True:
+            corps = self._page(q, curseur)
+            if corps is None:
+                return nouvelles
+            for etab in corps.get("etablissements") or []:
+                if plafond is not None and len(entreprises) >= plafond:
+                    return nouvelles
+                infos = extraire_infos(etab)
+                siret = infos["siret"]
+                if siret and (entreprises.get(siret) or {}).get("_deja_en_base"):
+                    entreprises[siret]["_vue_par_sirene"] = True
+                elif siret and siret not in entreprises:
+                    entreprises[siret] = infos
+                    nouvelles += 1
+            suivant = (corps.get("header") or {}).get("curseurSuivant")
+            if not suivant or suivant == curseur or (plafond is not None and len(entreprises) >= plafond):
+                return nouvelles
+            curseur = suivant
 
 
 # ─── Extraction des infos depuis un établissement Sirene ─────────────────────
@@ -205,9 +258,6 @@ def extraire_infos(etab):
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
-from database.entreprises_db import ajouter_entreprises, noter_source
-
-
 def enregistrer(user_id, entreprises: dict) -> int:
     """Nouvelles entreprises en base, et source « sirene » notée sur les
     entreprises déjà connues (LBA) que Sirene a retrouvées."""
@@ -250,7 +300,7 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
     toutes), de La Bonne Alternance et de Sirene, sans priorité de l'une
     sur l'autre (D44) : LBA a droit à la moitié de la limite, Sirene au
     reste (plus ce que LBA n'a pas utilisé)."""
-    _log = log_fn or print
+    _log = log_fn if log_fn is not None else print
     from database.profil_db import lire_profil
     profil = lire_profil(user_id)
 
@@ -264,102 +314,48 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
     if stop_event and stop_event.is_set():
         return
 
-    if not INSEE_API_KEY:
-        _log("❌  INSEE_API_KEY manquante dans le .env — arrêt.")
+    cle = _cle()
+    if not cle:
+        _log("❌  INSEE_API_KEY manquante dans le .env : Sirene non interrogé.")
+        return
+    plan = plan_sirene(profil, _log)
+    if not plan:
+        _log("ℹ️  Sirene : rien à chercher pour ce profil.")
         return
 
-    # Codes NAF selon le domaine de l'utilisateur (lu depuis son profil)
-    from shared.domaines import domaines_du_profil, domaines_sans_correspondance, naf_codes
-    _domaines = domaines_du_profil(profil)
-    codes_naf = naf_codes(_domaines)
-    print(f"  Domaines du profil : {_domaines or '(défaut)'} → {len(codes_naf)} codes NAF")
-    if domaines_sans_correspondance(_domaines, "sirene"):
-        _log("ℹ️  Sirene : domaines pas encore pris en charge, ignorés : "
-             + ", ".join(domaines_sans_correspondance(_domaines, "sirene")))
-    if not codes_naf:
-        _log("ℹ️  Aucun domaine du profil n'est encore pris en charge pour les candidatures spontanées : arrêt.")
-        return
-
-    print("=" * 60)
-    print("  Chasseur — Fetch Entreprises IDF v7")
-    print(f"  API : INSEE Sirene 3.11 (curseur — pas de limite)")
-    print(f"  {len(DEPARTEMENTS)} départements | {len(codes_naf)} codes NAF")
-    print(f"  Filtres : siège actif | ≥10 sal. | employeur déclaré")
-    print("=" * 60)
-
-    # On charge les sirets déjà en base pour ne pas les recompter comme nouveaux
+    # SIRET déjà en base (Sirene ou LBA) : pas de doublon, seulement la source notée
     from database.entreprises_db import lire_entreprises
-    existantes = lire_entreprises(user_id)
-    entreprises = {}
-    for e in existantes:
-        siret_e = (e.get("_extra") or {}).get("siret", "")
-        if siret_e:
-            entreprises[siret_e] = {"_deja_en_base": True}
-    total_au_depart = len(entreprises)
-    print(f"  Base existante : {total_au_depart} entreprises déjà connues")
-    stats_dept      = {d: 0 for d in DEPARTEMENTS}
-    stats_naf       = {n: 0 for n in codes_naf}
-
-    total_combos = len(DEPARTEMENTS) * len(codes_naf)
-    combos_faits = 0
-    print(f"  Total de requêtes : {total_combos} (vs 512+ en v6)\n")
-    plafond = total_au_depart + max_entreprises if max_entreprises else None
-
-    for dept in DEPARTEMENTS:
-        if plafond is not None and len(entreprises) >= plafond:
+    entreprises = {(e.get("_extra") or {}).get("siret"): {"_deja_en_base": True}
+                   for e in lire_entreprises(user_id) if (e.get("_extra") or {}).get("siret")}
+    au_depart = len(entreprises)
+    plafond = au_depart + max_entreprises if max_entreprises else None
+    collecte, debut, par_groupe = Collecte(cle, _log), time.monotonic(), {}
+    _log(f"🔍 Sirene : {len(plan)} recherches")
+    for i, (groupe, q) in enumerate(plan, 1):
+        if stop_event and stop_event.is_set():
+            _log("⏹️  Arrêt demandé : entreprises déjà reçues enregistrées")
             break
-        for naf in codes_naf:
-            if plafond is not None and len(entreprises) >= plafond:
-                _log(f"⏹️  Limite de {max_entreprises} nouvelles entreprises atteinte.")
+        if plafond is not None and len(entreprises) >= plafond:
+            _log(f"⏹️  Limite de {max_entreprises} nouvelles entreprises atteinte.")
+            break
+        try:
+            par_groupe[groupe] = par_groupe.get(groupe, 0) + collecte.recuperer(q, entreprises, plafond)
+        except ErreurSirene as e:
+            collecte.erreurs += 1
+            _log(f"  ⚠️  Sirene, recherche abandonnée ({groupe}) : {e}")
+            if "clé refusée" in str(e):
                 break
-            if stop_event and stop_event.is_set():
-                print("⏹️  Arrêt — sauvegarde en cours...")
-                n = enregistrer(user_id, entreprises)
-                print(f"  {n} nouvelles entreprises ajoutées en base")
-                return
+        if on_progress:
+            on_progress(round(i / len(plan) * 100), f"{i}/{len(plan)} recherches · {len(entreprises) - au_depart} nouvelles")
 
-            print(f"\n[Sirene] Dept {dept} | NAF {naf}")
-            avant = len(entreprises)
-
-            fetch_toutes_pages(naf, dept, entreprises, stats_dept, stats_naf, plafond=plafond)
-
-            apres = len(entreprises)
-            print(f"  ✔  {dept}/{naf} — +{apres - avant} entreprises")
-            combos_faits += 1
-            if on_progress:
-                pct = round(combos_faits / total_combos * 100)
-                on_progress(pct, f"{combos_faits}/{total_combos} zones · {len(entreprises)} entreprises")
-            time.sleep(0.5)
-
-    # ── Sauvegarde finale (en base) ───────────────────────────────────────────
     nb_ajoutees = enregistrer(user_id, entreprises)
-    _log(f"  {nb_ajoutees} nouvelles entreprises ajoutées en base")
-
-    # ── Stats ─────────────────────────────────────────────────────────────────
-    total_nouvelles = len(entreprises) - total_au_depart
-    avec_email = sum(1 for e in entreprises.values() if e.get("emails_trouves"))
-    par_cat    = {}
-    for e in entreprises.values():
-        c = e.get("categorie") or "?"
-        par_cat[c] = par_cat.get(c, 0) + 1
-
-    print("\n" + "=" * 60)
-    print(f"  Total entreprises      : {len(entreprises)}")
-    print(f"  En base au départ      : {total_au_depart}")
-    print(f"  Nouvelles ce run       : {total_nouvelles}")
-    print(f"  Avec email scrapé      : {avec_email}")
-    print(f"  Par catégorie INSEE    : {par_cat}")
-    print()
-    print("  Nouvelles par département :")
-    for d, n in sorted(stats_dept.items()):
-        print(f"    {d} : {n}")
-    print()
-    print("  Nouvelles par code NAF (top 10) :")
-    for naf, n in sorted(stats_naf.items(), key=lambda x: -x[1])[:10]:
-        print(f"    {naf} : {n}")
-    print(f"\n  Entreprises enregistrées en base de données")
-    print("=" * 60)
-    print(f"\n→ Lance maintenant : python -m spontanees.scraper_emails --user {user_id}")
+    deja = sum(1 for e in entreprises.values() if e.get("_vue_par_sirene"))
+    duree = time.monotonic() - debut
+    _log(f"🏢 Sirene : {nb_ajoutees} nouvelles entreprises ("
+         + ", ".join(f"{n} {g}" for g, n in par_groupe.items()) + ")"
+         + (f", {deja} déjà en base retrouvées" if deja else "")
+         + f" ; {collecte.requetes} requêtes en {int(duree) // 60} min {int(duree) % 60:02d} s"
+         + (f", {collecte.erreurs} en erreur" if collecte.erreurs else ""))
 
 
 if __name__ == "__main__":

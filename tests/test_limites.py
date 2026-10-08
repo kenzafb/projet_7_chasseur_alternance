@@ -15,6 +15,7 @@ import spontanees.scraper_emails as scraper_emails
 from database.candidatures_db import lire_candidatures
 from database.dedup_db import lire_offres_vues
 from database.entreprises_db import ajouter_entreprises, lire_entreprises
+from database.profil_db import sauvegarder_profil
 from shared import config
 from tests.conftest import compte_verifie
 from tests.test_envoyeur import attendre, entreprises
@@ -150,7 +151,7 @@ class FausseSirene:
 @pytest.fixture
 def sirene(monkeypatch):
     faux = FausseSirene()
-    monkeypatch.setattr(fetch, "INSEE_API_KEY", "factice")
+    monkeypatch.setenv("INSEE_API_KEY", "factice")
     monkeypatch.setattr(fetch.requests, "get", faux.get)
     monkeypatch.setattr(fetch.time, "sleep", lambda s: None)
     return faux
@@ -158,16 +159,18 @@ def sirene(monkeypatch):
 
 def test_fetch_s_arrete_a_la_limite(utilisateur, sirene):
     _, user_id = utilisateur("a@test.fr", prenom="Alice")
+    sauvegarder_profil(user_id, {"recherche": {"domaines": ["M18"]}})
     ajouter_entreprises(user_id, [{"siret": "DEJA1", "nom": "Ancienne"}])
     logs = []
     fetch.main(user_id, max_entreprises=5, log_fn=logs.append)
     assert len(lire_entreprises(user_id)) == 1 + 5   # les anciennes ne comptent pas
     assert sirene.appels == 2                         # plus aucune requête une fois la limite atteinte
-    assert any("5 nouvelles entreprises ajoutées" in l for l in logs)
+    assert any("Sirene : 5 nouvelles entreprises" in l for l in logs)
 
 
 def test_fetch_sans_limite_parcourt_tout(utilisateur, sirene):
     _, user_id = utilisateur("a@test.fr", prenom="Alice")
+    sauvegarder_profil(user_id, {"recherche": {"domaines": ["M18"]}})
     fetch.main(user_id)
     assert len(lire_entreprises(user_id)) == sirene.appels * 3 > 5
 

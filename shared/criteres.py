@@ -8,7 +8,9 @@ Critères de recherche du profil (profils.recherche, colonne JSON) :
   - tailles : tailles d'entreprise (shared.tailles), [] pour toutes ;
     taille_inconnue : garder les offres sans information (vrai par défaut) ;
   - themes : thèmes France Travail du mode job (13 saisonniers, 17 sans
-    diplôme ni expérience), décochés par défaut.
+    diplôme ni expérience), décochés par défaut ;
+  - departements : départements d'Île-de-France des candidatures
+    spontanées (Sirene), [] pour tous.
 
 normaliser_recherche les remet en forme à l'enregistrement (valeurs
 inconnues retirées, types fixés) ; les autres clés (disponibilité, champs
@@ -17,6 +19,7 @@ la recherche d'un mode.
 """
 
 from shared import referentiels
+from shared.config import DEPTS_IDF
 from shared.domaines import normaliser_domaines
 from shared.modes import get_mode
 from shared.tailles import CLES_TAILLES, TAILLES
@@ -55,6 +58,8 @@ def normaliser_recherche(recherche) -> dict:
         out["taille_inconnue"] = out["taille_inconnue"] is not False
     if "themes" in out:
         out["themes"] = _liste(out["themes"], set(THEMES_PROPOSES))
+    if "departements" in out:
+        out["departements"] = sorted(_liste(out["departements"], DEPTS_IDF))
     return out
 
 
@@ -80,9 +85,10 @@ def criteres_france_travail(profil: dict, mode: str) -> dict:
 
 
 def options_du_profil() -> dict:
-    """Listes proposées dans le profil : secteurs, tailles, thèmes."""
+    """Listes proposées dans le profil : secteurs, tailles, thèmes, départements."""
     themes = referentiels.libelles(referentiels.france_travail("themes"))
     return {
+        "departements": [dict(e) for e in referentiels.france_travail("departements") if e["code"] in DEPTS_IDF],
         "secteurs": [dict(e) for e in referentiels.france_travail("secteurs_activites")],
         "tailles": [{k: t[k] for k in ("cle", "libelle")} | ({"avertissement": t["avertissement"]}
                                                             if "avertissement" in t else {})

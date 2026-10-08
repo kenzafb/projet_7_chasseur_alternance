@@ -1,7 +1,6 @@
 """Modèle des domaines (SPEC_SOURCES section 1) : codes France Travail,
 indifférent, anciennes clés, migration 0007, enregistrement du profil,
-codes métiers de LBA tirés du référentiel (phase 5c), Sirene inchangé
-pour les profils existants (jusqu'à la phase 5d)."""
+codes métiers de LBA tirés du référentiel (phase 5c). Sirene : tests/test_sirene.py."""
 
 import sqlite3
 
@@ -56,15 +55,6 @@ def test_codes_metiers_lba_tires_du_referentiel():
     assert d.codes_metiers(["C", "C15"]) == d.codes_metiers(["C"])   # C15 déjà dans C
     assert d.codes_metiers([]) == []                               # indifférent : sans code
     assert d.codes_metiers(["J", "M18"]) == sorted(d.codes_metiers(["J"]) + m18)
-
-
-def test_sirene_inchange_pour_les_profils_existants():
-    """Correspondances d'avant la phase 5b, rangées sous les nouveaux codes."""
-    assert "68.32B" in d.naf_codes(["C15"]) and len(d.naf_codes(["C15"])) == 7
-    assert len(d.naf_codes([])) == 16 and d.naf_codes([]) == d.naf_codes(["M18"])
-    # Domaine sans correspondance : rien de cherché, signalé
-    assert d.naf_codes(["J11"]) == []
-    assert d.domaines_sans_correspondance(["J", "M18"], "sirene") == ["J"]
 
 
 def test_profil_enregistre_en_codes(utilisateur):
@@ -141,15 +131,6 @@ def test_migration_0007(tmp_path):
 
 
 # ─── Décisions D27 et D28 ─────────────────────────────────────────────────────
-def test_avertissement_domaines_non_couverts():
-    assert d.avertissement_non_couverts(["M18", "C15"], "sirene") == ""
-    m = d.avertissement_non_couverts(["J", "M18"], "sirene")
-    assert m.startswith("Domaines pas encore couverts par Sirene (candidatures spontanées) : Santé (J)")
-    assert "pas cherchés pour l'instant" in m
-    m = d.avertissement_non_couverts(["J11"], "sirene")
-    assert "Sirene" in m and "(J11)" in m and "cette source est ignorée" in m
-
-
 def test_avertissement_au_lancement(utilisateur, monkeypatch):
     client, uid = utilisateur("a@test.fr", prenom="Alice")
     sauvegarder_profil(uid, {"recherche": {"domaines": ["J", "M18"]}})
@@ -158,6 +139,7 @@ def test_avertissement_au_lancement(utilisateur, monkeypatch):
     from tests.test_pipelines import attendre
     r = client.post("/api/spontanees/fetch").json()
     assert "Sirene" in r["avertissement"] and "Santé (J)" in r["avertissement"]
+    assert "choisis des secteurs" in r["avertissement"]
     assert "La Bonne Alternance" not in r["avertissement"]      # LBA couvre tout (D37)
     # Tout couvert : pas d'avertissement
     sauvegarder_profil(uid, {"recherche": {"domaines": ["M18"]}})

@@ -759,11 +759,14 @@ def api_spontanees_fetch(body: Fetch | None = None, user: User = Depends(utilisa
     user_id = user.id
     maximum, note = _limite("entreprises", body.max_entreprises if body else None)
     # Même profil que fetch_entreprises (mode alternance) : LBA d'abord, puis Sirene
-    from shared.domaines import avertissement_non_couverts, domaines_du_profil
+    from shared.criteres import normaliser_recherche
+    from shared.domaines import domaines_du_profil
+    from shared.naf import avertissement_sirene
     profil = lire_profil(user_id)
     avertissement = " ".join(filter(None, [
         lba_ignoree_pour_profil(profil),
-        avertissement_non_couverts(domaines_du_profil(profil), "sirene")]))
+        avertissement_sirene(domaines_du_profil(profil),
+                             normaliser_recherche(profil.get("recherche") or {}).get("secteurs") or [])]))
 
     def travail(arret, log, on_progress):
         from spontanees.fetch_entreprises import main as fetch_main

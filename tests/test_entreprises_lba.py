@@ -176,7 +176,9 @@ def test_recuperer_partage_la_limite_entre_lba_et_sirene(utilisateur, monkeypatc
     limite, Sirene au reste. Une entreprise trouvée par les deux garde les
     deux sources. Durée et requêtes de LBA dans les logs."""
     import spontanees.fetch_entreprises as fetch
+    from database.profil_db import sauvegarder_profil
     _, uid = utilisateur("a@test.fr", prenom="Alice")
+    sauvegarder_profil(uid, {"recherche": {"domaines": ["M18"]}})
     options = {}
     # Sirene simulé renvoie les SIRET 00000000000000, 00000000000001...
     lba_ents = [_norm(1, siret="00000000000001")] + [_norm(10 + i) for i in range(3)]

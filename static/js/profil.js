@@ -265,7 +265,7 @@ async function rendreOptions(rech, mode) {
   let o;
   try { o = await api.criteresOptions(); } catch (_) { c.innerHTML = ""; return; }
   const tailles = new Set(rech.tailles || []), secteurs = new Set(rech.secteurs || []);
-  const themes = new Set(rech.themes || []);
+  const themes = new Set(rech.themes || []), departements = new Set(rech.departements || []);
   const caseOption = (attribut, valeur, libelle, coche, extra = "") => `
     <label class="domaine-case domaine-case--petit">
       <input type="checkbox" value="${esc(valeur)}" ${attribut} ${coche ? "checked" : ""}>
@@ -274,14 +274,14 @@ async function rendreOptions(rech, mode) {
   c.innerHTML = `
     <div class="options-bloc">
       <span class="field__label">Taille de l'entreprise</span>
-      <p class="profil-card__sub" style="margin:4px 0 10px;">Rien de coché : toutes les tailles. France Travail indique en général l'effectif de l'établissement qui recrute.</p>
+      <p class="profil-card__sub" style="margin:4px 0 10px;">Rien de coché : toutes les tailles. France Travail indique en général l'effectif de l'établissement qui recrute${mode === "alternance" ? " ; pour les candidatures spontanées, c'est l'effectif de l'entreprise entière (Sirene, La Bonne Alternance)" : ""}.</p>
       <div class="domaines-choix">${o.tailles.map(t => caseOption("data-taille-case", t.cle, t.libelle, tailles.has(t.cle),
         t.avertissement && mode === "alternance" ? ` <small class="options-avert">(${esc(t.avertissement)})</small>` : "")).join("")}
       </div>
       <div class="domaines-choix" style="margin-top:8px;">
         <label class="domaine-case domaine-case--petit">
           <input type="checkbox" data-taille-inconnue ${rech.taille_inconnue !== false ? "checked" : ""}>
-          <span>Garder les offres sans information de taille</span>
+          <span>Garder les offres${mode === "alternance" ? " et entreprises" : ""} sans information de taille</span>
         </label>
       </div>
     </div>
@@ -291,9 +291,15 @@ async function rendreOptions(rech, mode) {
       <p class="profil-card__sub" style="margin:4px 0 10px;">Renseignés volontairement par l'employeur : cocher un thème écarte les offres qui ne l'ont pas.</p>
       <div class="domaines-choix">${o.themes.map(t => caseOption("data-theme-case", t.code, t.libelle, themes.has(t.code))).join("")}</div>
     </div>` : ""}
+    ${mode === "alternance" ? `
+    <div class="options-bloc">
+      <span class="field__label">Départements des candidatures spontanées</span>
+      <p class="profil-card__sub" style="margin:4px 0 10px;">Entreprises cherchées sur Sirene. Rien de coché : toute l'Île-de-France.</p>
+      <div class="domaines-choix">${o.departements.map(d => caseOption("data-departement-case", d.code, `${d.code} · ${d.libelle}`, departements.has(d.code))).join("")}</div>
+    </div>` : ""}
     <details class="options-bloc" ${secteurs.size ? "open" : ""}>
       <summary class="field__label options-resume">Secteur de l'employeur <span style="opacity:.6;font-weight:400;">(optionnel${secteurs.size ? `, ${secteurs.size} choisi${secteurs.size > 1 ? "s" : ""}` : ""})</span></summary>
-      <p class="profil-card__sub" style="margin:4px 0 10px;">Rien de coché : tous les secteurs. Le secteur est l'activité de l'entreprise, pas le métier.</p>
+      <p class="profil-card__sub" style="margin:4px 0 10px;">Rien de coché : tous les secteurs. Le secteur est l'activité de l'entreprise, pas le métier.${mode === "alternance" ? " Candidatures spontanées : ces secteurs servent à chercher les entreprises sur Sirene quand aucun domaine n'est choisi, ou pour un domaine sans correspondance NAF (seuls l'informatique et l'immobilier en ont une)." : ""}</p>
       <div class="secteurs-liste">${o.secteurs.map(s => caseOption("data-secteur-case", s.code, `${s.code} · ${s.libelle}`, secteurs.has(s.code))).join("")}</div>
     </details>`;
   c.querySelectorAll(".domaine-case").forEach(l => l.classList.toggle("is-checked", l.querySelector("input").checked));
@@ -315,6 +321,7 @@ function lireOptions(mode) {
     secteurs: coches("data-secteur-case"),
   };
   if (mode === "job") out.themes = coches("data-theme-case");
+  if (mode === "alternance") out.departements = coches("data-departement-case");
   return out;
 }
 

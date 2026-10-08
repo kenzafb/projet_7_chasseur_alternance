@@ -196,15 +196,3 @@ def nomenclature_naf(aujourdhui: date | None = None) -> str:
             return nom
     aujourdhui = aujourdhui or datetime.now(ZoneInfo(FUSEAU_AFFICHAGE)).date()
     return "NAF2025" if aujourdhui >= DATE_BASCULE_NAF_2025 else "NAFRev2"
-
-# INSEE Sirene : départements interrogés pour les candidatures spontanées
-SIRENE_DEPARTEMENTS = [
-    "75",   # Paris
-#   "77",   # Seine-et-Marne
-#   "78",   # Yvelines
-#   "91",   # Essonne
-    "92",   # Hauts-de-Seine
-    "93",   # Seine-Saint-Denis
-    "94",   # Val-de-Marne
-#   "95",   # Val-d'Oise
-]

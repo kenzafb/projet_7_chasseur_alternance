@@ -29,6 +29,23 @@ TRANCHES_INSEE = {
 }
 
 
+# Tranches INSEE de chaque taille (SPEC_SOURCES 4.2), pour les filtres Sirene
+TRANCHES_PAR_TAILLE = {
+    "moins_10":  ["00", "01", "02", "03"],
+    "10_49":     ["11", "12"],
+    "50_249":    ["21", "22", "31"],
+    "250_4999":  ["32", "41", "42", "51"],
+    "5000_plus": ["52", "53"],
+}
+# Unités légales de 250 salariés et plus : secteurs transverses (SPEC_SOURCES 4.1)
+TAILLES_250_PLUS = ["250_4999", "5000_plus"]
+
+
+def tranches_insee(tailles) -> list[str]:
+    """Tranches INSEE des tailles choisies, dans l'ordre ; [] si aucune."""
+    return [t for cle in CLES_TAILLES if cle in (tailles or []) for t in TRANCHES_PAR_TAILLE[cle]]
+
+
 def taille_depuis_effectif(effectif: int | None) -> str | None:
     if effectif is None or effectif < 0:
         return None
