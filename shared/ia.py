@@ -68,18 +68,21 @@ class Limiteur:
     attend son tour hors du verrou : les créneaux sont servis dans l'ordre
     des réservations."""
 
-    def __init__(self, intervalle: float):
+    def __init__(self, intervalle: float, horloge=time.monotonic, dormir=time.sleep):
         self.intervalle = intervalle
+        self._horloge, self._dormir = horloge, dormir   # remplaçables par un temps simulé (tests)
         self._verrou = threading.Lock()
-        self._prochain = 0.0   # instant (time.monotonic) du prochain créneau libre
+        self._prochain = 0.0   # instant (horloge) du prochain créneau libre
 
-    def attendre(self):
+    def attendre(self) -> float:
+        """Attend son créneau et le renvoie."""
         with self._verrou:
-            maintenant = time.monotonic()
+            maintenant = self._horloge()
             creneau = max(maintenant, self._prochain)
             self._prochain = creneau + self.intervalle
         if creneau > maintenant:
-            time.sleep(creneau - maintenant)
+            self._dormir(creneau - maintenant)
+        return creneau
 
 
 limiteur = Limiteur(MISTRAL_INTERVALLE_MIN_S)
