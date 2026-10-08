@@ -1,7 +1,7 @@
 /* ============================================================================
    spontanees.js — table des entreprises + pilotage du pipeline
    ============================================================================ */
-import { api, limite } from "./api.js";
+import { api, limite, confirmerLancement } from "./api.js";
 
 let stats = null;
 let compte = null;    // compte d'envoi (mode test affiché en bandeau)
@@ -126,9 +126,12 @@ export const Spontanees = {
 
   async action(nom) {
     try {
-      if (nom === "fetch")    await api.spFetch(limite("entreprises"));
-      if (nom === "scraper")  await api.spScraper(limite("scrapees"));
-      if (nom === "envoyer")  await api.spEnvoyer(limite("mails"));
+      const cle = { fetch: "entreprises", scraper: "scrapees", envoyer: "mails" }[nom];
+      const lancer = { fetch: api.spFetch, scraper: api.spScraper, envoyer: api.spEnvoyer }[nom];
+      if (lancer) {
+        const demandee = limite(cle);
+        confirmerLancement(cle, demandee, await lancer(demandee));
+      }
       this.charger();
     } catch (e) {
       alert(e.message);

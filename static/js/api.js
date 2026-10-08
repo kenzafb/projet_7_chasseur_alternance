@@ -9,13 +9,39 @@ function verifierSession(r) {
   if (r.status === 401) window.location.href = "/login";
 }
 
-/* Limite saisie dans un champ [data-limite="cle"], bornée par ses min et max
-   (le serveur la borne aussi) ; champ absent ou vide : défaut du serveur */
+/* Limite saisie dans un champ [data-limite="cle"], envoyée telle quelle : le
+   serveur la ramène dans ses bornes et renvoie la valeur appliquée, affichée
+   par confirmerLancement. Champ absent ou vide : défaut du serveur */
 export function limite(cle) {
   const champ = document.querySelector(`[data-limite="${cle}"]`);
   const n = parseInt(champ?.value, 10);
-  if (!champ || Number.isNaN(n)) return undefined;
-  return Math.max(parseInt(champ.min, 10) || 1, Math.min(n, parseInt(champ.max, 10) || n));
+  return !champ || Number.isNaN(n) ? undefined : n;
+}
+
+/* Confirmation d'un lancement avec la valeur réellement appliquée par le
+   serveur ; le champ reprend cette valeur. */
+const LANCEMENTS = {
+  analyses:    { champ: "max_analyses",    texte: n => `Recherche lancée : ${n} offres analysées au plus` },
+  entreprises: { champ: "max_entreprises", texte: n => `Récupération lancée : ${n} nouvelles entreprises au plus` },
+  scrapees:    { champ: "max_scrapees",    texte: n => `Scraping lancé : ${n} entreprises au plus` },
+  mails:       { champ: "limite",          texte: n => `Envoi lancé : ${n} mails au plus` },
+};
+
+export function confirmerLancement(cle, demandee, reponse) {
+  const regle = LANCEMENTS[cle];
+  const appliquee = reponse?.[regle.champ];
+  if (appliquee === undefined) return;
+  let texte = regle.texte(appliquee);
+  if (demandee !== undefined && demandee !== appliquee) texte += ` (demandé : ${demandee}, ramené à ${appliquee})`;
+  if (reponse.mode_test) texte += ". 🧪 Mode test : tout part vers ton adresse d'expédition";
+  const champ = document.querySelector(`[data-limite="${cle}"]`);
+  if (champ) champ.value = appliquee;
+  const el = document.querySelector("[data-confirmation]");
+  if (!el) return;
+  el.textContent = texte + ".";
+  el.hidden = false;
+  clearTimeout(confirmerLancement._minuteur);
+  confirmerLancement._minuteur = setTimeout(() => { el.hidden = true; }, 20000);
 }
 
 async function get(url) {

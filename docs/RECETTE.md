@@ -63,7 +63,7 @@ Pour chaque étape : **Faire**, **Observer** (ce qui doit se passer), **Échec s
 1. Si aucun compte n'est configuré : choisir Gmail, saisir l'adresse d'expédition et le mot de passe d'application (16 caractères), « Enregistrer et tester ».
 2. « Tester la connexion ».
 3. « M'envoyer un mail de test ».
-4. Cocher **Mode test**.
+4. Vérifier que **Mode test** est coché : il l'est d'office pour un compte créé à partir de la phase 4 (décision D7) ; un compte plus ancien doit être coché à la main.
 
 **Observer** :
 - après le test : « configuré, vérifié le JJ/MM/AAAA à HH:MM » en vert ; le champ mot de passe reste vide ;

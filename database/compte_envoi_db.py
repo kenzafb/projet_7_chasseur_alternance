@@ -71,7 +71,9 @@ def enregistrer_compte(user_id: int, donnees: dict, mot_de_passe: str | None) ->
         c = db.query(CompteEnvoi).filter_by(user_id=user_id).first()
         nouveau = c is None
         if nouveau:
-            c = CompteEnvoi(user_id=user_id)
+            # Mode test activé à la création (décision D7) : rien ne part vers
+            # une entreprise avant que l'utilisateur le décoche
+            c = CompteEnvoi(user_id=user_id, mode_test=True)
             db.add(c)
         change = nouveau or mot_de_passe is not None or any(
             getattr(c, champ) != donnees[champ] for champ in _CHAMPS_CONNEXION)

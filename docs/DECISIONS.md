@@ -30,6 +30,20 @@ Format : identifiant, date, phase, décision, raison, conséquence dans le code,
 - **Raison.** Insister sur les entreprises suivantes ne servirait à rien et pourrait faire bloquer le compte.
 - **Conséquence.** Comportement inchangé en phase 4.
 
-## Phase 4 (préparation du test réel)
+## Phase 4 (préparation du test réel), décisions du 8 octobre 2026
 
-Aucune nouvelle décision humaine pendant la phase. Les choix faits par défaut (adresse de redirection du mode test, valeurs par défaut et plafonds des limites, mails de test comptés dans le plafond...) sont listés dans `docs/PHASE_4_RAPPORT.md`, section « Points à valider », et seront reportés ici une fois tranchés.
+### D5. Le mode test envoie à l'adresse d'expédition : validé
+- **Décision.** En mode test, chaque candidature spontanée part vers l'adresse d'expédition du compte d'envoi, le vrai destinataire dans l'objet, et non vers l'adresse de connexion.
+- **Raison.** C'est une boîte dont l'utilisateur détient forcément le mot de passe ; l'adresse de connexion n'est pas vérifiée à l'inscription.
+
+### D6. Valeurs de limite hors bornes ramenées, valeur appliquée affichée
+- **Décision.** Une limite de lancement hors bornes est ramenée dans les bornes (pas de refus en 400), mais la valeur réellement appliquée est montrée à l'utilisateur : dans la confirmation de lancement de l'interface et dans les logs du pipeline (« demandé : X, ramené à Y »).
+- **Conséquence.** Le front n'arrondit plus lui-même : il envoie la valeur saisie et affiche celle que renvoie le serveur.
+
+### D7. Mode test activé à la création d'un compte d'envoi
+- **Décision.** Un compte d'envoi créé est en mode test ; l'utilisateur le décoche pour envoyer pour de vrai. Les comptes existant avant la migration 0006 ne changent pas (mode test coupé).
+- **Raison.** Aucun mail ne doit partir vers une entreprise avant un choix explicite.
+- **Conséquence.** Réenregistrer ou modifier un compte existant ne touche pas au mode test.
+
+### D8. Les mails du mode test comptent dans le plafond quotidien : validé
+- **Décision.** Ce sont de vrais mails, envoyés par le vrai serveur : ils consomment le plafond du jour (D3) comme les autres.

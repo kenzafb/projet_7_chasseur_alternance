@@ -442,6 +442,12 @@
   font-size: 14px; color: var(--txt); width: 100%;
 }
 .pipe__nombre input:focus { border-color: var(--signal); outline: none; }
+/* Confirmation d'un lancement (limite appliquée par le serveur) */
+.confirmation {
+  border: 1px solid var(--signal); background: var(--signal-soft); border-radius: var(--r-md);
+  padding: 10px 14px; margin-bottom: 14px; font-size: 13px; font-weight: 600; color: var(--txt);
+}
+.confirmation[hidden] { display: none; }
 /* Limite de la recherche d'offres, réglée avant de lancer */
 .limite-lancement { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-size: 13px; color: var(--txt-muted); }
 .limite-lancement input {

@@ -30,7 +30,32 @@ def activer(client, actif=True):
 
 
 # ─── L'option ────────────────────────────────────────────────────────────────
-def test_option_coupee_par_defaut_et_reglable(alice):
+def test_mode_test_active_a_la_creation_du_compte(utilisateur, smtp_simule):
+    """Décision D7 : un compte d'envoi neuf est en mode test."""
+    client, _ = utilisateur("a@test.fr")
+    r = client.post("/api/compte_envoi", json={"preset": "gmail", "adresse": "alice@gmail.com",
+                                              "mot_de_passe": "abcdefghijklmnop"})
+    assert r.json()["compte"]["mode_test"] is True
+    # Le réenregistrer (ou le modifier) ne touche pas au choix de l'utilisateur
+    activer(client, False)
+    client.post("/api/compte_envoi", json={"preset": "gmail", "adresse": "alice2@gmail.com",
+                                          "mot_de_passe": "abcdefghijklmnop"})
+    assert client.get("/api/compte_envoi").json()["compte"]["mode_test"] is False
+
+
+def test_compte_neuf_n_envoie_qu_a_soi(utilisateur, smtp_simule):
+    client, user_id = utilisateur("a@test.fr")
+    client.post("/api/compte_envoi", json={"preset": "gmail", "adresse": "alice@gmail.com",
+                                          "mot_de_passe": "abcdefghijklmnop"})
+    smtp_simule.comptes["alice@gmail.com"] = "abcdefghijklmnop"
+    assert client.post("/api/compte_envoi/tester").json()["ok"] is True
+    entreprises(user_id, 1)
+    envoyeur.main(user_id, limite=1)
+    assert smtp_simule.messages[0][2] == ["alice@gmail.com"]
+    assert lire_emails_contactes(user_id, "alternance") == set()
+
+
+def test_option_reglable(alice):
     client, _ = alice
     assert client.get("/api/compte_envoi").json()["compte"]["mode_test"] is False
     compte = activer(client)

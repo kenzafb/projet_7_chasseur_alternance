@@ -226,3 +226,32 @@ def test_envoi_respecte_la_limite(utilisateur, smtp_simule, monkeypatch):
     entreprises(user_id, 5)
     assert envoyeur.main(user_id, limite=2)["envoyes"] == 2
     assert len(smtp_simule.messages) == 2
+
+
+# ─── Valeur appliquée affichée (décision D6) ─────────────────────────────────
+def test_valeur_ramenee_journalisee(utilisateur, monkeypatch, pipelines_neufs):
+    client, user_id = utilisateur("a@test.fr", prenom="Alice")
+    monkeypatch.setattr(scraper_emails, "main", lambda **kw: None)
+    r = client.post("/api/spontanees/scraper", json={"max_scrapees": 999})
+    assert r.json()["max_scrapees"] == 200
+    attendre(lambda: not pipelines_neufs.etat("spontanees", user_id)["en_cours"])
+    assert "(demandé : 999, ramené à 200)" in client.get("/api/logs").text
+
+
+def test_valeur_dans_les_bornes_sans_precision(utilisateur, monkeypatch, pipelines_neufs):
+    client, user_id = utilisateur("a@test.fr", prenom="Alice")
+    monkeypatch.setattr(scraper_emails, "main", lambda **kw: None)
+    client.post("/api/spontanees/scraper", json={"max_scrapees": 7})
+    attendre(lambda: not pipelines_neufs.etat("spontanees", user_id)["en_cours"])
+    logs = client.get("/api/logs").text
+    assert "au plus 7 entreprises" in logs and "ramené" not in logs
+
+
+def test_front_affiche_la_valeur_appliquee_par_le_serveur():
+    api = (config.STATIC_DIR / "js" / "api.js").read_text(encoding="utf-8")
+    fonction = api[api.index("export function limite"):api.index("const LANCEMENTS")]
+    assert "Math.min" not in fonction and "Math.max" not in fonction   # plus de bornage côté front
+    assert "export function confirmerLancement" in api and "ramené à" in api
+    for module in ("app.js", "spontanees.js"):
+        assert "confirmerLancement(" in (config.STATIC_DIR / "js" / module).read_text(encoding="utf-8")
+    assert "data-confirmation" in (config.TEMPLATES_DIR / "base.html").read_text(encoding="utf-8")

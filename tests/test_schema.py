@@ -174,3 +174,21 @@ def test_migration_0004_emails_contactes_par_mode(tmp_path):
     cx = sqlite3.connect(chemin)
     assert cx.execute("SELECT user_id, email FROM emails_contactes").fetchall() == [(1, "rh@acme.fr")]
     cx.close()
+
+
+def test_migration_0006_comptes_existants_en_envoi_reel(tmp_path):
+    """Les comptes d'envoi d'avant 0006 ne changent pas : mode test coupé."""
+    chemin = tmp_path / "v5.db"
+    cfg = config_alembic(f"sqlite:///{chemin}")
+    command.upgrade(cfg, "0005")
+    cx = sqlite3.connect(chemin)
+    cx.execute("INSERT INTO users (id, email, mot_de_passe_hash) VALUES (1, 'a@test.fr', 'x')")
+    cx.execute("INSERT INTO comptes_envoi (user_id, adresse, preset, serveur, port, chiffrement, identifiant, "
+               "mot_de_passe_chiffre) VALUES (1, 'a@gmail.com', 'gmail', 'smtp.gmail.com', 465, 'ssl', "
+               "'a@gmail.com', 'x')")
+    cx.commit()
+    cx.close()
+    command.upgrade(cfg, "0006")
+    cx = sqlite3.connect(chemin)
+    assert cx.execute("SELECT mode_test FROM comptes_envoi").fetchall() == [(0,)]
+    cx.close()

@@ -181,6 +181,14 @@ class TelechargerPdf(BaseModel):
     lettre: str | None = None
 
 # Limites d'un lancement : absentes = défaut, bornées par config.limite_lancement
+def _limite(cle: str, demandee) -> tuple[int, str]:
+    """Limite appliquée à un lancement, et la précision à journaliser quand
+    la valeur demandée a été ramenée dans les bornes (décision D6)."""
+    appliquee = config.limite_lancement(cle, demandee)
+    if demandee is None or demandee == appliquee:
+        return appliquee, ""
+    return appliquee, f" (demandé : {demandee}, ramené à {appliquee})"
+
 class Recherche(BaseModel):
     model_config = ConfigDict(extra="forbid")
     max_analyses: int | None = None
@@ -409,7 +417,7 @@ def api_compte_envoi_mail_test(body: MailTest | None = None, user: User = Depend
 def api_recherche(request: Request, body: Recherche | None = None, user: User = Depends(utilisateur_requis)):
     user_id = user.id   # capturé AVANT le thread (le thread n'a pas accès à request)
     # Offres analysées par Mistral au plus, France Travail et LBA confondues
-    max_analyses = config.limite_lancement("analyses", body.max_analyses if body else None)
+    max_analyses, note = _limite("analyses", body.max_analyses if body else None)
     mode = mode_courant(request)   # idem : capturé avant le thread
     from shared.modes import get_mode
     cfg_mode = get_mode(mode)
@@ -432,7 +440,7 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
                 ajouter_candidature(user_id, offre, mode=mode)
 
             etat(message="Recherche France Travail...")
-            log(f"🔍 Recherche France Travail démarrée (au plus {max_analyses} offres analysées)")
+            log(f"🔍 Recherche France Travail démarrée (au plus {max_analyses} offres analysées){note}")
             analysees = lancer_recherche(user_id, profil, analyser=True, max_analyse=max_analyses,
                                          on_offre=ecrire_en_base, mode=mode) or []
             reste = max_analyses - len(analysees)
@@ -690,7 +698,7 @@ def _avec_limite(reponse, **limite):
 @prive.post("/api/spontanees/fetch")
 def api_spontanees_fetch(body: Fetch | None = None, user: User = Depends(utilisateur_requis)):
     user_id = user.id
-    maximum = config.limite_lancement("entreprises", body.max_entreprises if body else None)
+    maximum, note = _limite("entreprises", body.max_entreprises if body else None)
 
     def travail(arret, log, on_progress):
         from spontanees.fetch_entreprises import main as fetch_main
@@ -699,13 +707,13 @@ def api_spontanees_fetch(body: Fetch | None = None, user: User = Depends(utilisa
 
     return _avec_limite(_lancer_spontanees(
         user_id, "fetch", "Récupération des entreprises en Île-de-France...",
-        f"▶ Fetch entreprises démarré (au plus {maximum} nouvelles entreprises)", travail,
+        f"▶ Fetch entreprises démarré (au plus {maximum} nouvelles entreprises){note}", travail,
         "Fetch terminé !", "✅ Fetch terminé", "fetch"), max_entreprises=maximum)
 
 @prive.post("/api/spontanees/scraper")
 def api_spontanees_scraper(body: Scraper | None = None, user: User = Depends(utilisateur_requis)):
     user_id = user.id
-    maximum = config.limite_lancement("scrapees", body.max_scrapees if body else None)
+    maximum, note = _limite("scrapees", body.max_scrapees if body else None)
 
     def travail(arret, log, on_progress):
         from spontanees.scraper_emails import main as scraper_main
@@ -714,7 +722,7 @@ def api_spontanees_scraper(body: Scraper | None = None, user: User = Depends(uti
 
     return _avec_limite(_lancer_spontanees(
         user_id, "scraper", "Scraping des emails...",
-        f"▶ Scraper emails démarré (au plus {maximum} entreprises)", travail,
+        f"▶ Scraper emails démarré (au plus {maximum} entreprises){note}", travail,
         "Scraping terminé !", "✅ Scraping terminé", "scraper"), max_scrapees=maximum)
 
 @prive.post("/api/spontanees/envoyer")
@@ -722,7 +730,7 @@ def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends
     user_id = user.id
     mode = mode_courant(request)   # capturé avant le thread
     # Plafond de sécurité par lancement (réputation du compte d'envoi)
-    limite = config.limite_lancement("mails", body.limite)
+    limite, note = _limite("mails", body.limite)
     # Refus clair AVANT tout lancement : pas de clé (503), pas de compte ou
     # compte jamais vérifié (400), plafond du jour déjà atteint (400)
     compte = compte_envoi.exiger_compte_verifie(user_id)
@@ -733,10 +741,10 @@ def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends
     test = bool(body.test or compte["mode_test"])
     if test:
         message = f"🧪 MODE TEST : envoi vers {compte['adresse']} (limite : {limite})..."
-        debut = f"▶ Envoi démarré, limite {limite}. 🧪 MODE TEST : tout part vers {compte['adresse']}"
+        debut = f"▶ Envoi démarré, limite {limite}{note}. 🧪 MODE TEST : tout part vers {compte['adresse']}"
     else:
         message = f"Envoi en cours (limite : {limite})..."
-        debut = f"▶ Envoi démarré, limite {limite}"
+        debut = f"▶ Envoi démarré, limite {limite}{note}"
 
     def travail(arret, log, on_progress):
         from spontanees.envoyeur import main as env_main

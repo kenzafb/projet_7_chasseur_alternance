@@ -245,7 +245,9 @@ class CompteEnvoi(Base):
     # jamais renvoyé par l'API ni écrit dans un log
     mot_de_passe_chiffre = Column(Text, nullable=False)
     # Mode test : chaque candidature spontanée part vers l'adresse d'expédition,
-    # le vrai destinataire dans l'objet ; rien n'est enregistré comme contacté
+    # le vrai destinataire dans l'objet ; rien n'est enregistré comme contacté.
+    # Vrai à la création d'un compte (compte_envoi_db), faux pour les comptes
+    # antérieurs à la migration 0006
     mode_test    = Column(Boolean, nullable=False, default=False, server_default=false())
     # Dernière connexion et authentification réussies ; remis à NULL quand
     # les paramètres de connexion changent ou que l'authentification échoue
