@@ -29,6 +29,11 @@ PROCHAINES_AFFICHEES = 30
 STATUTS_REPONSE = {"reponse", "entretien", "refus"}
 
 
+def _siren(e) -> str:
+    """SIREN d'une entreprise en base : colonne, à défaut début du SIRET."""
+    return e.siren or ((e.extra or {}).get("siret") or "")[:9]
+
+
 def _avec_source(e, source: str) -> bool:
     """Ajoute source à la liste de l'entreprise ; vrai si elle n'y était pas."""
     sources = list(e.sources or [])
@@ -313,7 +318,9 @@ def sauvegarder_enrichissement(user_id: int, liste: list[dict]):
 def ajouter_entreprises(user_id: int, liste: list[dict]) -> int:
     """
     Insère en base les NOUVELLES entreprises trouvées par le fetch.
-    Dédup par siret (stocké dans extra). Ne touche pas aux existantes.
+    Dédup par SIRET (stocké dans extra), puis par SIREN : un autre
+    établissement d'une entreprise déjà en base n'est pas ajouté (D59).
+    Ne touche pas aux existantes.
     Retourne le nombre de nouvelles entreprises ajoutées.
     """
     db = SessionLocal()
@@ -321,15 +328,13 @@ def ajouter_entreprises(user_id: int, liste: list[dict]) -> int:
     try:
         # Sirets déjà présents pour cet utilisateur (dédup)
         existantes = db.query(Entreprise).filter_by(user_id=user_id).all()
-        sirets_connus = set()
-        for e in existantes:
-            s = (e.extra or {}).get("siret")
-            if s:
-                sirets_connus.add(s)
+        sirets_connus = {(e.extra or {}).get("siret") for e in existantes} - {None, ""}
+        sirens_connus = {_siren(e) for e in existantes} - {""}
 
         for d in liste:
             siret = d.get("siret", "")
-            if siret and siret in sirets_connus:
+            siren = d.get("siren") or siret[:9]
+            if (siret and siret in sirets_connus) or (siren and siren in sirens_connus):
                 continue  # déjà en base (la source est notée par noter_source)
             # Champs connus → colonnes ; le reste → extra
             extra = {
@@ -354,8 +359,8 @@ def ajouter_entreprises(user_id: int, liste: list[dict]) -> int:
                 extra          = extra,
             )
             db.add(e)
-            if siret:
-                sirets_connus.add(siret)
+            sirets_connus.add(siret)
+            sirens_connus.add(siren)
             ajoutees += 1
         db.commit()
     finally:
@@ -364,28 +369,29 @@ def ajouter_entreprises(user_id: int, liste: list[dict]) -> int:
 
 
 def cles_connues(user_id: int) -> frozenset:
-    """SIRET et identifiants LBA des entreprises déjà en base pour l'utilisateur."""
+    """SIRET, SIREN et identifiants LBA des entreprises déjà en base pour l'utilisateur."""
     db = SessionLocal()
     try:
         cles = set()
-        for (extra,) in db.query(Entreprise.extra).filter_by(user_id=user_id):
-            extra = extra or {}
-            cles.update(c for c in (extra.get("siret"), (extra.get("lba") or {}).get("identifiant")) if c)
+        for e in db.query(Entreprise).filter_by(user_id=user_id):
+            extra = e.extra or {}
+            cles.update(c for c in (extra.get("siret"), _siren(e), (extra.get("lba") or {}).get("identifiant")) if c)
         return frozenset(cles)
     finally:
         db.close()
 
 
-def noter_source(user_id: int, sirets, source: str) -> int:
+def noter_source(user_id: int, sirets, source: str, sirens=()) -> int:
     """Ajoute source aux entreprises déjà en base retrouvées par une autre
-    source (même SIRET). Retourne le nombre d'entreprises complétées."""
-    sirets = set(s for s in sirets if s)
-    if not sirets:
+    source : même SIRET, ou même SIREN (D59). Retourne le nombre
+    d'entreprises complétées."""
+    sirets, sirens = set(s for s in sirets if s), set(s for s in sirens if s)
+    if not (sirets or sirens):
         return 0
     db = SessionLocal()
     try:
         n = sum(1 for e in db.query(Entreprise).filter_by(user_id=user_id)
-                if (e.extra or {}).get("siret") in sirets and _avec_source(e, source))
+                if ((e.extra or {}).get("siret") in sirets or _siren(e) in sirens) and _avec_source(e, source))
         db.commit()
         return n
     finally:
@@ -396,7 +402,8 @@ def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None
     """Entreprises à fort potentiel de La Bonne Alternance (normalisées par
     france_travail.scraper_lba) dans les candidatures spontanées du mode
     alternance, source « lba ». Dédoublonnage par SIRET avec toutes les
-    entreprises de l'utilisateur (Sirene comprises), à défaut par
+    entreprises de l'utilisateur (Sirene comprises), puis par SIREN (un
+    autre établissement de la même entreprise, D59), à défaut par
     identifiant LBA. Une entreprise déjà connue garde ses données et ajoute
     « lba » à ses sources (D44) ; un email fourni par
     LBA est ajouté à ses emails s'il n'y est pas et qu'elle n'a pas encore
@@ -407,19 +414,22 @@ def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None
     bilan = {"ajoutees": 0, "deja_connues": 0, "deux_sources": 0, "avec_email": 0, "non_ajoutees": 0}
     db = SessionLocal()
     try:
-        par_siret, par_identifiant = {}, {}
+        par_siret, par_siren, par_identifiant = {}, {}, {}
         for e in db.query(Entreprise).filter_by(user_id=user_id):
             extra = e.extra or {}
             if extra.get("siret"):
                 par_siret[extra["siret"]] = e
+            if _siren(e):
+                par_siren.setdefault(_siren(e), e)
             if (extra.get("lba") or {}).get("identifiant"):
                 par_identifiant[extra["lba"]["identifiant"]] = e
         for d in liste:
             infos_lba = {k: d.get(k, "") for k in ("identifiant", "candidature_id", "candidature_url", "libelle_naf")}
             email = d.get("email") or ""
             email = "" if email_exclu(email) else email
-            e = (par_siret.get(d["siret"]) if d.get("siret") else None) or \
-                (par_identifiant.get(infos_lba["identifiant"]) if infos_lba["identifiant"] else None)
+            e = ((par_siret.get(d["siret"]) if d.get("siret") else None)
+                 or (par_siren.get(d["siren"]) if d.get("siren") else None)
+                 or (par_identifiant.get(infos_lba["identifiant"]) if infos_lba["identifiant"] else None))
             if e is not None:
                 bilan["deja_connues"] += 1
                 extra = dict(e.extra or {})
@@ -464,6 +474,8 @@ def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None
             db.add(e)
             if d.get("siret"):
                 par_siret[d["siret"]] = e
+            if d.get("siren"):
+                par_siren.setdefault(d["siren"], e)
             if infos_lba["identifiant"]:
                 par_identifiant[infos_lba["identifiant"]] = e
             bilan["ajoutees"] += 1

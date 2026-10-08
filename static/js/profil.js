@@ -274,14 +274,14 @@ async function rendreOptions(rech, mode) {
   c.innerHTML = `
     <div class="options-bloc">
       <span class="field__label">Taille de l'entreprise</span>
-      <p class="profil-card__sub" style="margin:4px 0 10px;">Rien de coché : toutes les tailles. France Travail indique en général l'effectif de l'établissement qui recrute${mode === "alternance" ? " ; pour les candidatures spontanées, c'est l'effectif de l'entreprise entière (Sirene, La Bonne Alternance)" : ""}.</p>
-      <div class="domaines-choix">${o.tailles.map(t => caseOption("data-taille-case", t.cle, t.libelle, tailles.has(t.cle),
+      <p class="profil-card__sub" style="margin:4px 0 10px;">Rien de coché : toutes les tailles${mode === "alternance" ? " sauf « sans salarié »" : ""}. France Travail indique en général l'effectif de l'établissement qui recrute${mode === "alternance" ? " ; pour les candidatures spontanées, c'est l'effectif de l'entreprise entière (Sirene, La Bonne Alternance)" : ""}.</p>
+      <div class="domaines-choix">${o.tailles.filter(t => mode === "alternance" || t.cle !== "sans_salarie").map(t => caseOption("data-taille-case", t.cle, t.libelle, tailles.has(t.cle),
         t.avertissement && mode === "alternance" ? ` <small class="options-avert">(${esc(t.avertissement)})</small>` : "")).join("")}
       </div>
       <div class="domaines-choix" style="margin-top:8px;">
         <label class="domaine-case domaine-case--petit">
           <input type="checkbox" data-taille-inconnue ${rech.taille_inconnue !== false ? "checked" : ""}>
-          <span>Garder les offres${mode === "alternance" ? " et entreprises" : ""} sans information de taille</span>
+          <span>Garder les offres${mode === "alternance" ? " et entreprises" : ""} dont l'effectif est inconnu</span>
         </label>
       </div>
     </div>

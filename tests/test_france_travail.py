@@ -282,7 +282,8 @@ def test_options_et_profil_par_l_api(utilisateur):
     options = client.get("/api/criteres_options").json()
     assert len(options["secteurs"]) == 88 and options["secteurs"][0] == {
         "code": "01", "libelle": "Culture et production animale, chasse et services annexes"}
-    assert [t["cle"] for t in options["tailles"]][0] == "moins_10"
+    assert [t["cle"] for t in options["tailles"]][:2] == ["sans_salarie", "moins_10"]
+    assert "quasiment jamais d'alternant" in options["tailles"][0]["avertissement"]
     assert "alternant" in options["tailles"][0]["avertissement"]
     assert options["themes"] == [{"code": "13", "libelle": "Métiers saisonniers, de vacances / Jobs d'été"},
                                  {"code": "17", "libelle": "Métiers accessibles sans diplôme et sans expérience"}]

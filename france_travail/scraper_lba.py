@@ -20,7 +20,8 @@ Recherche La Bonne Alternance (mode alternance), SPEC_SOURCES.md section 3.
   entreprises (D46).
 - Deux types de résultats : les offres, et les entreprises à fort
   potentiel d'embauche (sans offre publiée), destinées aux candidatures
-  spontanées, filtrées par la taille du profil (D40). Les offres relayées
+  spontanées, filtrées par la taille et les départements du profil (D40,
+  D58). Les offres relayées
   depuis France Travail sont exclues (déjà récupérées par l'API France
   Travail).
 
@@ -44,7 +45,7 @@ from shared.criteres import normaliser_recherche
 from shared.domaines import codes_metiers, domaines_du_profil
 from shared.niveaux import NIVEAUX, niveau_europeen
 from shared.offres import detecter_zone, generer_id
-from shared.tailles import garder_selon_taille, taille_depuis_tranche
+from shared.tailles import SANS_SALARIE, garder_selon_taille, taille_depuis_tranche
 
 PAUSE_S = 0.5           # entre deux requêtes
 DELAI_S = 20
@@ -228,7 +229,9 @@ class CollecteLBA:
         self.non_explores = 0         # requêtes laissées faute de budget
 
     def nouvelles_entreprises(self) -> int:
-        return sum(1 for cle in self.entreprises if cle not in self.connus)
+        """Entreprises reçues dont ni le SIRET ni le SIREN n'est déjà en base (D59)."""
+        return sum(1 for cle, e in self.entreprises.items()
+                   if cle not in self.connus and not (e.get("siren") and e["siren"] in self.connus))
 
     def _get(self, params: dict) -> dict:
         headers = {"Authorization": f"Bearer {self.cle}", "Accept": "application/json"}
@@ -358,7 +361,8 @@ def chercher_lba(codes: list[str], log=print, stop_event=None, **options) -> dic
            else "")
         + f" distinctes en {collecte.requetes} requêtes ({duree:.0f} s)"
         + (f" ; {len(collecte.relayees_ft)} offres relayées de France Travail écartées" if collecte.relayees_ft else "")
-        + (f" ; {len(collecte.ecartees_taille)} entreprises écartées par la taille" if collecte.ecartees_taille else "")
+        + (f" ; {len(collecte.ecartees_taille)} entreprises écartées par la taille ou le département"
+           if collecte.ecartees_taille else "")
         + (f" ; {len(collecte.hors_idf)} résultats hors IDF écartés" if collecte.hors_idf else "")
         + (f" ; {collecte.erreurs} requêtes en erreur" if collecte.erreurs else ""))
     if collecte.au_plafond:
@@ -397,20 +401,30 @@ def filtrer_niveau(offres: list[dict], niveau: int | None) -> tuple[list[dict], 
     return gardees, len(offres) - len(gardees)
 
 
-def filtre_taille(profil: dict):
-    """Prédicat sur les entreprises : tailles du profil (D40), None si aucun filtre."""
+def filtre_entreprise(profil: dict):
+    """Prédicat sur les entreprises : tailles du profil (D40, D55, D56) et
+    départements des candidatures spontanées d'après le code postal (D58).
+    None si aucun filtre."""
     rech = normaliser_recherche((profil or {}).get("recherche") or {})
     tailles, inconnue = rech.get("tailles") or [], rech.get("taille_inconnue", True)
-    if not tailles:
-        return None
-    return lambda e: garder_selon_taille(taille_entreprise(e.get("taille")), tailles, inconnue)
+    departements = set(rech.get("departements") or [])
+
+    def garder(e):
+        if departements and e.get("departement") not in departements:
+            return False
+        return garder_selon_taille(taille_entreprise(e.get("taille")), tailles, inconnue)
+    return garder
 
 
 def taille_entreprise(valeur) -> str | None:
-    """Taille d'un effectif LBA (« 6-9 », « 50-99 »), None si inconnu (« 0-0 », D45)."""
-    if valeur is None or str(valeur).strip() in ("",) + P.TAILLES_INCONNUES:
+    """Taille d'un effectif LBA (« 6-9 », « 50-99 ») ; « 0-0 » : sans
+    salarié (D56) ; None si absent."""
+    texte = str(valeur or "").strip()
+    if not texte:
         return None
-    return taille_depuis_tranche(valeur)
+    if texte in P.TAILLES_SANS_SALARIE:
+        return SANS_SALARIE
+    return taille_depuis_tranche(texte)
 
 
 def ignoree_pour_profil(profil: dict) -> str:
@@ -431,7 +445,7 @@ def rechercher_pour_profil(profil: dict, log=print, stop_event=None, **options) 
     log(f"  LBA : domaines {', '.join(domaines) or 'indifférent (recherche sans code métier)'}")
     niveau = niveau_du_profil(profil, log)
     if options.get("avec_entreprises", True):
-        options.setdefault("garder_entreprise", filtre_taille(profil))
+        options.setdefault("garder_entreprise", filtre_entreprise(profil))
     resultat = chercher_lba(codes_metiers(domaines), log, stop_event, **options)
     if resultat:
         resultat["offres"], ecartees = filtrer_niveau(resultat["offres"], niveau)

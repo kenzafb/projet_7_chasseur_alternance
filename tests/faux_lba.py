@@ -49,10 +49,15 @@ def offre(n, rome="M1805", lieu=(48.8566, 2.3522), cp="75012", niveau=6, partena
     return o
 
 
+def siret_lba(n):
+    """SIRET d'entreprise simulée : SIREN distinct pour chaque n (9 puis n sur 8 chiffres)."""
+    return f"9{n:08d}00011"
+
+
 def entreprise(n, rome="M1805", lieu=(48.8566, 2.3522), cp="75012", siret=None, email=None, taille="20-49"):
     e = {
         "identifier": {"id": f"rec{n}"},
-        "workplace": {"siret": siret or f"9{n:013d}", "name": f"Société {n}", "brand": None,
+        "workplace": {"siret": siret or siret_lba(n), "name": f"Société {n}", "brand": None,
                       "legal_name": f"SOCIETE {n} SAS", "website": None, "size": taille,
                       "location": {"address": f"{n} AVENUE TEST {cp} VILLE"},
                       "domain": {"naf": {"code": "6201Z", "label": "Programmation informatique"}}},

@@ -11,7 +11,7 @@ import france_travail.scraper_lba as lba
 from shared.config import LBA_CENTRES
 from shared.niveaux import niveau_europeen
 from shared.tailles import taille_depuis_tranche
-from tests.faux_lba import FausseLBA, distance_km, entreprise, offre
+from tests.faux_lba import FausseLBA, distance_km, entreprise, offre, siret_lba
 
 PARIS = (48.8566, 2.3522)
 
@@ -106,7 +106,7 @@ def test_recherche_codes_niveau_taille_et_exclusions(api):
                                      log=log)
     assert sorted(o["titre"] for o in res["offres"]) == sorted(
         [f"Alternance {i}" for i in (0, 1, 2, 20, 21)])                  # niveau 6 ou sans niveau
-    assert [e["siret"] for e in res["entreprises"]] == [f"9{2:013d}"]
+    assert [e["siret"] for e in res["entreprises"]] == [siret_lba(2)]
     # Une requête par centre, les 96 codes M18 en un lot, jamais de niveau envoyé
     assert len(fausse.recherches) == len(LBA_CENTRES)
     assert all(len(r["romes"].split(",")) == 96 for r in fausse.recherches)
@@ -114,7 +114,7 @@ def test_recherche_codes_niveau_taille_et_exclusions(api):
     t = log.texte()
     assert "2 offres relayées de France Travail écartées" in t
     assert "2 offres d'un autre niveau que le niveau 6 écartées" in t
-    assert "2 entreprises écartées par la taille" in t                  # « 0-0 » inconnu, refusé ici
+    assert "2 entreprises écartées par la taille ou le département" in t   # « 0-0 » : sans salarié
     assert f"en {len(LBA_CENTRES)} requêtes" in t
 
 
@@ -167,13 +167,26 @@ def test_entreprises_au_plafond_sans_redecoupage_signalees(api):
     assert "au plafond de 150 entreprises, non redécoupés" in log.texte()
 
 
-def test_effectif_0_0_lu_comme_inconnu(api):
-    """D45 : « 0-0 » soumis à l'option « garder les effectifs inconnus »."""
-    assert lba.taille_entreprise("0-0") is None and lba.taille_entreprise("6-9") == "moins_10"
-    api(FausseLBA([], [entreprise(1, taille="0-0"), entreprise(2, taille="6-9"), entreprise(3, taille="20-49")]))
-    for inconnue, attendus in ((True, {1, 3}), (False, {3})):
-        res = lba.rechercher_pour_profil(profil(tailles=["10_49"], inconnue=inconnue), log=Journal())
-        assert {int(e["siret"]) - 9 * 10**13 for e in res["entreprises"]} == attendus
+def test_effectif_0_0_sans_salarie(api):
+    """D56 : « 0-0 » est zéro salarié, gardé seulement si « sans salarié »
+    est cochée ; effectif inconnu : taille absente."""
+    assert lba.taille_entreprise("0-0") == "sans_salarie" and lba.taille_entreprise("6-9") == "moins_10"
+    assert lba.taille_entreprise(None) is None and lba.taille_entreprise("") is None
+    api(FausseLBA([], [entreprise(1, taille="0-0"), entreprise(2, taille="6-9"), entreprise(3, taille="20-49"),
+                       entreprise(4, taille=None)]))
+    for tailles, inconnue, attendus in (([], True, {2, 3, 4}), (["10_49"], True, {3, 4}),
+                                        (["10_49"], False, {3}), (["sans_salarie", "10_49"], False, {1, 3})):
+        res = lba.rechercher_pour_profil(profil(tailles=tailles, inconnue=inconnue), log=Journal())
+        assert {int(e["siret"][1:9]) for e in res["entreprises"]} == attendus, (tailles, inconnue)
+
+
+def test_departements_du_profil_pour_les_entreprises(api):
+    """D58 : le choix de départements s'applique aux entreprises LBA (code postal)."""
+    api(FausseLBA([], [entreprise(1, cp="75011"), entreprise(2, cp="92100"), entreprise(3, cp="77000")]))
+    p = profil()
+    p["recherche"]["departements"] = ["75", "92"]
+    res = lba.rechercher_pour_profil(p, log=Journal())
+    assert {int(e["siret"][1:9]) for e in res["entreprises"]} == {1, 2}
 
 
 def test_cercles_au_plafond_redecoupes(api):
@@ -217,7 +230,7 @@ def test_limite_de_requetes(api, monkeypatch):
 def test_objectif_de_nouvelles_entreprises(api):
     ents = [entreprise(i, lieu=p) for i, p in enumerate(autour(400))]
     fausse = api(FausseLBA([], ents))
-    connus = frozenset(f"9{i:013d}" for i in range(400))
+    connus = frozenset(siret_lba(i) for i in range(400))
     log = Journal()
     lba.rechercher_pour_profil(profil(), log=log, redecouper_entreprises=True, objectif_entreprises=10,
                                connus=connus)

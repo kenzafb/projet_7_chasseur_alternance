@@ -66,6 +66,9 @@ def test_secteurs_choisis_pour_indifferent_et_domaine_sans_correspondance():
     assert "68.32B" not in naf.secteurs_sirene([], ["68"], "NAFRev2")["secteurs"]
     s2025 = naf.secteurs_sirene([], ["68"], "NAF2025")["secteurs"]
     assert "68.32G" not in s2025 and "68.31Y" in s2025
+    # D57 : cible hors de la division gardée seulement si l'ancien code n'en a qu'une
+    assert "55.90Y" not in s2025                                          # 68.20A : deux cibles
+    assert "68.12Y" in naf.secteurs_sirene([], ["41"], "NAF2025")["secteurs"]   # 41.10A : une seule
     # Code déjà cœur : pas répété dans les secteurs
     c = naf.secteurs_sirene(["J11", "M18"], ["62"], "NAFRev2")
     assert c["secteurs"] == []

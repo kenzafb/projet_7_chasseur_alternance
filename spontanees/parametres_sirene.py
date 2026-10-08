@@ -11,23 +11,21 @@ Pour les trancher, lancer (clé INSEE_API_KEY dans le .env) :
 
 puis reporter ici les valeurs que le script affiche à la fin.
 
-Valeurs prudentes, NON VÉRIFIÉES (phase 5d, 9 octobre 2026) : celles de
-la requête utilisée avant la phase (une valeur de NAF et un département
-par requête, tranche lue sur l'unité légale), le reste rendu inoffensif
-s'il est faux (voir chaque valeur).
+Valeurs vérifiées sur la vraie API le 9 octobre 2026 (détail dans
+docs/referentiels/insee/verification_api.json, décision D54).
 """
 
 URL_RECHERCHE = "https://api.insee.fr/api-sirene/3.11/siret"
 ENTETE_CLE = "X-INSEE-Api-Key-Integration"
 
 # ─── Variables de la requête (syntaxe Lucene de l'API) ────────────────────────
-# Code NAF de l'unité légale par nomenclature (shared.naf.nomenclature_naf).
-# None pour NAF2025 : nom de la variable inconnu ; la recherche reste alors
-# en NAF rév. 2 avec un message dans les logs (Sirene affiche les deux
-# codes pendant 2026).
+# Code NAF de l'unité légale par nomenclature (shared.config.nomenclature_naf).
+# activitePrincipaleNAF25UniteLegale filtre (19101 pour 62.10Y à Paris) et
+# est rempli dans 100 réponses sur 100 dès 2026 ; les quatre autres noms
+# essayés sont refusés.
 VARIABLE_NAF = {
     "NAFRev2": "activitePrincipaleUniteLegale",
-    "NAF2025": None,
+    "NAF2025": "activitePrincipaleNAF25UniteLegale",
 }
 # Tranche d'effectif et catégorie d'entreprise, lues sur l'unité légale
 # (SPEC_SOURCES 4.1 : la taille d'une agence se lit sur son groupe)
@@ -35,19 +33,24 @@ VARIABLE_TRANCHE = "trancheEffectifsUniteLegale"
 VARIABLE_CATEGORIE = "categorieEntreprise"
 VARIABLE_CODE_POSTAL = "codePostalEtablissement"
 
-# Effectif inconnu : valeur « non renseigné » de la tranche. ABSENTS_PAR :
-# clause qui ajoute les unités sans tranche du tout (None : non demandées,
-# faute de syntaxe vérifiée ; elles sont alors perdues quand un filtre de
-# taille est appliqué).
-TRANCHE_NON_RENSEIGNEE = "NN"
-ABSENTS_PAR = None
+# « NN » : unité non employeuse (aucun salarié dans l'année de référence
+# ni au 31 décembre), documentation des variables Sirene ; 857 sièges sur
+# 1000 à Paris en 62.01Z. Taille « sans salarié », pas un effectif inconnu
+# (D55). Effectif inconnu : unité sans tranche du tout, ajoutée par
+# ABSENTS_PAR ; syntaxe acceptée (404, aucun résultat : les 19717 unités de
+# la référence ont toutes une tranche, 2819 connues + 16898 NN).
+TRANCHE_SANS_SALARIE = "NN"
+ABSENTS_PAR = "-trancheEffectifsUniteLegale:*"
 
-# Valeurs réunies par OU dans une requête. 1 : une requête par valeur
-# (comme avant la phase).
-NAF_PAR_REQUETE = 1
-DEPARTEMENTS_PAR_REQUETE = 1
+# Valeurs réunies par OU dans une requête : OU exact (somme des valeurs
+# seules) pour 2 et 10 codes, 120 codes acceptés, 250 refusés (414,
+# en-tête trop long) ; deux départements exacts, les huit tiennent.
+NAF_PAR_REQUETE = 120
+DEPARTEMENTS_PAR_REQUETE = 8
 
 # ─── Pagination ───────────────────────────────────────────────────────────────
-PAR_PAGE = 1000          # résultats par page (maximum documenté)
+# Toujours par curseur : « debut » est plafonné à 10000 (« valeur maximale
+# pour le paramètre debut: 10000 »), le curseur n'a pas de limite.
+PAR_PAGE = 1000          # résultats par page
 PAUSE_S = 0.5            # entre deux requêtes
 ATTENTE_429_S = 10       # quota dépassé : pause puis nouvelle tentative

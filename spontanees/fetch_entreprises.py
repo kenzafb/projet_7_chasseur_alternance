@@ -12,8 +12,9 @@ Sirene (SPEC_SOURCES section 4, phase 5d) :
     pour les unités légales de 250 salariés et plus seulement (tranche, ou
     catégorie ETI ou GE) ;
   - tailles du profil converties en tranches INSEE de l'unité légale, avec
-    l'option « effectifs inconnus » ; rien de coché : toutes les tailles
-    (le « au moins 10 salariés » écrit en dur avant la phase disparaît) ;
+    l'option « effectifs inconnus » (unités sans tranche) ; « sans
+    salarié » (NN, unités non employeuses) seulement si elle est cochée ;
+    rien de coché : toutes les tailles sauf elle (D55) ;
   - départements du profil (rien de coché : toute l'Île-de-France) ;
   - sièges actifs ; nomenclature NAF de shared.config.nomenclature_naf ;
   - pagination par curseur, sans plafond de résultats ;
@@ -64,13 +65,13 @@ def _paquets(valeurs: list, taille: int | None) -> list[list]:
     return [valeurs[i:i + taille] for i in range(0, len(valeurs), taille)]
 
 
-def filtre_tailles(tailles, inconnue: bool) -> str | None:
-    """Clause de taille des secteurs cœurs, None : toutes les tailles."""
-    tranches = tranches_insee(tailles)
-    if not tranches:
-        return None
-    clause = _ou(P.VARIABLE_TRANCHE, tranches + ([P.TRANCHE_NON_RENSEIGNEE] if inconnue else []))
-    if inconnue and P.ABSENTS_PAR:
+def filtre_tailles(tailles, inconnue: bool) -> str:
+    """Clause de taille des secteurs cœurs : tranches des tailles cochées,
+    ou toutes sauf « sans salarié » (NN) si rien n'est coché (D55) ; unités
+    sans tranche ajoutées si l'option effectifs inconnus est cochée (ou si
+    rien n'est coché)."""
+    clause = _ou(P.VARIABLE_TRANCHE, tranches_insee(tailles))
+    if (inconnue or not tailles) and P.ABSENTS_PAR:
         clause = f"({clause} OR {P.ABSENTS_PAR})"
     return clause
 
@@ -124,7 +125,7 @@ def plan_sirene(profil: dict, log=print) -> list[tuple[str, str]]:
     log(f"  Sirene ({codes['nomenclature']}) : "
         f"{len(codes['coeurs'])} codes cœurs, {len(codes['secteurs'])} codes de secteurs choisis, "
         f"{len(codes['transverses'])} codes transverses ; départements {', '.join(departements)} ; "
-        f"tailles {', '.join(tailles) or 'toutes'}{' et inconnues' if tailles and inconnue else ''} ; "
+        f"tailles {', '.join(tailles) or 'toutes sauf sans salarié'}{' et inconnues' if tailles and inconnue else ''} ; "
         f"{len(plan)} recherches")
     return plan
 
@@ -135,10 +136,12 @@ class ErreurSirene(Exception):
 
 
 class Collecte:
-    def __init__(self, cle: str, log=print):
+    def __init__(self, cle: str, log=print, sirens_connus=frozenset()):
         self.cle, self.log = cle, log
         self.requetes = 0
         self.erreurs = 0
+        self.sirens_connus = sirens_connus   # entreprises déjà en base (D59)
+        self.sirens_vus = set()
 
     def _page(self, q: str, curseur: str) -> dict | None:
         """Corps d'une page, None si aucun résultat (404)."""
@@ -169,7 +172,8 @@ class Collecte:
     def recuperer(self, q: str, entreprises: dict, plafond=None) -> int:
         """Toutes les pages d'une requête (curseur) ; nouvelles entreprises
         ajoutées à entreprises (SIRET -> infos). Les SIRET déjà en base sont
-        notés vus par Sirene (D44). Retourne le nombre de nouvelles."""
+        notés vus par Sirene (D44), de même qu'un SIREN déjà en base (D59).
+        Retourne le nombre de nouvelles."""
         curseur, nouvelles = "*", 0
         while True:
             corps = self._page(q, curseur)
@@ -182,6 +186,8 @@ class Collecte:
                 siret = infos["siret"]
                 if siret and (entreprises.get(siret) or {}).get("_deja_en_base"):
                     entreprises[siret]["_vue_par_sirene"] = True
+                elif infos["siren"] and infos["siren"] in self.sirens_connus:
+                    self.sirens_vus.add(infos["siren"])     # autre établissement déjà en base (D59)
                 elif siret and siret not in entreprises:
                     entreprises[siret] = infos
                     nouvelles += 1
@@ -258,10 +264,12 @@ def extraire_infos(etab):
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
-def enregistrer(user_id, entreprises: dict) -> int:
+def enregistrer(user_id, entreprises: dict, sirens_vus=()) -> int:
     """Nouvelles entreprises en base, et source « sirene » notée sur les
-    entreprises déjà connues (LBA) que Sirene a retrouvées."""
-    noter_source(user_id, [s for s, e in entreprises.items() if e.get("_vue_par_sirene")], "sirene")
+    entreprises déjà connues (LBA) que Sirene a retrouvées, par SIRET ou
+    par SIREN."""
+    noter_source(user_id, [s for s, e in entreprises.items() if e.get("_vue_par_sirene")], "sirene",
+                 sirens=sirens_vus)
     return ajouter_entreprises(user_id, [e for e in entreprises.values() if not e.get("_deja_en_base")])
 
 
@@ -325,11 +333,13 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
 
     # SIRET déjà en base (Sirene ou LBA) : pas de doublon, seulement la source notée
     from database.entreprises_db import lire_entreprises
+    existantes = lire_entreprises(user_id)
     entreprises = {(e.get("_extra") or {}).get("siret"): {"_deja_en_base": True}
-                   for e in lire_entreprises(user_id) if (e.get("_extra") or {}).get("siret")}
+                   for e in existantes if (e.get("_extra") or {}).get("siret")}
+    sirens = frozenset(e.get("siren") or ((e.get("_extra") or {}).get("siret") or "")[:9] for e in existantes) - {""}
     au_depart = len(entreprises)
     plafond = au_depart + max_entreprises if max_entreprises else None
-    collecte, debut, par_groupe = Collecte(cle, _log), time.monotonic(), {}
+    collecte, debut, par_groupe = Collecte(cle, _log, sirens), time.monotonic(), {}
     _log(f"🔍 Sirene : {len(plan)} recherches")
     for i, (groupe, q) in enumerate(plan, 1):
         if stop_event and stop_event.is_set():
@@ -348,8 +358,8 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
         if on_progress:
             on_progress(round(i / len(plan) * 100), f"{i}/{len(plan)} recherches · {len(entreprises) - au_depart} nouvelles")
 
-    nb_ajoutees = enregistrer(user_id, entreprises)
-    deja = sum(1 for e in entreprises.values() if e.get("_vue_par_sirene"))
+    nb_ajoutees = enregistrer(user_id, entreprises, collecte.sirens_vus)
+    deja = sum(1 for e in entreprises.values() if e.get("_vue_par_sirene")) + len(collecte.sirens_vus)
     duree = time.monotonic() - debut
     _log(f"🏢 Sirene : {nb_ajoutees} nouvelles entreprises ("
          + ", ".join(f"{n} {g}" for g, n in par_groupe.items()) + ")"

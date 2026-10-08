@@ -86,7 +86,7 @@ def test_tranche_effectif(api, tmp_path):
     assert t["champ_propose"] == "trancheEffectifEtab"
     champ = t["champs"]["trancheEffectifEtab"]
     assert champ["presence"] < champ["sur"]                 # absent de certaines offres
-    assert "NN" in champ["non_reconnues"]
+    assert champ["non_reconnues"] == []                     # NN : sans salarié (D55)
     assert res["propositions"]["CHAMP_TRANCHE_EFFECTIF"] == "trancheEffectifEtab"
     assert "trancheEffectifEtab : présent dans" in sortie
 

@@ -1,0 +1,322 @@
+{
+  "verifie_le": "2026-10-08T23:17:43+00:00",
+  "requetes": 57,
+  "reference": {
+    "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+    "statut": 200,
+    "total": 19717,
+    "curseur_suivant": null
+  },
+  "tranches": {
+    "trancheEffectifsUniteLegale": {
+      "seules": {
+        "11": 291,
+        "12": 249
+      },
+      "somme": 540,
+      "liste": {
+        "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND trancheEffectifsUniteLegale:(11 OR 12) AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+        "statut": 200,
+        "total": 540,
+        "curseur_suivant": null
+      },
+      "ou_exact": true,
+      "NN": 16898,
+      "absents": {
+        "-{v}:*": {
+          "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND -trancheEffectifsUniteLegale:* AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+          "statut": 404,
+          "total": 0
+        },
+        "NOT {v}:*": {
+          "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND NOT trancheEffectifsUniteLegale:* AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+          "statut": 404,
+          "total": 0
+        },
+        "-{v}:[* TO *]": {
+          "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND -trancheEffectifsUniteLegale:[* TO *] AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+          "statut": 404,
+          "total": 0
+        }
+      }
+    },
+    "trancheEffectifsEtablissement": {
+      "seules": {
+        "11": 182,
+        "12": 135
+      },
+      "somme": 317,
+      "liste": {
+        "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND trancheEffectifsEtablissement:(11 OR 12) AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+        "statut": 200,
+        "total": 317,
+        "curseur_suivant": null
+      },
+      "ou_exact": true,
+      "NN": 17575,
+      "absents": {
+        "-{v}:*": {
+          "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND -trancheEffectifsEtablissement:* AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+          "statut": 404,
+          "total": 0
+        },
+        "NOT {v}:*": {
+          "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND NOT trancheEffectifsEtablissement:* AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+          "statut": 404,
+          "total": 0
+        },
+        "-{v}:[* TO *]": {
+          "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND -trancheEffectifsEtablissement:[* TO *] AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+          "statut": 404,
+          "total": 0
+        }
+      }
+    },
+    "lus": {
+      "etablissements": 1000,
+      "unite_legale": {
+        "NN": 857,
+        "01": 75,
+        "02": 24,
+        "11": 16,
+        "12": 13,
+        "03": 9,
+        "00": 4,
+        "31": 1,
+        "21": 1
+      },
+      "etablissement": {
+        "NN": 891,
+        "01": 59,
+        "02": 20,
+        "11": 11,
+        "12": 8,
+        "03": 6,
+        "00": 4,
+        "31": 1
+      },
+      "part_non_renseignes_unite_legale": 0.857
+    },
+    "toutes_tranches_connues": 2819,
+    "total": 19717,
+    "part_non_renseignes_requete": 0.857
+  },
+  "categories": {
+    "unite_legale": {
+      "seules": {
+        "PME": 11822,
+        "ETI": 152,
+        "GE": 53
+      },
+      "somme": 12027,
+      "liste": {
+        "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND categorieEntreprise:(PME OR ETI OR GE) AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+        "statut": 200,
+        "total": 12027,
+        "curseur_suivant": null
+      },
+      "ou_exact": true
+    },
+    "etablissement_GE": {
+      "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND categorieEntrepriseEtablissement:GE AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+      "statut": 400,
+      "total": null,
+      "message": "Erreur de syntaxe dans le paramètre q"
+    },
+    "transverses_tranche_ou_categorie": {
+      "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND (trancheEffectifsUniteLegale:(32 OR 41 OR 42 OR 51 OR 52 OR 53) OR categorieEntreprise:(ETI OR GE)) AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+      "statut": 200,
+      "total": 206,
+      "curseur_suivant": null
+    }
+  },
+  "naf_multiples": {
+    "deux": {
+      "seules": {
+        "62.01Z": 19717,
+        "62.02A": 18395
+      },
+      "somme": 38112,
+      "liste": {
+        "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND activitePrincipaleUniteLegale:(62.01Z OR 62.02A) AND codePostalEtablissement:75*",
+        "statut": 200,
+        "total": 38112,
+        "curseur_suivant": null
+      },
+      "ou_exact": true
+    },
+    "dix": {
+      "seules": {
+        "62.01Z": 19717,
+        "62.02A": 18395,
+        "62.02B": 639,
+        "62.03Z": 348,
+        "62.09Z": 816,
+        "63.11Z": 1919,
+        "63.12Z": 2223,
+        "58.21Z": 370,
+        "58.29A": 302,
+        "58.29C": 2950
+      },
+      "somme": 47679,
+      "liste": {
+        "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND activitePrincipaleUniteLegale:(62.01Z OR 62.02A OR 62.02B OR 62.03Z OR 62.09Z OR 63.11Z OR 63.12Z OR 58.21Z OR 58.29A OR 58.29C) AND codePostalEtablissement:75*",
+        "statut": 200,
+        "total": 47679,
+        "curseur_suivant": null
+      },
+      "ou_exact": true
+    },
+    "longs": {
+      "30": {
+        "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND activitePrincipaleUniteLegale:(01.11Z OR 01.12Z OR 01.13Z OR 01.14Z OR 01.15Z OR 01.16Z OR 01.19Z OR 01.21Z OR 01.22Z OR 01.23Z OR 01.24Z... (423 caractères)",
+        "statut": 200,
+        "total": 684,
+        "curseur_suivant": null
+      },
+      "60": {
+        "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND activitePrincipaleUniteLegale:(01.11Z OR 01.12Z OR 01.13Z OR 01.14Z OR 01.15Z OR 01.16Z OR 01.19Z OR 01.21Z OR 01.22Z OR 01.23Z OR 01.24Z... (723 caractères)",
+        "statut": 200,
+        "total": 1764,
+        "curseur_suivant": null
+      },
+      "120": {
+        "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND activitePrincipaleUniteLegale:(01.11Z OR 01.12Z OR 01.13Z OR 01.14Z OR 01.15Z OR 01.16Z OR 01.19Z OR 01.21Z OR 01.22Z OR 01.23Z OR 01.24Z... (1323 caractères)",
+        "statut": 200,
+        "total": 12530,
+        "curseur_suivant": null
+      },
+      "250": {
+        "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND activitePrincipaleUniteLegale:(01.11Z OR 01.12Z OR 01.13Z OR 01.14Z OR 01.15Z OR 01.16Z OR 01.19Z OR 01.21Z OR 01.22Z OR 01.23Z OR 01.24Z... (2623 caractères)",
+        "statut": 414,
+        "total": null,
+        "message": "Taille du header de la réponse dépassée : essayez de diminuer le nombre de caractères de votre requête"
+      }
+    },
+    "max_accepte": 120
+  },
+  "departements": {
+    "seules": {
+      "75": 19717,
+      "92": 4831
+    },
+    "somme": 24548,
+    "liste": {
+      "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND codePostalEtablissement:(75* OR 92*) AND activitePrincipaleUniteLegale:62.01Z",
+      "statut": 200,
+      "total": 24548,
+      "curseur_suivant": null
+    },
+    "ou_exact": true
+  },
+  "naf2025": {
+    "champs": {
+      "activitePrincipaleNAF25Etablissement": {
+        "presence": 100,
+        "sur": 100,
+        "valeurs": {
+          "62.10Y": 98,
+          "58.29Y": 1,
+          "62.20H": 1
+        }
+      },
+      "uniteLegale.nomenclatureActivitePrincipaleUniteLegale": {
+        "presence": 100,
+        "sur": 100,
+        "valeurs": {
+          "NAFRev2": 100
+        }
+      },
+      "uniteLegale.activitePrincipaleNAF25UniteLegale": {
+        "presence": 100,
+        "sur": 100,
+        "valeurs": {
+          "62.10Y": 98,
+          "58.29Y": 1,
+          "62.20H": 1
+        }
+      },
+      "periodesEtablissement[].nomenclatureActivitePrincipaleEtablissement": {
+        "presence": 100,
+        "sur": 100,
+        "valeurs": {
+          "NAFRev2": 100
+        }
+      }
+    },
+    "essais": {
+      "activitePrincipaleNAF25UniteLegale": {
+        "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND codePostalEtablissement:75* AND activitePrincipaleNAF25UniteLegale:62.10Y",
+        "statut": 200,
+        "total": 19101,
+        "curseur_suivant": null
+      },
+      "activitePrincipaleUniteLegaleNAF25": {
+        "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND codePostalEtablissement:75* AND activitePrincipaleUniteLegaleNAF25:62.10Y",
+        "statut": 400,
+        "total": null,
+        "message": "Erreur de syntaxe dans le paramètre q"
+      },
+      "activitePrincipaleNaf25UniteLegale": {
+        "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND codePostalEtablissement:75* AND activitePrincipaleNaf25UniteLegale:62.10Y",
+        "statut": 400,
+        "total": null,
+        "message": "Erreur de syntaxe dans le paramètre q"
+      },
+      "activitePrincipaleNAF2025UniteLegale": {
+        "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND codePostalEtablissement:75* AND activitePrincipaleNAF2025UniteLegale:62.10Y",
+        "statut": 400,
+        "total": null,
+        "message": "Erreur de syntaxe dans le paramètre q"
+      },
+      "activitePrincipale2025UniteLegale": {
+        "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND codePostalEtablissement:75* AND activitePrincipale2025UniteLegale:62.10Y",
+        "statut": 400,
+        "total": null,
+        "message": "Erreur de syntaxe dans le paramètre q"
+      }
+    },
+    "variable_qui_filtre": "activitePrincipaleNAF25UniteLegale",
+    "variable_vue_dans_les_reponses": "activitePrincipaleNAF25Etablissement"
+  },
+  "pagination": {
+    "nombre_1000": {
+      "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+      "statut": 200,
+      "total": 19717,
+      "curseur_suivant": null
+    },
+    "nombre_1001": {
+      "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+      "statut": 200,
+      "total": 19717,
+      "curseur_suivant": null
+    },
+    "debut_1000": {
+      "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+      "statut": 200,
+      "total": 19717,
+      "curseur_suivant": null
+    },
+    "debut_20000": {
+      "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND codePostalEtablissement:75* AND activitePrincipaleUniteLegale:62.01Z",
+      "statut": 400,
+      "total": null,
+      "message": "valeur maximale pour le paramètre debut: 10000. Récupérez les fichiers exhaustifs sur https:\\www.data.gouv.fr ou utilisez la fonctionnalité curseur."
+    },
+    "curseur": {
+      "pages": 3,
+      "lus": 3000
+    }
+  },
+  "propositions": {
+    "NAF_PAR_REQUETE": 120,
+    "DEPARTEMENTS_PAR_REQUETE": 8,
+    "VARIABLE_NAF": {
+      "NAFRev2": "activitePrincipaleUniteLegale",
+      "NAF2025": "activitePrincipaleNAF25UniteLegale"
+    },
+    "ABSENTS_PAR": null,
+    "PAR_PAGE": 1000
+  }
+}

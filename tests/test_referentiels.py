@@ -48,17 +48,19 @@ def test_grands_domaines_couvrent_les_domaines():
     ("03", "moins_10"), ("11", "10_49"), ("31", "50_249"), ("32", "250_4999"), ("53", "5000_plus"),
     ({"code": "21", "libelle": "?"}, "50_249"), ({"libelle": "100 à 199 salariés"}, "50_249"),
     (42, "10_49"),
-    ("NN", None), ("Non renseigné", None), ("", None), (None, None), ({}, None),
+    ("NN", "sans_salarie"), ("Non renseigné", None), ("", None), (None, None), ({}, None),
 ])
 def test_taille_depuis_tranche(tranche, taille):
     assert taille_depuis_tranche(tranche) == taille
 
 
 def test_filtre_de_taille():
-    assert garder_selon_taille("moins_10", [], False)          # aucune taille choisie : tout passe
+    assert garder_selon_taille("moins_10", [], False)          # aucune taille choisie : tout passe...
     assert garder_selon_taille(None, [], False)
+    assert not garder_selon_taille("sans_salarie", [], True)    # ... sauf « sans salarié » (D55)
+    assert garder_selon_taille("sans_salarie", ["sans_salarie", "10_49"], False)
     assert garder_selon_taille("10_49", ["10_49", "50_249"], False)
     assert not garder_selon_taille("moins_10", ["10_49"], True)
     assert garder_selon_taille(None, ["10_49"], True)
     assert not garder_selon_taille(None, ["10_49"], False)
-    assert len(CLES_TAILLES) == 5
+    assert len(CLES_TAILLES) == 6 and CLES_TAILLES[0] == "sans_salarie"

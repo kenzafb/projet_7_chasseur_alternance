@@ -13,7 +13,7 @@ import main
 from database.entreprises_db import (ajouter_entreprises, ajouter_entreprises_lba, calculer_stats,
                                      cles_connues, lire_entreprises, noter_source)
 from database.schema import config_alembic
-from tests.faux_lba import entreprise
+from tests.faux_lba import entreprise, siret_lba
 from tests.test_limites import sirene  # noqa: F401  (fixture)
 from tests.test_pipelines import attendre
 
@@ -39,12 +39,12 @@ def test_entreprises_lba_dedoublonnees_par_siret_sans_priorite(utilisateur):
     assert connue["emails_trouves"] == ["rh@aussi.fr"] and connue["emails_lba"] == ["rh@aussi.fr"]
     assert connue["_extra"]["lba"]["candidature_id"] == "partners_1"
     assert ents[2]["mode"] == "alternance" and ents[2]["emails_lba"] == ["jobs@deux.fr"]
-    assert ents[3]["emails_trouves"] == [] and ents[3]["_extra"]["siret"] == f"9{3:013d}"
+    assert ents[3]["emails_trouves"] == [] and ents[3]["_extra"]["siret"] == siret_lba(3)
     # Second passage : rien de nouveau, aucune source en double
     b = ajouter_entreprises_lba(uid, [_norm(2), _norm(3), lba.normaliser_entreprise(brut)])
     assert b["ajoutees"] == 0 and b["deja_connues"] == 3 and b["deux_sources"] == 0
     assert lire_entreprises(uid)[1]["sources"] == ["sirene", "lba"]
-    assert cles_connues(uid) >= {"S3", "11111111100011", f"9{2:013d}", "rec2"}
+    assert cles_connues(uid) >= {"S3", "11111111100011", siret_lba(2), "rec2"}
 
 
 def test_sirene_note_sa_source_sur_une_entreprise_lba(utilisateur):
@@ -180,8 +180,8 @@ def test_recuperer_partage_la_limite_entre_lba_et_sirene(utilisateur, monkeypatc
     _, uid = utilisateur("a@test.fr", prenom="Alice")
     sauvegarder_profil(uid, {"recherche": {"domaines": ["M18"]}})
     options = {}
-    # Sirene simulé renvoie les SIRET 00000000000000, 00000000000001...
-    lba_ents = [_norm(1, siret="00000000000001")] + [_norm(10 + i) for i in range(3)]
+    # Sirene simulé (test_limites) renvoie les SIRET 00000000000010, 00000000100010...
+    lba_ents = [_norm(1, siret="00000000100010")] + [_norm(10 + i) for i in range(3)]
 
     def faux(profil, log=print, stop_event=None, **kw):
         options.update(kw)
@@ -193,7 +193,7 @@ def test_recuperer_partage_la_limite_entre_lba_et_sirene(utilisateur, monkeypatc
     ents = lire_entreprises(uid)
     assert len(ents) == 5
     assert sum(e["sources"] == ["lba"] for e in ents) == 2
-    assert next(e for e in ents if e["_extra"]["siret"] == "00000000000001")["sources"] == ["lba", "sirene"]
+    assert next(e for e in ents if e["_extra"]["siret"] == "00000000100010")["sources"] == ["lba", "sirene"]
     assert sum(e["sources"] == ["sirene"] for e in ents) == 2
     texte = "\n".join(logs)
     assert "La Bonne Alternance terminée : 42 requêtes en 1 min 15 s" in texte

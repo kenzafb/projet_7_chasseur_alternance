@@ -64,7 +64,9 @@ def test_autres_reponses(cle, tmp_path):
     code, sortie, res, _ = lancer(jeu(variable_naf25=None, max_ou=40, absents_ok=False), tmp_path)
     prop = res["propositions"]
     assert prop["NAF_PAR_REQUETE"] == 30
-    assert prop["VARIABLE_NAF"]["NAF2025"] is None and prop["ABSENTS_PAR"] is None
+    # Rien trouvé : la valeur actuelle de parametres_sirene.py est gardée
+    assert res["naf2025"]["variable_qui_filtre"] is None
+    assert prop["VARIABLE_NAF"] == vs.P.VARIABLE_NAF and prop["ABSENTS_PAR"] == vs.P.ABSENTS_PAR
     assert res["naf2025"]["variable_vue_dans_les_reponses"] is None
     assert "Aucune variable NAF 2025 essayée ne filtre" in sortie
 

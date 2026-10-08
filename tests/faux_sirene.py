@@ -23,10 +23,15 @@ class Reponse:
         return self._corps
 
 
+def siret_sirene(n):
+    """SIRET du siège simulé : SIREN n sur 9 chiffres, établissement 00012."""
+    return f"{n:09d}00012"
+
+
 def etablissement(n, naf="62.01Z", cp="75011", tranche="12", categorie="PME", naf25="62.10Y",
                   tranche_etab=None, siege=True, actif=True, nom=None):
     """Établissement simulé ; tranche None : unité légale sans tranche."""
-    return {"siret": f"{n:014d}", "cp": cp, "naf": naf, "naf25": naf25, "tranche": tranche,
+    return {"siret": siret_sirene(n), "cp": cp, "naf": naf, "naf25": naf25, "tranche": tranche,
             "tranche_etab": tranche_etab if tranche_etab is not None else tranche,
             "categorie": categorie, "siege": siege, "actif": actif, "nom": nom or f"Société {n}"}
 

@@ -59,12 +59,14 @@ def exclusions(nomenclature: str) -> set[str]:
 
 def codes_division(division: str, nomenclature: str) -> list[str]:
     """Sous-classes d'une division NAF rév. 2 (« 62 »), dans la nomenclature
-    demandée ; en NAF 2025, toutes les cibles officielles de ces
-    sous-classes (une division a pu être répartie entre plusieurs)."""
+    demandée. En NAF 2025, cibles officielles de ces sous-classes ; une
+    cible hors de la division n'est gardée que si l'ancien code n'a qu'une
+    cible (D57 : 68.20A vers 55.90Y, hébergement, est écartée)."""
     rev2 = [c for c in table_insee() if c.startswith(f"{division}.")]
     if nomenclature == "NAFRev2":
         return rev2
-    return list(dict.fromkeys(c for code in rev2 for c in table_insee()[code]))
+    return list(dict.fromkeys(c for code in rev2 for c in table_insee()[code]
+                              if c.startswith(f"{division}.") or len(table_insee()[code]) == 1))
 
 
 def domaines_couverts() -> set[str]:

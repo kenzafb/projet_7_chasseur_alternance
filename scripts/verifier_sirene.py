@@ -11,8 +11,9 @@ Requête de référence : sièges actifs à Paris (codes postaux 75), NAF 62.01Z
 
 1. Tranche d'effectif : filtre sur l'unité légale et sur l'établissement,
    liste de tranches par OU comparée à la somme des tranches seules ;
-   « NN » ; unités sans tranche du tout (plusieurs syntaxes) ; part des
-   effectifs non renseignés, comptée aussi sur 1000 établissements lus.
+   « NN » (unités non employeuses) ; unités sans tranche du tout (plusieurs
+   syntaxes) ; part des NN et absentes, comptée aussi sur 1000
+   établissements lus.
 2. Catégorie d'entreprise : PME, ETI, GE seules et en liste, sur l'unité
    légale et (essai) sur l'établissement.
 3. Plusieurs codes NAF en une requête : 2 et 10 codes comparés à la somme
@@ -197,7 +198,8 @@ class Verificateur:
         res["lus"] = {"etablissements": len(etabs), "unite_legale": dict(ul.most_common()),
                       "etablissement": dict(et.most_common()),
                       "part_non_renseignes_unite_legale": round(inconnus / len(etabs), 3) if etabs else None}
-        self.afficher(f"  sur {len(etabs)} établissements lus : tranche de l'unité légale NN ou absente "
+        self.afficher(f"  sur {len(etabs)} établissements lus : tranche de l'unité légale NN (non employeuse) "
+                      "ou absente "
                       f"{inconnus} ({res['lus']['part_non_renseignes_unite_legale']}) ; détail {dict(ul.most_common(6))}")
         # Part des non renseignés sur toute la requête : total moins les tranches connues
         connues = self.compter(ou("trancheEffectifsUniteLegale", TRANCHES), *base)["total"]
@@ -318,7 +320,8 @@ def propositions(res: dict) -> dict:
     variable = res["naf2025"]["variable_qui_filtre"]
     prop["VARIABLE_NAF"] = {**P.VARIABLE_NAF, "NAF2025": variable or P.VARIABLE_NAF["NAF2025"]}
     absents = res["tranches"]["trancheEffectifsUniteLegale"]["absents"]
-    syntaxe = next((s for s, e in absents.items() if e["total"]), None)
+    # Syntaxe acceptée : des résultats, ou aucun (404) sans erreur de syntaxe
+    syntaxe = next((s for s, e in absents.items() if e["total"] is not None), None)
     prop["ABSENTS_PAR"] = syntaxe.format(v=P.VARIABLE_TRANCHE) if syntaxe else P.ABSENTS_PAR
     prop["PAR_PAGE"] = 1000 if res["pagination"]["nombre_1000"]["total"] is not None else P.PAR_PAGE
     return prop
