@@ -10,10 +10,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 
-  <!-- Styles (servis par FastAPI depuis /static) -->
-  <link rel="stylesheet" href="/static/css/base.css">
-  <link rel="stylesheet" href="/static/css/components.css">
-  <link rel="stylesheet" href="/static/css/pages.css">
+  <!-- Styles (servis par FastAPI depuis /static, version = empreinte du contenu) -->
+  <link rel="stylesheet" href="{{ statique('css/base.css') }}">
+  <link rel="stylesheet" href="{{ statique('css/components.css') }}">
+  <link rel="stylesheet" href="{{ statique('css/pages.css') }}">
+  <!-- Modules JS : chaque import pointe vers la version courante du fichier -->
+  <script type="importmap">
+{{ importmap()|safe }}
+  </script>
   <script>
     // Applique l'état replié de la sidebar avant le rendu (évite le flash)
     try {
@@ -175,6 +179,6 @@
 </script>
 
 <!-- Modules JS (servis depuis /static) -->
-<script type="module" src="/static/js/app.js"></script>
+<script type="module" src="{{ statique('js/app.js') }}"></script>
 </body>
 </html>

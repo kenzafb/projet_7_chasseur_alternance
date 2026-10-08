@@ -43,6 +43,7 @@ from shared.chiffrement import ChiffrementIndisponible, raison_indisponible
 from shared import compte_envoi
 from database import compte_envoi_db
 from shared.pipelines import Pipelines, RECHERCHE, SPONTANEES
+from shared.statique import importmap, url_statique
 from database.dates import maintenant_utc
 
 # ─── Modules métier ───────────────────────────────────────────────
@@ -58,6 +59,8 @@ app = FastAPI(title="Chasseur d'Alternance", version="15",
               docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+# URL des JS et CSS versionnées par leur contenu (cache navigateur)
+templates.env.globals.update(statique=url_statique, importmap=importmap)
 
 # Sessions signées (cookie de connexion). secret_key() lève une erreur si
 # SECRET_KEY est absente ou trop courte : l'app ne démarre pas sans elle.
