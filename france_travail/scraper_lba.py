@@ -16,8 +16,8 @@ Recherche La Bonne Alternance (mode alternance), SPEC_SOURCES.md section 3.
   moitié, jusqu'à LBA_RAYON_MIN_KM, puis le lot de codes en deux ; ce qui
   reste au plafond est écrit dans les logs (D36). Les entreprises, au
   plafond presque partout, ne déclenchent ce redécoupage que dans l'étape
-  « Récupérer » des spontanées ; la recherche d'offres compte ces cercles
-  sans les redécouper.
+  « Récupérer » des spontanées ; la recherche d'offres ignore les
+  entreprises (D46).
 - Deux types de résultats : les offres, et les entreprises à fort
   potentiel d'embauche (sans offre publiée), destinées aux candidatures
   spontanées, filtrées par la taille du profil (D40). Les offres relayées
@@ -204,10 +204,12 @@ class CollecteLBA:
     LBA_RAYON_MIN_KM, puis en deux moitiés du lot de codes ; ce qui reste au
     plafond est noté (self.au_plafond)."""
 
-    def __init__(self, cle: str, log=print, redecouper_entreprises=False, garder_entreprise=None,
-                 objectif_entreprises=None, connus=frozenset()):
+    def __init__(self, cle: str, log=print, avec_entreprises=True, redecouper_entreprises=False,
+                 garder_entreprise=None, objectif_entreprises=None, connus=frozenset()):
         self.cle = cle
         self.log = log
+        # Sans entreprises (recherche d'offres, D46) : elles sont ignorées
+        self.avec_entreprises = avec_entreprises
         # Entreprises au plafond : redécoupées seulement si demandé (étape
         # « Récupérer » des spontanées) ; sinon seulement comptées
         self.redecouper_entreprises = redecouper_entreprises
@@ -285,7 +287,7 @@ class CollecteLBA:
         par_source, total_offres, nb_entreprises = self._ajouter(corps)
         offres_pleines = (total_offres >= P.PLAFOND_TOTAL_OFFRES
                           or any(n >= P.PLAFOND_PAR_SOURCE for n in par_source.values()))
-        entreprises_pleines = nb_entreprises >= P.PLAFOND_PAR_SOURCE
+        entreprises_pleines = self.avec_entreprises and nb_entreprises >= P.PLAFOND_PAR_SOURCE
         if entreprises_pleines and not self.redecouper_entreprises and not offres_pleines:
             self.entreprises_non_redecoupees.append(cercle)
         if not (offres_pleines or (entreprises_pleines and self.redecouper_entreprises)):
@@ -316,7 +318,7 @@ class CollecteLBA:
                 continue
             self.offres.setdefault(offre["id"], offre)
         bruts = corps.get(P.CLE_ENTREPRISES) or []
-        for brut in bruts:
+        for brut in bruts if self.avec_entreprises else []:
             ent = normaliser_entreprise(brut)
             if ent is None:
                 self.hors_idf.add(f"e{P.lire(brut, 'identifier.id') or id(brut)}")
@@ -343,14 +345,18 @@ def chercher_lba(codes: list[str], log=print, stop_event=None, **options) -> dic
     log(f"  LBA : {len(codes) or 'aucun'} code(s) métier en {len(lots)} lot(s) × {len(LBA_CENTRES)} centres"
         + (", cercles au plafond d'entreprises redécoupés" if options.get("redecouper_entreprises") else ""))
     collecte = CollecteLBA(cle, log, **options)
+    debut = time.monotonic()
     try:
         collecte.parcourir(lots, stop_event)
     except CleRefusee as e:
         log(f"  ⚠️  LBA arrêtée : {e}")
         if not (collecte.offres or collecte.entreprises):
             return None
-    log(f"  LBA : {len(collecte.offres)} offres et {len(collecte.entreprises)} entreprises à fort potentiel "
-        f"distinctes en {collecte.requetes} requêtes"
+    duree = time.monotonic() - debut
+    log(f"  LBA : {len(collecte.offres)} offres"
+        + (f" et {len(collecte.entreprises)} entreprises à fort potentiel" if options.get("avec_entreprises", True)
+           else "")
+        + f" distinctes en {collecte.requetes} requêtes ({duree:.0f} s)"
         + (f" ; {len(collecte.relayees_ft)} offres relayées de France Travail écartées" if collecte.relayees_ft else "")
         + (f" ; {len(collecte.ecartees_taille)} entreprises écartées par la taille" if collecte.ecartees_taille else "")
         + (f" ; {len(collecte.hors_idf)} résultats hors IDF écartés" if collecte.hors_idf else "")
@@ -362,10 +368,9 @@ def chercher_lba(codes: list[str], log=print, stop_event=None, **options) -> dic
     if collecte.entreprises_non_redecoupees:
         exemples = ", ".join(decrire_cercle(c) for c in collecte.entreprises_non_redecoupees[:5])
         log(f"  ℹ️  LBA : {len(collecte.entreprises_non_redecoupees)} cercle(s) au plafond de "
-            f"{P.PLAFOND_PAR_SOURCE} entreprises, non redécoupés pendant la recherche d'offres "
-            f"(l'étape « Récupérer » des spontanées le fait) : {exemples}")
+            f"{P.PLAFOND_PAR_SOURCE} entreprises, non redécoupés : {exemples}")
     return {"offres": list(collecte.offres.values()), "entreprises": list(collecte.entreprises.values()),
-            "requetes": collecte.requetes, "au_plafond": len(collecte.au_plafond)}
+            "requetes": collecte.requetes, "au_plafond": len(collecte.au_plafond), "duree_s": duree}
 
 
 # ─── Profil ───────────────────────────────────────────────────────────────────
@@ -398,7 +403,14 @@ def filtre_taille(profil: dict):
     tailles, inconnue = rech.get("tailles") or [], rech.get("taille_inconnue", True)
     if not tailles:
         return None
-    return lambda e: garder_selon_taille(taille_depuis_tranche(e.get("taille")), tailles, inconnue)
+    return lambda e: garder_selon_taille(taille_entreprise(e.get("taille")), tailles, inconnue)
+
+
+def taille_entreprise(valeur) -> str | None:
+    """Taille d'un effectif LBA (« 6-9 », « 50-99 »), None si inconnu (« 0-0 », D45)."""
+    if valeur is None or str(valeur).strip() in ("",) + P.TAILLES_INCONNUES:
+        return None
+    return taille_depuis_tranche(valeur)
 
 
 def ignoree_pour_profil(profil: dict) -> str:
@@ -418,10 +430,17 @@ def rechercher_pour_profil(profil: dict, log=print, stop_event=None, **options) 
     domaines = domaines_du_profil(profil)
     log(f"  LBA : domaines {', '.join(domaines) or 'indifférent (recherche sans code métier)'}")
     niveau = niveau_du_profil(profil, log)
-    resultat = chercher_lba(codes_metiers(domaines), log, stop_event,
-                            garder_entreprise=filtre_taille(profil), **options)
+    if options.get("avec_entreprises", True):
+        options.setdefault("garder_entreprise", filtre_taille(profil))
+    resultat = chercher_lba(codes_metiers(domaines), log, stop_event, **options)
     if resultat:
         resultat["offres"], ecartees = filtrer_niveau(resultat["offres"], niveau)
         if ecartees:
             log(f"  LBA : {ecartees} offres d'un autre niveau que le niveau {niveau} écartées")
     return resultat
+
+
+def rechercher_offres_pour_profil(profil: dict, log=print) -> dict | None:
+    """Recherche d'offres : les entreprises à fort potentiel sont ignorées,
+    seule l'étape « Récupérer » des spontanées en ajoute (D46)."""
+    return rechercher_pour_profil(profil, log, avec_entreprises=False)

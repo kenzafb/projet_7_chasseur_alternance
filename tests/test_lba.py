@@ -102,7 +102,8 @@ def test_recherche_codes_niveau_taille_et_exclusions(api):
     ents = [entreprise(1, taille="0-0"), entreprise(2, taille="50-99"), entreprise(3, taille="10-19")]
     fausse = api(FausseLBA(offres, ents, exclusion_ignoree=True))
     log = Journal()
-    res = lba.rechercher_pour_profil(profil(niveau="Licence pro (Bac+3)", tailles=["50_249"]), log=log)
+    res = lba.rechercher_pour_profil(profil(niveau="Licence pro (Bac+3)", tailles=["50_249"], inconnue=False),
+                                     log=log)
     assert sorted(o["titre"] for o in res["offres"]) == sorted(
         [f"Alternance {i}" for i in (0, 1, 2, 20, 21)])                  # niveau 6 ou sans niveau
     assert [e["siret"] for e in res["entreprises"]] == [f"9{2:013d}"]
@@ -113,7 +114,7 @@ def test_recherche_codes_niveau_taille_et_exclusions(api):
     t = log.texte()
     assert "2 offres relayées de France Travail écartées" in t
     assert "2 offres d'un autre niveau que le niveau 6 écartées" in t
-    assert "2 entreprises écartées par la taille" in t
+    assert "2 entreprises écartées par la taille" in t                  # « 0-0 » inconnu, refusé ici
     assert f"en {len(LBA_CENTRES)} requêtes" in t
 
 
@@ -146,14 +147,33 @@ def test_entreprise_normalisee(api):
     assert lba.normaliser_entreprise(entreprise(8, cp="60200")) is None
 
 
-def test_entreprises_au_plafond_comptees_pendant_la_recherche_d_offres(api):
+def test_recherche_d_offres_ignore_les_entreprises(api):
+    """D46 : seule l'étape « Récupérer » ajoute des entreprises ; la recherche
+    d'offres ne les lit pas et ne redécoupe pas pour elles."""
     ents = [entreprise(i, lieu=p) for i, p in enumerate(autour(400))]
-    fausse = api(FausseLBA([], ents))
+    fausse = api(FausseLBA([offre(1)], ents))
+    log = Journal()
+    res = lba.rechercher_offres_pour_profil(profil(), log=log)
+    assert res["entreprises"] == [] and len(res["offres"]) == 1
+    assert len(fausse.recherches) == len(LBA_CENTRES)                    # pas de redécoupage
+    assert "entreprise" not in log.texte()
+
+
+def test_entreprises_au_plafond_sans_redecoupage_signalees(api):
+    api(FausseLBA([], [entreprise(i, lieu=p) for i, p in enumerate(autour(400))]))
     log = Journal()
     res = lba.rechercher_pour_profil(profil(), log=log)
-    assert len(fausse.recherches) == len(LBA_CENTRES)                    # pas de redécoupage
     assert len(res["entreprises"]) < 400
-    assert "au plafond de 150 entreprises, non redécoupés pendant la recherche d'offres" in log.texte()
+    assert "au plafond de 150 entreprises, non redécoupés" in log.texte()
+
+
+def test_effectif_0_0_lu_comme_inconnu(api):
+    """D45 : « 0-0 » soumis à l'option « garder les effectifs inconnus »."""
+    assert lba.taille_entreprise("0-0") is None and lba.taille_entreprise("6-9") == "moins_10"
+    api(FausseLBA([], [entreprise(1, taille="0-0"), entreprise(2, taille="6-9"), entreprise(3, taille="20-49")]))
+    for inconnue, attendus in ((True, {1, 3}), (False, {3})):
+        res = lba.rechercher_pour_profil(profil(tailles=["10_49"], inconnue=inconnue), log=Journal())
+        assert {int(e["siret"]) - 9 * 10**13 for e in res["entreprises"]} == attendus
 
 
 def test_cercles_au_plafond_redecoupes(api):

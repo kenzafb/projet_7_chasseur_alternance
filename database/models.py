@@ -18,7 +18,7 @@ comme UTC. Les structures (listes, objets) sont en colonnes JSON.
 from datetime import datetime, timezone
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean, Date,
-    ForeignKey, DateTime, JSON, UniqueConstraint, Index, MetaData, false,
+    ForeignKey, DateTime, JSON, UniqueConstraint, Index, MetaData, false, text,
 )
 from sqlalchemy.orm import relationship, declarative_base
 
@@ -185,9 +185,10 @@ class Entreprise(Base):
     siren          = Column(String(20),  index=True, default="")
     site_web       = Column(Text, default="")
     secteur        = Column(String(200), default="")
-    # sirene, ou lba : entreprise à fort potentiel de La Bonne Alternance,
-    # traitée et affichée avant les autres (database.entreprises_db)
-    source         = Column(String(20), nullable=False, default="sirene", server_default="sirene")
+    # Sources qui ont trouvé l'entreprise : ["sirene"], ["lba"] (entreprise à
+    # fort potentiel de La Bonne Alternance) ou les deux, dans l'ordre où
+    # elles l'ont trouvée. Aucune priorité de l'une sur l'autre (D44).
+    sources        = Column(JSON, nullable=False, default=list, server_default=text("'[]'"))
 
     emails_trouves = Column(JSON, default=list)
     telephones     = Column(JSON, default=list)

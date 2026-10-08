@@ -114,6 +114,8 @@ def fetch_toutes_pages(code_naf, departement, entreprises, stats_dept, stats_naf
                 break
             infos = extraire_infos(etab)
             siret = infos["siret"]
+            if siret and (entreprises.get(siret) or {}).get("_deja_en_base"):
+                entreprises[siret]["_vue_par_sirene"] = True   # trace des deux sources (D44)
             if siret and siret not in entreprises:
                 entreprises[siret]      = infos
                 nouvelles_cette_page   += 1
@@ -203,46 +205,61 @@ def extraire_infos(etab):
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
-from database.entreprises_db import ajouter_entreprises
+from database.entreprises_db import ajouter_entreprises, noter_source
+
+
+def enregistrer(user_id, entreprises: dict) -> int:
+    """Nouvelles entreprises en base, et source « sirene » notée sur les
+    entreprises déjà connues (LBA) que Sirene a retrouvées."""
+    noter_source(user_id, [s for s, e in entreprises.items() if e.get("_vue_par_sirene")], "sirene")
+    return ajouter_entreprises(user_id, [e for e in entreprises.values() if not e.get("_deja_en_base")])
+
 
 def entreprises_lba(user_id, profil, max_entreprises=None, stop_event=None, log_fn=print) -> int:
-    """Entreprises à fort potentiel de La Bonne Alternance, ajoutées avant
-    celles de Sirene (SPEC_SOURCES section 3). Retourne le nombre de
-    nouvelles entreprises ajoutées (au plus max_entreprises)."""
+    """Entreprises à fort potentiel de La Bonne Alternance (SPEC_SOURCES
+    section 3). Retourne le nombre de nouvelles entreprises ajoutées (au
+    plus max_entreprises)."""
     from france_travail.scraper_lba import rechercher_pour_profil
-    from database.entreprises_db import cles_connues
-    log_fn("🔍 La Bonne Alternance : entreprises à fort potentiel d'embauche d'alternants")
-    # Cercles au plafond de 150 entreprises redécoupés (décision D36), jusqu'à
+    from database.entreprises_db import ajouter_entreprises_lba, cles_connues
+    from shared.config import LBA_RAYON_MIN_KM, LBA_REQUETES_MAX
+    log_fn("🔍 La Bonne Alternance : entreprises à fort potentiel d'embauche d'alternants "
+           f"(rayon minimal {LBA_RAYON_MIN_KM:g} km, au plus {LBA_REQUETES_MAX} requêtes, "
+           "réglables dans shared/config.py)")
+    # Cercles au plafond de 150 entreprises redécoupés (D36), jusqu'à
     # max_entreprises nouvelles
     lba = rechercher_pour_profil(profil, log=log_fn, stop_event=stop_event, redecouper_entreprises=True,
                                  objectif_entreprises=max_entreprises, connus=cles_connues(user_id))
+    if lba is not None:
+        log_fn(f"⏱️  La Bonne Alternance terminée : {lba['requetes']} requêtes en "
+               f"{int(lba['duree_s']) // 60} min {int(lba['duree_s']) % 60:02d} s")
     if not lba or not lba["entreprises"]:
         if lba is not None:
             log_fn("ℹ️  Aucune entreprise à fort potentiel trouvée sur LBA")
         return 0
-    from database.entreprises_db import ajouter_entreprises_lba
     b = ajouter_entreprises_lba(user_id, lba["entreprises"], maximum=max_entreprises)
     log_fn(f"🏢 LBA : {b['ajoutees']} nouvelles entreprises à fort potentiel"
            + (f" (dont {b['avec_email']} avec un email fourni par LBA)" if b["avec_email"] else "")
            + (f", {b['deja_connues']} déjà connues" if b["deja_connues"] else "")
-           + (f" dont {b['passees_en_lba']} passées en priorité" if b["passees_en_lba"] else "")
+           + (f" dont {b['deux_sources']} trouvées aussi par Sirene" if b["deux_sources"] else "")
            + (f", {b['non_ajoutees']} laissées pour le prochain lancement (limite)" if b["non_ajoutees"] else ""))
     return b["ajoutees"]
 
 
 def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_fn=None):
     """Ajoute en base au plus max_entreprises NOUVELLES entreprises (None :
-    toutes) : d'abord les entreprises à fort potentiel de La Bonne
-    Alternance, puis celles de Sirene pour le reste de la limite."""
+    toutes), de La Bonne Alternance et de Sirene, sans priorité de l'une
+    sur l'autre (D44) : LBA a droit à la moitié de la limite, Sirene au
+    reste (plus ce que LBA n'a pas utilisé)."""
     _log = log_fn or print
     from database.profil_db import lire_profil
     profil = lire_profil(user_id)
 
-    ajoutees_lba = entreprises_lba(user_id, profil, max_entreprises, stop_event, _log)
+    part_lba = None if max_entreprises is None else (max_entreprises + 1) // 2
+    ajoutees_lba = entreprises_lba(user_id, profil, part_lba, stop_event, _log)
     if max_entreprises is not None:
         max_entreprises -= ajoutees_lba
         if max_entreprises <= 0:
-            _log("⏹️  Limite de nouvelles entreprises atteinte avec La Bonne Alternance : Sirene non interrogé.")
+            _log("⏹️  Limite de nouvelles entreprises atteinte : Sirene non interrogé.")
             return
     if stop_event and stop_event.is_set():
         return
@@ -297,7 +314,7 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
                 break
             if stop_event and stop_event.is_set():
                 print("⏹️  Arrêt — sauvegarde en cours...")
-                n = ajouter_entreprises(user_id, [e for e in entreprises.values() if not e.get('_deja_en_base')])
+                n = enregistrer(user_id, entreprises)
                 print(f"  {n} nouvelles entreprises ajoutées en base")
                 return
 
@@ -315,7 +332,7 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
             time.sleep(0.5)
 
     # ── Sauvegarde finale (en base) ───────────────────────────────────────────
-    nb_ajoutees = ajouter_entreprises(user_id, [e for e in entreprises.values() if not e.get('_deja_en_base')])
+    nb_ajoutees = enregistrer(user_id, entreprises)
     _log(f"  {nb_ajoutees} nouvelles entreprises ajoutées en base")
 
     # ── Stats ─────────────────────────────────────────────────────────────────

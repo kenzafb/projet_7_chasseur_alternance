@@ -65,6 +65,10 @@ CLE_ENTREPRISES = "recruiters"   # entreprises à fort potentiel d'embauche
 # Champ du libellé de partenaire d'une offre (chemin pointé)
 CHAMP_PARTENAIRE = "identifier.partner_label"
 
+# Effectifs (workplace.size) lus comme « inconnu » : « 0-0 », fréquent, ne
+# dit pas s'il s'agit de 0 salarié ou d'une valeur non renseignée (D45)
+TAILLES_INCONNUES = ("0-0",)
+
 # Champs d'une entreprise à fort potentiel : premier chemin pointé non vide.
 # Sur 4148 entreprises lues : SIRET, nom, adresse, effectif (workplace.size,
 # « 0-0 », « 6-9 »...), NAF et apply.url toujours présents ; aucun email ni

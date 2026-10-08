@@ -36,7 +36,7 @@
         <span class="pipe__badge" data-step-badge>En cours…</span>
       </div>
       <div class="pipe__name">Récupérer</div>
-      <div class="pipe__sub">Entreprises de tes domaines en Île-de-France : La Bonne Alternance (fort potentiel d'embauche d'alternants) d'abord, puis Sirene</div>
+      <div class="pipe__sub">Entreprises de tes domaines en Île-de-France : Sirene et La Bonne Alternance (fort potentiel d'embauche d'alternants), moitié de la limite chacune au plus</div>
       <div class="pipe__msg" data-step-msg></div>
       <div class="pipe__progress" data-step-progress>
         <div class="pipe__progress-track">
@@ -122,12 +122,23 @@
     <div data-list="a-valider"></div>
   </div>
 
+  <!-- Répartition par source : une entreprise trouvée par les deux compte dans chaque ligne -->
+  <div class="card par-source" data-par-source hidden>
+    <strong>Par source</strong>
+    <div class="table">
+      <div class="trow thead trow--source"><span>Source</span><span>Entreprises</span><span>Emails</span><span>Envoyés</span><span>Réponses</span><span>Entretiens</span></div>
+      <div data-list="par-source"></div>
+    </div>
+    <p class="a-valider__sous">Une entreprise trouvée par les deux sources compte dans chacune. Réponses : réponse, entretien ou refus.</p>
+  </div>
+
   <div class="section-bar">
     <div class="filters" data-filters="spontanees">
       <button class="filter is-active" data-filter="all">Tous</button>
       <button class="filter" data-filter="email">Avec email</button>
       <button class="filter" data-filter="envoye">Envoyés</button>
-      <button class="filter" data-filter="lba">Fort potentiel (LBA)</button>
+      <button class="filter" data-filter="sirene">Sirene</button>
+      <button class="filter" data-filter="lba">LBA</button>
     </div>
   </div>
 

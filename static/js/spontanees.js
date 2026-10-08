@@ -15,13 +15,15 @@ function ligne(e) {
     : aEmail
       ? `<span class="chip chip--ft">à envoyer</span>`
       : `<span class="chip chip--gris">ignoré</span>`;
-  // Entreprise à fort potentiel de La Bonne Alternance : traitée en priorité
-  const lba = e.lba ? ` <span class="chip chip--lba" title="Fort potentiel d'embauche d'alternants (La Bonne Alternance)">LBA</span>` : "";
+  // Pastille par source (Sirene, LBA, ou les deux) ; aucune priorité entre elles
+  const pastilles = (e.sources || []).map(src => src === "lba"
+    ? ` <span class="chip chip--lba" title="Fort potentiel d'embauche d'alternants (La Bonne Alternance)">LBA</span>`
+    : ` <span class="chip chip--gris" title="Répertoire Sirene de l'INSEE">Sirene</span>`).join("");
   const origine = aEmail && e.email_lba ? ` <span class="trow__sub">(fourni par LBA)</span>` : "";
   return `
     <div class="trow">
       <div>
-        <div class="trow__name">${esc(e.nom || "—")}${lba}</div>
+        <div class="trow__name">${esc(e.nom || "—")}${pastilles}</div>
         <div class="trow__sub">${esc(e.ville || "")}</div>
       </div>
       <div class="trow__mail ${aEmail ? "" : "trow__mail--none"}">${aEmail ? esc(e.email) : "non trouvé"}${origine}</div>
@@ -32,11 +34,11 @@ function ligne(e) {
 function rendreTable() {
   const el = document.querySelector('[data-list="spontanees"]');
   if (!el || !stats) return;
-  // Prochaines entreprises (LBA d'abord, ordre du scraper et de l'envoyeur), puis les dernières envoyées
+  // Prochaines entreprises (ordre du scraper et de l'envoyeur), puis les dernières envoyées
   let items = [...(stats.prochaines || []), ...(stats.dernieres || [])];
   if (filtre === "email")  items = items.filter(e => e.email);
   if (filtre === "envoye") items = items.filter(e => e.envoye);
-  if (filtre === "lba")    items = items.filter(e => e.lba);
+  if (filtre === "lba" || filtre === "sirene") items = items.filter(e => (e.sources || []).includes(filtre));
 
   el.innerHTML = items.length
     ? items.map(ligne).join("")
@@ -54,7 +56,9 @@ function rendreKpis() {
   set("mail_envoye", fmt(stats.mail_envoye));
   const taux = stats.raw ? Math.round((stats.avec_email / stats.raw) * 100) : 0;
   set("taux_email", `${taux}% de la base`);
-  set("lba", stats.lba ? `dont ${fmt(stats.lba)} à fort potentiel (LBA)` : "dans la base");
+  const ps = stats.par_source || {};
+  set("lba", ps.lba?.entreprises ? `dont ${fmt(ps.lba.entreprises)} à fort potentiel (LBA)` : "dans la base");
+  rendreParSource(ps);
 
   // compteur sidebar + pied
   const c = document.querySelector('[data-count="spontanees"]');
@@ -143,6 +147,18 @@ function rendreAValider() {
       <span class="chip chip--gris">non validé</span>
       <button class="btn btn--sm" data-valider="${e.id}">Valider</button>
     </div>`).join("");
+}
+
+/* Répartition par source : entreprises, emails, envoyés, réponses, entretiens */
+function rendreParSource(ps) {
+  const carte = document.querySelector("[data-par-source]");
+  const liste = document.querySelector('[data-list="par-source"]');
+  if (!carte || !liste) return;
+  const lignes = [["Sirene", ps.sirene], ["La Bonne Alternance", ps.lba], ["Les deux", ps.les_deux]];
+  carte.hidden = !lignes.some(([, l]) => l && l.entreprises);
+  liste.innerHTML = lignes.filter(([, l]) => l).map(([nom, l]) => `
+    <div class="trow trow--source"><span>${nom}</span><span>${fmt(l.entreprises)}</span><span>${fmt(l.avec_email)}</span>
+      <span>${fmt(l.envoyes)}</span><span>${fmt(l.reponses)}</span><span>${fmt(l.entretiens)}</span></div>`).join("");
 }
 
 function fmt(n) { return (n ?? 0).toLocaleString("fr-FR"); }

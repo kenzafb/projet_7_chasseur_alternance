@@ -17,16 +17,24 @@ from database.models import Entreprise
 
 LONGUEUR_CONTACT_RH = 200   # taille de la colonne entreprises.contact_rh
 
-# Entreprises à fort potentiel de La Bonne Alternance (SPEC_SOURCES section 3) :
-# lues, scrapées, envoyées et affichées avant celles de Sirene
+# Sources des entreprises (colonne sources, liste) : Sirene et les
+# entreprises à fort potentiel de La Bonne Alternance, traitées et
+# affichées ensemble, sans priorité de l'une sur l'autre (décision D44)
 SOURCE_LBA = "lba"
 SOURCE_SIRENE = "sirene"
+SOURCES = (SOURCE_SIRENE, SOURCE_LBA)
 PROCHAINES_AFFICHEES = 30
+# Statuts de suivi comptés comme une réponse de l'entreprise
+STATUTS_REPONSE = {"reponse", "entretien", "refus"}
 
 
-def _priorite(e) -> tuple:
-    """Clé de tri : LBA d'abord, puis ordre d'insertion."""
-    return (e.source != SOURCE_LBA, e.id)
+def _avec_source(e, source: str) -> bool:
+    """Ajoute source à la liste de l'entreprise ; vrai si elle n'y était pas."""
+    sources = list(e.sources or [])
+    if source in sources:
+        return False
+    e.sources = sources + [source]
+    return True
 
 
 def normaliser_contact_rh(valeur) -> str:
@@ -64,6 +72,24 @@ def _date_envoi(e):
     return depuis_base(e.mail_envoye_le) or _TRES_ANCIEN
 
 
+def repartition_par_source(entreprises) -> dict:
+    """Pour chaque source : entreprises, emails trouvés, mails envoyés,
+    réponses (réponse, entretien, refus) et entretiens. Une entreprise
+    trouvée par les deux sources compte dans chacune ; « les_deux » les
+    compte à part."""
+    def compter(liste):
+        return {
+            "entreprises": len(liste),
+            "avec_email":  sum(1 for e in liste if e.emails_trouves),
+            "envoyes":     sum(1 for e in liste if e.mail_envoye),
+            "reponses":    sum(1 for e in liste if e.mail_envoye and e.statut_suivi in STATUTS_REPONSE),
+            "entretiens":  sum(1 for e in liste if e.mail_envoye and e.statut_suivi == "entretien"),
+        }
+    out = {src: compter([e for e in entreprises if src in (e.sources or [])]) for src in SOURCES}
+    out["les_deux"] = compter([e for e in entreprises if set(SOURCES) <= set(e.sources or [])])
+    return out
+
+
 def calculer_stats(user_id: int) -> dict:
     """Statistiques globales des entreprises d'un utilisateur."""
     db = SessionLocal()
@@ -85,27 +111,27 @@ def calculer_stats(user_id: int) -> dict:
                 "email":  (e.emails_trouves or [""])[0] if e.emails_trouves else "",
                 "envoye": bool(e.mail_envoye),
                 "date":   en_texte(e.mail_envoye_le, JOUR_HEURE),
-                "lba":    e.source == SOURCE_LBA,
+                "sources": list(e.sources or []),
             }
             for e in recentes
         ]
-        # Prochaines entreprises traitées, LBA d'abord (même ordre que le scraper et l'envoyeur)
+        # Prochaines entreprises traitées, dans l'ordre du scraper et de l'envoyeur
         prochaines = [
             {
                 "nom":       (e.nom_commercial or (e.extra or {}).get("nom", "") or "?")[:40],
                 "ville":     e.ville or "",
                 "email":     (e.emails_trouves or [""])[0] if e.emails_trouves else "",
                 "envoye":    False,
-                "lba":       e.source == SOURCE_LBA,
+                "sources":   list(e.sources or []),
                 "email_lba": bool(set(e.emails_trouves or []) & set((e.extra or {}).get("emails_lba") or [])),
             }
-            for e in sorted((e for e in toutes if not e.mail_envoye), key=_priorite)[:PROCHAINES_AFFICHEES]
+            for e in sorted((e for e in toutes if not e.mail_envoye), key=lambda e: e.id)[:PROCHAINES_AFFICHEES]
         ]
         return {
             "raw": raw,
             "avec_email": avec_email,
             "mail_envoye": mail_envoye,
-            "lba": sum(1 for e in toutes if e.source == SOURCE_LBA),
+            "par_source": repartition_par_source(toutes),
             "dernieres": dernieres,
             "prochaines": prochaines,
         }
@@ -140,7 +166,7 @@ def _entreprise_vers_dict(e) -> dict:
         "traite":         bool(e.traite),
         "mail_envoye":    bool(e.mail_envoye),
         "mail_envoye_le": en_texte(e.mail_envoye_le, JOUR_HEURE),
-        "source":         e.source,
+        "sources":        list(e.sources or []),
         "emails_lba":     list(extra.get("emails_lba") or []),
     }
     # On remonte les champs utiles depuis extra
@@ -207,11 +233,10 @@ def valider_emails(user_id: int, entreprise_id: int) -> bool:
 
 def lire_entreprises(user_id: int) -> list[dict]:
     """Toutes les entreprises d'un utilisateur, format dict (comme l'ancien
-    JSON), celles de La Bonne Alternance d'abord : le scraper et l'envoyeur
-    les traitent donc en priorité."""
+    JSON), dans l'ordre d'insertion, toutes sources confondues (D44)."""
     db = SessionLocal()
     try:
-        lignes = sorted(db.query(Entreprise).filter_by(user_id=user_id).all(), key=_priorite)
+        lignes = db.query(Entreprise).filter_by(user_id=user_id).order_by(Entreprise.id).all()
         return [_entreprise_vers_dict(e) for e in lignes]
     finally:
         db.close()
@@ -303,7 +328,7 @@ def ajouter_entreprises(user_id: int, liste: list[dict]) -> int:
         for d in liste:
             siret = d.get("siret", "")
             if siret and siret in sirets_connus:
-                continue  # déjà en base
+                continue  # déjà en base (la source est notée par noter_source)
             # Champs connus → colonnes ; le reste → extra
             extra = {
                 "siret":       siret,
@@ -323,7 +348,7 @@ def ajouter_entreprises(user_id: int, liste: list[dict]) -> int:
                 siren          = d.get("siren", ""),
                 site_web       = d.get("site_web") or "",
                 secteur        = d.get("code_naf", ""),
-                source         = SOURCE_SIRENE,
+                sources        = [SOURCE_SIRENE],
                 extra          = extra,
             )
             db.add(e)
@@ -349,19 +374,35 @@ def cles_connues(user_id: int) -> frozenset:
         db.close()
 
 
+def noter_source(user_id: int, sirets, source: str) -> int:
+    """Ajoute source aux entreprises déjà en base retrouvées par une autre
+    source (même SIRET). Retourne le nombre d'entreprises complétées."""
+    sirets = set(s for s in sirets if s)
+    if not sirets:
+        return 0
+    db = SessionLocal()
+    try:
+        n = sum(1 for e in db.query(Entreprise).filter_by(user_id=user_id)
+                if (e.extra or {}).get("siret") in sirets and _avec_source(e, source))
+        db.commit()
+        return n
+    finally:
+        db.close()
+
+
 def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None = None) -> dict:
     """Entreprises à fort potentiel de La Bonne Alternance (normalisées par
     france_travail.scraper_lba) dans les candidatures spontanées du mode
     alternance, source « lba ». Dédoublonnage par SIRET avec toutes les
     entreprises de l'utilisateur (Sirene comprises), à défaut par
-    identifiant LBA. Une entreprise déjà connue passe en source « lba »
-    (elle remonte en priorité) et garde ses données ; un email fourni par
+    identifiant LBA. Une entreprise déjà connue garde ses données et ajoute
+    « lba » à ses sources (D44) ; un email fourni par
     LBA est ajouté à ses emails s'il n'y est pas et qu'elle n'a pas encore
     été contactée. Les emails fournis par LBA sont notés dans
     extra["emails_lba"]. maximum : nouvelles entreprises au plus (None :
-    toutes). Retourne {"ajoutees", "deja_connues", "passees_en_lba",
-    "avec_email", "non_ajoutees"}."""
-    bilan = {"ajoutees": 0, "deja_connues": 0, "passees_en_lba": 0, "avec_email": 0, "non_ajoutees": 0}
+    toutes). Retourne {"ajoutees", "deja_connues", "deux_sources" (déjà
+    connues d'une autre source), "avec_email", "non_ajoutees"}."""
+    bilan = {"ajoutees": 0, "deja_connues": 0, "deux_sources": 0, "avec_email": 0, "non_ajoutees": 0}
     db = SessionLocal()
     try:
         par_siret, par_identifiant = {}, {}
@@ -380,9 +421,8 @@ def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None
                 bilan["deja_connues"] += 1
                 extra = dict(e.extra or {})
                 extra["lba"] = infos_lba
-                if e.source != SOURCE_LBA:
-                    e.source = SOURCE_LBA
-                    bilan["passees_en_lba"] += 1
+                if _avec_source(e, SOURCE_LBA):
+                    bilan["deux_sources"] += 1
                 if email and not e.mail_envoye and email not in (e.emails_trouves or []):
                     e.emails_trouves = list(e.emails_trouves or []) + [email]
                 if email:
@@ -407,7 +447,7 @@ def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None
             e = Entreprise(
                 user_id        = user_id,
                 mode           = "alternance",
-                source         = SOURCE_LBA,
+                sources        = [SOURCE_LBA],
                 nom_commercial = d.get("nom_commercial") or d.get("nom", ""),
                 ville          = d.get("ville", ""),
                 code_postal    = d.get("code_postal", ""),
