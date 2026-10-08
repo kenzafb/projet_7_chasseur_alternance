@@ -12,7 +12,9 @@ le modèle Mistral et la géographie de recherche (Île-de-France).
 """
 
 import os
+from datetime import date, datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 from dotenv import load_dotenv
 
@@ -177,6 +179,23 @@ LBA_CENTRES = [
 LBA_RAYON_MIN_KM = 1
 # Requêtes LBA au plus par recherche (redécoupages compris), environ 3 min
 LBA_REQUETES_MAX = 300
+
+# Nomenclature des codes NAF envoyés à Sirene (SPEC_SOURCES 4.3) : NAFRev2
+# jusqu'au 31 décembre 2026, NAF2025 à partir du 1er janvier 2027 (décret
+# 2025-736), jour de Paris. NOMENCLATURE_NAF du .env force l'une ou l'autre.
+NOMENCLATURES_NAF = ("NAFRev2", "NAF2025")
+DATE_BASCULE_NAF_2025 = date(2027, 1, 1)
+
+
+def nomenclature_naf(aujourdhui: date | None = None) -> str:
+    """NAFRev2 ou NAF2025, relue à chaque appel ; une valeur inconnue du
+    .env est ignorée (défaut selon la date)."""
+    forcee = os.getenv("NOMENCLATURE_NAF", "").strip()
+    for nom in NOMENCLATURES_NAF:
+        if forcee.lower() == nom.lower():
+            return nom
+    aujourdhui = aujourdhui or datetime.now(ZoneInfo(FUSEAU_AFFICHAGE)).date()
+    return "NAF2025" if aujourdhui >= DATE_BASCULE_NAF_2025 else "NAFRev2"
 
 # INSEE Sirene : départements interrogés pour les candidatures spontanées
 SIRENE_DEPARTEMENTS = [

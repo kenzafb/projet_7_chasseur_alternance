@@ -1,0 +1,657 @@
+{
+ "description": "Correspondance domaine France Travail vers codes NAF de Sirene (SPEC_SOURCES section 4.1). Cœurs : le métier est l'activité de l'entreprise, toutes tailles. Transverses : le métier existe comme service interne, seulement pour les unités légales de 250 salariés et plus (tranche 32 et au-delà, ou catégorie ETI ou GE). Codes NAF 2025 tirés de la table officielle de l'INSEE ; pour une correspondance multiple, retenus_2025 donne les cibles gardées pour le domaine (a_valider) et note la raison.",
+ "source_naf_2025": "INSEE, Correspondances_NAFrev2-NAF2025.xlsx (édition janvier 2026), insee.fr/fr/information/8181066, téléchargé le 9 octobre 2026 ; copie : docs/referentiels/insee/correspondance_naf_rev2_naf2025.csv",
+ "exclusions": [
+  {
+   "naf_rev2": "68.32B",
+   "intitule": "Supports juridiques de gestion de patrimoine immobilier",
+   "naf_2025": [
+    {
+     "code": "68.32G",
+     "intitule": "Activités des unités non productives détentrices de patrimoine immobilier",
+     "type": "unique",
+     "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+    }
+   ],
+   "retenus_2025": [
+    "68.32G"
+   ]
+  },
+  {
+   "naf_rev2": "41.10D",
+   "intitule": "Supports juridiques de programmes",
+   "naf_2025": [
+    {
+     "code": "68.32G",
+     "intitule": "Activités des unités non productives détentrices de patrimoine immobilier",
+     "type": "unique",
+     "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+    }
+   ],
+   "retenus_2025": [
+    "68.32G"
+   ]
+  },
+  {
+   "naf_rev2": "66.19A",
+   "intitule": "Supports juridiques de gestion de patrimoine mobilier",
+   "naf_2025": [
+    {
+     "code": "66.19G",
+     "intitule": "Activités des unités non productives détentrices de patrimoine mobilier",
+     "type": "unique",
+     "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+    }
+   ],
+   "retenus_2025": [
+    "66.19G"
+   ]
+  }
+ ],
+ "domaines": {
+  "M18": {
+   "coeurs": [
+    {
+     "naf_rev2": "62.01Z",
+     "intitule": "Programmation informatique",
+     "naf_2025": [
+      {
+       "code": "62.10Y",
+       "intitule": "Activités de programmation informatique",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "62.10Y"
+     ]
+    },
+    {
+     "naf_rev2": "62.02A",
+     "intitule": "Conseil en systèmes et logiciels informatiques",
+     "naf_2025": [
+      {
+       "code": "62.20G",
+       "intitule": "Conseil en systèmes et logiciels informatiques",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "62.20G"
+     ]
+    },
+    {
+     "naf_rev2": "62.02B",
+     "intitule": "Tierce maintenance de systèmes et d’applications informatiques",
+     "naf_2025": [
+      {
+       "code": "62.20H",
+       "intitule": "Gestion d'installations informatiques et maintenance de systèmes et d’applications informatiques",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "62.20H"
+     ]
+    },
+    {
+     "naf_rev2": "62.03Z",
+     "intitule": "Gestion d'installations informatiques",
+     "naf_2025": [
+      {
+       "code": "62.20H",
+       "intitule": "Gestion d'installations informatiques et maintenance de systèmes et d’applications informatiques",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "62.20H"
+     ]
+    },
+    {
+     "naf_rev2": "62.09Z",
+     "intitule": "Autres activités informatiques",
+     "naf_2025": [
+      {
+       "code": "62.90Y",
+       "intitule": "Autres activités de service informatique",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "62.90Y"
+     ]
+    },
+    {
+     "naf_rev2": "63.11Z",
+     "intitule": "Traitement de données, hébergement et activités connexes",
+     "naf_2025": [
+      {
+       "code": "60.20H",
+       "intitule": "Édition de services de médias à la demande",
+       "type": "multiple",
+       "contenu": "- l'exploitation de sites de diffusion en continu de jeux vidéo"
+      },
+      {
+       "code": "60.39Y",
+       "intitule": "Autres activités de distribution de contenu",
+       "type": "multiple",
+       "contenu": "- l'exploitation de sites de jeux en ligne ou de jeux vidéo, indépendamment de l'édition des jeux - la fourniture de livres électroniques en tant que service de streaming ou de téléchargement non asso"
+      },
+      {
+       "code": "63.10Y",
+       "intitule": "Infrastructure informatique, traitement de données, hébergement et activités connexes",
+       "type": "multiple",
+       "contenu": "- la fourniture d'infrastructures informatiques, y compris la fourniture d'infrastructures et de plateformes en nuage (IaaS, PaaS) - l'informatique en nuage (à l'exception de l'édition de logiciels et"
+      }
+     ],
+     "retenus_2025": [
+      "60.39Y",
+      "63.10Y"
+     ],
+     "a_valider": true,
+     "note": "60.20H (édition de services de médias à la demande) réunit aussi les chaînes de télévision (60.20A, 60.20B) ; seule la diffusion en continu de jeux vidéo y vient de 63.11Z."
+    },
+    {
+     "naf_rev2": "63.12Z",
+     "intitule": "Portails Internet",
+     "naf_2025": [
+      {
+       "code": "60.39Y",
+       "intitule": "Autres activités de distribution de contenu",
+       "type": "multiple",
+       "contenu": "- les services de distribution de sites de partage de contenu, par exemple les sites wiki et les sites de réseaux sociaux, qui publient des des contenus produits et édités par les utilisateurs et qui "
+      },
+      {
+       "code": "63.91Y",
+       "intitule": "Activités de portail de recherche sur le web",
+       "type": "multiple",
+       "contenu": "- l'exploitation de sites web qui utilisent un moteur de recherche pour générer et maintenir de vastes bases de données d'adresses et de contenus internet dans un format facilement consultable ; ces p"
+      }
+     ],
+     "retenus_2025": [
+      "60.39Y",
+      "63.91Y"
+     ],
+     "a_valider": true,
+     "note": "Les deux cibles (60.39Y distribution de contenu, 63.91Y portails de recherche) ne viennent que de 63.11Z et 63.12Z."
+    },
+    {
+     "naf_rev2": "58.21Z",
+     "intitule": "Édition de jeux électroniques",
+     "naf_2025": [
+      {
+       "code": "58.21Y",
+       "intitule": "Édition de jeux vidéo",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "58.21Y"
+     ]
+    },
+    {
+     "naf_rev2": "58.29A",
+     "intitule": "Édition de logiciels système et de réseau",
+     "naf_2025": [
+      {
+       "code": "58.29Y",
+       "intitule": "Édition d’autres logiciels",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "58.29Y"
+     ]
+    },
+    {
+     "naf_rev2": "58.29B",
+     "intitule": "Edition de logiciels outils de développement et de langages",
+     "naf_2025": [
+      {
+       "code": "58.29Y",
+       "intitule": "Édition d’autres logiciels",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "58.29Y"
+     ]
+    },
+    {
+     "naf_rev2": "58.29C",
+     "intitule": "Edition de logiciels applicatifs",
+     "naf_2025": [
+      {
+       "code": "58.29Y",
+       "intitule": "Édition d’autres logiciels",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "58.29Y"
+     ]
+    },
+    {
+     "naf_rev2": "61.10Z",
+     "intitule": "Télécommunications filaires",
+     "naf_2025": [
+      {
+       "code": "61.10Y",
+       "intitule": "Activités de télécommunications filaires, sans fil et satellitaires",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "61.10Y"
+     ]
+    },
+    {
+     "naf_rev2": "61.20Z",
+     "intitule": "Télécommunications sans fil",
+     "naf_2025": [
+      {
+       "code": "61.10Y",
+       "intitule": "Activités de télécommunications filaires, sans fil et satellitaires",
+       "type": "multiple",
+       "contenu": "- l'exploitation, la maintenance ou la fourniture d'accès à des installations pour la transmission de la voix, de données, de textes, de sons et de vidéos au moyen d'une infrastructure de télécommunic"
+      },
+      {
+       "code": "61.90Y",
+       "intitule": "Autres activités de télécommunications",
+       "type": "multiple",
+       "contenu": "- la transmission de messages textuels (SMS) via l'internet"
+      }
+     ],
+     "retenus_2025": [
+      "61.10Y",
+      "61.90Y"
+     ],
+     "a_valider": true,
+     "note": "Les deux cibles restent dans les télécommunications."
+    },
+    {
+     "naf_rev2": "61.30Z",
+     "intitule": "Télécommunications par satellite",
+     "naf_2025": [
+      {
+       "code": "61.10Y",
+       "intitule": "Activités de télécommunications filaires, sans fil et satellitaires",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "61.10Y"
+     ]
+    },
+    {
+     "naf_rev2": "61.90Z",
+     "intitule": "Autres activités de télécommunication",
+     "naf_2025": [
+      {
+       "code": "61.20Y",
+       "intitule": "Activités de revente de télécommunications et activités de service d’intermédiation pour les télécommunications",
+       "type": "multiple",
+       "contenu": "- la revente de télécommunications filaires, sans fil et par satellite (c'est-à-dire l'achat et la revente de capacité de réseau), y compris les activités des courtiers en télécommunications et des re"
+      },
+      {
+       "code": "61.90Y",
+       "intitule": "Autres activités de télécommunications",
+       "type": "multiple",
+       "contenu": "- la fourniture d'applications de télécommunications spécialisées, par exemple le suivi des satellites, la télémétrie des communications, l'exploitation de stations radar - l'exploitation de stations "
+      }
+     ],
+     "retenus_2025": [
+      "61.20Y",
+      "61.90Y"
+     ],
+     "a_valider": true,
+     "note": "61.20Y reçoit aussi une partie de 82.99Z ; gardée, l'essentiel est la revente de télécommunications."
+    },
+    {
+     "naf_rev2": "26.20Z",
+     "intitule": "Fabrication d'ordinateurs et d'équipements périphériques",
+     "naf_2025": [
+      {
+       "code": "26.20Y",
+       "intitule": "Fabrication d’ordinateurs et d’équipements périphériques",
+       "type": "multiple",
+       "contenu": "- la fabrication d'ordinateurs de bureau - la fabrication d'ordinateurs portables - la fabrication d'ordinateurs centraux - la fabrication d'ordinateurs de poche - la fabrication de lecteurs de disque"
+      },
+      {
+       "code": "26.40Y",
+       "intitule": "Fabrication de produits électroniques grand public",
+       "type": "multiple",
+       "contenu": "- la fabrication de casques de réalité virtuelle"
+      }
+     ],
+     "retenus_2025": [
+      "26.20Y"
+     ],
+     "a_valider": true,
+     "note": "26.40Y (électronique grand public) ne reçoit de 26.20Z que les casques de réalité virtuelle et réunit toute l'ancienne 26.40Z."
+    },
+    {
+     "naf_rev2": "46.51Z",
+     "intitule": "Commerce de gros (commerce interentreprises) d'ordinateurs, d'équipements informatiques périphériques et de logiciels",
+     "naf_2025": [
+      {
+       "code": "46.50Y",
+       "intitule": "Commerce de gros d’équipements de l’information et de la communication",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "46.50Y"
+     ]
+    },
+    {
+     "naf_rev2": "95.11Z",
+     "intitule": "Réparation d'ordinateurs et d'équipements périphériques",
+     "naf_2025": [
+      {
+       "code": "95.10Y",
+       "intitule": "Réparation et entretien d’ordinateurs et d’équipements de communication",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "95.10Y"
+     ]
+    }
+   ],
+   "transverses": [
+    {
+     "naf_rev2": "64.19Z",
+     "intitule": "Autres intermédiations monétaires",
+     "naf_2025": [
+      {
+       "code": "64.19Y",
+       "intitule": "Autre intermédiation monétaire",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "64.19Y"
+     ]
+    },
+    {
+     "naf_rev2": "65.11Z",
+     "intitule": "Assurance vie",
+     "naf_2025": [
+      {
+       "code": "65.11Y",
+       "intitule": "Assurance vie",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "65.11Y"
+     ]
+    },
+    {
+     "naf_rev2": "65.12Z",
+     "intitule": "Autres assurances",
+     "naf_2025": [
+      {
+       "code": "65.12Y",
+       "intitule": "Assurances non-vie",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "65.12Y"
+     ]
+    },
+    {
+     "naf_rev2": "70.10Z",
+     "intitule": "Activités des sièges sociaux",
+     "naf_2025": [
+      {
+       "code": "70.10Y",
+       "intitule": "Activités des sièges sociaux",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "70.10Y"
+     ]
+    },
+    {
+     "naf_rev2": "70.22Z",
+     "intitule": "Conseil pour les affaires et autres conseils de gestion",
+     "naf_2025": [
+      {
+       "code": "70.20Y",
+       "intitule": "Activités de conseil pour les affaires et autre conseil de gestion",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "70.20Y"
+     ]
+    },
+    {
+     "naf_rev2": "71.12B",
+     "intitule": "Ingénierie, études techniques",
+     "naf_2025": [
+      {
+       "code": "71.12Y",
+       "intitule": "Activités d’ingénierie et de conseil technique connexe",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "71.12Y"
+     ]
+    }
+   ]
+  },
+  "C15": {
+   "coeurs": [
+    {
+     "naf_rev2": "68.31Z",
+     "intitule": "Agences immobilières",
+     "naf_2025": [
+      {
+       "code": "68.31Y",
+       "intitule": "Activités de service d’intermédiation pour les activités immobilières",
+       "type": "multiple",
+       "contenu": "- l'intermédiation dans l'achat, la vente et la location de biens immobiliers sur la base d'honoraires ou de contrats"
+      },
+      {
+       "code": "68.32H",
+       "intitule": "Autres activités immobilières pour compte de tiers n.c.a.",
+       "type": "multiple",
+       "contenu": "- les activités d'évaluation des biens immobiliers - les activités des agents de séquestre immobilier - les activités de conseil, sur la base d'honoraires ou de contrats, en rapport avec l'achat, la v"
+      }
+     ],
+     "retenus_2025": [
+      "68.31Y",
+      "68.32H"
+     ],
+     "a_valider": true,
+     "note": "68.31Y (intermédiation) et 68.32H (évaluation, conseil, avec l'ancienne 68.32A) relèvent tous deux de l'immobilier."
+    },
+    {
+     "naf_rev2": "68.32A",
+     "intitule": "Administration d'immeubles et autres biens immobiliers",
+     "naf_2025": [
+      {
+       "code": "68.32H",
+       "intitule": "Autres activités immobilières pour compte de tiers n.c.a.",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "68.32H"
+     ]
+    },
+    {
+     "naf_rev2": "68.20A",
+     "intitule": "Location de logements",
+     "naf_2025": [
+      {
+       "code": "55.90Y",
+       "intitule": "Autres hébergements",
+       "type": "multiple",
+       "contenu": "- la fourniture de maisons et d'appartements meublés ou non meublés pour une période inférieure à un an"
+      },
+      {
+       "code": "68.20G",
+       "intitule": "Location de logements",
+       "type": "multiple",
+       "contenu": "à l’exception de la fourniture de maisons et d'appartements meublés ou non meublés pour une période inférieure à un an, tout le contenu de la sous-classe NAF rév. 2, à savoir : - la location et l'expl"
+      }
+     ],
+     "retenus_2025": [
+      "68.20G"
+     ],
+     "a_valider": true,
+     "note": "55.90Y (autres hébergements) ne reçoit de 68.20A que la location de logements de moins d'un an et réunit toute l'ancienne 55.90Z (hébergement touristique)."
+    },
+    {
+     "naf_rev2": "68.20B",
+     "intitule": "Location de terrains et d'autres biens immobiliers",
+     "naf_2025": [
+      {
+       "code": "68.20H",
+       "intitule": "Location et exploitation d'autres biens immobiliers propres ou loués",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2, à savoir : - la location et l'exploitation de biens immobiliers détenus en propre ou en crédit-bail : • bâtiments non résidentiels, y compris immeubles de"
+      }
+     ],
+     "retenus_2025": [
+      "68.20H"
+     ]
+    },
+    {
+     "naf_rev2": "68.10Z",
+     "intitule": "Activités des marchands de biens immobiliers",
+     "naf_2025": [
+      {
+       "code": "68.11Y",
+       "intitule": "Achat et vente de biens propres",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "68.11Y"
+     ]
+    },
+    {
+     "naf_rev2": "41.10A",
+     "intitule": "Promotion immobilière de logements",
+     "naf_2025": [
+      {
+       "code": "68.12Y",
+       "intitule": "Promotion immobilière",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "68.12Y"
+     ]
+    },
+    {
+     "naf_rev2": "41.10B",
+     "intitule": "Promotion immobilière de bureaux",
+     "naf_2025": [
+      {
+       "code": "68.12Y",
+       "intitule": "Promotion immobilière",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "68.12Y"
+     ]
+    },
+    {
+     "naf_rev2": "41.10C",
+     "intitule": "Promotion immobilière d'autres bâtiments",
+     "naf_2025": [
+      {
+       "code": "68.12Y",
+       "intitule": "Promotion immobilière",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "68.12Y"
+     ]
+    }
+   ],
+   "transverses": [
+    {
+     "naf_rev2": "64.19Z",
+     "intitule": "Autres intermédiations monétaires",
+     "naf_2025": [
+      {
+       "code": "64.19Y",
+       "intitule": "Autre intermédiation monétaire",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "64.19Y"
+     ]
+    },
+    {
+     "naf_rev2": "65.11Z",
+     "intitule": "Assurance vie",
+     "naf_2025": [
+      {
+       "code": "65.11Y",
+       "intitule": "Assurance vie",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "65.11Y"
+     ]
+    },
+    {
+     "naf_rev2": "65.12Z",
+     "intitule": "Autres assurances",
+     "naf_2025": [
+      {
+       "code": "65.12Y",
+       "intitule": "Assurances non-vie",
+       "type": "unique",
+       "contenu": "tout le contenu de la sous-classe NAF rév. 2"
+      }
+     ],
+     "retenus_2025": [
+      "65.12Y"
+     ]
+    }
+   ]
+  }
+ }
+}
