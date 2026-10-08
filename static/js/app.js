@@ -106,11 +106,27 @@ async function majCompteurSuivi() {
   } catch (_) {}
 }
 
-/* ── Polling : reflète l'état des pipelines en haut de page ─────────────── */
+/* ── Polling : reflète l'état des pipelines en haut de page ───────────────
+   Une requête au chargement, puis toutes les POLL_MS seulement tant qu'un
+   pipeline tourne. Chaque lancement ou arrêt relance la surveillance. */
+const POLL_MS = 5000;
+let minuteur = null;     // prochain poll programmé
+let enVol = false;       // une requête de statut est en cours
+let aRelancer = false;   // surveiller() appelé pendant cette requête
+
+function surveiller() {
+  if (enVol) { aRelancer = true; return; }
+  clearTimeout(minuteur);
+  minuteur = null;
+  pollEtat();
+}
+
 async function pollEtat() {
+  enVol = true;
+  let actif = !!pollEtat._etaitActif;   // erreur réseau : on garde le dernier état connu
   try {
-    const [rech, sp] = await Promise.all([api.statutRecherche(), api.spStatut()]);
-    const actif = rech.en_cours || sp.en_cours;
+    const { recherche: rech, spontanees: sp } = await api.statutPipelines();
+    actif = rech.en_cours || sp.en_cours;
     const bar = document.querySelector("[data-runbar]");
     bar.classList.toggle("is-on", actif);
     if (actif) {
@@ -135,6 +151,9 @@ async function pollEtat() {
     }
     pollEtat._etaitActif = actif;
   } catch (_) {}
+  enVol = false;
+  if (aRelancer) { aRelancer = false; surveiller(); return; }
+  if (actif) minuteur = setTimeout(pollEtat, POLL_MS);
 }
 
 /* ── Sauvegarde du profil (topbar + bouton de page) ──────────────────────── */
@@ -207,6 +226,7 @@ function brancher() {
   // bouton d'action contextuel de la topbar
   document.querySelector('[data-topbar="action"]').addEventListener("click", async () => {
     try { await TOPBAR[pageCourante].run(); } catch (e) { alert(e.message); }
+    surveiller();   // un pipeline vient peut-être de démarrer
   });
 
   // clics délégués sur les offres
@@ -260,7 +280,7 @@ function brancher() {
 
   // actions pipeline spontanées
   document.querySelectorAll("[data-action]").forEach(b =>
-    b.addEventListener("click", () => Spontanees.action(b.dataset.action)));
+    b.addEventListener("click", async () => { await Spontanees.action(b.dataset.action); surveiller(); }));
 
   // modale
   document.querySelector("[data-modal-close]").addEventListener("click", () => modal.fermer());
@@ -271,12 +291,20 @@ function brancher() {
   });
 
   // bouton arrêter du runbar
-  document.querySelector("[data-runbar-stop]").addEventListener("click", () => api.spStop());
+  document.querySelector("[data-runbar-stop]").addEventListener("click", async () => {
+    try { await api.spStop(); } catch (_) {}
+    surveiller();
+  });
   // Boutons Arrêter sur les cartes du pipeline
   document.querySelectorAll("[data-stop]").forEach(b =>
     b.addEventListener("click", async () => {
       try { await api.spStop(); Spontanees.charger(); } catch (_) {}
+      surveiller();
     }));
+  // Retour sur l'onglet : un pipeline a pu être lancé ailleurs (autre onglet)
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") surveiller();
+  });
 
   // rafraîchir le kanban quand on déplace une carte
   Candidatures.onRefresh(() => recharger());
@@ -310,4 +338,4 @@ recharger();
     aller(PAGES_VALIDES.includes(hash) ? hash : "offres");
   }
 })();
-setInterval(pollEtat, 2500);
+surveiller();

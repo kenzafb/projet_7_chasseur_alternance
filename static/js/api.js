@@ -76,7 +76,7 @@ export const api = {
   // Offres / candidatures
   candidatures:      ()        => get("/api/candidatures"),
   recherche:         (max)     => post("/api/recherche", { max_analyses: max }),
-  statutRecherche:   ()        => get("/api/statut_recherche"),
+  statutPipelines:   ()        => get("/api/statut_pipelines"),
   analyser:          (id)      => post("/api/analyser", { id }),
   genererLettre:     (id)      => post("/api/generer_lettre", { id }),
   majStatut:         (id, s)   => post("/api/maj_statut", { id, statut: s }),
@@ -110,7 +110,6 @@ export const api = {
   spSuivi:       ()           => get("/api/spontanees/suivi"),
   spSuiviStatut: (id, statut) => post("/api/spontanees/suivi/statut", { id, statut }),
   spStats:    ()       => get("/api/spontanees/stats"),
-  spStatut:   ()       => get("/api/spontanees/statut"),
   spFetch:    (max)    => post("/api/spontanees/fetch", { max_entreprises: max }),
   spScraper:  (max)    => post("/api/spontanees/scraper", { max_scrapees: max }),
   spEnvoyer:  (limite, test = false) => post("/api/spontanees/envoyer", { limite, test }),

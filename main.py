@@ -12,6 +12,7 @@ Les pipelines longs (recherche, fetch, scraper, envoi) tournent dans des
 threads avec stop_event : les fonctions métier sont synchrones.
 """
 
+import logging
 import os
 import re
 import secrets
@@ -115,6 +116,29 @@ def chiffrement_indisponible(request: Request, exc: ChiffrementIndisponible):
 
 if raison_indisponible():
     print(f"⚠️  {raison_indisponible()}")
+
+
+# ─── Journal d'accès : sans les requêtes de statut ───────────────────────────
+# Le front interroge l'état des pipelines toutes les quelques secondes tant
+# qu'ils tournent : ces lignes noieraient le journal d'accès d'uvicorn.
+ROUTES_DE_STATUT = frozenset({"/api/statut_pipelines", "/api/statut_recherche", "/api/spontanees/statut"})
+
+
+class SansRequetesDeStatut(logging.Filter):
+    """Écarte du journal « uvicorn.access » les requêtes vers ROUTES_DE_STATUT.
+    uvicorn journalise (client, méthode, chemin avec requête, version, code)."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        args = record.args
+        if isinstance(args, tuple) and len(args) >= 3:
+            return str(args[2]).split("?", 1)[0] not in ROUTES_DE_STATUT
+        return True
+
+
+FILTRE_STATUT = SansRequetesDeStatut()
+# Le filtre est posé sur le logger : la configuration des logs d'uvicorn
+# (dictConfig, appelée avant l'import de l'app) ne le retire pas
+logging.getLogger("uvicorn.access").addFilter(FILTRE_STATUT)
 
 # ─── États, arrêts et logs des pipelines, par utilisateur ─────────────────────
 pipelines = Pipelines()
@@ -479,6 +503,12 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
 @prive.get("/api/statut_recherche")
 def api_statut_recherche(user: User = Depends(utilisateur_requis)):
     return pipelines.etat(RECHERCHE, user.id)
+
+@prive.get("/api/statut_pipelines")
+def api_statut_pipelines(user: User = Depends(utilisateur_requis)):
+    """État des deux pipelines de l'utilisateur en une requête (polling du front)."""
+    return {"recherche": pipelines.etat(RECHERCHE, user.id),
+            "spontanees": pipelines.etat(SPONTANEES, user.id)}
 
 @prive.post("/api/generer_lettre")
 def api_generer_lettre(body: OffreId, request: Request, user: User = Depends(utilisateur_requis)):
