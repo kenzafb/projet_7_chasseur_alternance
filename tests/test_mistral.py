@@ -169,7 +169,7 @@ def recherche(utilisateur, mistral, monkeypatch, pipelines_neufs):
     """Lance la recherche par la route, France Travail et LBA simulés."""
     client, user_id = utilisateur("a@test.fr", prenom="Alice")
     sources = {"ft": [_brut_ft(i) for i in range(3)], "lba": []}
-    monkeypatch.setattr(scraper, "recuperer_offres", lambda criteres, log=print: list(sources["ft"]))
+    monkeypatch.setattr(scraper, "recuperer_offres", lambda criteres, log=print, **_: list(sources["ft"]))
     monkeypatch.setattr(main, "rechercher_lba", lambda profil, log=print: {"offres": list(sources["lba"]), "entreprises": [], "requetes": 0})
     mistral.reponse = ANALYSE
 

@@ -145,6 +145,8 @@ class FausseAPI:
             return Reponse(400, {"message": str(e)})
         if not trouvees:
             return Reponse(204)
+        if params.get("sort") == "1":   # date de création décroissante, comme l'API
+            trouvees = sorted(trouvees, key=lambda o: o["dateCreation"], reverse=True)
         page = trouvees[debut:fin + 1]
         statut = 200 if len(trouvees) <= fin + 1 and debut == 0 else 206
         return Reponse(statut, {"resultats": page},

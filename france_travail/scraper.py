@@ -130,15 +130,29 @@ def _par_fenetre(params):
 
 
 class Collecte:
-    """Récupération complète d'un ensemble de requêtes, dédoublonnée."""
+    """Récupération d'un ensemble de requêtes, dédoublonnée.
 
-    def __init__(self, token: str, log=print):
+    Avec un objectif (nombre d'offres retenues par le prédicat retenir :
+    nouvelles, en IDF, de la bonne taille...), la récupération s'arrête dès
+    qu'il est atteint : plus aucune page ni tranche demandée. Les pages
+    arrivent des plus récentes aux plus anciennes (sort=1) et la tranche de
+    dates la plus récente est lue d'abord : les offres obtenues sont les plus
+    récentes de la requête."""
+
+    def __init__(self, token: str, log=print, retenir=None, objectif: int | None = None):
         self.token = token
         self.log = log
         self.offres = {}          # identifiant -> offre brute
         self.requetes = 0
         self.non_recuperees = 0   # tranches d'une heure encore au-delà du plafond
         self.erreurs = 0
+        self.retenir = retenir
+        self.objectif = objectif
+        self.retenues = set()     # identifiants des offres retenues
+
+    @property
+    def complet(self) -> bool:
+        return self.objectif is not None and len(self.retenues) >= self.objectif
 
     def _page(self, params, debut):
         if self.requetes:
@@ -159,6 +173,8 @@ class Collecte:
         """Récupère toutes les offres de params. Si la requête a dû être
         découpée, écrit le total annoncé par l'API, le nombre d'offres
         distinctes récupérées et l'écart."""
+        if self.complet:
+            return
         page = self._premiere_page(params)
         if page is None:
             return
@@ -167,6 +183,10 @@ class Collecte:
             self._recuperer(params, page, ids)
             return
         self._recuperer(params, page, ids)
+        if self.complet:
+            self.log(f"  Recherche découpée par date ({_decrire(params)}) : {page[0]} annoncées par l'API, "
+                     f"arrêtée dès {self.objectif} nouvelles offres obtenues ({len(ids)} reçues)")
+            return
         ecart = page[0] - len(ids)
         self.log(f"  Recherche découpée par date ({_decrire(params)}) : {page[0]} annoncées par l'API, "
                  f"{len(ids)} récupérées, écart {ecart}"
@@ -181,8 +201,9 @@ class Collecte:
                 # Garde-fou : deux moitiés qui ont chacune le total entier =
                 # dates ignorées par l'API ; continuer multiplierait les requêtes
                 if not all(p and p[0] == total for p in pages):
-                    for s, p in zip(sous, pages):
-                        if p:
+                    # Tranche la plus récente d'abord, pour pouvoir s'arrêter tôt
+                    for s, p in reversed(list(zip(sous, pages))):
+                        if p and not self.complet:
                             self._recuperer(s, p, ids)
                     return
                 self.log(f"  ⚠️  Découpage par date sans effet ({_decrire(sous[0])} renvoie les {total} "
@@ -192,7 +213,8 @@ class Collecte:
                      f"{total - PLAFOND_REQUETE} non récupérées")
         self._ajouter(premiere, ids)
         debut = TAILLE_PAGE
-        while debut < min(total, PLAFOND_REQUETE) and len(premiere) == TAILLE_PAGE:
+        while (debut < min(total, PLAFOND_REQUETE) and len(premiere) == TAILLE_PAGE
+               and not self.complet):
             try:
                 _, resultats = self._page(params, debut)
             except ErreurFT as e:
@@ -208,7 +230,10 @@ class Collecte:
         for o in resultats:
             cle = o.get("id") or id(o)
             ids.add(cle)
-            self.offres.setdefault(cle, o)
+            if cle not in self.offres:
+                self.offres[cle] = o
+                if self.retenir and self.retenir(o):
+                    self.retenues.add(cle)
 
 
 def _paquets(valeurs: list, taille: int | None) -> list[str]:
@@ -241,105 +266,108 @@ def requetes_initiales(filtres: dict, domaines: list[str]) -> list[dict]:
     return requetes
 
 
-def recuperer_offres(criteres: dict, log=print) -> list:
-    """Offres brutes de France Travail pour des critères, dédoublonnées."""
+def recuperer_offres(criteres: dict, log=print, retenir=None, objectif: int | None = None) -> list:
+    """Offres brutes de France Travail pour des critères, dédoublonnées.
+    retenir, objectif : arrêt dès qu'objectif offres satisfont retenir
+    (voir Collecte) ; sans objectif, tout est récupéré."""
     token = get_token()
     if not token:
         log("  ⚠️  France Travail : token refusé, aucune offre récupérée")
         return []
     requetes = requetes_initiales(criteres["filtres"], criteres["domaines"])
-    collecte = Collecte(token, log)
+    collecte = Collecte(token, log, retenir=retenir, objectif=objectif)
     for params in requetes:
         collecte.recuperer(params)
     log(f"  France Travail : {len(collecte.offres)} offres distinctes reçues en {collecte.requetes} requêtes"
+        + (f", arrêt dès {objectif} nouvelles offres obtenues" if collecte.complet else "")
         + (f", {collecte.erreurs} en erreur" if collecte.erreurs else "")
         + (f", {collecte.non_recuperees} non récupérées (plafond)" if collecte.non_recuperees else ""))
     return list(collecte.offres.values())
 
 
 def _normaliser(bruts: list) -> list:
-    offres   = []
-    hors_idf = 0
-
-    for offre in bruts:
-        lien = offre.get("origineOffre", {}).get("urlOrigine", "")
-        if not lien:
-            lien = f"https://candidat.francetravail.fr/offres/recherche/detail/{offre.get('id', '')}"
-
-        lieu = offre.get("lieuTravail", {}).get("libelle", "")
-        zone = detecter_zone(lieu)
-        if zone is None:
-            hors_idf += 1
-            continue
-
-        # --- Enrichissement description ---
-        desc = offre.get("description", "")
-
-        # Description entreprise
-        desc_entreprise = offre.get("entreprise", {}).get("description", "")
-        if desc_entreprise:
-            desc += f"\n\nEntreprise : {desc_entreprise}"
-
-        # Infos contrat
-        exp     = offre.get("experienceLibelle", "")
-        duree   = offre.get("dureeTravailLibelleConverti", "")
-        salaire = offre.get("salaire", {}).get("libelle", "")
-        qualif  = offre.get("qualificationLibelle", "")
-        secteur = offre.get("secteurActiviteLibelle", "")
-
-        if exp:     desc += f"\nExpérience : {exp}"
-        if duree:   desc += f"\nDurée : {duree}"
-        if salaire: desc += f"\nSalaire : {salaire}"
-        if qualif:  desc += f"\nQualification : {qualif}"
-        if secteur: desc += f"\nSecteur : {secteur}"
-
-        # Formations (~10% des offres mais critique pour détecter Bac+5)
-        for f in offre.get("formations", []):
-            niv       = f.get("niveauLibelle", "")
-            domaine_f = f.get("domaineLibelle", "")
-            exige     = "indispensable" if f.get("exigence") == "E" else "souhaitée"
-            label     = " - ".join(filter(None, [domaine_f, niv]))
-            if label: desc += f"\nFormation : {label} ({exige})"
-
-        # Compétences (~10% des offres)
-        for c in offre.get("competences", []):
-            lib   = c.get("libelle", "")
-            exige = "indispensable" if c.get("exigence") == "E" else "souhaitée"
-            if lib: desc += f"\nCompétence : {lib} ({exige})"
-
-        # Langues (rare mais utile)
-        for l in offre.get("langues", []):
-            lib   = l.get("libelle", "")
-            exige = "indispensable" if l.get("exigence") == "E" else "souhaitée"
-            if lib: desc += f"\nLangue : {lib} ({exige})"
-
-        offres.append({
-            "id":           generer_id(offre.get("id", lien)),
-            "titre":        offre.get("intitule", "Sans titre"),
-            "entreprise":   offre.get("entreprise", {}).get("nom", "Inconnue"),
-            "lieu":         lieu,
-            "zone":         zone,
-            "domaine":      "Non analysé",
-            "lien":         lien,
-            "source":       "France Travail",
-            "description":  desc[:10000],
-            "date_trouvee": instant_depuis_api(offre.get("dateCreation")),
-            "score":        0,
-            "lettre":       "",
-            "statut":       "nouveau",
-            "_alternance":  bool(offre.get("alternance", False)),
-            "_taille":      taille_depuis_tranche(parametres_api.tranche_effectif(offre)),
-        })
-
-    if hors_idf:
-        print(f"  {hors_idf} offres hors IDF écartées")
+    offres = [o for o in map(_normaliser_une, bruts) if o is not None]
+    if len(offres) < len(bruts):
+        print(f"  {len(bruts) - len(offres)} offres hors IDF écartées")
     return offres
+
+
+def _normaliser_une(offre: dict) -> dict | None:
+    """Offre au format des candidatures, None hors IDF."""
+    lien = offre.get("origineOffre", {}).get("urlOrigine", "")
+    if not lien:
+        lien = f"https://candidat.francetravail.fr/offres/recherche/detail/{offre.get('id', '')}"
+
+    lieu = offre.get("lieuTravail", {}).get("libelle", "")
+    zone = detecter_zone(lieu)
+    if zone is None:
+        return None
+
+    # --- Enrichissement description ---
+    desc = offre.get("description", "")
+
+    # Description entreprise
+    desc_entreprise = offre.get("entreprise", {}).get("description", "")
+    if desc_entreprise:
+        desc += f"\n\nEntreprise : {desc_entreprise}"
+
+    # Infos contrat
+    exp     = offre.get("experienceLibelle", "")
+    duree   = offre.get("dureeTravailLibelleConverti", "")
+    salaire = offre.get("salaire", {}).get("libelle", "")
+    qualif  = offre.get("qualificationLibelle", "")
+    secteur = offre.get("secteurActiviteLibelle", "")
+
+    if exp:     desc += f"\nExpérience : {exp}"
+    if duree:   desc += f"\nDurée : {duree}"
+    if salaire: desc += f"\nSalaire : {salaire}"
+    if qualif:  desc += f"\nQualification : {qualif}"
+    if secteur: desc += f"\nSecteur : {secteur}"
+
+    # Formations (~10% des offres mais critique pour détecter Bac+5)
+    for f in offre.get("formations", []):
+        niv       = f.get("niveauLibelle", "")
+        domaine_f = f.get("domaineLibelle", "")
+        exige     = "indispensable" if f.get("exigence") == "E" else "souhaitée"
+        label     = " - ".join(filter(None, [domaine_f, niv]))
+        if label: desc += f"\nFormation : {label} ({exige})"
+
+    # Compétences (~10% des offres)
+    for c in offre.get("competences", []):
+        lib   = c.get("libelle", "")
+        exige = "indispensable" if c.get("exigence") == "E" else "souhaitée"
+        if lib: desc += f"\nCompétence : {lib} ({exige})"
+
+    # Langues (rare mais utile)
+    for l in offre.get("langues", []):
+        lib   = l.get("libelle", "")
+        exige = "indispensable" if l.get("exigence") == "E" else "souhaitée"
+        if lib: desc += f"\nLangue : {lib} ({exige})"
+
+    return {
+        "id":           generer_id(offre.get("id", lien)),
+        "titre":        offre.get("intitule", "Sans titre"),
+        "entreprise":   offre.get("entreprise", {}).get("nom", "Inconnue"),
+        "lieu":         lieu,
+        "zone":         zone,
+        "domaine":      "Non analysé",
+        "lien":         lien,
+        "source":       "France Travail",
+        "description":  desc[:10000],
+        "date_trouvee": instant_depuis_api(offre.get("dateCreation")),
+        "score":        0,
+        "lettre":       "",
+        "statut":       "nouveau",
+        "_alternance":  bool(offre.get("alternance", False)),
+        "_taille":      taille_depuis_tranche(parametres_api.tranche_effectif(offre)),
+    }
 
 
 def chercher_offres(user_id, criteres=None, mode="alternance", limite_lot=None, marquer=True,
                     log=print) -> list:
     """Offres FT pas encore vues par cet utilisateur dans ce mode, les plus
-    récentes d'abord. criteres : shared.criteres.criteres_france_travail
+    récentes d'abord. Avec limite_lot, la recherche s'arrête de télécharger
+    dès limite_lot offres retenues (nouvelles, de la bonne taille...). criteres : shared.criteres.criteres_france_travail
     (défaut : ceux du mode, profil vide). Si marquer, les offres retenues
     (et, hors lots, toutes celles reçues) sont marquées vues en base ; sinon
     l'appelant les marque une à une après analyse. Les offres écartées par
@@ -350,7 +378,15 @@ def chercher_offres(user_id, criteres=None, mode="alternance", limite_lot=None, 
           f"filtres : {criteres['filtres']})...")
     offres_vues = lire_offres_vues(user_id, mode)
 
-    candidates = _normaliser(recuperer_offres(criteres, log=log))
+    def retenue(brut) -> bool:
+        """Offre qui comptera dans le lot : mêmes filtres que ci-dessous."""
+        o = _normaliser_une(brut)
+        return (o is not None and o["titre"] != "Sans titre" and o["id"] not in offres_vues
+                and garder_selon_taille(o["_taille"], criteres["tailles"], criteres["taille_inconnue"])
+                and not (criteres.get("exclure_alternance") and o["_alternance"]))
+
+    # Avec un lot : téléchargement arrêté dès limite_lot offres retenues
+    candidates = _normaliser(recuperer_offres(criteres, log=log, retenir=retenue, objectif=limite_lot))
 
     # Taille de l'établissement, filtrée après récupération (l'API ne la filtre pas)
     ecartees = {o["id"] for o in candidates

@@ -216,6 +216,57 @@ def test_job_ecarte_l_alternance_et_trie_par_date(api, utilisateur):
     assert [o["titre"] for o in retenues] == ["Offre 3", "Offre 1"]
 
 
+# ─── Arrêt dès que le lot est plein (point reporté de la phase 5b) ────────────
+def _grand_jeu():
+    return [offre(n, dept=DEPTS[n % 8], jours=n % 50) for n in range(3313)]
+
+
+def test_lot_arrete_le_telechargement(api, utilisateur):
+    """Une recherche limitée à N offres s'arrête dès N nouvelles offres,
+    au lieu de lire toutes les tranches pour n'en garder que N ; ce sont
+    les plus récentes."""
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    api.offres = _grand_jeu()
+    _, log_complet = recuperer()
+    requetes_completes = len(api.recherches)
+    api.recherches.clear()
+    log = Journal()
+    retenues = scraper.chercher_offres(uid, criteres(), limite_lot=100, marquer=False, log=log)
+    plus_recentes = sorted(api.offres, key=lambda o: o["dateCreation"], reverse=True)[:100]
+    assert {o["titre"] for o in retenues} == {o["intitule"] for o in plus_recentes}
+    assert len(api.recherches) < requetes_completes / 2
+    assert f"en {len(api.recherches)} requêtes, arrêt dès 100 nouvelles offres obtenues" in log.texte()
+    assert "arrêtée dès 100 nouvelles offres obtenues" in log.texte()
+    assert "écart" not in log.texte()                     # pas de faux écart sur une recherche arrêtée
+    assert f"en {requetes_completes} requêtes" in log_complet.texte()
+
+
+def test_lot_compte_seulement_les_offres_nouvelles(api, utilisateur):
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    api.offres = _grand_jeu()
+    premieres = scraper.chercher_offres(uid, criteres(), limite_lot=100, log=Journal())   # marquées vues
+    suivantes = scraper.chercher_offres(uid, criteres(), limite_lot=100, log=Journal())
+    assert len(suivantes) == 100 and not {o["id"] for o in premieres} & {o["id"] for o in suivantes}
+    assert min(o["date_trouvee"] for o in premieres) >= max(o["date_trouvee"] for o in suivantes)
+
+
+def test_lot_ne_compte_pas_les_offres_ecartees_par_la_taille(api, utilisateur):
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    api.offres = [offre(n, tranche="1 ou 2 salariés" if n % 2 else "20 à 49 salariés", jours=n % 30)
+                  for n in range(1000)]
+    c = criteres(tailles=["10_49"], taille_inconnue=False)
+    retenues = scraper.chercher_offres(uid, c, limite_lot=100, marquer=False, log=Journal())
+    assert len(retenues) == 100 and all(o["_taille"] == "10_49" for o in retenues)
+    assert len(api.recherches) == 2                       # 75 retenues dans la première page, 150 après
+
+
+def test_sans_lot_tout_est_lu(api, utilisateur):
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    api.offres = [offre(n) for n in range(400)]
+    assert len(scraper.chercher_offres(uid, criteres(), marquer=False, log=Journal())) == 400
+    assert len(api.recherches) == 3
+
+
 # ─── Profil ───────────────────────────────────────────────────────────────────
 def test_normalisation_des_options():
     assert normaliser_recherche({"secteurs": ["62", "62", "00", 68], "tailles": ["10_49", "x"],

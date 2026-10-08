@@ -65,7 +65,7 @@ def sources(monkeypatch, mistral):
     """France Travail et LBA simulés : nb_ft et nb_lba offres à chaque appel."""
     nombres = {"ft": 0, "lba": 0}
     monkeypatch.setattr(scraper, "recuperer_offres",
-                        lambda criteres, log=print: [_brut_ft(i) for i in range(nombres["ft"])])
+                        lambda criteres, log=print, **_: [_brut_ft(i) for i in range(nombres["ft"])])
     monkeypatch.setattr(main, "rechercher_lba", lambda profil, log=print: {"offres": [_lba(i) for i in range(nombres["lba"])], "entreprises": [], "requetes": 0})
     monkeypatch.setattr(france_travail.analyseur, "PAUSE_MISTRAL", 0)
     mistral.reponse = ANALYSE

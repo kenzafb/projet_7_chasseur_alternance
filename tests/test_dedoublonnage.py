@@ -26,7 +26,7 @@ def _brut_ft(id_ft, titre="Développeur"):
 def france_travail_simule(monkeypatch):
     """L'API France Travail renvoie toujours les mêmes offres, sans réseau."""
     bruts = [_brut_ft("FT1"), _brut_ft("FT2")]
-    monkeypatch.setattr(scraper, "recuperer_offres", lambda criteres, log=print: list(bruts))
+    monkeypatch.setattr(scraper, "recuperer_offres", lambda criteres, log=print, **_: list(bruts))
     monkeypatch.setattr(france_travail.analyseur, "PAUSE_MISTRAL", 0)
     return bruts
 
