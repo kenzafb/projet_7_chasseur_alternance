@@ -139,7 +139,7 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 1 et 2), validées par l'humai
 ### D29. LBA et Sirene avec un domaine non couvert : comportement conservé, signalé au lancement
 - **Décision.** Jusqu'aux phases 5c et 5d, LBA et Sirene ne cherchent que M18 et C15 ; profil indifférent : ancien défaut, informatique ; domaine sans correspondance : non cherché ; aucun domaine couvert : source ignorée. En plus des logs, la confirmation de lancement dans l'interface nomme les domaines non couverts (recherche d'offres pour LBA, récupération des entreprises pour Sirene), champ `avertissement` de la réponse.
 - **À reconsidérer** en 5c (LBA) et 5d (Sirene), quand les correspondances seront tirées des référentiels.
-- **Remplacée pour LBA** par D37 (phase 5c) : LBA couvre tous les domaines, profil indifférent compris. Toujours valable pour Sirene jusqu'à la phase 5d.
+- **Remplacée pour LBA** par D37 (phase 5c) : LBA couvre tous les domaines, profil indifférent compris. **Remplacée pour Sirene** par D51 (phase 5d) : plus de défaut « informatique », secteurs choisis pour l'indifférent et les domaines sans correspondance.
 
 ### D30. « Garder les offres sans information de taille » cochée par défaut : validé
 - **Décision.** `taille_inconnue` vaut vrai tant que l'utilisateur ne la décoche pas (D25).
@@ -225,3 +225,28 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 1 et 2), validées par l'humai
 
 ### D48. Rayon minimal et requêtes LBA réglables, durée dans les logs
 - **Décision.** `LBA_RAYON_MIN_KM` (1 km) et `LBA_REQUETES_MAX` (300) restent dans `shared/config.py`. L'étape « Récupérer » écrit ces deux réglages au départ, puis le nombre de requêtes LBA faites et leur durée.
+
+## Phase 5d (Sirene), décisions du 9 octobre 2026
+
+Décisions de `docs/SPEC_SOURCES.md` (sections 0, 4 et 7), validées par l'humain et mises en œuvre dans cette phase. Les choix faits pendant la mise en œuvre restent à valider dans `docs/PHASE_5D_RAPPORT.md`.
+
+### D49. Correspondance domaine vers NAF en fichier de données
+- **Décision.** `shared/referentiels/correspondance_naf.json` : pour M18 et C15, secteurs cœurs (toutes tailles) et transverses (unités légales de 250 salariés et plus : tranche 32 et au-delà, ou catégorie ETI ou GE, taille lue sur l'unité légale), listes de la spec 4.1. Exclusions systématiques 68.32B, 41.10D, 66.19A, quelle que soit l'origine du code (domaine ou secteur choisi). Remplace les listes écrites à la main de `shared/domaines.py`.
+- **NAF 2025.** Chaque code porte ses cibles NAF 2025 de la table officielle de l'INSEE (`Correspondances_NAFrev2-NAF2025.xlsx`, édition janvier 2026, copie en CSV dans `docs/referentiels/insee/`). Aucun code inventé ; pour une correspondance multiple, les cibles retenues pour le domaine sont marquées à valider.
+
+### D50. NOMENCLATURE_NAF : bascule au 1er janvier 2027
+- **Décision.** `shared.config.nomenclature_naf()` vaut `NAFRev2` jusqu'au 31 décembre 2026 et `NAF2025` à partir du 1er janvier 2027 (jour de Paris), relue à chaque recherche ; `NOMENCLATURE_NAF` du `.env` force l'une ou l'autre. Tant que le nom de la variable NAF 2025 de l'API n'est pas vérifié, une recherche en NAF 2025 se fait en NAF rév. 2, avec un message.
+
+### D51. Filtres Sirene du profil (remplace D29 pour Sirene)
+- **Tailles.** Celles du profil (communes avec France Travail et LBA), converties en tranches INSEE de l'unité légale (spec 4.2) ; option « effectifs inconnus » (tranche NN). Le « au moins 10 salariés » écrit en dur disparaît.
+- **Départements.** Nouveau champ du profil d'alternance, choix multiple parmi les 8 départements d'Île-de-France ; remplace `SIRENE_DEPARTEMENTS`.
+- **Secteurs.** Profil indifférent ou domaine sans correspondance : les secteurs choisis dans le profil (divisions NAF, le même champ que le filtre « secteur de l'employeur » de France Travail) sont cherchés, toutes leurs sous-classes. Plus de défaut « informatique » ; sans domaine couvert ni secteur, Sirene n'est pas interrogé, avec un message au lancement.
+- **Sièges actifs**, pagination par curseur, requêtes et durée dans les logs.
+
+### D52. Pas de doublon avec LBA
+- **Décision.** Une entreprise déjà en base (même SIRET, trouvée par LBA ou par un lancement précédent) n'est pas dupliquée ; Sirene ajoute sa source (D44).
+
+### D53. Points de l'API Sirene réunis en un seul endroit
+- **Décision.** Variables de la requête, nombre de codes NAF et de départements par requête, syntaxe des unités sans tranche, taille de page et pauses sont lus dans `spontanees/parametres_sirene.py`, et nulle part ailleurs. `scripts/verifier_sirene.py`, lancé par l'humain, affiche les valeurs à y reporter.
+- **En attendant.** Valeurs prudentes : un code NAF et un département par requête (comme avant), tranche « NN » seulement pour les inconnus, variable NAF 2025 inconnue.
+- **À reconsidérer** dès que le script a tourné.
