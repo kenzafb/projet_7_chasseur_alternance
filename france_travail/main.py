@@ -24,17 +24,13 @@ def lancer_recherche(user_id, profil, analyser=True, max_analyse=999, on_offre=N
     écrite « non analysée » (archivage par mots-clés seulement) puis
     marquée vue."""
     print("\nRecherche des offres...")
+    from shared.criteres import criteres_france_travail
     from shared.modes import get_mode
     cfg = get_mode(mode)
-    ft_params = cfg["ft_params"]
-    filtrer_domaines = cfg["utilise_domaines"]
-    # Domaines choisis par l'utilisateur (seulement si le mode filtre par domaine)
-    from shared.domaines import domaines_du_profil
-    domaines = domaines_du_profil(profil) if filtrer_domaines else None
     lot = min(cfg.get("limite_lot") or max_analyse, max_analyse)
     nouvelles_offres = chercher_offres(
-        user_id, domaines, ft_params=ft_params, filtrer_domaines=filtrer_domaines,
-        mode=mode, limite_lot=lot, marquer=False)
+        user_id, criteres_france_travail(profil, mode), mode=mode, limite_lot=lot, marquer=False,
+        log=log_fn or print)
 
     if not nouvelles_offres:
         print("Aucune nouvelle offre.")

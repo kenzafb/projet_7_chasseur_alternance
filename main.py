@@ -292,6 +292,13 @@ def api_domaines():
     return grands_domaines()
 
 
+@prive.get("/api/criteres_options")
+def api_criteres_options():
+    """Secteurs employeur, tailles d'entreprise et thèmes proposés dans le profil."""
+    from shared.criteres import options_du_profil
+    return options_du_profil()
+
+
 @prive.get("/api/profil")
 def api_get_profil(request: Request, user: User = Depends(utilisateur_requis)):
     return lire_profil(user.id, mode=mode_courant(request))

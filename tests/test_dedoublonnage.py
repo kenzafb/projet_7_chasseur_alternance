@@ -26,7 +26,7 @@ def _brut_ft(id_ft, titre="Développeur"):
 def france_travail_simule(monkeypatch):
     """L'API France Travail renvoie toujours les mêmes offres, sans réseau."""
     bruts = [_brut_ft("FT1"), _brut_ft("FT2")]
-    monkeypatch.setattr(scraper, "_paginer", lambda params: list(bruts))
+    monkeypatch.setattr(scraper, "recuperer_offres", lambda criteres, log=print: list(bruts))
     monkeypatch.setattr(france_travail.analyseur, "PAUSE_MISTRAL", 0)
     return bruts
 
@@ -51,7 +51,7 @@ def test_offres_vues_separees_par_mode(a_et_b, france_travail_simule):
     """Bug 1 : un run job n'efface plus la mémoire du mode alternance."""
     id_a, _ = a_et_b
     scraper.chercher_offres(id_a, mode="alternance")
-    assert len(scraper.chercher_offres(id_a, mode="job", filtrer_domaines=False)) == 2
+    assert len(scraper.chercher_offres(id_a, mode="job")) == 2
     assert scraper.chercher_offres(id_a, mode="alternance") == []
     assert lire_offres_vues(id_a, "alternance") == lire_offres_vues(id_a, "job")
 

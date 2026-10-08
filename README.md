@@ -15,7 +15,9 @@ scripts/             importer_ancienne_base.py (comptes et profils de l'ancienne
 france_travail/      Offres : scrapers FT et LBA, analyse Mistral, lettre, PDF
 spontanees/          Candidatures spontanées : Sirene, scraping des emails, envoi
 shared/              config.py (.env, chemins, géographie), ia.py (client Mistral),
-                     modes.py, domaines.py, offres.py
+                     modes.py, domaines.py, criteres.py, tailles.py, offres.py,
+                     referentiels/ (lecture des référentiels versionnés)
+docs/referentiels/   Référentiels France Travail téléchargés, avec leur date
 templates/, static/  Interface (Jinja2, JS en modules ES)
 archive/             Code désactivé (bot Telegram)
 data/                Base SQLite, uploads, fichiers de dédup (gitignoré)
@@ -84,6 +86,8 @@ python -m spontanees.envoyeur --user 1 --limite 10 --test
 **Limites par lancement**, réglées dans l'interface au moment de lancer, bornées par le serveur (`LIMITES_LANCEMENT` dans `shared/config.py`) : offres analysées par Mistral (30 par défaut, 200 au plus, France Travail et LBA ensemble), nouvelles entreprises récupérées (200, 5000), entreprises scrapées (20, 200), mails envoyés (10, 50).
 
 **Modèles Mistral.** Un par usage : `MODELE_MISTRAL_ANALYSE`, `MODELE_MISTRAL_LETTRE`, `MODELE_MISTRAL_EXTRACTION`, sinon `MODELE_MISTRAL` pour tous, sinon `mistral-medium-latest` (analyse, lettre) et `mistral-small-latest` (extraction). `python scripts/verifier_mistral.py` liste les modèles de la clé et teste ceux configurés (appels réels). Une erreur Mistral ne produit jamais de note ni de lettre inventée : clé refusée ou modèle non autorisé arrêtent le pipeline avec un message clair, une erreur passagère fait sauter l'offre, qui reviendra au lancement suivant.
+
+**Recherche France Travail.** Domaines du profil en codes France Travail (grand domaine « M » ou domaine « M18 », rien de coché : indifférent), lus dans les référentiels de `docs/referentiels/france_travail/`. Alternance : contrats d'apprentissage et de professionnalisation ; job : CDD, intérim, saisonnier, thèmes 13 et 17 en option. Secteur de l'employeur en option, taille d'entreprise filtrée après récupération. Au-delà de 3150 offres par requête (plafond de l'API), la recherche est redécoupée (département, domaine, valeurs, dates de publication) ; rien n'est tronqué sans message. Les points de l'API encore à vérifier sont réunis dans `france_travail/parametres_api.py` : `python scripts/verifier_france_travail.py` (appels réels, identifiants `FT_CLIENT_ID` et `FT_CLIENT_SECRET`) affiche les valeurs à y reporter.
 
 **Interrupteur `ANALYSE_IA`** (`.env`, vrai par défaut). À `false`, aucun appel à Mistral : les offres sont ajoutées « non analysées » (sans score ni verdict, archivées seulement par mots-clés : public réservé, école ou CFA, stage), la génération de lettre, la réanalyse et la validation des emails par l'IA sont refusées, le scraper lit les pages directement (emails notés non validés, à valider à la main). Un bandeau le signale dans l'interface.
 

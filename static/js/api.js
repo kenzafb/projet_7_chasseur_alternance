@@ -124,6 +124,7 @@ export const api = {
   sauverProfil:    (donnees) => post("/api/profil", donnees),
   mode:            ()        => get("/api/mode"),
   domaines:        ()        => get("/api/domaines"),
+  criteresOptions: ()        => get("/api/criteres_options"),
   envoyerPiece:    (fd)      => postForm("/api/profil/upload", fd),
   supprimerPiece:  (nom)     => post("/api/profil/piece/supprimer", { nom }),
 

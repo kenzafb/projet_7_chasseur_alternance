@@ -254,6 +254,67 @@ function lireDomainesCoches(selecteur = "[data-domaines-choix]") {
   return [...lettres, ...domaines];
 }
 
+/* ── Options de recherche : taille, thèmes (job), secteurs employeur ──────
+   Rien de coché : aucun filtre. Taille filtrée après récupération des offres. */
+async function rendreOptions(rech, mode) {
+  const c = document.querySelector(`[data-options-recherche="${mode}"]`);
+  if (!c) return;
+  let o;
+  try { o = await api.criteresOptions(); } catch (_) { c.innerHTML = ""; return; }
+  const tailles = new Set(rech.tailles || []), secteurs = new Set(rech.secteurs || []);
+  const themes = new Set(rech.themes || []);
+  const caseOption = (attribut, valeur, libelle, coche, extra = "") => `
+    <label class="domaine-case domaine-case--petit">
+      <input type="checkbox" value="${esc(valeur)}" ${attribut} ${coche ? "checked" : ""}>
+      <span>${esc(libelle)}${extra}</span>
+    </label>`;
+  c.innerHTML = `
+    <div class="options-bloc">
+      <span class="field__label">Taille de l'entreprise</span>
+      <p class="profil-card__sub" style="margin:4px 0 10px;">Rien de coché : toutes les tailles. France Travail indique en général l'effectif de l'établissement qui recrute.</p>
+      <div class="domaines-choix">${o.tailles.map(t => caseOption("data-taille-case", t.cle, t.libelle, tailles.has(t.cle),
+        t.avertissement && mode === "alternance" ? ` <small class="options-avert">(${esc(t.avertissement)})</small>` : "")).join("")}
+      </div>
+      <div class="domaines-choix" style="margin-top:8px;">
+        <label class="domaine-case domaine-case--petit">
+          <input type="checkbox" data-taille-inconnue ${rech.taille_inconnue !== false ? "checked" : ""}>
+          <span>Garder les offres sans information de taille</span>
+        </label>
+      </div>
+    </div>
+    ${mode === "job" ? `
+    <div class="options-bloc">
+      <span class="field__label">Thèmes <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
+      <p class="profil-card__sub" style="margin:4px 0 10px;">Renseignés volontairement par l'employeur : cocher un thème écarte les offres qui ne l'ont pas.</p>
+      <div class="domaines-choix">${o.themes.map(t => caseOption("data-theme-case", t.code, t.libelle, themes.has(t.code))).join("")}</div>
+    </div>` : ""}
+    <details class="options-bloc" ${secteurs.size ? "open" : ""}>
+      <summary class="field__label options-resume">Secteur de l'employeur <span style="opacity:.6;font-weight:400;">(optionnel${secteurs.size ? `, ${secteurs.size} choisi${secteurs.size > 1 ? "s" : ""}` : ""})</span></summary>
+      <p class="profil-card__sub" style="margin:4px 0 10px;">Rien de coché : tous les secteurs. Le secteur est l'activité de l'entreprise, pas le métier.</p>
+      <div class="secteurs-liste">${o.secteurs.map(s => caseOption("data-secteur-case", s.code, `${s.code} · ${s.libelle}`, secteurs.has(s.code))).join("")}</div>
+    </details>`;
+  c.querySelectorAll(".domaine-case").forEach(l => l.classList.toggle("is-checked", l.querySelector("input").checked));
+  if (c.dataset.branche) return;
+  c.dataset.branche = "1";
+  c.addEventListener("change", e => {
+    const l = e.target.closest(".domaine-case");
+    if (l) l.classList.toggle("is-checked", e.target.checked);
+  });
+}
+
+function lireOptions(mode) {
+  const c = document.querySelector(`[data-options-recherche="${mode}"]`);
+  if (!c || !c.querySelector("[data-taille-inconnue]")) return {};   // options non chargées : on n'écrase rien
+  const coches = attribut => [...c.querySelectorAll(`[${attribut}]:checked`)].map(i => i.value);
+  const out = {
+    tailles: coches("data-taille-case"),
+    taille_inconnue: c.querySelector("[data-taille-inconnue]").checked,
+    secteurs: coches("data-secteur-case"),
+  };
+  if (mode === "job") out.themes = coches("data-theme-case");
+  return out;
+}
+
 /* ── Affichage des sections selon le mode (alternance/job) ─────────────── */
 async function appliquerModeProfil() {
   let mode = "alternance";
@@ -310,6 +371,7 @@ export const Profil = {
     } else {
       await rendreDomaines(domainesSel, "[data-domaines-choix]");
     }
+    await rendreOptions(rech, mode);
 
     rendrePiecesJointes(p.pieces_jointes || []);
     CompteEnvoi.charger();
@@ -348,6 +410,7 @@ export const Profil = {
     rech.domaines = lireDomainesCoches(
       _modeProfilCourant === "job" ? "[data-domaines-choix-job]" : "[data-domaines-choix]"
     );
+    Object.assign(rech, lireOptions(_modeProfilCourant));
     data.recherche = rech;
 
     try {

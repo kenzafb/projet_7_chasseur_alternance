@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 URL_TOKEN = "https://entreprise.francetravail.fr/connexion/oauth2/access_token?realm=/partenaire"
 URL_RECHERCHE = "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search"
 DEPTS = ["75", "77", "78", "91", "92", "93", "94", "95"]
-MAINTENANT = datetime(2026, 10, 8, 12, 0, tzinfo=timezone.utc)
+MAINTENANT = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
 
 
 class Reponse:

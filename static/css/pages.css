@@ -485,7 +485,9 @@
 .domaine-case input { cursor: pointer; width: 16px; height: 16px; accent-color: var(--signal); }
 .domaine-case.is-checked { border-color: var(--signal); background: var(--signal-soft); }
 .domaine-case:has(input:disabled) { opacity: .55; cursor: default; }
+.domaines-choix:has(> .gd-liste) { display: block; }   /* arbre des domaines : indifférent puis grille */
 .domaine-case--indifferent { margin-bottom: 12px; width: fit-content; }
+.secteurs-liste .domaine-case { align-items: flex-start; }
 .domaine-case--petit { padding: 6px 10px; font-size: 13px; }
 /* Grands domaines, affinables par domaine */
 .gd-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 10px; }
@@ -499,3 +501,11 @@
 .gd__affiner:hover { border-color: var(--signal); color: var(--txt); }
 .gd__domaines { display: flex; flex-direction: column; gap: 6px; padding-left: 14px; }
 .gd__domaines[hidden] { display: none; }
+/* Options de recherche du profil : taille, thèmes, secteurs */
+.options-recherche { display: flex; flex-direction: column; gap: 18px; margin-top: 18px; }
+.options-resume { cursor: pointer; }
+.options-avert { color: var(--txt-muted); font-size: 12px; }
+.secteurs-liste {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 6px;
+  max-height: 320px; overflow-y: auto; padding-right: 4px;
+}

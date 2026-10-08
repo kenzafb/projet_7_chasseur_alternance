@@ -1,12 +1,43 @@
-import requests
+"""
+france_travail/scraper.py
+=========================
+Recherche d'offres France Travail (API Offres d'emploi v2) en Île-de-France,
+selon les critères du profil et du mode (shared.criteres).
+
+Plafond de l'API (mesuré le 8 octobre 2026) : 150 offres par page, début de
+plage au plus 3000, donc au plus 3150 offres par requête. Rien n'est tronqué
+en silence : une requête qui dépasse est redécoupée (SPEC_SOURCES 2.2), par
+département d'Île-de-France, puis par domaine, puis par valeur des autres
+filtres, puis par fenêtre de publication ; les offres sont dédoublonnées par
+identifiant. Ce qui dépend encore de la vérification de l'API (noms des
+paramètres de domaine, valeurs multiples, champ de tranche d'effectif) est
+lu dans france_travail/parametres_api.py.
+"""
+
+import itertools
 import os
 import time
-from shared.config import FT_REGION
+from datetime import datetime, timedelta, timezone
+
+import requests
+
 from database.dates import instant_depuis_api
 from database.dedup_db import lire_offres_vues, marquer_offres_vues
-from shared.offres import detecter_zone, generer_id
 from france_travail import parametres_api
-from shared.domaines import est_grand_domaine
+from shared.config import DEPTS_IDF, FT_REGION
+from shared.criteres import criteres_france_travail
+from shared.domaines import domaines_du_grand_domaine, est_grand_domaine, grands_domaines
+from shared.offres import detecter_zone, generer_id
+from shared.tailles import garder_selon_taille, taille_depuis_tranche
+
+URL_RECHERCHE = "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search"
+TAILLE_PAGE = 150
+DEBUT_MAX = 3000
+PLAFOND_REQUETE = DEBUT_MAX + TAILLE_PAGE      # 3150 offres au plus par requête
+PAUSE_S = 0.4                                  # entre deux requêtes
+ATTENTE_429_S = 5                              # une nouvelle tentative sur 429
+FORMAT_DATE = "%Y-%m-%dT%H:%M:%SZ"
+FENETRE_MIN = timedelta(minutes=1)             # en deçà, plus de découpage par date
 
 
 _token_cache = {"token": None, "expire": 0}
@@ -33,59 +64,216 @@ def get_token():
     return None
 
 
-def _paginer(params_base: dict) -> list:
-    offres = []
+class ErreurFT(Exception):
+    """Réponse inattendue de l'API pour une requête (les autres continuent)."""
+
+
+def _page(params: dict, debut: int, token: str) -> tuple[int, list]:
+    """(total, offres) d'une page de TAILLE_PAGE offres à partir de debut."""
+    params = {**params, "range": f"{debut}-{debut + TAILLE_PAGE - 1}"}
+    headers = {"Authorization": f"Bearer {token}"}
+    for essai in (1, 2):
+        try:
+            r = requests.get(URL_RECHERCHE, params=params, headers=headers, timeout=15)
+        except requests.RequestException as e:
+            raise ErreurFT(f"France Travail injoignable ({type(e).__name__})") from None
+        if r.status_code == 429 and essai == 1:
+            time.sleep(float(r.headers.get("Retry-After") or ATTENTE_429_S))
+            continue
+        break
+    if r.status_code == 204:
+        return 0, []
+    if r.status_code not in (200, 206):
+        raise ErreurFT(f"FT {r.status_code} : {r.text[:200]}")
+    try:
+        resultats = r.json().get("resultats") or []
+    except ValueError:
+        raise ErreurFT("réponse illisible") from None
+    try:
+        total = int(r.headers.get("Content-Range", "").rsplit("/", 1)[1])
+    except (IndexError, ValueError):
+        total = debut + len(resultats)
+    return total, resultats
+
+
+def _decrire(params: dict) -> str:
+    return ", ".join(f"{k}={v}" for k, v in params.items() if k != "sort")
+
+
+# ─── Découpage (SPEC_SOURCES 2.2) ─────────────────────────────────────────────
+# Chaque étape renvoie les sous-requêtes d'une requête trop volumineuse, ou
+# None si elle ne sait pas la découper ; une étape peut s'appliquer plusieurs
+# fois (grand domaine, puis domaine ; fenêtre, puis demi-fenêtre).
+def _sans(params: dict, *cles) -> dict:
+    return {k: v for k, v in params.items() if k not in cles}
+
+
+def _par_departement(params):
+    if "region" not in params:
+        return None
+    return [{**_sans(params, "region"), "departement": d} for d in sorted(DEPTS_IDF)]
+
+
+def _eclater(params, param):
+    """Une sous-requête par valeur d'un paramètre à valeurs multiples."""
+    valeurs = str(params.get(param, "")).split(",")
+    if len(valeurs) < 2:
+        return None
+    return [{**params, param: v} for v in valeurs]
+
+
+def _par_domaine(params):
+    p_grand, p_dom = parametres_api.PARAM_GRAND_DOMAINE, parametres_api.PARAM_DOMAINE
+    for p in (p_grand, p_dom):
+        if p and (sous := _eclater(params, p)):
+            return sous
+    if p_grand and p_grand in params:
+        valeur = params[p_grand]
+    elif p_dom and p_dom in params:
+        valeur = params[p_dom]
+    else:   # aucun filtre de domaine : grands domaines, ou domaines à défaut
+        if p_grand:
+            return [{**params, p_grand: g["code"]} for g in grands_domaines()]
+        return [{**params, p_dom: d["code"]} for g in grands_domaines() for d in g["domaines"]]
+    if est_grand_domaine(valeur) and p_dom:
+        return [{**_sans(params, p_grand), p_dom: d} for d in domaines_du_grand_domaine(valeur)]
+    return None
+
+
+def _par_valeur(params):
+    domaine = {parametres_api.PARAM_GRAND_DOMAINE, parametres_api.PARAM_DOMAINE}
+    for param in params:
+        if param not in domaine and param not in ("minCreationDate", "maxCreationDate"):
+            if sous := _eclater(params, param):
+                return sous
+    return None
+
+
+def _maintenant() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _par_fenetre(params):
+    if "minCreationDate" in params:
+        debut = datetime.strptime(params["minCreationDate"], FORMAT_DATE).replace(tzinfo=timezone.utc)
+        fin = datetime.strptime(params["maxCreationDate"], FORMAT_DATE).replace(tzinfo=timezone.utc)
+    else:
+        debut = datetime.strptime(parametres_api.DATE_PLUS_ANCIENNE, FORMAT_DATE).replace(tzinfo=timezone.utc)
+        fin = _maintenant().replace(microsecond=0) + timedelta(minutes=1)
+    if fin - debut < FENETRE_MIN:
+        return None
+    milieu = (debut + (fin - debut) / 2).replace(microsecond=0)
+    return [{**params, "minCreationDate": a.strftime(FORMAT_DATE), "maxCreationDate": b.strftime(FORMAT_DATE)}
+            for a, b in ((debut, milieu), (milieu + timedelta(seconds=1), fin))]
+
+
+DECOUPAGES = [("département", _par_departement), ("domaine", _par_domaine),
+              ("valeur", _par_valeur), ("date de publication", _par_fenetre)]
+
+
+class Collecte:
+    """Récupération complète d'un ensemble de requêtes, dédoublonnée."""
+
+    def __init__(self, token: str, log=print):
+        self.token = token
+        self.log = log
+        self.offres = {}          # identifiant -> offre brute
+        self.requetes = 0
+        self.non_recuperees = 0   # au-delà du plafond, aucun découpage possible
+        self.erreurs = 0
+
+    def _page(self, params, debut):
+        if self.requetes:
+            time.sleep(PAUSE_S)
+        self.requetes += 1
+        return _page(params, debut, self.token)
+
+    def _ajouter(self, resultats):
+        for o in resultats:
+            self.offres.setdefault(o.get("id") or id(o), o)
+
+    def recuperer(self, params: dict, etape: int = 0) -> int:
+        """Récupère toutes les offres de params ; renvoie le nombre couvert."""
+        try:
+            total, premiere = self._page(params, 0)
+        except ErreurFT as e:
+            self.erreurs += 1
+            self.log(f"  ⚠️  France Travail, requête abandonnée ({_decrire(params)}) : {e}")
+            return 0
+        if total > PLAFOND_REQUETE:
+            for i in range(etape, len(DECOUPAGES)):
+                nom, decouper = DECOUPAGES[i]
+                sous = decouper(params)
+                if sous:
+                    print(f"  {total} offres ({_decrire(params)}) : découpage par {nom} en {len(sous)}")
+                    couvert = sum(self.recuperer(s, i) for s in sous)
+                    if couvert < total:
+                        self.log(f"  ⚠️  Découpage par {nom} : {couvert} offres retrouvées sur {total} "
+                                 f"({_decrire(params)})")
+                    return couvert
+            self.non_recuperees += total - PLAFOND_REQUETE
+            self.log(f"  ⚠️  {total} offres ({_decrire(params)}), aucun découpage possible : "
+                     f"{total - PLAFOND_REQUETE} non récupérées")
+        self._ajouter(premiere)
+        debut = TAILLE_PAGE
+        while debut < min(total, PLAFOND_REQUETE) and len(premiere) == TAILLE_PAGE:
+            try:
+                _, resultats = self._page(params, debut)
+            except ErreurFT as e:
+                self.erreurs += 1
+                self.log(f"  ⚠️  France Travail, page {debut} abandonnée ({_decrire(params)}) : {e}")
+                break
+            self._ajouter(resultats)
+            if len(resultats) < TAILLE_PAGE:
+                break
+            debut += TAILLE_PAGE
+        return total
+
+
+def _paquets(valeurs: list, taille: int | None) -> list[str]:
+    """Valeurs réunies par paquets de taille (séparées par des virgules)."""
+    if not taille or taille >= len(valeurs):
+        return [",".join(valeurs)]
+    return [",".join(valeurs[i:i + taille]) for i in range(0, len(valeurs), taille)]
+
+
+def requetes_initiales(filtres: dict, domaines: list[str]) -> list[dict]:
+    """Requêtes couvrant les critères : une valeur d'un même filtre ou une
+    autre (OU), les filtres entre eux (ET). Grands domaines et domaines
+    passent par des paramètres distincts, donc par des requêtes distinctes."""
+    p_grand, p_dom = parametres_api.PARAM_GRAND_DOMAINE, parametres_api.PARAM_DOMAINE
+    groupes = [None]
+    if domaines:
+        lettres = [c for c in domaines if est_grand_domaine(c)]
+        codes = [c for c in domaines if not est_grand_domaine(c)]
+        if lettres and not p_grand:
+            codes += [d for lettre in lettres for d in domaines_du_grand_domaine(lettre)]
+            lettres = []
+        groupes = [(p, v) for p, v in ((p_grand, lettres), (p_dom, codes)) if v]
+    requetes = []
+    for groupe in groupes:
+        axes = [(p, v) for p, v in filtres.items() if v] + ([groupe] if groupe else [])
+        choix = [[(p, paquet) for paquet in _paquets(list(v), parametres_api.valeurs_par_requete(p))]
+                 for p, v in axes]
+        for combinaison in itertools.product(*choix):
+            requetes.append({"region": FT_REGION, "sort": "1", **dict(combinaison)})
+    return requetes
+
+
+def recuperer_offres(criteres: dict, log=print) -> list:
+    """Offres brutes de France Travail pour des critères, dédoublonnées."""
     token = get_token()
     if not token:
-        return offres
-
-    url     = "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search"
-    headers = {"Authorization": f"Bearer {token}"}
-    debut   = 0
-    taille  = 100
-    total_attendu = None
-
-    while True:
-        fin    = debut + taille - 1
-        params = {**params_base, "range": f"{debut}-{fin}"}
-
-        try:
-            r = requests.get(url, params=params, headers=headers, timeout=15)
-
-            if r.status_code == 204:
-                break
-
-            if r.status_code not in [200, 206]:
-                print(f"  FT {r.status_code} (range {debut}-{fin}) : {r.text[:200]}")
-                break
-
-            content_range = r.headers.get("Content-Range", "")
-            if content_range and total_attendu is None:
-                try:
-                    total_attendu = int(content_range.split("/")[-1])
-                    print(f"  {total_attendu} offres disponibles côté France Travail")
-                except Exception:
-                    pass
-
-            resultats = r.json().get("resultats", [])
-            if not resultats:
-                break
-
-            offres.extend(resultats)
-            debut += taille
-
-            if total_attendu and debut >= min(total_attendu, 3000):
-                break
-            if len(resultats) < taille:
-                break
-
-            time.sleep(0.4)
-
-        except Exception as e:
-            print(f"  Erreur range {debut}-{fin} : {e}")
-            break
-
-    return offres
+        log("  ⚠️  France Travail : token refusé, aucune offre récupérée")
+        return []
+    requetes = requetes_initiales(criteres["filtres"], criteres["domaines"])
+    collecte = Collecte(token, log)
+    for params in requetes:
+        collecte.recuperer(params)
+    log(f"  France Travail : {len(collecte.offres)} offres distinctes reçues en {collecte.requetes} requêtes"
+        + (f", {collecte.erreurs} en erreur" if collecte.erreurs else "")
+        + (f", {collecte.non_recuperees} non récupérées (plafond)" if collecte.non_recuperees else ""))
+    return list(collecte.offres.values())
 
 
 def _normaliser(bruts: list) -> list:
@@ -159,6 +347,7 @@ def _normaliser(bruts: list) -> list:
             "lettre":       "",
             "statut":       "nouveau",
             "_alternance":  bool(offre.get("alternance", False)),
+            "_taille":      taille_depuis_tranche(parametres_api.tranche_effectif(offre)),
         })
 
     if hors_idf:
@@ -166,45 +355,48 @@ def _normaliser(bruts: list) -> list:
     return offres
 
 
-def chercher_offres(user_id, domaines=None, ft_params=None, filtrer_domaines=True,
-                    mode="alternance", limite_lot=None, marquer=True) -> list:
-    """Offres FT pas encore vues par cet utilisateur dans ce mode. Si marquer,
-    les offres retenues (et, hors lots, toutes celles reçues) sont marquées
-    vues en base ; sinon l'appelant les marque une à une après analyse."""
-    # ft_params : paramètres FT spécifiques au mode (E2 pour alternance, CDD pour job)
-    if ft_params is None:
-        ft_params = {"natureContrat": "E2"}   # défaut alternance (rétrocompat)
+def chercher_offres(user_id, criteres=None, mode="alternance", limite_lot=None, marquer=True,
+                    log=print) -> list:
+    """Offres FT pas encore vues par cet utilisateur dans ce mode, les plus
+    récentes d'abord. criteres : shared.criteres.criteres_france_travail
+    (défaut : ceux du mode, profil vide). Si marquer, les offres retenues
+    (et, hors lots, toutes celles reçues) sont marquées vues en base ; sinon
+    l'appelant les marque une à une après analyse. Les offres écartées par
+    la taille ne sont pas marquées : elles reviennent si la taille change."""
+    if criteres is None:
+        criteres = criteres_france_travail({}, mode)
+    print(f"Recherche FT (IDF, domaines : {', '.join(criteres['domaines']) or 'indifférent'}, "
+          f"filtres : {criteres['filtres']})...")
     offres_vues = lire_offres_vues(user_id, mode)
 
-    bruts = []
-    base_params = {"region": FT_REGION, "sort": "1", **ft_params}
+    candidates = _normaliser(recuperer_offres(criteres, log=log))
 
-    if filtrer_domaines and domaines:
-        # Mode alternance : on filtre par domaine (1 requête par domaine)
-        print(f"Recherche FT (IDF, domaines: {', '.join(domaines)}, params: {ft_params})...\n")
-        for code in domaines:
-            param = parametres_api.PARAM_GRAND_DOMAINE if est_grand_domaine(code) else parametres_api.PARAM_DOMAINE
-            bruts += _paginer({**base_params, param: code})
-    else:
-        # Mode job : recherche large, pas de filtre domaine
-        print(f"Recherche FT (IDF, tous domaines, params: {ft_params})...\n")
-        bruts += _paginer(base_params)
+    # Taille de l'établissement, filtrée après récupération (l'API ne la filtre pas)
+    ecartees = {o["id"] for o in candidates
+                if not garder_selon_taille(o["_taille"], criteres["tailles"], criteres["taille_inconnue"])}
+    if ecartees:
+        sans_info = sum(1 for o in candidates if o["id"] in ecartees and o["_taille"] is None)
+        log(f"  {len(ecartees)} offres écartées par la taille d'entreprise"
+            + (f" (dont {sans_info} sans information)" if sans_info else ""))
+    candidates = [o for o in candidates if o["id"] not in ecartees]
 
-    candidates   = _normaliser(bruts)
     toutes_offres = [
         o for o in candidates
         if o["id"] not in offres_vues and o["titre"] != "Sans titre"
     ]
 
-    # Mode job (pas de filtre domaine) : exclure les offres d'alternance/apprentissage
-    if not filtrer_domaines:
+    # Mode job : les contrats d'alternance (CDD en apprentissage) sont écartés
+    if criteres.get("exclure_alternance"):
         avant = len(toutes_offres)
         toutes_offres = [o for o in toutes_offres if not o.get("_alternance")]
         exclues = avant - len(toutes_offres)
         if exclues:
             print(f"  {exclues} offres d'alternance écartées (mode job)")
 
-    # Mode job : on traite par LOTS (ex. 100/run) pour ne pas tout analyser d'un coup
+    # Le découpage mélange l'ordre de l'API : les plus récentes d'abord
+    toutes_offres.sort(key=lambda o: o["date_trouvee"], reverse=True)
+
+    # On traite par LOTS (ex. 100/run) pour ne pas tout analyser d'un coup
     if limite_lot:
         toutes_offres = toutes_offres[:limite_lot]
         if marquer:

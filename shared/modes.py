@@ -13,19 +13,22 @@ MODES = {
         "mot_poste": "alternance",        # pour les textes ("offre d'alternance"...)
         "couleur": "bleu",
         "sources": ["france_travail", "lba"],   # les deux sources
-        # France Travail : filtre apprentissage
-        "ft_params": {"natureContrat": "E2"},
-        "utilise_domaines": True,         # filtre par grand domaine / ROME
+        # France Travail (SPEC_SOURCES 2.1) : apprentissage et professionnalisation,
+        # aucun filtre de qualification ; domaines du profil (indifférent : aucun)
+        "ft_filtres": {"natureContrat": ["E2", "FS"]},
+        "ft_options": ["secteurs"],       # options du profil appliquées à la recherche
     },
     "job": {
         "label": "Chasseur de Job",
         "mot_poste": "job",               # "offre de job", "mission"...
         "couleur": "orange",
         "sources": ["france_travail"],    # FT seulement (pas d'alternance → pas de LBA)
-        # France Travail : CDD + intérim + saisonnier, non-cadre, tous domaines
-        # Pas de filtre experience (trop d'offres sans mention) → Mistral juge le niveau
-        "ft_params": {"typeContrat": "CDD,MIS,SAI", "qualification": "0"},
-        "utilise_domaines": False,        # tous domaines, on ne filtre pas
+        # France Travail : CDD, intérim, saisonnier ; aucun filtre de qualification
+        # (qualification=0 écartait les offres « X », 61 % du total en IDF) ni
+        # d'expérience ; domaines du profil, indifférent par défaut
+        "ft_filtres": {"typeContrat": ["CDD", "MIS", "SAI"]},
+        "ft_options": ["secteurs", "themes"],
+        "ft_exclure_alternance": True,    # les contrats d'alternance en CDD sont écartés
         "limite_lot": 100,                # analyse 100 offres par run (le reste aux runs suivants)
     },
 }
