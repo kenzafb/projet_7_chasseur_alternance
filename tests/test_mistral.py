@@ -274,13 +274,18 @@ def test_lettre_en_echec_rien_d_enregistre(utilisateur, mistral, monkeypatch):
 
 
 # ─── scripts/verifier_mistral.py ─────────────────────────────────────────────
-def _script(monkeypatch, autorises):
+def _script(monkeypatch, autorises, passageres=()):
+    """Lance le script avec un faux client : 403 hors de `autorises`,
+    erreur passagère pour les modèles de `passageres` ({modèle: statut})."""
     import importlib.util
     spec = importlib.util.spec_from_file_location("verifier_mistral", config.BASE_DIR / "scripts" / "verifier_mistral.py")
     script = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(script)
+    passageres = dict(passageres)
 
     def complete(model, messages, max_tokens):
+        if model in passageres:
+            raise erreur_http(passageres[model])
         if model not in autorises:
             raise erreur_http(403, TIER)
         return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="OK"))])
@@ -315,3 +320,29 @@ def test_script_sans_cle(monkeypatch):
     monkeypatch.delenv("MISTRAL_API_KEY")
     lignes = []
     assert script.main(sortie=lignes.append) == 1 and "MISTRAL_API_KEY absente" in lignes[0]
+
+
+TOUS = ["mistral-medium-latest", "mistral-small-latest"]
+
+
+@pytest.mark.parametrize("statut", [429, 503])
+def test_script_erreur_passagere_ne_renvoie_pas_au_env(monkeypatch, statut):
+    code, sortie = _script(monkeypatch, TOUS, {"mistral-medium-latest": statut})
+    assert code == 1 and "erreur passagère" in sortie
+    assert ".env :" not in sortie and "À corriger" not in sortie
+    assert "limite de débit ou le quota Mistral est atteint" in sortie
+    assert "Réessaie plus tard" in sortie and "console Mistral" in sortie
+
+
+def test_script_erreurs_bloquante_et_passagere(monkeypatch):
+    code, sortie = _script(monkeypatch, ["mistral-small-latest"], {"mistral-small-latest": 429})
+    assert code == 1
+    assert "À corriger dans le .env" in sortie and "limite de débit" in sortie
+
+
+def test_script_passe_par_le_limiteur(monkeypatch):
+    reservations = []
+    monkeypatch.setattr(shared.ia, "limiteur", SimpleNamespace(attendre=lambda: reservations.append(1)))
+    code, _ = _script(monkeypatch, TOUS)
+    # liste des modèles + un appel par modèle distinct (medium, small)
+    assert code == 0 and len(reservations) == 3
