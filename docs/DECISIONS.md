@@ -139,6 +139,7 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 1 et 2), validées par l'humai
 ### D29. LBA et Sirene avec un domaine non couvert : comportement conservé, signalé au lancement
 - **Décision.** Jusqu'aux phases 5c et 5d, LBA et Sirene ne cherchent que M18 et C15 ; profil indifférent : ancien défaut, informatique ; domaine sans correspondance : non cherché ; aucun domaine couvert : source ignorée. En plus des logs, la confirmation de lancement dans l'interface nomme les domaines non couverts (recherche d'offres pour LBA, récupération des entreprises pour Sirene), champ `avertissement` de la réponse.
 - **À reconsidérer** en 5c (LBA) et 5d (Sirene), quand les correspondances seront tirées des référentiels.
+- **Remplacée pour LBA** par D37 (phase 5c) : LBA couvre tous les domaines, profil indifférent compris. Toujours valable pour Sirene jusqu'à la phase 5d.
 
 ### D30. « Garder les offres sans information de taille » cochée par défaut : validé
 - **Décision.** `taille_inconnue` vaut vrai tant que l'utilisateur ne la décoche pas (D25).
@@ -169,3 +170,35 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 1 et 2), validées par l'humai
 ### D35. Fuseau des dates confirmé ; secteurActivite à deux valeurs
 - **Fuseau.** L'API lit `minCreationDate` et `maxCreationDate` en heure de Paris malgré le « Z » : fenêtre finissant à maintenant (UTC) 66790 offres, finissant à maintenant plus 3 h 66932, le total sans dates. La marge de fin de 24 h de D31 est conservée (elle couvre l'heure d'hiver comme l'heure d'été). Découpage exact : les deux moitiés font 56937 + 9995 = 66932.
 - **secteurActivite.** Deux valeurs acceptées (`62,68` : 1289 = 614 + 675), cinq refusées : `VALEURS_PAR_REQUETE["secteurActivite"]` passe à 2. Clôt D33.
+
+## Phase 5c (La Bonne Alternance), décisions du 9 octobre 2026
+
+`scripts/verifier_lba.py` lancé par l'humain le 9 octobre 2026 (32 requêtes), détail dans `docs/referentiels/lba/verification_api.json`. Décisions 1 à 6 données par l'humain après lecture du résultat.
+
+### D36. Cercles au plafond redécoupés, rayon réduit
+- **Constat.** Les entreprises à fort potentiel sont plafonnées à 150 par requête sur tous les cercles essayés, de 10 à 200 km, seul Cergy à 10 km en donne 98. Les offres : 150 par source et 450 en tout (sans code métier : 150 offres LBA, 261 France Travail, 39 autres).
+- **Décision.** Recherche autour de 19 centres à rayon réduit (`LBA_CENTRES`, 8 km pour Paris, 10 km en petite couronne, 18 à 25 km en grande couronne). Un cercle dont la réponse atteint le plafond est redécoupé en sept cercles de rayon moitié qui le recouvrent entièrement, jusqu'à 1 km (`LBA_RAYON_MIN_KM`), puis le lot de codes métiers en deux ; les cercles encore au plafond sont écrits dans les logs. Au plus 300 requêtes par recherche (`LBA_REQUETES_MAX`), parcourues en largeur (tous les centres avant les redécoupages).
+- **Conséquence.** Les cercles au plafond d'entreprises sont redécoupés dans l'étape « Récupérer » des spontanées (qui s'arrête à la limite de nouvelles entreprises) ; la recherche d'offres ne redécoupe que pour les offres et écrit dans les logs les cercles au plafond d'entreprises laissés tels quels.
+
+### D37. Profil « indifférent » : LBA sans code métier
+- **Décision.** L'API accepte une recherche sans code : un profil sans domaine cherche sur LBA sans code au lieu d'être ignoré. Les autres profils envoient tous les métiers de `metiers.json` des domaines choisis, par lots de 100 (100 codes acceptés en une requête). Remplace D29 pour LBA.
+
+### D38. Niveau de diplôme filtré après récupération
+- **Constat.** `target_diploma_level` filtre (les autres noms essayés sont ignorés), mais écarte les offres sans niveau indiqué : au niveau 6, 1 offre sur les 3 de la référence.
+- **Décision.** Le niveau n'est jamais envoyé à l'API. Le niveau visé du profil (texte libre) est converti en niveau européen 3 à 7 ; après récupération, les offres d'un autre niveau (`offer.target_diploma.european`) sont écartées et celles sans niveau gardées. Niveau visé vide ou non reconnu : aucun filtre, signalé dans les logs.
+
+### D39. Entreprises LBA sans email : par le scraper ; identifiant de candidature gardé
+- **Constat.** Aucun email ni téléphone sur 4148 entreprises lues ; `apply.recipient_id` présent dans 772.
+- **Décision.** Les entreprises LBA passent par le scraper comme celles de Sirene. `apply.recipient_id` est gardé (`extra.lba.candidature_id`) pour la future candidature directe, qui n'est pas branchée. Si LBA fournit un jour un email, il est gardé et noté `extra.emails_lba`.
+
+### D40. Taille du profil appliquée aux entreprises LBA
+- **Décision.** `workplace.size` est toujours présent (« 0-0 », « 6-9 »...) : les entreprises LBA sont filtrées par les tailles cochées du profil d'alternance, avec l'option « garder les tailles inconnues ».
+
+### D41. Spontanées : La Bonne Alternance d'abord, puis Sirene
+- **Décision.** Validée : l'étape « Récupérer » interroge LBA d'abord, puis Sirene pour le reste de la limite de nouvelles entreprises. Les entreprises LBA (source `lba`, colonne `entreprises.source`, migration 0008) sont dédoublonnées par SIRET avec celles de Sirene (une entreprise Sirene retrouvée sur LBA passe en source `lba`), scrapées, envoyées et affichées en priorité. La recherche d'offres verse aussi dans les spontanées les entreprises qu'elle reçoit.
+
+### D42. Valeurs de `parametres_lba.py` vérifiées
+- **Décision.** `CODES_PAR_REQUETE` 100, `ACCEPTE_SANS_CODES` vrai, `RAYON_MAX_KM` 200 (201 refusé), `PLAFOND_PAR_SOURCE` 150, `PLAFOND_TOTAL_OFFRES` 450, coordonnées prises en compte (Paris et Cergy différents). L'exclusion `partners_to_exclude=France Travail` marche avec des codes métiers mais pas sans code (261 offres France Travail reçues) : le filtre par nom de partenaire reste indispensable.
+
+### D43. France Travail : arrêt dès que le lot est plein
+- **Décision.** Point reporté de la phase 5b : une recherche limitée à N offres arrête de télécharger dès N offres retenues (non vues, en Île-de-France, bonne taille, hors alternance en mode job), au lieu de lire toutes les tranches du découpage pour n'en garder que N. Pages lues des plus récentes aux plus anciennes, tranche de dates la plus récente d'abord. Les logs donnent le nombre de requêtes et l'arrêt anticipé ; le bilan « annoncé, récupéré, écart » de D31 n'est écrit que pour une recherche lue en entier.

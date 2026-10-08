@@ -12,7 +12,7 @@ Pour les trancher, lancer (clé LBA_API_KEY dans le .env) :
 puis reporter ici les valeurs que le script affiche à la fin.
 
 Valeurs vérifiées sur la vraie API le 9 octobre 2026 (détail dans
-docs/referentiels/lba/verification_api.json, décisions D36 à D41).
+docs/referentiels/lba/verification_api.json, décisions D36 à D42).
 """
 
 URL_RECHERCHE = "https://api.apprentissage.beta.gouv.fr/api/job/v1/search"
