@@ -47,6 +47,9 @@ Trois, aucune légitime : CAF de Paris « Développeur Applicatif - Alternance �
 
 ## Points à valider
 
+Tranchés après le rapport : décisions D15 à D18 de `docs/DECISIONS.md` (400 bloquant, emails non validés jamais envoyés automatiquement avec validation manuelle ou relance de l'IA, « maazi » retiré, nettoyage par l'humain).
+
+
 1. 400 traité comme bloquant.
 2. Emails non validés par l'IA envoyés comme les autres, ou mis de côté jusqu'à validation.
 3. Abandon du mot-clé « maazi ».

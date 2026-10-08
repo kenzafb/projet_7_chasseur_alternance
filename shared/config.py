@@ -97,6 +97,7 @@ LIMITES_LANCEMENT = {
     "analyses":    {"defaut": 30,  "max": 200},    # offres analysées par Mistral (France Travail + LBA)
     "entreprises": {"defaut": 200, "max": 5000},   # nouvelles entreprises récupérées (Sirene)
     "scrapees":    {"defaut": 20,  "max": 200},    # entreprises dont on cherche le site et les emails
+    "revalidations": {"defaut": 20, "max": 200},   # entreprises aux emails non validés repassées à l'IA
     "mails":       {"defaut": 10,  "max": LIMITE_ENVOIS_PAR_LANCEMENT},   # mails envoyés
 }
 

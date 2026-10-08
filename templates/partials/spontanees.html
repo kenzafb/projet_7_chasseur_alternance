@@ -98,6 +98,25 @@
     </div>
   </div>
 
+  <!-- Emails lus dans les pages sans validation par l'IA : jamais envoyés tels quels -->
+  <div class="card a-valider" data-a-valider hidden>
+    <div class="a-valider__tete">
+      <div>
+        <strong>Emails non validés (<span data-a-valider-nombre>0</span>)</strong>
+        <p class="a-valider__sous">Trouvés dans les pages sans que l'IA ait pu les vérifier. Ils ne partent jamais automatiquement : valide-les un par un, ou relance la validation par l'IA.</p>
+      </div>
+      <div class="a-valider__actions">
+        <label class="pipe__nombre">
+          <span>Entreprises à revalider au plus (max {{ limites.revalidations.max }})</span>
+          <input type="number" data-limite="revalidations" value="{{ limites.revalidations.defaut }}"
+                 min="1" max="{{ limites.revalidations.max }}">
+        </label>
+        <button class="btn" data-action="revalider">Relancer la validation IA</button>
+      </div>
+    </div>
+    <div data-list="a-valider"></div>
+  </div>
+
   <div class="section-bar">
     <div class="filters" data-filters="spontanees">
       <button class="filter is-active" data-filter="all">Tous</button>

@@ -442,6 +442,14 @@
   font-size: 14px; color: var(--txt); width: 100%;
 }
 .pipe__nombre input:focus { border-color: var(--signal); outline: none; }
+/* Emails non validés par l'IA */
+.a-valider { padding: 14px 16px; margin-bottom: 14px; border: 1px solid var(--ambre); }
+.a-valider[hidden] { display: none; }
+.a-valider__tete { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.a-valider__sous { font-size: 12.5px; color: var(--txt-muted); margin: 4px 0 10px; max-width: 520px; }
+.a-valider__actions { display: flex; align-items: flex-end; gap: 10px; }
+.a-valider__ligne { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--hair); font-size: 13px; flex-wrap: wrap; }
+.a-valider__ligne .trow__mail { flex: 1; }
 /* Confirmation d'un lancement (limite appliquée par le serveur) */
 .confirmation {
   border: 1px solid var(--signal); background: var(--signal-soft); border-radius: var(--r-md);

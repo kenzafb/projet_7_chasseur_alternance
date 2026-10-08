@@ -141,6 +141,42 @@ def compter_a_scraper(user_id: int) -> int:
         db.close()
 
 
+def _en_attente_de_validation(e: Entreprise) -> bool:
+    """Emails lus dans la page sans validation par l'IA, pas encore envoyés (D15)."""
+    return bool((e.extra or {}).get("emails_non_valides")) and bool(e.emails_trouves) and not e.mail_envoye
+
+
+def lire_a_valider(user_id: int) -> list[dict]:
+    """Entreprises dont les emails attendent une validation (manuelle ou par l'IA)."""
+    db = SessionLocal()
+    try:
+        return [{"id": e.id, "nom": e.nom_commercial or (e.extra or {}).get("nom", "") or "?",
+                 "ville": e.ville or "", "site": e.site_web or "", "emails": list(e.emails_trouves or [])}
+                for e in db.query(Entreprise).filter_by(user_id=user_id).order_by(Entreprise.id)
+                if _en_attente_de_validation(e)]
+    finally:
+        db.close()
+
+
+def compter_a_valider(user_id: int) -> int:
+    return len(lire_a_valider(user_id))
+
+
+def valider_emails(user_id: int, entreprise_id: int) -> bool:
+    """Validation manuelle des emails d'une entreprise de l'utilisateur.
+    False si l'entreprise n'existe pas (ou n'est pas à lui) ou n'attend rien."""
+    db = SessionLocal()
+    try:
+        e = db.query(Entreprise).filter_by(user_id=user_id, id=entreprise_id).first()
+        if not e or not _en_attente_de_validation(e):
+            return False
+        e.extra = {**(e.extra or {}), "emails_non_valides": False}
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+
 def lire_entreprises(user_id: int) -> list[dict]:
     """Toutes les entreprises d'un utilisateur, format dict (comme l'ancien JSON)."""
     db = SessionLocal()

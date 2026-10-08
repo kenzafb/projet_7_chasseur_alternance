@@ -70,3 +70,18 @@ Format : identifiant, date, phase, décision, raison, conséquence dans le code,
 
 ### D14. Limites bornées par ce qui existe
 - **Décision.** Le maximum du scraper est le nombre d'entreprises non traitées, celui de l'envoi le nombre d'entreprises avec email dont une adresse au moins n'a pas été contactée dans le mode courant. Le front l'affiche, le serveur l'applique (avec « demandé : X, ramené à Y », D6) et refuse en 400 un lancement sans rien à traiter.
+
+## Phase 4b, points tranchés après le rapport (8 octobre 2026)
+
+### D15. Emails non validés par l'IA : jamais envoyés automatiquement
+- **Décision.** Les emails gardés sans validation par Mistral (D13) ne partent jamais d'eux-mêmes, même en mode test, et ne comptent pas dans le maximum d'envoi. Ils restent visibles dans la page Spontanées avec la mention « non validé ». L'utilisateur les valide à la main, une entreprise à la fois (`POST /api/spontanees/valider`), ou relance plus tard la validation par l'IA sur les entreprises concernées (`POST /api/spontanees/revalider`, limite « revalidations », 20 par défaut, 200 au plus, bornée par le nombre en attente).
+- **Conséquence.** Une revalidation réussie remplace emails, téléphones et contact par ceux que l'IA retient ; un échec passager laisse l'entreprise en attente ; une erreur bloquante arrête la revalidation avec un seul message.
+
+### D16. Code HTTP 400 de Mistral bloquant : validé
+- **Décision.** 400 rejoint 401, 403, 404 et 422 : arrêt immédiat du pipeline (D11).
+
+### D17. Mot-clé « maazi » retiré de la règle « public spécifique »
+- **Décision.** Retiré (fait en phase 4b, confirmé) ; seules les tournures de réservation de D12 archivent.
+
+### D18. Nettoyage des 5 candidatures issues d'analyses échouées : par l'humain
+- **Décision.** L'humain lance lui-même la commande de `docs/PHASE_4B_RAPPORT.md` (section « Avant de relancer la recette ») ; le code n'y touche pas.

@@ -139,13 +139,20 @@ def adresses_nouvelles(entreprise, deja) -> list[str]:
     return [a for a in uniques if a not in deja]
 
 
+def envoyable(e) -> bool:
+    """Entreprise que l'envoyeur peut viser : des emails, pas encore envoyée,
+    et des emails validés (par l'IA ou à la main). Les emails non validés ne
+    partent jamais automatiquement (décision D15)."""
+    return bool(e.get("emails_trouves")) and not e.get("mail_envoye") and not e.get("emails_non_valides")
+
+
 def compter_a_envoyer(user_id, mode) -> int:
     """Entreprises avec email, pas encore envoyées, dont au moins une adresse
     n'a pas été contactée dans ce mode : le maximum utile d'un envoi."""
     entreprises = charger_json(user_id)
     deja = adresses_deja_contactees(user_id, mode, entreprises)
     return sum(1 for e in entreprises
-               if e.get("emails_trouves") and not e.get("mail_envoye") and adresses_nouvelles(e, deja))
+               if envoyable(e) and adresses_nouvelles(e, deja))
 
 
 # ─── Envoi mail ───────────────────────────────────────────────────────────────
@@ -215,10 +222,11 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
          f"= {len(emails_deja_envoyes)} total")
 
     # ── Queue ─────────────────────────────────────────────────────────────────
-    a_envoyer = [
-        e for e in entreprises
-        if e.get("emails_trouves") and not e.get("mail_envoye")
-    ]
+    a_envoyer = [e for e in entreprises if envoyable(e)]
+    non_valides = sum(1 for e in entreprises
+                      if e.get("emails_trouves") and not e.get("mail_envoye") and e.get("emails_non_valides"))
+    if non_valides:
+        _log(f"ℹ️  {non_valides} entreprise(s) aux emails non validés ignorée(s) : à valider dans la page Spontanées.")
 
     deja_envoyes = sum(1 for e in entreprises if e.get("mail_envoye"))
     _log(f"Queue : {len(a_envoyer)} à envoyer | {deja_envoyes} déjà envoyés")
@@ -246,7 +254,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
             bilan["arret"] = "limite"
             break
 
-        if not e.get("emails_trouves") or e.get("mail_envoye"):
+        if not envoyable(e):
             continue
 
         nom = (e.get("nom_commercial") or e.get("nom", "?"))[:50]

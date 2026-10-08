@@ -5,6 +5,7 @@ import { api, limite, confirmerLancement } from "./api.js";
 
 let stats = null;
 let compte = null;    // compte d'envoi (mode test affiché en bandeau)
+let aValider = [];    // entreprises aux emails non validés par l'IA
 let filtre = "all";
 
 function ligne(e) {
@@ -121,6 +122,23 @@ function rendreMaximums() {
   }
 }
 
+/* Emails non validés : mention, validation manuelle une entreprise à la fois */
+function rendreAValider() {
+  const carte = document.querySelector("[data-a-valider]");
+  const liste = document.querySelector('[data-list="a-valider"]');
+  if (!carte || !liste) return;
+  carte.hidden = aValider.length === 0;
+  const nb = document.querySelector("[data-a-valider-nombre]");
+  if (nb) nb.textContent = fmt(aValider.length);
+  liste.innerHTML = aValider.map(e => `
+    <div class="a-valider__ligne">
+      <div><div class="trow__name">${esc(e.nom)}</div><div class="trow__sub">${esc(e.ville)}</div></div>
+      <div class="trow__mail">${e.emails.map(esc).join(", ")}</div>
+      <span class="chip chip--gris">non validé</span>
+      <button class="btn btn--sm" data-valider="${e.id}">Valider</button>
+    </div>`).join("");
+}
+
 function fmt(n) { return (n ?? 0).toLocaleString("fr-FR"); }
 function esc(s) {
   return String(s).replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
@@ -130,6 +148,18 @@ export const Spontanees = {
   async charger() {
     try { stats = await api.spStats(); } catch (_) { stats = null; }
     try { compte = (await api.compteEnvoi()).compte; } catch (_) { compte = null; }
+    try { aValider = await api.spAValider(); } catch (_) { aValider = []; }
+    rendreAValider();
+    if (!this._brancheValider) {
+      const liste = document.querySelector('[data-list="a-valider"]');
+      if (liste) liste.addEventListener("click", async e => {
+        const id = e.target.closest("[data-valider]")?.dataset.valider;
+        if (!id) return;
+        try { await api.spValider(parseInt(id, 10)); } catch (err) { alert(err.message); }
+        this.charger();
+      });
+      this._brancheValider = true;
+    }
     rendreModeTest();
     rendreMaximums();
     rendreKpis();
@@ -147,8 +177,9 @@ export const Spontanees = {
 
   async action(nom) {
     try {
-      const cle = { fetch: "entreprises", scraper: "scrapees", envoyer: "mails" }[nom];
-      const lancer = { fetch: api.spFetch, scraper: api.spScraper, envoyer: api.spEnvoyer }[nom];
+      const cle = { fetch: "entreprises", scraper: "scrapees", envoyer: "mails", revalider: "revalidations" }[nom];
+      const lancer = { fetch: api.spFetch, scraper: api.spScraper, envoyer: api.spEnvoyer,
+                       revalider: api.spRevalider }[nom];
       if (lancer) {
         const demandee = limite(cle);
         confirmerLancement(cle, demandee, await lancer(demandee));

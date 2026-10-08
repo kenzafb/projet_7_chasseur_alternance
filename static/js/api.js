@@ -25,6 +25,7 @@ const LANCEMENTS = {
   entreprises: { champ: "max_entreprises", texte: n => `Récupération lancée : ${n} nouvelles entreprises au plus` },
   scrapees:    { champ: "max_scrapees",    texte: n => `Scraping lancé : ${n} entreprises au plus` },
   mails:       { champ: "limite",          texte: n => `Envoi lancé : ${n} mails au plus` },
+  revalidations: { champ: "max_revalidations", texte: n => `Validation IA lancée : ${n} entreprises au plus` },
 };
 
 export function confirmerLancement(cle, demandee, reponse) {
@@ -141,6 +142,9 @@ export const api = {
   spScraper:  (max)    => post("/api/spontanees/scraper", { max_scrapees: max }),
   spEnvoyer:  (limite, test = false) => post("/api/spontanees/envoyer", { limite, test }),
   spStop:     ()       => post("/api/spontanees/stop"),
+  spAValider:  ()      => get("/api/spontanees/a_valider"),
+  spValider:   (id)    => post("/api/spontanees/valider", { id }),
+  spRevalider: (max)   => post("/api/spontanees/revalider", { max_revalidations: max }),
 
   // Logs
   logs: () => get("/api/logs"),

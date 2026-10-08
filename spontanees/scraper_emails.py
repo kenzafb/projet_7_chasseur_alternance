@@ -930,6 +930,51 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
     _log(f"   DDG : {_compteur_ddg} requêtes")
 
 
+def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=None):
+    """Relance la validation par Mistral des emails gardés sans elle (D15) :
+    pages relues, puis emails, téléphones et contact remplacés par ceux que
+    l'IA retient. Échec passager : l'entreprise reste à valider. Erreur
+    bloquante : arrêt du lancement, un seul message."""
+    _log = log_fn or print
+    entreprises = charger_entreprises(user_id)
+    cibles = [e for e in entreprises
+              if e.get("emails_non_valides") and e.get("emails_trouves") and not e.get("mail_envoye")]
+    if max_n:
+        cibles = cibles[:max_n]
+    _log(f"Validation IA | Mistral = {modele_mistral('extraction')} | {len(cibles)} entreprise(s)")
+    validees = 0
+    for i, e in enumerate(cibles, 1):
+        if stop_event and stop_event.is_set():
+            _log("⏹️  Arrêt — sauvegarde en cours...")
+            break
+        nom = (e.get("nom_commercial") or e.get("nom", "?"))[:50]
+        if on_progress:
+            on_progress(round(i / len(cibles) * 100), f"{i}/{len(cibles)} entreprises revalidées")
+        url = e.get("site_web") or e.get("url_scrapee")
+        if not url:
+            _log(f"  ⏭️  {nom} : site inconnu, reste à valider à la main")
+            continue
+        resultat = scraper_et_extraire(url, nom, dirigeant=e.get("dirigeant", ""), ia=True)
+        if resultat.get("ia_bloquee"):
+            _log(f"❌ Mistral refuse les appels : {resultat['ia_bloquee']} Validation arrêtée, "
+                 "les entreprises restantes attendent toujours.")
+            break
+        if not resultat.get("valide_ia"):
+            _log(f"  ⚠️  {nom} : {resultat.get('erreur_ia') or 'validation impossible'} Reste à valider.")
+            continue
+        e["emails_trouves"]     = resultat["emails"]
+        e["telephones"]         = resultat.get("telephones", [])
+        e["telephone"]          = e["telephones"][0] if e["telephones"] else None
+        e["contact_rh"]         = resultat.get("contact_rh")
+        e["url_scrapee"]        = resultat.get("url_finale") or url
+        e["emails_non_valides"] = False
+        validees += 1
+        retenus = ", ".join(resultat["emails"]) or "aucun email retenu par l'IA"
+        _log(f"  ✅ {nom} : {retenus}")
+    sauvegarder(user_id, entreprises)
+    _log(f"✅ Validation IA terminée : {validees}/{len(cibles)} entreprise(s) validée(s)")
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()

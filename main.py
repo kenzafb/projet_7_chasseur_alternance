@@ -213,6 +213,14 @@ class Scraper(BaseModel):
     model_config = ConfigDict(extra="forbid")
     max_scrapees: int | None = None
 
+class Revalider(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    max_revalidations: int | None = None
+
+class ValiderEmails(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: int
+
 class Envoyer(BaseModel):
     limite: int | None = None
     test: bool = False
@@ -655,6 +663,8 @@ def api_spontanees_stats(request: Request, user: User = Depends(utilisateur_requ
     from spontanees.envoyeur import compter_a_envoyer
     stats["a_scraper"] = compter_a_scraper(user.id)
     stats["a_envoyer"] = compter_a_envoyer(user.id, mode_courant(request))
+    from database.entreprises_db import compter_a_valider
+    stats["a_valider"] = compter_a_valider(user.id)
     # On ajoute l'état du pipeline de l'utilisateur, géré en mémoire
     etat = pipelines.etat(SPONTANEES, user.id)
     stats.update({cle: etat[cle] for cle in ("en_cours", "etape", "message", "pourcentage", "mode_test")})
@@ -745,6 +755,39 @@ def api_spontanees_scraper(body: Scraper | None = None, user: User = Depends(uti
         user_id, "scraper", "Scraping des emails...",
         f"▶ Scraper emails démarré (au plus {maximum} entreprises){note}", travail,
         "Scraping terminé !", "✅ Scraping terminé", "scraper"), max_scrapees=maximum)
+
+# ─── Emails non validés par l'IA : jamais envoyés tels quels (D15) ────────────
+@prive.get("/api/spontanees/a_valider")
+def api_spontanees_a_valider(user: User = Depends(utilisateur_requis)):
+    from database.entreprises_db import lire_a_valider
+    return lire_a_valider(user.id)
+
+@prive.post("/api/spontanees/valider")
+def api_spontanees_valider(body: ValiderEmails, user: User = Depends(utilisateur_requis)):
+    """Validation manuelle des emails d'une entreprise, une à la fois."""
+    from database.entreprises_db import valider_emails
+    if not valider_emails(user.id, body.id):
+        return JSONResponse({"erreur": "Entreprise introuvable ou sans email à valider"}, status_code=404)
+    return {"ok": True}
+
+@prive.post("/api/spontanees/revalider")
+def api_spontanees_revalider(body: Revalider | None = None, user: User = Depends(utilisateur_requis)):
+    """Relance la validation par l'IA des entreprises aux emails non validés."""
+    user_id = user.id
+    from database.entreprises_db import compter_a_valider
+    disponibles = compter_a_valider(user_id)
+    if not disponibles:
+        raise ErreurUtilisateur("Aucun email en attente de validation.")
+    maximum, note = _limite("revalidations", body.max_revalidations if body else None, disponibles)
+
+    def travail(arret, log, on_progress):
+        from spontanees.scraper_emails import revalider
+        revalider(user_id, stop_event=arret, log_fn=log, on_progress=on_progress, max_n=maximum)
+
+    return _avec_limite(_lancer_spontanees(
+        user_id, "revalider", "Validation IA des emails...",
+        f"▶ Validation IA démarrée (au plus {maximum} entreprises){note}", travail,
+        "Validation terminée !", "✅ Validation terminée", "validation"), max_revalidations=maximum)
 
 @prive.post("/api/spontanees/envoyer")
 def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends(utilisateur_requis)):
