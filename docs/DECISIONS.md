@@ -178,7 +178,7 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 1 et 2), validées par l'humai
 ### D36. Cercles au plafond redécoupés, rayon réduit
 - **Constat.** Les entreprises à fort potentiel sont plafonnées à 150 par requête sur tous les cercles essayés, de 10 à 200 km, seul Cergy à 10 km en donne 98. Les offres : 150 par source et 450 en tout (sans code métier : 150 offres LBA, 261 France Travail, 39 autres).
 - **Décision.** Recherche autour de 19 centres à rayon réduit (`LBA_CENTRES`, 8 km pour Paris, 10 km en petite couronne, 18 à 25 km en grande couronne). Un cercle dont la réponse atteint le plafond est redécoupé en sept cercles de rayon moitié qui le recouvrent entièrement, jusqu'à 1 km (`LBA_RAYON_MIN_KM`), puis le lot de codes métiers en deux ; les cercles encore au plafond sont écrits dans les logs. Au plus 300 requêtes par recherche (`LBA_REQUETES_MAX`), parcourues en largeur (tous les centres avant les redécoupages).
-- **Conséquence.** Les cercles au plafond d'entreprises sont redécoupés dans l'étape « Récupérer » des spontanées (qui s'arrête à la limite de nouvelles entreprises) ; la recherche d'offres ne redécoupe que pour les offres et écrit dans les logs les cercles au plafond d'entreprises laissés tels quels.
+- **Conséquence.** Les cercles au plafond d'entreprises sont redécoupés dans l'étape « Récupérer » des spontanées (qui s'arrête à la limite de nouvelles entreprises) ; la recherche d'offres ne redécoupe que pour les offres (et, depuis D46, ignore les entreprises).
 
 ### D37. Profil « indifférent » : LBA sans code métier
 - **Décision.** L'API accepte une recherche sans code : un profil sans domaine cherche sur LBA sans code au lieu d'être ignoré. Les autres profils envoient tous les métiers de `metiers.json` des domaines choisis, par lots de 100 (100 codes acceptés en une requête). Remplace D29 pour LBA.
@@ -194,7 +194,8 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 1 et 2), validées par l'humai
 ### D40. Taille du profil appliquée aux entreprises LBA
 - **Décision.** `workplace.size` est toujours présent (« 0-0 », « 6-9 »...) : les entreprises LBA sont filtrées par les tailles cochées du profil d'alternance, avec l'option « garder les tailles inconnues ».
 
-### D41. Spontanées : La Bonne Alternance d'abord, puis Sirene
+### D41. Spontanées : La Bonne Alternance d'abord, puis Sirene (remplacée par D44)
+- **Remplacée** par D44 après l'essai réel : plus de priorité de LBA sur Sirene.
 - **Décision.** Validée : l'étape « Récupérer » interroge LBA d'abord, puis Sirene pour le reste de la limite de nouvelles entreprises. Les entreprises LBA (source `lba`, colonne `entreprises.source`, migration 0008) sont dédoublonnées par SIRET avec celles de Sirene (une entreprise Sirene retrouvée sur LBA passe en source `lba`), scrapées, envoyées et affichées en priorité. La recherche d'offres verse aussi dans les spontanées les entreprises qu'elle reçoit.
 
 ### D42. Valeurs de `parametres_lba.py` vérifiées
@@ -202,3 +203,25 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 1 et 2), validées par l'humai
 
 ### D43. France Travail : arrêt dès que le lot est plein
 - **Décision.** Point reporté de la phase 5b : une recherche limitée à N offres arrête de télécharger dès N offres retenues (non vues, en Île-de-France, bonne taille, hors alternance en mode job), au lieu de lire toutes les tranches du découpage pour n'en garder que N. Pages lues des plus récentes aux plus anciennes, tranche de dates la plus récente d'abord. Les logs donnent le nombre de requêtes et l'arrêt anticipé ; le bilan « annoncé, récupéré, écart » de D31 n'est écrit que pour une recherche lue en entier.
+
+## Phase 5c, points tranchés après le rapport et l'essai réel (9 octobre 2026)
+
+### D44. Sirene et LBA ensemble, sans priorité ; trace des deux sources (remplace D41)
+- **Décision.** Les entreprises de Sirene et de La Bonne Alternance sont traitées par le scraper et l'envoyeur, et affichées, dans l'ordre d'insertion, sans priorité de l'une sur l'autre. Dédoublonnage par SIRET conservé. Chaque entreprise garde la liste des sources qui l'ont trouvée (`entreprises.sources`, migration 0009, remplace `entreprises.source`) : une entreprise trouvée par les deux sources a `["sirene", "lba"]` (ou l'inverse, selon l'ordre de découverte), pour comparer les sources plus tard.
+- **Interface.** Pastille par source sur chaque entreprise, filtres « Sirene » et « LBA ». Statistiques par source : entreprises, emails trouvés, mails envoyés, réponses (statut de suivi réponse, entretien ou refus), entretiens ; une entreprise des deux sources compte dans chacune, une ligne « les deux » les compte à part.
+- **Étape « Récupérer ».** LBA a droit à la moitié de la limite de nouvelles entreprises (arrondie au-dessus), Sirene au reste, plus ce que LBA n'a pas utilisé.
+- **Migration.** Les entreprises existantes reçoivent leur source d'avant ; celles passées de Sirene à « lba » sous D41 ne gardent que « lba ».
+
+### D45. Effectif LBA « 0-0 » : inconnu
+- **Décision.** « 0-0 » (`parametres_lba.TAILLES_INCONNUES`) est traité comme un effectif inconnu : l'entreprise est gardée ou écartée selon l'option « inclure les effectifs inconnus » du profil.
+
+### D46. La recherche d'offres n'ajoute aucune entreprise
+- **Décision.** Seule l'étape « Récupérer » des spontanées ajoute des entreprises LBA, avec sa limite. La recherche d'offres ignore les entreprises à fort potentiel (ni lues, ni redécoupées, ni signalées).
+
+### D47. Adresses techniques ou factices jamais enregistrées
+- **Constat.** Essai réel : `…@o4506196830715904.ingest.us.sentry.io` (suivi d'erreurs) et `votre@email.com` (exemple de formulaire) retenues par le scraper.
+- **Décision.** Règles dans `shared/referentiels/emails_exclus.txt`, fichier de données à compléter : `@domaine` (domaine et sous-domaines : sentry.io, wixpress.com, example.com, domain.com...), `local@` (votre@, nom@, prenom.nom@...), adresse exacte. Appliquées par le scraper (adresse jamais retenue) et à l'enregistrement en base (scraper et LBA).
+- **Conséquence.** Les adresses déjà en base ne sont pas nettoyées.
+
+### D48. Rayon minimal et requêtes LBA réglables, durée dans les logs
+- **Décision.** `LBA_RAYON_MIN_KM` (1 km) et `LBA_REQUETES_MAX` (300) restent dans `shared/config.py`. L'étape « Récupérer » écrit ces deux réglages au départ, puis le nombre de requêtes LBA faites et leur durée.

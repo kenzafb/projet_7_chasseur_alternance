@@ -92,3 +92,14 @@ API simulée `tests/faux_lba.py` : offres et entreprises placées sur une carte,
 6. **Lecture du niveau visé en texte libre** : règles de la section 2 (« Bac+1 » lu 5). Une liste à choix dans le profil serait plus sûre.
 7. **Email fourni par LBA envoyable sans validation**, comme un email validé. Théorique : aucune entreprise n'en a.
 8. **Offres LBA d'un autre niveau** : non mémorisées, relues et réécartées à chaque lancement (pas d'« offres vues » pour LBA, comme avant).
+
+## Suite : points tranchés après le rapport et l'essai réel
+
+Décisions D44 à D48 de `docs/DECISIONS.md` (points 1 à 3 tranchés ; points 4 à 8 sans changement). Mises en œuvre sur la même branche :
+- **D44.** Plus aucune priorité entre Sirene et LBA ; colonne `entreprises.sources` (liste, migration 0009) ; Sirene note sa source sur une entreprise LBA qu'il retrouve ; pastilles, filtres et répartition par source dans la page Spontanées ; limite de « Récupérer » partagée (moitié pour LBA).
+- **D45.** « 0-0 » lu comme effectif inconnu.
+- **D46.** La recherche d'offres ignore les entreprises (`rechercher_offres_pour_profil`).
+- **D47.** Adresses techniques ou factices écartées (`shared/referentiels/emails_exclus.txt`, `shared/emails_exclus.py`), au scraper et à l'enregistrement. Les adresses déjà en base restent : un nettoyage peut être ajouté si tu le souhaites.
+- **D48.** Réglages, nombre de requêtes et durée de LBA dans les logs de « Récupérer ».
+
+Avant la recette : `venv/bin/alembic upgrade head` (migrations 0008 et 0009). Tests : 636 passed (`test_emails_exclus.py` 22, `test_entreprises_lba.py` 10, `test_lba.py` 50).
