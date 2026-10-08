@@ -40,15 +40,15 @@ def test_valeurs_trouvees(cle, tmp_path):
     assert prop["CODES_PAR_REQUETE"] == 20
     assert prop["ACCEPTE_SANS_CODES"] is False
     assert prop["RAYON_MAX_KM"] == 200
-    assert prop["PARAM_NIVEAU"] == "target_diploma_level"
-    assert prop["VALEURS_NIVEAU"] == {"3": "3", "4": "4", "5": "5", "6": "6", "7": "7"}
+    assert res["niveau"]["param"] == "target_diploma_level" and "PARAM_NIVEAU" not in prop
+    assert "n'est pas envoyé (décision D38)" in sortie
     assert prop["PLAFOND_PAR_SOURCE"] == 150            # offres LBA et entreprises butent sur 150
     assert res["niveau"]["par_niveau"]["6"]["niveaux_lus_dans_les_offres"] == {"6": 60}   # M1800 hors des codes de référence
     assert res["france_travail"]["partenaires_france_travail"] == ["France Travail"]
     assert res["france_travail"]["exclusion_efficace"] is True
     assert "À reporter dans france_travail/parametres_lba.py" in sortie
-    assert "CODES_PAR_REQUETE = 20   # inchangé" in sortie
-    assert "RAYON_MAX_KM = 200   # actuel : 60" in sortie
+    assert "CODES_PAR_REQUETE = 20   # actuel : 100" in sortie
+    assert "RAYON_MAX_KM = 200   # inchangé" in sortie
 
 
 def test_structure_des_entreprises_sans_donnees_sensibles(cle, tmp_path):
@@ -69,7 +69,7 @@ def test_autres_reponses_de_l_api(cle, tmp_path):
     prop = res["propositions"]
     assert prop["CODES_PAR_REQUETE"] == 50 and prop["RAYON_MAX_KM"] == 100
     assert prop["ACCEPTE_SANS_CODES"] is True
-    assert prop["PARAM_NIVEAU"] == "diploma"
+    assert res["niveau"]["param"] == "diploma"
     assert res["france_travail"]["restantes_malgre_exclusion"] == {"France Travail": 20}
     assert "encore présentes malgré l'exclusion" in sortie
 
@@ -77,8 +77,8 @@ def test_autres_reponses_de_l_api(cle, tmp_path):
 def test_niveau_introuvable_garde_la_valeur_actuelle(cle, tmp_path):
     code, sortie, res, _ = lancer(jeu(param_niveau="autre"), tmp_path)
     assert res["niveau"]["param"] is None
-    assert res["propositions"]["PARAM_NIVEAU"] == vl.P.PARAM_NIVEAU
     assert "Aucun paramètre de niveau ne filtre" in sortie
+    assert "PARAM_NIVEAU" not in res["propositions"]
 
 
 def test_sans_cle_ou_cle_refusee(monkeypatch, tmp_path):

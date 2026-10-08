@@ -1,0 +1,1107 @@
+{
+  "verifie_le": "2026-10-08T22:11:36+00:00",
+  "requetes": 32,
+  "reference": {
+    "params": {
+      "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+      "latitude": 48.8566,
+      "longitude": 2.3522,
+      "radius": 30,
+      "partners_to_exclude": "France Travail"
+    },
+    "statut": 200,
+    "offres": 3,
+    "entreprises": 150,
+    "par_source": {
+      "offres_emploi_lba": 2,
+      "PASS": 1,
+      "<entreprises>": 150
+    },
+    "cles_reponse": [
+      "jobs",
+      "recruiters",
+      "warnings"
+    ]
+  },
+  "codes": {
+    "essais": {
+      "20": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810,... (20 valeurs)",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 30,
+          "partners_to_exclude": "France Travail"
+        },
+        "statut": 200,
+        "offres": 3,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 2,
+          "PASS": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ]
+      },
+      "21": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810,... (21 valeurs)",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 30,
+          "partners_to_exclude": "France Travail"
+        },
+        "statut": 200,
+        "offres": 4,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 2,
+          "PASS": 2,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ]
+      },
+      "30": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810,... (30 valeurs)",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 30,
+          "partners_to_exclude": "France Travail"
+        },
+        "statut": 200,
+        "offres": 7,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 2,
+          "PASS": 2,
+          "Veritone": 1,
+          "RH Alternance": 1,
+          "Meteojob": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ]
+      },
+      "50": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810,... (50 valeurs)",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 30,
+          "partners_to_exclude": "France Travail"
+        },
+        "statut": 200,
+        "offres": 7,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 2,
+          "PASS": 2,
+          "Veritone": 1,
+          "RH Alternance": 1,
+          "Meteojob": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ]
+      },
+      "100": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810,... (100 valeurs)",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 30,
+          "partners_to_exclude": "France Travail"
+        },
+        "statut": 200,
+        "offres": 16,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 2,
+          "PASS": 4,
+          "Veritone": 1,
+          "RH Alternance": 3,
+          "Meteojob": 2,
+          "Le bon coin emploi": 2,
+          "Jobposting": 1,
+          "Talentplug": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ]
+      }
+    },
+    "max_par_requete": 100,
+    "sans_codes": {
+      "params": {
+        "latitude": 48.8566,
+        "longitude": 2.3522,
+        "radius": 30,
+        "partners_to_exclude": "France Travail"
+      },
+      "statut": 200,
+      "offres": 450,
+      "entreprises": 150,
+      "par_source": {
+        "offres_emploi_lba": 150,
+        "France Travail": 261,
+        "Meteojob": 31,
+        "RH Alternance": 7,
+        "Jobposting": 1,
+        "<entreprises>": 150
+      },
+      "cles_reponse": [
+        "jobs",
+        "recruiters",
+        "warnings"
+      ]
+    },
+    "accepte_sans_codes": true
+  },
+  "rayon": {
+    "essais": {
+      "10": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 10,
+          "partners_to_exclude": "France Travail"
+        },
+        "statut": 200,
+        "offres": 2,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 1,
+          "PASS": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ]
+      },
+      "30": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 30,
+          "partners_to_exclude": "France Travail"
+        },
+        "statut": 200,
+        "offres": 3,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 2,
+          "PASS": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ]
+      },
+      "60": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 60,
+          "partners_to_exclude": "France Travail"
+        },
+        "statut": 200,
+        "offres": 4,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 3,
+          "PASS": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ]
+      },
+      "100": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 100,
+          "partners_to_exclude": "France Travail"
+        },
+        "statut": 200,
+        "offres": 4,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 3,
+          "PASS": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ]
+      },
+      "150": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 150,
+          "partners_to_exclude": "France Travail"
+        },
+        "statut": 200,
+        "offres": 5,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 4,
+          "PASS": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ]
+      },
+      "200": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 200,
+          "partners_to_exclude": "France Travail"
+        },
+        "statut": 200,
+        "offres": 5,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 4,
+          "PASS": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ]
+      },
+      "201": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 201,
+          "partners_to_exclude": "France Travail"
+        },
+        "statut": 400,
+        "offres": null,
+        "entreprises": null,
+        "par_source": {},
+        "message": "querystring.radius: Too big: expected number to be <=200 {\"validationError\": {\"code\": \"FST_ERR_VALIDATION\", \"issues\": [{\"code\": \"too_big\", \"path\": [\"radius\"], \"message\": \"Too big: expected number to be <=200\", \"origin\": \"number\", \"maximum\": 200, \"inclusive\": true}], \"name\": \"ZodError\", \"statusCode\": 400, \"validationContext\": \"querystring\"}}"
+      }
+    },
+    "rayon_max": 200
+  },
+  "coordonnees": {
+    "sans_coordonnees": {
+      "params": {
+        "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+        "partners_to_exclude": "France Travail"
+      },
+      "statut": 200,
+      "offres": 7,
+      "entreprises": 150,
+      "par_source": {
+        "offres_emploi_lba": 4,
+        "Meteojob": 1,
+        "PASS": 1,
+        "Nos Talents Nos Emplois": 1,
+        "<entreprises>": 150
+      },
+      "cles_reponse": [
+        "jobs",
+        "recruiters",
+        "warnings"
+      ]
+    },
+    "paris_10km": {
+      "params": {
+        "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+        "latitude": 48.8566,
+        "longitude": 2.3522,
+        "radius": 10,
+        "partners_to_exclude": "France Travail"
+      },
+      "statut": 200,
+      "offres": 2,
+      "entreprises": 150,
+      "par_source": {
+        "offres_emploi_lba": 1,
+        "PASS": 1,
+        "<entreprises>": 150
+      },
+      "cles_reponse": [
+        "jobs",
+        "recruiters",
+        "warnings"
+      ]
+    },
+    "cergy_10km": {
+      "params": {
+        "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+        "latitude": 49.0364,
+        "longitude": 2.0761,
+        "radius": 10,
+        "partners_to_exclude": "France Travail"
+      },
+      "statut": 200,
+      "offres": 0,
+      "entreprises": 98,
+      "par_source": {
+        "<entreprises>": 98
+      },
+      "cles_reponse": [
+        "jobs",
+        "recruiters",
+        "warnings"
+      ]
+    },
+    "coordonnees_ignorees": false
+  },
+  "niveau": {
+    "essais": [
+      {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 30,
+          "partners_to_exclude": "France Travail",
+          "target_diploma_level": "6"
+        },
+        "statut": 200,
+        "offres": 1,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ],
+        "param": "target_diploma_level",
+        "valeur": "6",
+        "effet": "filtre"
+      },
+      {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 30,
+          "partners_to_exclude": "France Travail",
+          "diploma": "6"
+        },
+        "statut": 200,
+        "offres": 3,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 2,
+          "PASS": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ],
+        "param": "diploma",
+        "valeur": "6",
+        "effet": "ignoré (résultats inchangés)"
+      },
+      {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 30,
+          "partners_to_exclude": "France Travail",
+          "diploma": "6 (Licence, BUT...)"
+        },
+        "statut": 200,
+        "offres": 3,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 2,
+          "PASS": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ],
+        "param": "diploma",
+        "valeur": "6 (Licence, BUT...)",
+        "effet": "ignoré (résultats inchangés)"
+      },
+      {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 30,
+          "partners_to_exclude": "France Travail",
+          "diplomaLevel": "6"
+        },
+        "statut": 200,
+        "offres": 3,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 2,
+          "PASS": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ],
+        "param": "diplomaLevel",
+        "valeur": "6",
+        "effet": "ignoré (résultats inchangés)"
+      },
+      {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 30,
+          "partners_to_exclude": "France Travail",
+          "niveau": "6"
+        },
+        "statut": 200,
+        "offres": 3,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 2,
+          "PASS": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ],
+        "param": "niveau",
+        "valeur": "6",
+        "effet": "ignoré (résultats inchangés)"
+      },
+      {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 30,
+          "partners_to_exclude": "France Travail",
+          "target_diploma_level": "99"
+        },
+        "statut": 400,
+        "offres": null,
+        "entreprises": null,
+        "par_source": {},
+        "message": "querystring.target_diploma_level: Invalid option: expected one of \"3\"|\"4\"|\"5\"|\"6\"|\"7\" {\"validationError\": {\"code\": \"FST_ERR_VALIDATION\", \"issues\": [{\"code\": \"invalid_value\", \"path\": [\"target_diploma_level\"], \"message\": \"Invalid option: expected one of \\\"3\\\"|\\\"4\\\"|\\\"5\\\"|\\\"6\\\"|\\\"7\\\"\", \"values\": [\"3\", \"4\", \"5\", \"6\", \"7\"]}], \"name\": \"ZodError\", \"statusCode\": 400, \"validationContext\": \"querystring\"}}",
+        "param": "target_diploma_level",
+        "valeur": "99",
+        "effet": "refusé"
+      }
+    ],
+    "param": "target_diploma_level",
+    "format_valeur": "6",
+    "par_niveau": {
+      "3": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 60,
+          "partners_to_exclude": "France Travail",
+          "target_diploma_level": "3"
+        },
+        "statut": 200,
+        "offres": 0,
+        "entreprises": 150,
+        "par_source": {
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ],
+        "valeur": "3",
+        "niveaux_lus_dans_les_offres": {}
+      },
+      "4": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 60,
+          "partners_to_exclude": "France Travail",
+          "target_diploma_level": "4"
+        },
+        "statut": 200,
+        "offres": 1,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ],
+        "valeur": "4",
+        "niveaux_lus_dans_les_offres": {
+          "4": 1
+        }
+      },
+      "5": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 60,
+          "partners_to_exclude": "France Travail",
+          "target_diploma_level": "5"
+        },
+        "statut": 200,
+        "offres": 0,
+        "entreprises": 150,
+        "par_source": {
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ],
+        "valeur": "5",
+        "niveaux_lus_dans_les_offres": {}
+      },
+      "6": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 60,
+          "partners_to_exclude": "France Travail",
+          "target_diploma_level": "6"
+        },
+        "statut": 200,
+        "offres": 1,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ],
+        "valeur": "6",
+        "niveaux_lus_dans_les_offres": {
+          "6": 1
+        }
+      },
+      "7": {
+        "params": {
+          "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 60,
+          "partners_to_exclude": "France Travail",
+          "target_diploma_level": "7"
+        },
+        "statut": 200,
+        "offres": 2,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 1,
+          "PASS": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ],
+        "valeur": "7",
+        "niveaux_lus_dans_les_offres": {
+          "7": 2
+        }
+      }
+    }
+  },
+  "plafond": {
+    "essais": {
+      "100 codes D, K, M, 30 km": {
+        "params": {
+          "romes": "D1101,D1102,D1103,D1104,D1105,D1106,D1107,D1108,D1109,D1110,... (100 valeurs)",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 30,
+          "partners_to_exclude": "France Travail"
+        },
+        "statut": 200,
+        "offres": 238,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 150,
+          "Meteojob": 20,
+          "RH Alternance": 9,
+          "OPCO EP": 42,
+          "Veritone": 5,
+          "Kelio": 2,
+          "annonces Atlas": 2,
+          "iquesta": 1,
+          "La Poste": 1,
+          "Talentplug": 3,
+          "Le bon coin emploi": 2,
+          "Jobposting": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ]
+      },
+      "100 codes D, K, M, 60 km": {
+        "params": {
+          "romes": "D1101,D1102,D1103,D1104,D1105,D1106,D1107,D1108,D1109,D1110,... (100 valeurs)",
+          "latitude": 48.8566,
+          "longitude": 2.3522,
+          "radius": 60,
+          "partners_to_exclude": "France Travail"
+        },
+        "statut": 200,
+        "offres": 253,
+        "entreprises": 150,
+        "par_source": {
+          "offres_emploi_lba": 150,
+          "Meteojob": 29,
+          "RH Alternance": 12,
+          "OPCO EP": 45,
+          "Veritone": 5,
+          "Kelio": 2,
+          "annonces Atlas": 2,
+          "iquesta": 1,
+          "La Poste": 1,
+          "Talentplug": 3,
+          "Le bon coin emploi": 2,
+          "Jobposting": 1,
+          "<entreprises>": 150
+        },
+        "cles_reponse": [
+          "jobs",
+          "recruiters",
+          "warnings"
+        ]
+      }
+    },
+    "max_par_source": {
+      "offres_emploi_lba": 150,
+      "PASS": 4,
+      "<entreprises>": 150,
+      "Veritone": 5,
+      "RH Alternance": 12,
+      "Meteojob": 31,
+      "Le bon coin emploi": 2,
+      "Jobposting": 1,
+      "Talentplug": 3,
+      "France Travail": 261,
+      "Nos Talents Nos Emplois": 1,
+      "OPCO EP": 45,
+      "Kelio": 2,
+      "annonces Atlas": 2,
+      "iquesta": 1,
+      "La Poste": 1
+    },
+    "plafond_observe": 150
+  },
+  "entreprises": {
+    "lues": 4148,
+    "champs": {
+      "identifier.id": {
+        "presence": 4148,
+        "sur": 4148,
+        "exemples": [
+          "6a003c399a6be614e48abba9",
+          "68f7bed849b8c5a9668a3f23",
+          "6a003c889a6be614e48ec247"
+        ]
+      },
+      "workplace.siret": {
+        "presence": 4148,
+        "sur": 4148,
+        "exemples": [
+          "82846965000075",
+          "97885742300013",
+          "84845778400025"
+        ]
+      },
+      "workplace.brand": {
+        "presence": 4148,
+        "sur": 4148,
+        "exemples": [
+          "WETRADELOCAL",
+          "GRANITE",
+          "LEHIBOU CYBERSECURITY"
+        ]
+      },
+      "workplace.legal_name": {
+        "presence": 4148,
+        "sur": 4148,
+        "exemples": [
+          "WETRADELOCAL",
+          "GRANITE",
+          "LEHIBOU CYBERSECURITY"
+        ]
+      },
+      "workplace.name": {
+        "presence": 4148,
+        "sur": 4148,
+        "exemples": [
+          "WETRADELOCAL",
+          "GRANITE",
+          "LEHIBOU CYBERSECURITY"
+        ]
+      },
+      "workplace.size": {
+        "presence": 4148,
+        "sur": 4148,
+        "exemples": [
+          "0-0",
+          "0-0",
+          "6-9"
+        ]
+      },
+      "workplace.location.address": {
+        "presence": 4148,
+        "sur": 4148,
+        "exemples": [
+          "3 avenue Victoria 75004 PARIS",
+          "86 rue de Rivoli 75004 PARIS",
+          "99 rue de la Verrerie 75004 PARIS"
+        ]
+      },
+      "workplace.location.geopoint.coordinates": {
+        "presence": 4148,
+        "sur": 4148,
+        "exemples": [
+          "[2.3503879999999997, 48.85684199998633]",
+          "[2.349936000000001, 48.85807599998632]",
+          "[2.3503730000000003, 48.85885899998632]"
+        ]
+      },
+      "workplace.location.geopoint.type": {
+        "presence": 4148,
+        "sur": 4148,
+        "exemples": [
+          "Point",
+          "Point",
+          "Point"
+        ]
+      },
+      "workplace.domain.opco": {
+        "presence": 4148,
+        "sur": 4148,
+        "exemples": [
+          "Opco entreprises de proximité",
+          "ATLAS",
+          "ATLAS"
+        ]
+      },
+      "workplace.domain.naf.code": {
+        "presence": 4148,
+        "sur": 4148,
+        "exemples": [
+          "62.01Z",
+          "62.02A",
+          "62.02A"
+        ]
+      },
+      "workplace.domain.naf.label": {
+        "presence": 4148,
+        "sur": 4148,
+        "exemples": [
+          "Programmation informatique",
+          "Conseil en systèmes et logiciels informatiques",
+          "Conseil en systèmes et logiciels informatiques"
+        ]
+      },
+      "apply.url": {
+        "presence": 4148,
+        "sur": 4148,
+        "exemples": [
+          "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/82846965000075/wetradelocal",
+          "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/97885742300013/granite",
+          "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/84845778400025/lehibou-cybersecurity"
+        ]
+      },
+      "workplace.domain.idcc": {
+        "presence": 3283,
+        "sur": 4148,
+        "exemples": [
+          "1978",
+          "1486",
+          "1486"
+        ]
+      },
+      "apply.recipient_id": {
+        "presence": 772,
+        "sur": 4148,
+        "exemples": [
+          "partners_6a65bf51d55499013b5d68f7",
+          "partners_6a816ed3b53a80d8beb1fd7b",
+          "partners_6a003cc69a6be614e491d3b9"
+        ]
+      }
+    },
+    "champs_par_nom": {
+      "siret": [
+        "workplace.siret"
+      ],
+      "nom": [
+        "workplace.brand",
+        "workplace.legal_name",
+        "workplace.name"
+      ],
+      "adresse": [
+        "workplace.location.address"
+      ],
+      "effectif": [
+        "workplace.size"
+      ],
+      "email": [],
+      "telephone": [],
+      "candidature": [
+        "apply.url",
+        "apply.recipient_id"
+      ]
+    },
+    "chemins_de_parametres_lba": {
+      "siret": {
+        "chemins": [
+          "workplace.siret"
+        ],
+        "presence": {
+          "workplace.siret": 4148
+        }
+      },
+      "nom": {
+        "chemins": [
+          "workplace.brand",
+          "workplace.name",
+          "workplace.legal_name"
+        ],
+        "presence": {
+          "workplace.brand": 4148,
+          "workplace.name": 4148,
+          "workplace.legal_name": 4148
+        }
+      },
+      "raison_sociale": {
+        "chemins": [
+          "workplace.legal_name"
+        ],
+        "presence": {
+          "workplace.legal_name": 4148
+        }
+      },
+      "adresse": {
+        "chemins": [
+          "workplace.location.address"
+        ],
+        "presence": {
+          "workplace.location.address": 4148
+        }
+      },
+      "effectif": {
+        "chemins": [
+          "workplace.size"
+        ],
+        "presence": {
+          "workplace.size": 4148
+        }
+      },
+      "code_naf": {
+        "chemins": [
+          "workplace.domain.naf.code"
+        ],
+        "presence": {
+          "workplace.domain.naf.code": 4148
+        }
+      },
+      "libelle_naf": {
+        "chemins": [
+          "workplace.domain.naf.label"
+        ],
+        "presence": {
+          "workplace.domain.naf.label": 4148
+        }
+      },
+      "site_web": {
+        "chemins": [
+          "workplace.website"
+        ],
+        "presence": {
+          "workplace.website": 0
+        }
+      },
+      "email": {
+        "chemins": [
+          "apply.email",
+          "contact.email",
+          "workplace.email"
+        ],
+        "presence": {
+          "apply.email": 0,
+          "contact.email": 0,
+          "workplace.email": 0
+        }
+      },
+      "telephone": {
+        "chemins": [
+          "apply.phone"
+        ],
+        "presence": {
+          "apply.phone": 0
+        }
+      },
+      "candidature_id": {
+        "chemins": [
+          "apply.recipient_id"
+        ],
+        "presence": {
+          "apply.recipient_id": 772
+        }
+      },
+      "candidature_url": {
+        "chemins": [
+          "apply.url"
+        ],
+        "presence": {
+          "apply.url": 4148
+        }
+      },
+      "identifiant": {
+        "chemins": [
+          "identifier.id"
+        ],
+        "presence": {
+          "identifier.id": 4148
+        }
+      }
+    }
+  },
+  "france_travail": {
+    "avec_exclusion": {
+      "params": {
+        "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+        "latitude": 48.8566,
+        "longitude": 2.3522,
+        "radius": 60,
+        "partners_to_exclude": "France Travail"
+      },
+      "statut": 200,
+      "offres": 4,
+      "entreprises": 150,
+      "par_source": {
+        "offres_emploi_lba": 3,
+        "PASS": 1,
+        "<entreprises>": 150
+      },
+      "cles_reponse": [
+        "jobs",
+        "recruiters",
+        "warnings"
+      ]
+    },
+    "sans_exclusion": {
+      "params": {
+        "romes": "M1801,M1802,M1803,M1804,M1805,M1806,M1807,M1808,M1809,M1810",
+        "latitude": 48.8566,
+        "longitude": 2.3522,
+        "radius": 60
+      },
+      "statut": 200,
+      "offres": 32,
+      "entreprises": 150,
+      "par_source": {
+        "offres_emploi_lba": 3,
+        "France Travail": 28,
+        "PASS": 1,
+        "<entreprises>": 150
+      },
+      "cles_reponse": [
+        "jobs",
+        "recruiters",
+        "warnings"
+      ]
+    },
+    "partenaires_france_travail": [
+      "France Travail"
+    ],
+    "restantes_malgre_exclusion": {},
+    "exclusion_efficace": true
+  },
+  "propositions": {
+    "CODES_PAR_REQUETE": 100,
+    "ACCEPTE_SANS_CODES": true,
+    "RAYON_MAX_KM": 200,
+    "PARAM_NIVEAU": "target_diploma_level",
+    "VALEURS_NIVEAU": {
+      "3": "3",
+      "4": "4",
+      "5": "5",
+      "6": "6",
+      "7": "7"
+    },
+    "PLAFOND_PAR_SOURCE": 150,
+    "PARTENAIRES_FRANCE_TRAVAIL": [
+      "france travail",
+      "pole emploi"
+    ]
+  }
+}

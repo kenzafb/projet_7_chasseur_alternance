@@ -11,11 +11,8 @@ Pour les trancher, lancer (clé LBA_API_KEY dans le .env) :
 
 puis reporter ici les valeurs que le script affiche à la fin.
 
-Valeurs prudentes, NON VÉRIFIÉES (phase 5c, 8 octobre 2026) : celles que
-le code utilisait avant la phase (romes par 20, rayon de 60 km, exclusion
-de France Travail par partners_to_exclude), le reste tiré de la
-documentation publique et rendu inoffensif s'il est faux (voir chaque
-valeur).
+Valeurs vérifiées sur la vraie API le 9 octobre 2026 (détail dans
+docs/referentiels/lba/verification_api.json, décisions D36 à D41).
 """
 
 URL_RECHERCHE = "https://api.apprentissage.beta.gouv.fr/api/job/v1/search"
@@ -27,38 +24,39 @@ PARAM_LONGITUDE = "longitude"
 PARAM_RAYON = "radius"         # en kilomètres
 
 # Codes métiers acceptés dans une requête (au-delà : plusieurs requêtes,
-# résultats réunis et dédoublonnés). 20 : valeur utilisée avant la phase.
-CODES_PAR_REQUETE = 20
+# résultats réunis et dédoublonnés). 100 codes acceptés, plus non essayé.
+CODES_PAR_REQUETE = 100
 
-# L'API accepte-t-elle une recherche sans code métier (profil « indifférent ») ?
-# False : LBA est ignorée pour un profil sans domaine, avec un message.
-ACCEPTE_SANS_CODES = False
+# L'API accepte une recherche sans code métier : un profil « indifférent »
+# cherche sur LBA sans code (décision D37).
+ACCEPTE_SANS_CODES = True
 
-# Rayon maximal accepté (km). Les rayons de shared.config.LBA_CENTRES y sont
-# ramenés. 60 : valeur utilisée avant la phase.
-RAYON_MAX_KM = 60
+# Rayon maximal accepté (km) : 201 refusé (« expected number to be <=200 »).
+RAYON_MAX_KM = 200
 
-# Niveau de diplôme visé : paramètre et valeur envoyée pour chaque niveau
-# européen (3 CAP, 4 bac, 5 bac+2, 6 bac+3 et bac+4, 7 bac+5). None : le
-# niveau n'est jamais envoyé. Si l'API refuse la requête (400) avec ce
-# paramètre, la recherche est refaite sans lui et le refus est écrit dans
-# les logs : une valeur fausse ne coûte qu'une requête par lancement.
-PARAM_NIVEAU = "target_diploma_level"
-VALEURS_NIVEAU = {3: "3", 4: "4", 5: "5", 6: "6", 7: "7"}
+# Niveau de diplôme : jamais envoyé à l'API (target_diploma_level filtre,
+# mais écarte les offres sans niveau indiqué : 1 offre sur 3 au niveau 6).
+# Filtre après récupération sur ce champ, offres sans niveau gardées (D38).
+CHAMP_NIVEAU_OFFRE = "offer.target_diploma.european"
 
 # Offres déjà relayées depuis France Travail : exclues à la source par ces
 # paramètres, puis par le libellé du partenaire (toute offre dont le
 # partenaire contient l'un de ces textes, casse et accents ignorés, est
-# écartée, même si l'API a ignoré l'exclusion).
+# écartée). Le second filtre est indispensable : l'exclusion marche avec
+# des codes métiers (28 offres France Travail retirées), mais une recherche
+# sans code renvoie quand même 261 offres France Travail.
 PARAMS_EXCLUSION = {"partners_to_exclude": "France Travail"}
 PARTENAIRES_FRANCE_TRAVAIL = ("france travail", "pole emploi")
 
 # ─── Plafond ──────────────────────────────────────────────────────────────────
-# Résultats au plus par source (partenaire d'offres, ou entreprises à fort
-# potentiel) dans une réponse (SPEC_SOURCES section 3 : 150 par source, 450
-# au total). Une source qui l'atteint est peut-être tronquée : la recherche
-# passe alors aux centres de shared.config.LBA_CENTRES.
+# Résultats au plus dans une réponse : 150 par source (partenaire d'offres,
+# ou entreprises à fort potentiel), 450 offres en tout (sans code : 150
+# offres LBA + 261 France Travail + 39 autres = 450). Les entreprises sont
+# à 150 sur presque tous les cercles (seul Cergy à 10 km en donne 98).
+# Une réponse au plafond est peut-être tronquée : son cercle est redécoupé
+# (france_travail.scraper_lba).
 PLAFOND_PAR_SOURCE = 150
+PLAFOND_TOTAL_OFFRES = 450
 
 # ─── Structure des réponses ───────────────────────────────────────────────────
 CLE_OFFRES = "jobs"
@@ -68,6 +66,10 @@ CLE_ENTREPRISES = "recruiters"   # entreprises à fort potentiel d'embauche
 CHAMP_PARTENAIRE = "identifier.partner_label"
 
 # Champs d'une entreprise à fort potentiel : premier chemin pointé non vide.
+# Sur 4148 entreprises lues : SIRET, nom, adresse, effectif (workplace.size,
+# « 0-0 », « 6-9 »...), NAF et apply.url toujours présents ; aucun email ni
+# téléphone (les entreprises passent par le scraper) ; apply.recipient_id
+# dans 772 (identifiant de la candidature directe, gardé sans être branché).
 CHAMPS_ENTREPRISE = {
     "siret":       ["workplace.siret"],
     "nom":         ["workplace.brand", "workplace.name", "workplace.legal_name"],

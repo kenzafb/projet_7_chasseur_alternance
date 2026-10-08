@@ -18,7 +18,8 @@ Vérifie sur la vraie API de La Bonne Alternance les points encore ouverts
 5. Niveau de diplôme : plusieurs noms et formats de paramètre, comparés à
    la référence (filtre, ignoré ou refusé, avec le message de l'API) ; pour
    le paramètre qui filtre, chaque niveau de 3 à 7 et le niveau lu dans
-   les offres renvoyées.
+   les offres renvoyées. Information seulement : le niveau n'est jamais
+   envoyé (décision D38), il est filtré après récupération.
 6. Plafond par source : nombre maximal de résultats observé par source sur
    des recherches larges (si plusieurs sources butent sur la même valeur,
    c'est le plafond).
@@ -74,7 +75,7 @@ ESSAIS_NIVEAU = [
     ("target_diploma_level", "99"),
 ]
 # Niveau lu dans une offre, pour vérifier le sens du filtre
-CHAMPS_NIVEAU_OFFRE = ["offer.target_diploma.european", "offer.target_diploma_level", "diplomaLevel"]
+CHAMPS_NIVEAU_OFFRE = [P.CHAMP_NIVEAU_OFFRE, "offer.target_diploma_level", "diplomaLevel"]
 # Champs recherchés dans les entreprises : nom -> mots du dernier élément du chemin
 MOTS_CHAMPS = {
     "siret": ("siret",), "nom": ("name", "brand", "nom"), "adresse": ("address", "adresse"),
@@ -123,6 +124,7 @@ class Verificateur:
         self.cle = os.getenv("LBA_API_KEY", "")
         self.requetes = 0
         self.max_par_source = Counter()   # plus grand nombre de résultats vu par source
+        self.max_offres = 0               # plus grand nombre d'offres vu dans une réponse
         self.entreprises_vues = []
         self.offres_vues = []
 
@@ -173,6 +175,7 @@ class Verificateur:
         if corps.get("warnings"):
             essai["avertissements"] = self._purger(json.dumps(corps["warnings"], ensure_ascii=False))[:600]
         essai["par_source"]["<entreprises>"] = len(entreprises)
+        self.max_offres = max(self.max_offres, len(offres))
         for source, n in essai["par_source"].items():
             self.max_par_source[source] = max(self.max_par_source[source], n)
         self.entreprises_vues += entreprises[:200]
@@ -291,7 +294,8 @@ class Verificateur:
         plafond = max(repete) if repete else None
         self.afficher(f"  plus grand nombre vu par source : {dict(self.max_par_source)}"
                       + (f" ; plusieurs sources butent sur {plafond}" if plafond else ""))
-        return {"essais": essais, "max_par_source": dict(self.max_par_source), "plafond_observe": plafond}
+        return {"essais": essais, "max_par_source": dict(self.max_par_source), "plafond_observe": plafond,
+                "max_offres": self.max_offres}
 
     # ── 7. Entreprises à fort potentiel ──
     def entreprises(self) -> dict:
@@ -344,15 +348,9 @@ def propositions(res: dict) -> dict:
     prop["CODES_PAR_REQUETE"] = res["codes"]["max_par_requete"] or P.CODES_PAR_REQUETE
     prop["ACCEPTE_SANS_CODES"] = res["codes"]["accepte_sans_codes"]
     prop["RAYON_MAX_KM"] = res["rayon"]["rayon_max"] or P.RAYON_MAX_KM
-    niv = res["niveau"]
-    if niv["param"]:
-        prop["PARAM_NIVEAU"] = niv["param"]
-        v = niv["format_valeur"]
-        prop["VALEURS_NIVEAU"] = {n: (v.replace("6", str(n), 1) if v.startswith("6") else str(n)) for n in range(3, 8)}
-    else:
-        prop["PARAM_NIVEAU"] = P.PARAM_NIVEAU
-        prop["VALEURS_NIVEAU"] = P.VALEURS_NIVEAU
     prop["PLAFOND_PAR_SOURCE"] = res["plafond"]["plafond_observe"] or P.PLAFOND_PAR_SOURCE
+    # Un total observé au-dessus du plafond actuel montre que le plafond est plus haut
+    prop["PLAFOND_TOTAL_OFFRES"] = max(P.PLAFOND_TOTAL_OFFRES, res["plafond"]["max_offres"])
     noms = [_normaliser(s) for s in res["france_travail"]["partenaires_france_travail"]]
     prop["PARTENAIRES_FRANCE_TRAVAIL"] = tuple(sorted(set(P.PARTENAIRES_FRANCE_TRAVAIL) | set(noms)))
     return prop
@@ -365,9 +363,13 @@ def resume(res: dict, afficher=print):
         actuel = getattr(P, nom)
         note = "inchangé" if actuel == valeur else f"actuel : {actuel!r}"
         afficher(f"{nom} = {valeur!r}   # {note}")
-    if not res["niveau"]["param"]:
-        afficher("⚠️  Aucun paramètre de niveau ne filtre : voir « niveau » dans le fichier "
-                 "(un 400 donne souvent les valeurs permises dans son message).")
+    niv = res["niveau"]
+    if niv["param"]:
+        afficher(f"ℹ️  Niveau de diplôme : {niv['param']} filtre (format {niv['format_valeur']!r}), mais il "
+                 "n'est pas envoyé (décision D38) : filtre après récupération sur "
+                 f"{P.CHAMP_NIVEAU_OFFRE}, voir « par_niveau » dans le fichier.")
+    else:
+        afficher("ℹ️  Aucun paramètre de niveau ne filtre : voir « niveau » dans le fichier.")
     if not res["plafond"]["plafond_observe"]:
         afficher(f"ℹ️  Plafond par source non atteint : {P.PLAFOND_PAR_SOURCE} gardé (voir « plafond »).")
     if res["coordonnees"]["coordonnees_ignorees"]:
