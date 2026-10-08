@@ -85,6 +85,8 @@ python -m spontanees.envoyeur --user 1 --limite 10 --test
 
 **Modèles Mistral.** Un par usage : `MODELE_MISTRAL_ANALYSE`, `MODELE_MISTRAL_LETTRE`, `MODELE_MISTRAL_EXTRACTION`, sinon `MODELE_MISTRAL` pour tous, sinon `mistral-medium-latest` (analyse, lettre) et `mistral-small-latest` (extraction). `python scripts/verifier_mistral.py` liste les modèles de la clé et teste ceux configurés (appels réels). Une erreur Mistral ne produit jamais de note ni de lettre inventée : clé refusée ou modèle non autorisé arrêtent le pipeline avec un message clair, une erreur passagère fait sauter l'offre, qui reviendra au lancement suivant.
 
+**Interrupteur `ANALYSE_IA`** (`.env`, vrai par défaut). À `false`, aucun appel à Mistral : les offres sont ajoutées « non analysées » (sans score ni verdict, archivées seulement par mots-clés : public réservé, école ou CFA, stage), la génération de lettre, la réanalyse et la validation des emails par l'IA sont refusées, le scraper lit les pages directement (emails notés non validés, à valider à la main). Un bandeau le signale dans l'interface.
+
 Procédure de test réel de bout en bout : `docs/RECETTE.md`. Décisions prises hors du code : `docs/DECISIONS.md`.
 
 ## Tests

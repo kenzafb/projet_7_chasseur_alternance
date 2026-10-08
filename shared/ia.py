@@ -20,6 +20,9 @@ Tous les appels du processus (tous utilisateurs, tous pipelines, retries
 compris) passent par un limiteur commun : au moins MISTRAL_INTERVALLE_MIN_S
 secondes entre deux appels, pour que des pipelines simultanés ne se
 prennent pas de 429.
+
+ANALYSE_IA=false (shared.config.analyse_ia_active) : appeler_mistral lève
+IADesactivee sans rien appeler.
 """
 
 import json
@@ -30,7 +33,7 @@ import time
 import httpx
 from mistralai.client import Mistral, errors
 
-from shared.config import MISTRAL_INTERVALLE_MIN_S, modele_mistral
+from shared.config import MESSAGE_IA_DESACTIVEE, MISTRAL_INTERVALLE_MIN_S, analyse_ia_active, modele_mistral
 
 client = Mistral(api_key=os.getenv("MISTRAL_API_KEY"))
 
@@ -52,6 +55,11 @@ class ErreurIABloquante(ErreurIA):
 
 class ErreurIAPassagere(ErreurIA):
     """Échec ponctuel (quota, serveur, réseau, réponse illisible)."""
+
+
+class IADesactivee(ErreurIABloquante):
+    """ANALYSE_IA=false : l'appel n'est pas tenté. Les pipelines testent
+    l'interrupteur avant ; ceci est le dernier rempart."""
 
 
 class Limiteur:
@@ -135,8 +143,10 @@ def appeler_mistral(messages, *, usage="analyse", tentatives=4, attente=lambda n
     options    : passées telles quelles à chat.complete (response_format, temperature...)
 
     Lève ErreurIABloquante tout de suite, ErreurIAPassagere une fois les
-    tentatives épuisées.
+    tentatives épuisées. IADesactivee sans rien appeler si ANALYSE_IA=false.
     """
+    if not analyse_ia_active():
+        raise IADesactivee(MESSAGE_IA_DESACTIVEE)
     modele = modele_mistral(usage)
     for tentative in range(1, tentatives + 1):
         limiteur.attendre()

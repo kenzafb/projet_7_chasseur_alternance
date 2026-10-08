@@ -50,7 +50,7 @@ from database.dates import maintenant_utc
 # ─── Modules métier ───────────────────────────────────────────────
 from france_travail.main import lancer_recherche
 from france_travail.generateur import generer_lettre
-from france_travail.analyseur import analyser_offre, appliquer_analyse
+from france_travail.analyseur import analyser_offre, appliquer_analyse, marquer_non_analysee
 from shared.ia import ErreurIA, ErreurIABloquante, ErreurIAPassagere
 from france_travail.pdf_generator import generer_pdf_lettre, nom_telechargement
 from france_travail.scraper_lba import chercher_offres_lba
@@ -252,7 +252,8 @@ class MailTest(BaseModel):
 @prive.get("/")
 def index(request: Request):
     return templates.TemplateResponse(request, "base.html", {"mode": mode_courant(request),
-                                                             "limites": config.LIMITES_LANCEMENT})
+                                                             "limites": config.LIMITES_LANCEMENT,
+                                                             "analyse_ia": config.analyse_ia_active()})
 
 @prive.get("/api/logs")
 def api_logs(user: User = Depends(utilisateur_requis)):
@@ -439,6 +440,8 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
     # Offres analysées par Mistral au plus, France Travail et LBA confondues
     max_analyses, note = _limite("analyses", body.max_analyses if body else None)
     mode = mode_courant(request)   # idem : capturé avant le thread
+    ia = config.analyse_ia_active()   # ANALYSE_IA=false : offres insérées « non analysées »
+    traitees = "analysées" if ia else "ajoutées sans analyse"
     from shared.modes import get_mode
     cfg_mode = get_mode(mode)
     profil = lire_profil(user_id, mode=mode)
@@ -460,14 +463,16 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
                 ajouter_candidature(user_id, offre, mode=mode)
 
             etat(message="Recherche France Travail...")
-            log(f"🔍 Recherche France Travail démarrée (au plus {max_analyses} offres analysées){note}")
-            analysees = lancer_recherche(user_id, profil, analyser=True, max_analyse=max_analyses,
+            if not ia:
+                log(f"ℹ️  {config.MESSAGE_IA_DESACTIVEE} Offres ajoutées « non analysées ».")
+            log(f"🔍 Recherche France Travail démarrée (au plus {max_analyses} offres {traitees}){note}")
+            analysees = lancer_recherche(user_id, profil, analyser=ia, max_analyse=max_analyses,
                                          on_offre=ecrire_en_base, mode=mode, log_fn=log) or []
             reste = max_analyses - len(analysees)
-            log(f"✅ France Travail terminé : {len(analysees)} offres analysées")
+            log(f"✅ France Travail terminé : {len(analysees)} offres {traitees}")
 
             if "lba" in cfg_mode["sources"] and reste <= 0:
-                log(f"ℹ️  LBA ignorée : limite de {max_analyses} offres analysées atteinte")
+                log(f"ℹ️  LBA ignorée : limite de {max_analyses} offres {traitees} atteinte")
                 offres_lba = []
             elif "lba" in cfg_mode["sources"]:
                 etat(message="Recherche La Bonne Alternance...")
@@ -486,10 +491,16 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
                 log(f"  {len(nouvelles_lba)} nouvelles offres LBA (hors doublons FT)")
                 if len(nouvelles_lba) > reste:
                     # Les suivantes ne sont pas en base : proposées au prochain lancement
-                    log(f"  Limite : {reste} offres LBA analysées sur {len(nouvelles_lba)}")
+                    log(f"  Limite : {reste} offres LBA {traitees} sur {len(nouvelles_lba)}")
                     nouvelles_lba = nouvelles_lba[:reste]
 
-                if nouvelles_lba:
+                if nouvelles_lba and not ia:
+                    # Sans IA : écrites « non analysées », archivage par mots-clés seulement
+                    for offre in nouvelles_lba:
+                        marquer_non_analysee(offre, verbeux=False)
+                        ajouter_candidature(user_id, offre, mode=mode)
+                    log(f"✅ {len(nouvelles_lba)} offres LBA ajoutées sans analyse")
+                elif nouvelles_lba:
                     etat(message=f"Analyse de {len(nouvelles_lba)} offres LBA...")
                     log("🧠 Analyse des offres LBA...")
                     ajoutees = 0
@@ -542,6 +553,10 @@ def api_generer_lettre(body: OffreId, request: Request, user: User = Depends(uti
     offre = lire_candidature(user.id, body.id, mode=mode_courant(request))
     if not offre:
         return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
+    if not config.analyse_ia_active():
+        return JSONResponse({"erreur": "Génération de lettre indisponible : l'IA est désactivée "
+                                       "(ANALYSE_IA=false). Écris la lettre toi-même ou réactive l'IA."},
+                            status_code=503)
     profil = lire_profil(user.id, mode=mode_courant(request))
     lettre = generer_lettre(offre, profil, mode=mode_courant(request))
     modifier_candidature(user.id, body.id, {"lettre": lettre, "statut": "en_cours"}, mode=mode_courant(request))
@@ -552,6 +567,9 @@ def api_analyser(body: OffreId, request: Request, user: User = Depends(utilisate
     offre = lire_candidature(user.id, body.id, mode=mode_courant(request))
     if not offre:
         return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
+    if not config.analyse_ia_active():
+        return JSONResponse({"erreur": "Analyse indisponible : l'IA est désactivée (ANALYSE_IA=false)."},
+                            status_code=503)
     profil = lire_profil(user.id, mode=mode_courant(request))
     # ErreurIA : réponse 502/503 (gestionnaire plus haut), l'offre n'est pas touchée
     analyse = analyser_offre(offre, profil, mode=mode_courant(request))
@@ -774,6 +792,9 @@ def api_spontanees_valider(body: ValiderEmails, user: User = Depends(utilisateur
 def api_spontanees_revalider(body: Revalider | None = None, user: User = Depends(utilisateur_requis)):
     """Relance la validation par l'IA des entreprises aux emails non validés."""
     user_id = user.id
+    if not config.analyse_ia_active():
+        raise ErreurUtilisateur("Validation par l'IA indisponible : l'IA est désactivée (ANALYSE_IA=false). "
+                                "Valide les emails à la main.")
     from database.entreprises_db import compter_a_valider
     disponibles = compter_a_valider(user_id)
     if not disponibles:

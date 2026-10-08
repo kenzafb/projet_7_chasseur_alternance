@@ -111,7 +111,12 @@
           <input type="number" data-limite="revalidations" value="{{ limites.revalidations.defaut }}"
                  min="1" max="{{ limites.revalidations.max }}">
         </label>
+        {% if analyse_ia|default(true) %}
         <button class="btn" data-action="revalider">Relancer la validation IA</button>
+        {% else %}
+        <button class="btn" disabled title="IA désactivée">Relancer la validation IA</button>
+        <span class="offre__note">IA désactivée : valide les emails à la main.</span>
+        {% endif %}
       </div>
     </div>
     <div data-list="a-valider"></div>

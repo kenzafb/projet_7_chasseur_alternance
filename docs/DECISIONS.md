@@ -85,3 +85,11 @@ Format : identifiant, date, phase, décision, raison, conséquence dans le code,
 
 ### D18. Nettoyage des 5 candidatures issues d'analyses échouées : par l'humain
 - **Décision.** L'humain lance lui-même la commande de `docs/PHASE_4B_RAPPORT.md` (section « Avant de relancer la recette ») ; le code n'y touche pas.
+
+## Phase 5a (préparation de l'étude des sources), décisions du 8 octobre 2026
+
+### D19. Interrupteur ANALYSE_IA : travail sans IA
+- **Décision.** `ANALYSE_IA` dans le `.env`, vrai par défaut. À `false` : aucun appel à Mistral nulle part (`appeler_mistral` lève `IADesactivee` sans appeler, en dernier rempart). La recherche insère les offres France Travail et LBA avec le verdict `non_analysee`, sans score (NULL) ni points ni résumé, et les marque vues normalement ; aucun archivage fondé sur l'analyse (note basse, hors domaine). L'interface affiche « non analysée » à la place du viseur ; génération de lettre, réanalyse et revalidation des emails sont désactivées avec un message clair (refus serveur : 503 pour lettre et réanalyse, 400 pour la revalidation). Le scraper ne fait que la lecture directe, emails notés non validés comme en cas d'échec de l'IA (D13), donc jamais envoyés automatiquement (D15). Un bandeau discret signale que l'IA est désactivée. `scripts/verifier_mistral.py` n'appelle rien.
+- **Raison.** Le compte Mistral ne permet plus l'API ; un modèle local viendra plus tard. On étudie France Travail, LBA et Sirene sans IA.
+- **Conséquence.** La limite « analyses » borne aussi le nombre d'offres ajoutées sans analyse. Une offre non analysée pourra être analysée par le bouton « Analyser » quand l'IA reviendra. Les offres non analysées sont triées après les autres.
+- **À reconsidérer** à l'arrivée du modèle local (analyse en lot des offres `non_analysee`).

@@ -109,6 +109,15 @@ def limite_lancement(cle: str, demandee) -> int:
     return max(1, min(int(demandee), regle["max"]))
 
 # ─── IA ───────────────────────────────────────────────────────────────────────
+def analyse_ia_active() -> bool:
+    """Interrupteur ANALYSE_IA du .env (vrai par défaut). Faux : aucun appel
+    à Mistral nulle part ; offres insérées « non analysées », scraper en
+    lecture directe seulement. Relu à chaque appel."""
+    valeur = os.getenv("ANALYSE_IA", "").strip().lower()
+    return valeur not in ("0", "false", "non", "no", "off")
+
+MESSAGE_IA_DESACTIVEE = "IA désactivée (ANALYSE_IA=false dans le .env) : aucun appel à Mistral."
+
 # Modèle par usage : MODELE_MISTRAL_<USAGE> du .env, sinon MODELE_MISTRAL, sinon
 # le défaut de l'usage. scripts/verifier_mistral.py teste ceux de la clé.
 USAGES_MISTRAL = {

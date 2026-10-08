@@ -8,7 +8,7 @@ Les offres déjà vues sont suivies en base par utilisateur et par mode
 """
 
 from france_travail.scraper import chercher_offres
-from france_travail.analyseur import analyser_offres
+from france_travail.analyseur import analyser_offres, marquer_non_analysee
 from database.dedup_db import marquer_offres_vues
 
 
@@ -18,7 +18,11 @@ def lancer_recherche(user_id, profil, analyser=True, max_analyse=999, on_offre=N
     Une offre n'est marquée vue qu'une fois analysée et écrite : celles
     au-delà de la limite, ou dont l'analyse a échoué, reviendront au
     lancement suivant. Retourne les offres retenues (analyse tentée).
-    ErreurIABloquante remonte telle quelle."""
+    ErreurIABloquante remonte telle quelle.
+
+    analyser=False (ANALYSE_IA=false) : aucune analyse ; chaque offre est
+    écrite « non analysée » (archivage par mots-clés seulement) puis
+    marquée vue."""
     print("\nRecherche des offres...")
     from shared.modes import get_mode
     cfg = get_mode(mode)
@@ -31,7 +35,7 @@ def lancer_recherche(user_id, profil, analyser=True, max_analyse=999, on_offre=N
     lot = min(cfg.get("limite_lot") or max_analyse, max_analyse)
     nouvelles_offres = chercher_offres(
         user_id, grands_domaines, ft_params=ft_params, filtrer_domaines=filtrer_domaines,
-        mode=mode, limite_lot=lot, marquer=not analyser)
+        mode=mode, limite_lot=lot, marquer=False)
 
     if not nouvelles_offres:
         print("Aucune nouvelle offre.")
@@ -47,6 +51,8 @@ def lancer_recherche(user_id, profil, analyser=True, max_analyse=999, on_offre=N
                         log_fn=log_fn)
     else:
         for offre in nouvelles_offres:
+            marquer_non_analysee(offre, mode=mode)
             on_offre(offre)
+            marquer_offres_vues(user_id, mode, {offre["id"]})
 
     return nouvelles_offres

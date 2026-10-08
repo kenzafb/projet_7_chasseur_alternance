@@ -242,22 +242,7 @@ def analyser_offre(offre, profil, mode="alternance"):
         '"resume": "max 12 mots factuels"}'
     )
 
-    # Détection écoles/CFA → archivage automatique
-    ECOLES_MOTS_CLES = [
-        "iscod", "scholia", "imc alternance", "mydigitalschool", "simplon",
-        "afpa", "cfa", "epitech", "openclassrooms", "studi", "ikigai",
-        "la plateforme", "digital campus", "m2i", "doranco", "efficom",
-        "ecole", "organisme de formation", "centre de formation",
-        "hitema", "h3", "igs", "isefac", "sup de vinci",
-        "aureis","nexa","Groupe IGF",
-    ]
-    description_lower = offre.get("description", "").lower()
-    entreprise_lower = offre.get("entreprise", "").lower()
-    titre_lower = offre.get("titre", "").lower()
-    est_ecole = any(
-        mot in description_lower or mot in entreprise_lower or mot in titre_lower
-        for mot in ECOLES_MOTS_CLES
-    )
+    est_ecole = est_ecole_cfa(offre)
 
     # Appel Mistral avec retry sur les erreurs passagères (4 tentatives, pauses 15s, 30s, 45s).
     # ErreurIABloquante / ErreurIAPassagere remontent : jamais de note inventée.
@@ -279,6 +264,29 @@ def analyser_offre(offre, profil, mode="alternance"):
         result["statut_auto"] = "archive"
         print(f"     → Archivée automatiquement (école/CFA détectée)")
     return result
+
+# Détection écoles/CFA (mots-clés) → archivage automatique
+ECOLES_MOTS_CLES = [
+    "iscod", "scholia", "imc alternance", "mydigitalschool", "simplon",
+    "afpa", "cfa", "epitech", "openclassrooms", "studi", "ikigai",
+    "la plateforme", "digital campus", "m2i", "doranco", "efficom",
+    "ecole", "organisme de formation", "centre de formation",
+    "hitema", "h3", "igs", "isefac", "sup de vinci",
+    "aureis","nexa","Groupe IGF",
+]
+
+
+def est_ecole_cfa(offre) -> bool:
+    """Vrai si l'offre semble publiée par une école ou un CFA (mots-clés
+    dans la description, l'entreprise ou le titre ; pas d'IA)."""
+    description_lower = (offre.get("description") or "").lower()
+    entreprise_lower = (offre.get("entreprise") or "").lower()
+    titre_lower = (offre.get("titre") or "").lower()
+    return any(
+        mot in description_lower or mot in entreprise_lower or mot in titre_lower
+        for mot in ECOLES_MOTS_CLES
+    )
+
 
 def _valider_analyse(result: dict) -> dict:
     """Analyse renvoyée par Mistral, contrôlée : un score entier de 1 à 10 est
@@ -396,6 +404,43 @@ def appliquer_analyse(offre, analyse, mode="alternance", verbeux=True):
         "resume_analyse": analyse["resume"],
     })
     appliquer_archivage_auto(offre, analyse, mode=mode, verbeux=verbeux)
+
+
+# Offre insérée sans analyse (ANALYSE_IA=false) : verdict « non_analysee »,
+# ni score ni points ; elle pourra être réanalysée quand l'IA reviendra.
+VERDICT_NON_ANALYSEE = "non_analysee"
+
+
+def marquer_non_analysee(offre, mode="alternance", verbeux=True):
+    """Prépare une offre pour l'insertion sans IA et applique les seules
+    règles d'archivage qui ne dépendent pas d'une analyse (mode alternance :
+    réservée à un public spécifique, école ou CFA, stage). Jamais d'archivage
+    pour note basse ni hors domaine. Modifie offre en place."""
+    _log = print if verbeux else (lambda *a, **k: None)
+    offre.update({
+        "score":          None,
+        "verdict":        VERDICT_NON_ANALYSEE,
+        "eligible":       True,
+        "points_forts":   [],
+        "points_faibles": [],
+        "domaine":        "",
+        "resume_analyse": "",
+        "raison_archivage": "",
+    })
+    if mode == "job":
+        return offre
+    titre_lower = (offre.get("titre") or "").lower()
+    desc_lower = (offre.get("description") or "").lower()
+    if reserve_public_specifique(desc_lower) or reserve_public_specifique(titre_lower):
+        offre["statut"], offre["raison_archivage"] = "archive", "public_specifique"
+        _log("     -> Archivée automatiquement (réservé public spécifique / BOETH)")
+    elif est_ecole_cfa(offre):
+        offre["statut"], offre["raison_archivage"] = "archive", "ecole_cfa"
+        _log("     -> Archivée automatiquement (école/CFA détectée)")
+    elif "stage" in titre_lower:
+        offre["statut"], offre["raison_archivage"] = "archive", "stage"
+        _log("     -> Archivée automatiquement (stage détecté)")
+    return offre
 
 
 def analyser_offres(offres, profil, callback=None, mode="alternance", log_fn=None):

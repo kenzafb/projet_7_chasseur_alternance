@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fr" data-mode="{{ mode|default('alternance') }}">
+<html lang="fr" data-mode="{{ mode|default('alternance') }}" data-analyse-ia="{{ 'oui' if analyse_ia|default(true) else 'non' }}">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -124,6 +124,11 @@
         </div>
         <button class="btn btn--sm" data-runbar-stop>Arrêter</button>
       </div>
+
+      {% if not analyse_ia|default(true) %}
+      <!-- ANALYSE_IA=false : aucun appel à Mistral -->
+      <div class="bandeau-ia" data-bandeau-ia>IA désactivée : les offres sont ajoutées sans analyse ni score, la génération de lettre et la validation des emails par l'IA sont indisponibles.</div>
+      {% endif %}
 
       <!-- confirmation d'un lancement : valeur de limite réellement appliquée -->
       <div class="confirmation" data-confirmation hidden></div>

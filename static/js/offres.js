@@ -4,6 +4,9 @@
 import { api } from "./api.js";
 
 const SEUIL = 7;                 // score minimum "à postuler" — repère du viseur
+// ANALYSE_IA=false (attribut posé par le serveur) : ni analyse ni lettre automatique
+const IA_ACTIVE = document.documentElement.dataset.analyseIa !== "non";
+const NON_ANALYSEE = "non_analysee";
 let cache = [];                  // offres chargées
 let filtre = "all";
 let modeArchives = false;   // false = offres à postuler, true = archivées
@@ -46,6 +49,8 @@ function carte(o) {
   const forts   = (o.points_forts   || []).map(p => `<li>${esc(p)}</li>`).join("");
   const faibles = (o.points_faibles || []).map(p => `<li>${esc(p)}</li>`).join("");
   const aLettre = !!o.lettre;
+  const nonAnalysee = o.verdict === NON_ANALYSEE;
+  const lettreBloquee = !IA_ACTIVE && !aLettre;   // une lettre déjà écrite reste ouvrable
 
   return `
   <article class="card offre" data-id="${o.id}" data-search-text="${esc((o.titre||'')+' '+(o.entreprise||'')+' '+(o.lieu||o.zone||'')).toLowerCase()}">
@@ -53,13 +58,14 @@ function carte(o) {
       <div class="offre__meta">
         <div class="offre__tags">
           ${badgeSource(o.source)}
+          ${nonAnalysee ? '<span class="chip chip--gris">non analysée</span>' : ""}
           ${score >= SEUIL ? '<span class="chip chip--vert">à postuler</span>' : ""}
           ${o.domaine ? `<span class="chip chip--gris">${esc(o.domaine)}</span>` : ""}
         </div>
         <div class="offre__title">${esc(o.titre || "Sans titre")}</div>
         <div class="offre__org"><b>${esc(o.entreprise || "Entreprise inconnue")}</b> · ${esc(o.lieu || o.zone || "")}</div>
       </div>
-      <div class="offre__score">${viseur(score)}</div>
+      <div class="offre__score">${nonAnalysee ? '<span class="non-analysee">non analysée</span>' : viseur(score)}</div>
       <svg class="offre__chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
     </div>
     <div class="offre__body">
@@ -70,8 +76,9 @@ function carte(o) {
       </div>
       <div class="offre__actions">
         ${o.lien ? `<a class="btn" href="${o.lien}" target="_blank" rel="noopener">Voir l'offre</a>` : ""}
-        <button class="btn" data-act="analyser">Réanalyser</button>
-        <button class="btn btn--signal" data-act="lettre">${aLettre ? "Voir la lettre" : "Générer la lettre"}</button>
+        <button class="btn" data-act="analyser"${IA_ACTIVE ? "" : ' disabled title="IA désactivée"'}>${nonAnalysee ? "Analyser" : "Réanalyser"}</button>
+        <button class="btn btn--signal" data-act="lettre"${lettreBloquee ? ' disabled title="IA désactivée"' : ""}>${aLettre ? "Voir la lettre" : "Générer la lettre"}</button>
+        ${lettreBloquee ? '<span class="offre__note">Génération de lettre indisponible : l\'IA est désactivée.</span>' : ""}
         ${o.statut !== "archive" ? `
         <select class="archiver-select" data-archiver-select>
           <option value="">Archiver…</option>
@@ -135,7 +142,7 @@ function rendre() {
 /* Met à jour les KPI du haut de page */
 function rendreKpis() {
   const actives = cache.filter(o => o.statut !== "archive");
-  const scores  = actives.map(o => o.score ?? 0);
+  const scores  = actives.filter(o => o.verdict !== NON_ANALYSEE).map(o => o.score ?? 0);
   const moy     = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
   const set = (k, v) => { const e = document.querySelector(`[data-kpi="${k}"]`); if (e) e.textContent = v; };
   set("nouvelles", actives.length);

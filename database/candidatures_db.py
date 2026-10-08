@@ -47,7 +47,7 @@ def lire_candidatures(user_id: int, mode: str = "alternance") -> list[dict]:
     try:
         lignes = (db.query(Candidature)
                     .filter_by(user_id=user_id, mode=mode)
-                    .order_by(Candidature.score.desc())
+                    .order_by(Candidature.score.desc().nullslast())   # non analysées en dernier
                     .all())
         return [_vers_dict(c) for c in lignes]
     finally:

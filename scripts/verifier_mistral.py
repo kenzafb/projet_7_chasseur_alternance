@@ -14,6 +14,7 @@ Chaque appel passe par le limiteur commun de shared/ia.py
 (MISTRAL_INTERVALLE_MIN_S entre deux appels), comme le reste du projet.
 
 Code de sortie 0 si chaque modèle configuré répond, 1 sinon.
+ANALYSE_IA=false : aucun appel, message et code de sortie 0.
 Aucune clé n'est affichée.
 """
 
@@ -61,6 +62,9 @@ def essayer(modele: str) -> tuple[str | None, str]:
 
 
 def main(sortie=print) -> int:
+    if not config.analyse_ia_active():
+        sortie(f"ℹ️  {config.MESSAGE_IA_DESACTIVEE} Rien à vérifier.")
+        return 0
     if not os.getenv("MISTRAL_API_KEY"):
         sortie("❌ MISTRAL_API_KEY absente du .env.")
         return 1

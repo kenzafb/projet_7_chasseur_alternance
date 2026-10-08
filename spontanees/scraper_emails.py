@@ -28,7 +28,7 @@ import requests
 from bs4 import BeautifulSoup
 from ddgs import DDGS
 from ddgs.exceptions import RatelimitException
-from shared.config import modele_mistral
+from shared.config import MESSAGE_IA_DESACTIVEE, analyse_ia_active, modele_mistral
 from shared.ia import ErreurIABloquante, ErreurIAPassagere, appeler_mistral, reponse_json
 
 # ─── Config ───────────────────────────────────────────────────────────────────
@@ -790,7 +790,9 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
     """Cherche site, emails et contact des entreprises pas encore traitées,
     au plus max_scrapees par lancement (None : toutes)."""
     _log = log_fn or print
-    _log(f"Scraper Emails v15 | Mistral = {modele_mistral('extraction')} | Moteur = DDG")
+    ia_configuree = analyse_ia_active()   # ANALYSE_IA=false : lecture directe seulement
+    mistral = modele_mistral("extraction") if ia_configuree else "désactivé"
+    _log(f"Scraper Emails v15 | Mistral = {mistral} | Moteur = DDG")
     if DEBUG:
         _log("  [Mode DEBUG activé — logs DDG détaillés]")
 
@@ -814,7 +816,10 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
         return
 
     traites_ce_run = 0
-    ia_active = True   # coupée pour tout le lancement sur une erreur Mistral bloquante
+    # Coupée pour tout le lancement sur une erreur Mistral bloquante, ou d'emblée sans IA
+    ia_active = ia_configuree
+    if not ia_configuree:
+        _log(f"ℹ️  {MESSAGE_IA_DESACTIVEE} Emails lus directement dans les pages, notés non validés.")
 
     def extraire(url, nom, dirigeant):
         nonlocal ia_active
@@ -936,6 +941,9 @@ def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=Non
     l'IA retient. Échec passager : l'entreprise reste à valider. Erreur
     bloquante : arrêt du lancement, un seul message."""
     _log = log_fn or print
+    if not analyse_ia_active():
+        _log(f"❌ {MESSAGE_IA_DESACTIVEE} Validation non lancée.")
+        return
     entreprises = charger_entreprises(user_id)
     cibles = [e for e in entreprises
               if e.get("emails_non_valides") and e.get("emails_trouves") and not e.get("mail_envoye")]
