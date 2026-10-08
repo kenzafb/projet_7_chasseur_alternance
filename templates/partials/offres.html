@@ -6,9 +6,10 @@
   </div>
 
   <label class="limite-lancement">
-    <span>Offres analysées au plus par lancement (max {{ limites.analyses.max }})</span>
-    <input type="number" data-limite="analyses" value="{{ limites.analyses.defaut }}"
-           min="1" max="{{ limites.analyses.max }}">
+    {% set limite_offres = limites.analyses if analyse_ia|default(true) else limites.sans_ia %}
+    <span>Offres {{ "analysées" if analyse_ia|default(true) else "ajoutées sans analyse" }} au plus par lancement (max {{ limite_offres.max }})</span>
+    <input type="number" data-limite="analyses" value="{{ limite_offres.defaut }}"
+           min="1" max="{{ limite_offres.max }}">
   </label>
 
   <div class="kpis kpis--4">

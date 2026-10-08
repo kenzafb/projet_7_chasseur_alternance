@@ -151,3 +151,35 @@ def test_verifier_mistral_n_appelle_rien(ia_coupee, mistral, monkeypatch):
     sorties = []
     assert verifier_mistral.main(sortie=sorties.append) == 0
     assert "IA désactivée" in sorties[0] and mistral.appels == []
+
+
+# ─── Plafond propre sans IA (D20) ────────────────────────────────────────────
+def test_limite_sans_ia_par_defaut_et_plafond(ia_coupee, recherche):
+    recherche.sources["ft"] = [_brut_ft(i) for i in range(150)]
+    r = recherche.client.post("/api/recherche", json=None)
+    assert r.json()["max_analyses"] == 100
+    from tests.test_envoyeur import attendre
+    attendre(lambda: not main.pipelines.etat("recherche", recherche.user_id)["en_cours"])
+    assert len(lire_candidatures(recherche.user_id)) == 100
+    r = recherche.client.post("/api/recherche", json={"max_analyses": 10**6})
+    assert r.json()["max_analyses"] == 500
+    attendre(lambda: not main.pipelines.etat("recherche", recherche.user_id)["en_cours"])
+    assert "ramené à 500" in recherche.client.get("/api/logs").text
+
+
+def test_limite_avec_ia_inchangee(recherche):
+    r = recherche.client.post("/api/recherche", json={"max_analyses": 10**6})
+    assert r.json()["max_analyses"] == 200
+
+
+def test_interface_affiche_le_plafond_sans_ia(ia_coupee, utilisateur):
+    client, _ = utilisateur("a@test.fr", prenom="Alice")
+    page = client.get("/").text
+    assert "ajoutées sans analyse au plus par lancement (max 500)" in page
+    assert 'value="100"' in page and 'max="500"' in page
+    assert "ajoutées sans analyse" in (config.STATIC_DIR / "js" / "api.js").read_text(encoding="utf-8")
+
+
+def test_interface_plafond_avec_ia(utilisateur):
+    page = utilisateur("a@test.fr", prenom="Alice")[0].get("/").text
+    assert "Offres analysées au plus par lancement (max 200)" in page

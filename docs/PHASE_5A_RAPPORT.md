@@ -48,6 +48,8 @@ Une cinquantaine de requêtes, moins d'une minute. Fichiers dans `docs/referenti
 
 ## Points à valider
 
+Tranchés après le rapport : D20 (archivage par mots-clés conservé, plafond sans IA de 100 par défaut et 500 au plus) et D21 (analyse en différé, travail futur) dans `docs/DECISIONS.md`.
+
 1. Archivage par mots-clés (public réservé, école ou CFA, stage) conservé sans IA ; seuls note basse et hors domaine disparaissent.
 2. Limite « analyses » appliquée aussi aux offres ajoutées sans analyse, ou plafond distinct (voire aucun) quand l'IA est coupée.
 3. Analyse en lot des offres `non_analysee` à prévoir avec le modèle local.

@@ -21,7 +21,8 @@ export function limite(cle) {
 /* Confirmation d'un lancement avec la valeur réellement appliquée par le
    serveur ; le champ reprend cette valeur. */
 const LANCEMENTS = {
-  analyses:    { champ: "max_analyses",    texte: n => `Recherche lancée : ${n} offres analysées au plus` },
+  analyses:    { champ: "max_analyses",    texte: n => `Recherche lancée : ${n} offres ${
+    document.documentElement.dataset.analyseIa === "non" ? "ajoutées sans analyse" : "analysées"} au plus` },
   entreprises: { champ: "max_entreprises", texte: n => `Récupération lancée : ${n} nouvelles entreprises au plus` },
   scrapees:    { champ: "max_scrapees",    texte: n => `Scraping lancé : ${n} entreprises au plus` },
   mails:       { champ: "limite",          texte: n => `Envoi lancé : ${n} mails au plus` },

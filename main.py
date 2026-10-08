@@ -437,10 +437,11 @@ def api_compte_envoi_mail_test(body: MailTest | None = None, user: User = Depend
 @prive.post("/api/recherche")
 def api_recherche(request: Request, body: Recherche | None = None, user: User = Depends(utilisateur_requis)):
     user_id = user.id   # capturé AVANT le thread (le thread n'a pas accès à request)
-    # Offres analysées par Mistral au plus, France Travail et LBA confondues
-    max_analyses, note = _limite("analyses", body.max_analyses if body else None)
-    mode = mode_courant(request)   # idem : capturé avant le thread
     ia = config.analyse_ia_active()   # ANALYSE_IA=false : offres insérées « non analysées »
+    # Offres traitées au plus, France Travail et LBA confondues ; sans IA,
+    # plafond propre (D20), même champ max_analyses
+    max_analyses, note = _limite("analyses" if ia else "sans_ia", body.max_analyses if body else None)
+    mode = mode_courant(request)   # idem : capturé avant le thread
     traitees = "analysées" if ia else "ajoutées sans analyse"
     from shared.modes import get_mode
     cfg_mode = get_mode(mode)

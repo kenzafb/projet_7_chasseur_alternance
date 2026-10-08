@@ -43,6 +43,8 @@ def test_interface_reprend_defauts_et_plafonds(utilisateur):
     client, _ = utilisateur("a@test.fr", prenom="Alice")
     page = client.get("/").text
     for cle, regle in config.LIMITES_LANCEMENT.items():
+        if cle == "sans_ia":   # même champ que « analyses », affiché quand ANALYSE_IA=false
+            continue
         assert f'data-limite="{cle}" value="{regle["defaut"]}"' in page
         assert f'max="{regle["max"]}"' in page
 
