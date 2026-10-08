@@ -29,12 +29,11 @@ def lancer_recherche(user_id, profil, analyser=True, max_analyse=999, on_offre=N
     ft_params = cfg["ft_params"]
     filtrer_domaines = cfg["utilise_domaines"]
     # Domaines choisis par l'utilisateur (seulement si le mode filtre par domaine)
-    from shared.domaines import ft_grands_domaines
-    cles_domaines = profil.get("recherche", {}).get("domaines", [])
-    grands_domaines = ft_grands_domaines(cles_domaines) if filtrer_domaines else None
+    from shared.domaines import domaines_du_profil
+    domaines = domaines_du_profil(profil) if filtrer_domaines else None
     lot = min(cfg.get("limite_lot") or max_analyse, max_analyse)
     nouvelles_offres = chercher_offres(
-        user_id, grands_domaines, ft_params=ft_params, filtrer_domaines=filtrer_domaines,
+        user_id, domaines, ft_params=ft_params, filtrer_domaines=filtrer_domaines,
         mode=mode, limite_lot=lot, marquer=False)
 
     if not nouvelles_offres:

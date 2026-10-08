@@ -287,9 +287,9 @@ def api_set_mode(request: Request, body: dict = Body(...)):
 
 @prive.get("/api/domaines")
 def api_domaines():
-    """Liste des domaines disponibles pour le choix dans le profil."""
-    from shared.domaines import labels_domaines
-    return labels_domaines()
+    """Grands domaines et leurs domaines, pour le choix dans le profil."""
+    from shared.domaines import grands_domaines
+    return grands_domaines()
 
 
 @prive.get("/api/profil")
@@ -476,11 +476,19 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
                 log(f"ℹ️  LBA ignorée : limite de {max_analyses} offres {traitees} atteinte")
                 offres_lba = []
             elif "lba" in cfg_mode["sources"]:
-                etat(message="Recherche La Bonne Alternance...")
-                log("🔍 Recherche La Bonne Alternance démarrée")
-                from shared.domaines import lba_romes
-                _cles = profil.get("recherche", {}).get("domaines", [])
-                offres_lba = chercher_offres_lba(lba_romes(_cles))
+                from shared.domaines import domaines_du_profil, domaines_sans_correspondance, lba_romes
+                _domaines = domaines_du_profil(profil)
+                _romes = lba_romes(_domaines)
+                if domaines_sans_correspondance(_domaines, "lba"):
+                    log("ℹ️  LBA : domaines pas encore pris en charge, ignorés : "
+                        + ", ".join(domaines_sans_correspondance(_domaines, "lba")))
+                if _romes:
+                    etat(message="Recherche La Bonne Alternance...")
+                    log("🔍 Recherche La Bonne Alternance démarrée")
+                    offres_lba = chercher_offres_lba(_romes)
+                else:
+                    log("ℹ️  LBA ignorée : aucun domaine du profil n'y est encore pris en charge")
+                    offres_lba = []
             else:
                 log("ℹ️  LBA ignorée (mode sans alternance)")
                 offres_lba = []

@@ -9,6 +9,7 @@ quel utilisateur.
 
 from database.connexion import SessionLocal
 from database.models import Profil
+from shared.criteres import normaliser_recherche
 
 
 def lire_profil(user_id: int, mode: str = "alternance") -> dict:
@@ -80,6 +81,8 @@ def sauvegarder_profil(user_id: int, donnees: dict, mode: str = "alternance") ->
         # Le formulaire envoie "email" (clé de lire_profil), la colonne est email_contact
         if "email" in donnees and "email_contact" not in donnees:
             donnees = {**donnees, "email_contact": donnees["email"]}
+        if "recherche" in donnees:
+            donnees = {**donnees, "recherche": normaliser_recherche(donnees["recherche"])}
         for champ in champs_texte:
             if champ in donnees:
                 setattr(p, champ, donnees[champ] or "")

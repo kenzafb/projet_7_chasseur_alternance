@@ -169,27 +169,89 @@ function brancherPiecesJointes() {
   });
 }
 
-/* ── Domaines recherchés (cases à cocher) ──────────────────────────────── */
+/* ── Domaines recherchés ───────────────────────────────────────────────
+   Grands domaines (lettre) d'abord, affinables par domaine (3 caractères).
+   Enregistrés en codes : ["M18"], ["C"], [] pour indifférent. Un grand
+   domaine coché couvre tous ses domaines (cases grisées). */
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 async function rendreDomaines(selectionnes, selecteur = "[data-domaines-choix]") {
   const c = document.querySelector(selecteur);
   if (!c) return;
-  let dispo = [];
-  try { dispo = await api.domaines(); } catch (_) { dispo = []; }
-  c.innerHTML = "";
-  dispo.forEach(d => {
-    const checked = selectionnes.includes(d.cle);
-    const label = document.createElement("label");
-    label.className = "domaine-case" + (checked ? " is-checked" : "");
-    label.innerHTML = `<input type="checkbox" value="${d.cle}"${checked ? " checked" : ""}><span>${d.label}</span>`;
-    label.querySelector("input").addEventListener("change", e => {
-      label.classList.toggle("is-checked", e.target.checked);
+  let arbre = [];
+  try { arbre = await api.domaines(); } catch (_) { arbre = []; }
+  const choisis = new Set(selectionnes);
+  c.innerHTML = `
+    <label class="domaine-case domaine-case--indifferent">
+      <input type="checkbox" data-domaine-indifferent ${choisis.size ? "" : "checked"}>
+      <span>Indifférent (tous les domaines)</span>
+    </label>
+    <div class="gd-liste">${arbre.map(g => `
+      <div class="gd" data-gd="${esc(g.code)}">
+        <div class="gd__tete">
+          <label class="domaine-case">
+            <input type="checkbox" value="${esc(g.code)}" data-gd-case ${choisis.has(g.code) ? "checked" : ""}>
+            <span>${esc(g.libelle)}</span>
+          </label>
+          <button type="button" class="gd__affiner" data-gd-affiner>Affiner</button>
+        </div>
+        <div class="gd__domaines" data-gd-domaines hidden>${g.domaines.map(d => `
+          <label class="domaine-case domaine-case--petit">
+            <input type="checkbox" value="${esc(d.code)}" data-domaine-case ${choisis.has(d.code) ? "checked" : ""}>
+            <span>${esc(d.libelle)}</span>
+          </label>`).join("")}
+        </div>
+      </div>`).join("")}
+    </div>`;
+
+  majAffichageDomaines(c);
+  if (c.dataset.branche) return;            // écouteurs posés une seule fois par conteneur
+  c.dataset.branche = "1";
+  c.addEventListener("change", e => {
+    const indifferent = c.querySelector("[data-domaine-indifferent]");
+    if (e.target === indifferent) {
+      if (indifferent.checked) c.querySelectorAll("[data-gd-case], [data-domaine-case]").forEach(i => { i.checked = false; });
+    } else if (e.target.checked) {
+      indifferent.checked = false;
+    }
+    if (!c.querySelector("[data-gd-case]:checked, [data-domaine-case]:checked")) indifferent.checked = true;
+    majAffichageDomaines(c);
+  });
+  c.addEventListener("click", e => {
+    const bouton = e.target.closest("[data-gd-affiner]");
+    if (!bouton) return;
+    const liste = bouton.closest(".gd").querySelector("[data-gd-domaines]");
+    liste.hidden = !liste.hidden;
+  });
+}
+
+function majAffichageDomaines(c) {
+  c.querySelectorAll(".gd").forEach(gd => {
+    const lettre = gd.querySelector("[data-gd-case]");
+    const sous = [...gd.querySelectorAll("[data-domaine-case]")];
+    sous.forEach(i => {
+      i.disabled = lettre.checked;
+      if (lettre.checked) i.checked = false;
     });
-    c.appendChild(label);
+    const n = sous.filter(i => i.checked).length;
+    gd.querySelector("[data-gd-affiner]").textContent = lettre.checked ? "Tout le domaine"
+      : n ? `${n} domaine${n > 1 ? "s" : ""} choisi${n > 1 ? "s" : ""}` : "Affiner";
+    if (n) gd.querySelector("[data-gd-domaines]").hidden = false;
+  });
+  c.querySelectorAll(".domaine-case").forEach(l => {
+    l.classList.toggle("is-checked", l.querySelector("input").checked);
   });
 }
 
 function lireDomainesCoches(selecteur = "[data-domaines-choix]") {
-  return [...document.querySelectorAll(selecteur + " input:checked")].map(i => i.value);
+  const c = document.querySelector(selecteur);
+  if (!c || c.querySelector("[data-domaine-indifferent]")?.checked) return [];
+  const lettres = [...c.querySelectorAll("[data-gd-case]:checked")].map(i => i.value);
+  const domaines = [...c.querySelectorAll("[data-domaine-case]:checked")].map(i => i.value)
+    .filter(code => !lettres.includes(code[0]));
+  return [...lettres, ...domaines];
 }
 
 /* ── Affichage des sections selon le mode (alternance/job) ─────────────── */

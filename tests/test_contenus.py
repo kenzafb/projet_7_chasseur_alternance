@@ -72,7 +72,8 @@ def test_analyse_job_tire_les_preferences_du_profil(mistral):
     analyseur.analyser_offre(OFFRE, PROFIL, mode="job")
     texte = _prompts(mistral)
     for valeur in ("TYPES-OK-DU-PROFIL", "TYPES-EVITER-DU-PROFIL", "HORAIRES-DU-PROFIL",
-                   "MOBILITE-DU-PROFIL", "DUREE-DU-PROFIL", "LOCALISATION-DU-PROFIL", "Informatique"):
+                   "MOBILITE-DU-PROFIL", "DUREE-DU-PROFIL", "LOCALISATION-DU-PROFIL",
+                   "Systèmes d'information et de télécommunication"):
         assert valeur in texte, valeur
     # Plus de préférence personnelle écrite en dur
     for mot in ("calme", "surveillance", "pénibilité", "arrondissement"):

@@ -213,12 +213,17 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
         return
 
     # Codes NAF selon le domaine de l'utilisateur (lu depuis son profil)
-    from shared.domaines import naf_codes
+    from shared.domaines import domaines_du_profil, domaines_sans_correspondance, naf_codes
     from database.profil_db import lire_profil
-    _profil = lire_profil(user_id)
-    _cles_domaines = (_profil.get("recherche", {}) or {}).get("domaines", []) or []
-    codes_naf = naf_codes(_cles_domaines)
-    print(f"  Domaines du profil : {_cles_domaines or '(défaut)'} → {len(codes_naf)} codes NAF")
+    _domaines = domaines_du_profil(lire_profil(user_id))
+    codes_naf = naf_codes(_domaines)
+    print(f"  Domaines du profil : {_domaines or '(défaut)'} → {len(codes_naf)} codes NAF")
+    if domaines_sans_correspondance(_domaines, "sirene"):
+        _log("ℹ️  Sirene : domaines pas encore pris en charge, ignorés : "
+             + ", ".join(domaines_sans_correspondance(_domaines, "sirene")))
+    if not codes_naf:
+        _log("ℹ️  Aucun domaine du profil n'est encore pris en charge pour les candidatures spontanées : arrêt.")
+        return
 
     print("=" * 60)
     print("  Chasseur — Fetch Entreprises IDF v7")

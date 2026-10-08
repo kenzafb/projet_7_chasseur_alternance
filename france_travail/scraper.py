@@ -5,7 +5,8 @@ from shared.config import FT_REGION
 from database.dates import instant_depuis_api
 from database.dedup_db import lire_offres_vues, marquer_offres_vues
 from shared.offres import detecter_zone, generer_id
-from shared.domaines import ft_grands_domaines
+from france_travail import parametres_api
+from shared.domaines import est_grand_domaine
 
 
 _token_cache = {"token": None, "expire": 0}
@@ -165,7 +166,7 @@ def _normaliser(bruts: list) -> list:
     return offres
 
 
-def chercher_offres(user_id, grands_domaines=None, ft_params=None, filtrer_domaines=True,
+def chercher_offres(user_id, domaines=None, ft_params=None, filtrer_domaines=True,
                     mode="alternance", limite_lot=None, marquer=True) -> list:
     """Offres FT pas encore vues par cet utilisateur dans ce mode. Si marquer,
     les offres retenues (et, hors lots, toutes celles reçues) sont marquées
@@ -178,13 +179,12 @@ def chercher_offres(user_id, grands_domaines=None, ft_params=None, filtrer_domai
     bruts = []
     base_params = {"region": FT_REGION, "sort": "1", **ft_params}
 
-    if filtrer_domaines:
-        # Mode alternance : on filtre par grand domaine (1 requête par domaine)
-        if not grands_domaines:
-            grands_domaines = ft_grands_domaines([])   # domaine par défaut (M18)
-        print(f"Recherche FT (IDF, domaines: {', '.join(grands_domaines)}, params: {ft_params})...\n")
-        for gd in grands_domaines:
-            bruts += _paginer({**base_params, "grandDomaine": gd})
+    if filtrer_domaines and domaines:
+        # Mode alternance : on filtre par domaine (1 requête par domaine)
+        print(f"Recherche FT (IDF, domaines: {', '.join(domaines)}, params: {ft_params})...\n")
+        for code in domaines:
+            param = parametres_api.PARAM_GRAND_DOMAINE if est_grand_domaine(code) else parametres_api.PARAM_DOMAINE
+            bruts += _paginer({**base_params, param: code})
     else:
         # Mode job : recherche large, pas de filtre domaine
         print(f"Recherche FT (IDF, tous domaines, params: {ft_params})...\n")

@@ -484,3 +484,18 @@
 .domaine-case:hover { border-color: var(--signal); }
 .domaine-case input { cursor: pointer; width: 16px; height: 16px; accent-color: var(--signal); }
 .domaine-case.is-checked { border-color: var(--signal); background: var(--signal-soft); }
+.domaine-case:has(input:disabled) { opacity: .55; cursor: default; }
+.domaine-case--indifferent { margin-bottom: 12px; width: fit-content; }
+.domaine-case--petit { padding: 6px 10px; font-size: 13px; }
+/* Grands domaines, affinables par domaine */
+.gd-liste { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 10px; }
+.gd { display: flex; flex-direction: column; gap: 8px; }
+.gd__tete { display: flex; align-items: stretch; gap: 6px; }
+.gd__tete .domaine-case { flex: 1; }
+.gd__affiner {
+  padding: 0 10px; border-radius: var(--r-sm); border: 1px solid var(--hair-strong);
+  background: var(--surface); color: var(--txt-muted); font-size: 12px; cursor: pointer; white-space: nowrap;
+}
+.gd__affiner:hover { border-color: var(--signal); color: var(--txt); }
+.gd__domaines { display: flex; flex-direction: column; gap: 6px; padding-left: 14px; }
+.gd__domaines[hidden] { display: none; }

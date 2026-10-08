@@ -52,9 +52,8 @@ def construire_contexte_profil_job(profil):
     jobs_ok         = (profil.get("types_jobs_ok", "") or "").strip()
     jobs_eviter     = (profil.get("types_jobs_eviter", "") or "").strip()
     loc_pref        = (profil.get("localisation_pref", "") or "").strip()
-    from shared.domaines import DOMAINES
-    _cles = (profil.get("recherche", {}) or {}).get("domaines", []) or []
-    domaines_pref   = ", ".join(DOMAINES[c]["label"] for c in _cles if c in DOMAINES)
+    from shared.domaines import domaines_du_profil, libelles_domaines
+    domaines_pref   = ", ".join(libelles_domaines(domaines_du_profil(profil)))
 
     parties = [f"Candidat : {nom}" + (f", {ville}." if ville else ".")]
     if niveau_etudes:  parties.append(f"NIVEAU D'ÉTUDES OBTENU : {niveau_etudes}")
@@ -178,9 +177,8 @@ def analyser_offre(offre, profil, mode="alternance"):
 
     contexte = construire_contexte_profil(profil)
     # Domaines recherchés par le candidat (libellés lisibles)
-    from shared.domaines import DOMAINES
-    _cles = (profil.get("recherche", {}) or {}).get("domaines", []) or []
-    _labels = [DOMAINES[c]["label"] for c in _cles if c in DOMAINES]
+    from shared.domaines import domaines_du_profil, libelles_domaines
+    _labels = libelles_domaines(domaines_du_profil(profil))
     domaines_txt = ", ".join(_labels) if _labels else "le domaine correspondant au profil ci-dessus"
 
     prompt = (
