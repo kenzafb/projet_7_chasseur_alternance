@@ -103,3 +103,26 @@ Format : identifiant, date, phase, décision, raison, conséquence dans le code,
 ### D21. Analyse en différé des offres « non analysées » : travail futur
 - **Décision.** Prévue pour l'arrivée du modèle local, non implémentée. En attendant, une offre `non_analysee` ne s'analyse qu'une à une, par le bouton « Analyser », IA active.
 - **À faire** avec le modèle local : analyse en lot des offres `verdict = "non_analysee"`, avec archivage complet une fois l'analyse obtenue.
+
+## Phase 5b (domaines et France Travail), décisions du 8 octobre 2026
+
+Décisions de `docs/SPEC_SOURCES.md` (sections 0, 1 et 2), validées par l'humain et mises en œuvre dans cette phase. Les choix faits pendant la mise en œuvre restent à valider dans `docs/PHASE_5B_RAPPORT.md`.
+
+### D22. Domaines du profil en codes France Travail
+- **Décision.** Le profil stocke des codes de la nomenclature France Travail : grands domaines (une lettre, « C ») et domaines (trois caractères, « M18 »), choix multiple ; `[]` signifie « indifférent ». L'interface montre les 14 grands domaines, chacun affinable par ses domaines. Les listes viennent des référentiels versionnés (`docs/referentiels/france_travail/`, plus `shared/referentiels/grands_domaines.json` pour les libellés des lettres), plus de `shared/domaines.py` écrit à la main.
+- **Migration.** `informatique` devient `M18`, `immobilier` devient `C15` (migration 0007, données seulement).
+- **Conséquence.** Un profil sans domaine cherche désormais tous les domaines sur France Travail (avant : informatique par défaut). En mode job, les domaines filtrent la recherche (avant : simple préférence pour l'analyse).
+
+### D23. Filtres France Travail par mode
+- **Décision.** Alternance : `natureContrat` E2 et FS (contrat de professionnalisation ajouté), aucun filtre de qualification. Job : `typeContrat` CDD, MIS, SAI, filtre `qualification=0` retiré (il écartait les offres « X », 61 % du total en IDF). Domaines du profil dans les deux modes. Options : secteur de l'employeur (88 divisions NAF) dans les deux modes ; thèmes 13 (saisonniers) et 17 (sans diplôme ni expérience) en mode job, décochés par défaut. Stage : aucune recherche France Travail (le mode n'existe pas encore).
+
+### D24. Rien de tronqué en silence : découpage adaptatif
+- **Décision.** Au-delà de 3150 offres par requête (150 par page, début au plus 3000, mesuré le 8 octobre 2026), la requête est redécoupée par département d'IDF, puis par domaine, puis par fenêtre de publication, avec dédoublonnage par identifiant. Une troncature ou une perte restante est écrite dans les logs du pipeline.
+
+### D25. Taille d'entreprise filtrée après récupération
+- **Décision.** L'API ne filtrant pas la taille, les offres sont filtrées après récupération selon la tranche d'effectif de l'établissement, avec l'option « garder les offres sans information ». Tailles proposées (communes avec Sirene, section 4.2 de la spec) : moins de 10 (avertissement « moins de chances d'accueillir un alternant »), 10 à 49, 50 à 249, 250 à 4999, 5000 et plus.
+
+### D26. Points de l'API à vérifier réunis en un seul endroit
+- **Décision.** Nom des paramètres de domaine, nombre de valeurs acceptées par requête, champ de tranche d'effectif et début des fenêtres de dates sont lus dans `france_travail/parametres_api.py`, et nulle part ailleurs. `scripts/verifier_france_travail.py`, lancé par l'humain, affiche les valeurs à y reporter.
+- **En attendant.** Valeurs prudentes : une requête par valeur, `grandDomaine` pour les lettres, `domaine` pour les codes, `trancheEffectifEtab`.
+- **À reconsidérer** dès que le script a tourné.
