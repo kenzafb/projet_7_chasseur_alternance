@@ -12,6 +12,12 @@ Compte d'envoi : uniquement celui de l'utilisateur qui lance le pipeline
 (table comptes_envoi), configuré ET vérifié, sinon rien ne part. Aucun
 compte commun dans le .env.
 
+Mode test (option du compte d'envoi, ou test=True / --test) : chaque mail
+part vers l'adresse d'expédition de l'utilisateur, le vrai destinataire
+indiqué dans l'objet. Aucune adresse n'est enregistrée comme contactée et
+aucune entreprise n'est marquée comme envoyée. Les mails de test comptent
+dans le plafond du jour (ce sont de vrais mails).
+
 Garde-fous :
   - limite par lancement (paramètre limite) ;
   - plafond par utilisateur et par jour (PLAFOND_ENVOIS_JOUR), tous
@@ -78,6 +84,11 @@ Vous trouverez mon CV en pièce jointe, avec mes disponibilités. Je reste à vo
 Cordialement,
 """,
 }
+
+
+def objet_test(objet: str, vrais_destinataires: list[str]) -> str:
+    """Objet d'un mail du mode test : le vrai destinataire en tête."""
+    return f"[TEST → {', '.join(vrais_destinataires)}] {objet}"
 
 
 def objet_et_corps(profil: dict, mode: str) -> tuple[str, str]:
@@ -148,11 +159,16 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
     _log = log_fn or print
     plafond = config.PLAFOND_ENVOIS_JOUR
 
-    _log(f"Envoyeur | mode={mode} | limite={limite} | plafond du jour={plafond} | test={test}")
-
     # Compte d'envoi de CET utilisateur, configuré et vérifié (sinon : erreur)
     compte = exiger_compte_verifie(user_id)
+    test = bool(test or compte.get("mode_test"))
+
+    _log(f"Envoyeur | mode={mode} | limite={limite} | plafond du jour={plafond} | test={test}")
     _log(f"Compte d'envoi : {compte['adresse']}")
+    if test:
+        _log(f"🧪 MODE TEST : chaque mail part vers {compte['adresse']}, le vrai destinataire "
+             "dans l'objet. Aucune adresse enregistrée comme contactée, aucune entreprise "
+             "marquée comme envoyée.")
 
     # Profil du mode : objet et trame du mail (défauts du mode sinon)
     from database.profil_db import lire_profil
@@ -228,6 +244,8 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
 
         if not emails_nouveaux:
             _log(f"  ⏭️  {nom} — tous les emails déjà contactés, skip")
+            if test:
+                continue   # mode test : l'entreprise n'est jamais marquée
             # Marquer quand même comme traité pour ne plus y revenir
             e["mail_envoye"]        = True
             e["mail_envoye_le"]     = maintenant_utc()
@@ -240,6 +258,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
             _log(f"  ℹ️  {nb_ignores} email(s) ignoré(s) (déjà contactés)")
 
         destinataires = [compte["adresse"]] if test else emails_nouveaux
+        objet = objet_test(objet_mail, emails_nouveaux) if test else objet_mail
 
         # Plafond quotidien : réservé avant l'envoi, rendu si le mail ne part pas
         jour = reserver_envoi(user_id, plafond)
@@ -251,10 +270,14 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
 
         idx   = deja_envoyes + traites + 1
         total = deja_envoyes + len(a_envoyer)
-        _log(f"[{idx}/{total}] {nom} → {', '.join(destinataires)}")
+        if test:
+            _log(f"[{idx}/{total}] 🧪 [TEST] {nom} → {compte['adresse']} "
+                 f"(vrai destinataire : {', '.join(emails_nouveaux)})")
+        else:
+            _log(f"[{idx}/{total}] {nom} → {', '.join(destinataires)}")
 
         try:
-            envoyer_mail(compte, destinataires, objet_mail, corps_mail, pieces)
+            envoyer_mail(compte, destinataires, objet, corps_mail, pieces)
             ok = True
         except smtp.ErreurSmtp as erreur:
             liberer_envoi(user_id, jour)
@@ -280,8 +303,9 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
 
                 # Mise à jour immédiate de la déduplication (en base)
                 ajouter_emails_contactes(user_id, mode, destinataires)
-                for addr in destinataires:
-                    emails_deja_envoyes.add(addr)
+            # En mémoire seulement en mode test : le lancement reste fidèle à un
+            # envoi réel (une adresse partagée n'est visée qu'une fois)
+            emails_deja_envoyes.update(emails_nouveaux)
 
             envoyes += 1
             _total_envoi = min(len(a_envoyer), limite)
@@ -306,7 +330,8 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
                 time.sleep(pause)
 
     sauvegarder_json(user_id, entreprises)
-    _log(f"✅ Envoi terminé — {envoyes} envoyés, {echecs} échecs")
+    _log(f"✅ Envoi terminé — {envoyes} envoyés, {echecs} échecs"
+         + (" (🧪 mode test : tous vers l'adresse d'expédition, rien enregistré)" if test else ""))
     _log(f"   Emails dans la base de dédup : {len(emails_deja_envoyes)}")
     return bilan_final(bilan["arret"])
 

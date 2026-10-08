@@ -25,7 +25,9 @@ SPONTANEES = "spontanees"
 
 ETATS_INITIAUX = {
     RECHERCHE:  {"en_cours": False, "message": "Prêt", "pourcentage": 0},
-    SPONTANEES: {"en_cours": False, "etape": None, "message": "Prêt", "pourcentage": 0},
+    # mode_test : envoi en cours vers l'utilisateur lui-même (affiché par le front)
+    SPONTANEES: {"en_cours": False, "etape": None, "message": "Prêt", "pourcentage": 0,
+                 "mode_test": False},
 }
 
 

@@ -18,7 +18,7 @@ comme UTC. Les structures (listes, objets) sont en colonnes JSON.
 from datetime import datetime, timezone
 from sqlalchemy import (
     Column, Integer, String, Text, Boolean, Date,
-    ForeignKey, DateTime, JSON, UniqueConstraint, Index, MetaData,
+    ForeignKey, DateTime, JSON, UniqueConstraint, Index, MetaData, false,
 )
 from sqlalchemy.orm import relationship, declarative_base
 
@@ -244,6 +244,9 @@ class CompteEnvoi(Base):
     # Chiffré par Fernet (shared/chiffrement.py, clé CLE_CHIFFREMENT) ;
     # jamais renvoyé par l'API ni écrit dans un log
     mot_de_passe_chiffre = Column(Text, nullable=False)
+    # Mode test : chaque candidature spontanée part vers l'adresse d'expédition,
+    # le vrai destinataire dans l'objet ; rien n'est enregistré comme contacté
+    mode_test    = Column(Boolean, nullable=False, default=False, server_default=false())
     # Dernière connexion et authentification réussies ; remis à NULL quand
     # les paramètres de connexion changent ou que l'authentification échoue
     verifie_le   = Column(DateTime(timezone=True))

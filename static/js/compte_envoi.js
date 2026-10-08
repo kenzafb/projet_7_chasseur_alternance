@@ -55,6 +55,15 @@ function rendre(r) {
     etat.textContent = `${c.adresse} : configuré, pas encore vérifié. Lance « Tester la connexion ».`;
     etat.classList.add("is-ko");
   }
+  if (c && c.mode_test) etat.textContent += " 🧪 Mode test actif : les envois partent vers cette adresse.";
+
+  const blocTest = $("[data-ce-mode-test-bloc]");
+  if (blocTest) {
+    blocTest.style.display = c ? "" : "none";   // sans compte, rien à régler
+    blocTest.classList.toggle("is-on", !!(c && c.mode_test));
+  }
+  const caseTest = $("[data-ce-mode-test]");
+  if (caseTest) caseTest.checked = !!(c && c.mode_test);
 
   const preset = c ? c.preset : "gmail";
   document.querySelectorAll("[data-ce-preset]").forEach(radio => { radio.checked = radio.value === preset; });
@@ -127,6 +136,18 @@ export const CompteEnvoi = {
       document.querySelectorAll("[data-ce-preset]").forEach(r => r.addEventListener("change", afficherPreset));
       document.querySelectorAll("[data-ce-action]").forEach(b =>
         b.addEventListener("click", () => action(b.dataset.ceAction)));
+      const caseTest = $("[data-ce-mode-test]");
+      if (caseTest) caseTest.addEventListener("change", async () => {
+        try {
+          await api.modeTestCompte(caseTest.checked);
+          await recharger();
+          message(caseTest.checked ? "Mode test activé : les envois partiront vers toi."
+                                   : "Mode test coupé : les envois partiront vers les entreprises.", true);
+        } catch (e) {
+          caseTest.checked = !caseTest.checked;
+          message(e.message, false);
+        }
+      });
       _branche = true;
     }
     await recharger();

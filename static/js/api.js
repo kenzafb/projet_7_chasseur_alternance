@@ -95,6 +95,7 @@ export const api = {
   supprimerCompte:      ()      => post("/api/compte_envoi/supprimer"),
   testerCompte:         ()      => post("/api/compte_envoi/tester"),
   mailTestCompte:       ()      => post("/api/compte_envoi/mail_test"),
+  modeTestCompte:       (actif) => post("/api/compte_envoi/mode_test", { actif }),
 
   // Spontanées
   spSuivi:       ()           => get("/api/spontanees/suivi"),

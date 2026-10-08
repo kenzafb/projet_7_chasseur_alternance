@@ -31,6 +31,7 @@ def _public(c: CompteEnvoi) -> dict:
         "mot_de_passe_configure": bool(c.mot_de_passe_chiffre),
         "verifie":     c.verifie_le is not None,
         "verifie_le":  en_texte(c.verifie_le, JOUR_HEURE),
+        "mode_test":   bool(c.mode_test),
     }
 
 
@@ -93,6 +94,21 @@ def supprimer_compte(user_id: int) -> bool:
         n = db.query(CompteEnvoi).filter_by(user_id=user_id).delete()
         db.commit()
         return n > 0
+    finally:
+        db.close()
+
+
+def definir_mode_test(user_id: int, actif: bool) -> dict | None:
+    """Active ou coupe le mode test (aucun effet sur la vérification).
+    Retourne le compte public, ou None s'il n'existe pas."""
+    db = SessionLocal()
+    try:
+        c = db.query(CompteEnvoi).filter_by(user_id=user_id).first()
+        if not c:
+            return None
+        c.mode_test = bool(actif)
+        db.commit()
+        return _public(c)
     finally:
         db.close()
 

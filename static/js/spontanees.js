@@ -4,6 +4,7 @@
 import { api } from "./api.js";
 
 let stats = null;
+let compte = null;    // compte d'envoi (mode test affiché en bandeau)
 let filtre = "all";
 
 function ligne(e) {
@@ -90,6 +91,16 @@ function rendrePipe() {
   }
 }
 
+/* Bandeau du mode test : option du compte, ou envoi de test en cours */
+function rendreModeTest() {
+  const bandeau = document.querySelector("[data-sp-mode-test]");
+  if (!bandeau) return;
+  const actif = !!(compte && compte.mode_test) || !!(stats?.en_cours && stats.mode_test);
+  bandeau.hidden = !actif;
+  const adr = document.querySelector("[data-sp-mode-test-adresse]");
+  if (adr) adr.textContent = compte ? compte.adresse : "ton adresse d'expédition";
+}
+
 function fmt(n) { return (n ?? 0).toLocaleString("fr-FR"); }
 function esc(s) {
   return String(s).replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
@@ -98,6 +109,8 @@ function esc(s) {
 export const Spontanees = {
   async charger() {
     try { stats = await api.spStats(); } catch (_) { stats = null; }
+    try { compte = (await api.compteEnvoi()).compte; } catch (_) { compte = null; }
+    rendreModeTest();
     rendreKpis();
     rendreTable();
     rendrePipe();
@@ -108,6 +121,7 @@ export const Spontanees = {
   majPipe(etatFrais) {
     stats = { ...(stats || {}), ...etatFrais };
     rendrePipe();
+    rendreModeTest();
   },
 
   async action(nom) {

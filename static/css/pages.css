@@ -212,6 +212,17 @@
 .ce-message { font-size: 13px; margin-top: 10px; min-height: 1em; }
 .ce-message.is-ok { color: var(--vert); }
 .ce-message.is-ko { color: var(--rouge); }
+/* Mode test d'envoi : bien visible, dans le profil et sur la page spontanées */
+.ce-mode-test {
+  display: flex; gap: 10px; align-items: flex-start; margin-top: 16px; padding: 12px 14px;
+  border: 1px solid var(--hair); border-radius: var(--r-md); background: var(--surface-2); font-size: 13px;
+}
+.ce-mode-test input { margin-top: 3px; }
+.ce-mode-test.is-on, .bandeau-test { background: var(--ambre-soft); border-color: var(--ambre); }
+.bandeau-test {
+  border: 1px solid var(--ambre); border-radius: var(--r-md); padding: 11px 14px;
+  margin-bottom: 14px; font-size: 13px; font-weight: 600; color: var(--txt);
+}
 
 /* Pièces jointes */
 .pj-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }

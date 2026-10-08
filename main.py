@@ -170,6 +170,10 @@ class CompteEnvoiCorps(BaseModel):
     identifiant: str = Field("", max_length=255)
     mot_de_passe: SecretStr | None = None
 
+class ModeTest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    actif: bool
+
 class MailTest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     destinataire: str | None = Field(None, max_length=255)
@@ -342,6 +346,15 @@ def api_compte_envoi_supprimer(user: User = Depends(utilisateur_requis)):
 def api_compte_envoi_tester(user: User = Depends(utilisateur_requis)):
     """Connexion + authentification puis déconnexion, aucun mail envoyé."""
     return compte_envoi.tester(user.id)
+
+@prive.post("/api/compte_envoi/mode_test")
+def api_compte_envoi_mode_test(body: ModeTest, user: User = Depends(utilisateur_requis)):
+    """Mode test : les candidatures spontanées partent vers l'adresse
+    d'expédition de l'utilisateur, rien n'est enregistré comme contacté."""
+    compte = compte_envoi_db.definir_mode_test(user.id, body.actif)
+    if compte is None:
+        raise ErreurUtilisateur("Configure d'abord ton compte d'envoi.")
+    return {"ok": True, "compte": compte}
 
 @prive.post("/api/compte_envoi/mail_test")
 def api_compte_envoi_mail_test(body: MailTest | None = None, user: User = Depends(utilisateur_requis)):
@@ -561,7 +574,7 @@ def api_spontanees_stats(request: Request, user: User = Depends(utilisateur_requ
     stats = calculer_stats(user.id)
     # On ajoute l'état du pipeline de l'utilisateur, géré en mémoire
     etat = pipelines.etat(SPONTANEES, user.id)
-    stats.update({cle: etat[cle] for cle in ("en_cours", "etape", "message", "pourcentage")})
+    stats.update({cle: etat[cle] for cle in ("en_cours", "etape", "message", "pourcentage", "mode_test")})
     return stats
 
 @prive.post("/api/spontanees/stop")
@@ -574,11 +587,11 @@ def api_spontanees_stop(user: User = Depends(utilisateur_requis)):
 
 
 def _lancer_spontanees(user_id: int, etape: str, message: str, debut_log: str,
-                       travail, fin_message: str, fin_log: str, nom_erreur: str):
+                       travail, fin_message: str, fin_log: str, nom_erreur: str, **etat):
     """Lance une étape du pipeline spontané dans un thread, pour cet utilisateur.
     travail(stop_event, log_fn, on_progress) fait le vrai travail.
     Retourne une réponse 400 si un pipeline spontané de l'utilisateur tourne déjà."""
-    if not pipelines.demarrer(SPONTANEES, user_id, etape=etape, message=message):
+    if not pipelines.demarrer(SPONTANEES, user_id, etape=etape, message=message, **etat):
         return JSONResponse({"erreur": "Pipeline déjà en cours"}, status_code=400)
     arret = pipelines.evenement_arret(user_id)
 
@@ -642,19 +655,30 @@ def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends
     limite = max(1, min(int(body.limite or 10), config.LIMITE_ENVOIS_PAR_LANCEMENT))
     # Refus clair AVANT tout lancement : pas de clé (503), pas de compte ou
     # compte jamais vérifié (400), plafond du jour déjà atteint (400)
-    compte_envoi.exiger_compte_verifie(user_id)
+    compte = compte_envoi.exiger_compte_verifie(user_id)
     if compte_envoi_db.envois_du_jour(user_id) >= config.PLAFOND_ENVOIS_JOUR:
         raise ErreurUtilisateur(f"Plafond de {config.PLAFOND_ENVOIS_JOUR} mails par jour atteint : "
                                 "les envois reprendront demain.")
+    # Mode test : option du compte d'envoi, ou demandé pour ce lancement
+    test = bool(body.test or compte["mode_test"])
+    if test:
+        message = f"🧪 MODE TEST : envoi vers {compte['adresse']} (limite : {limite})..."
+        debut = f"▶ Envoi démarré — limite {limite} — 🧪 MODE TEST, tout part vers {compte['adresse']}"
+    else:
+        message = f"Envoi en cours (limite : {limite})..."
+        debut = f"▶ Envoi démarré — limite {limite}"
 
     def travail(arret, log, on_progress):
         from spontanees.envoyeur import main as env_main
-        env_main(limite=limite, test=body.test, stop_event=arret, log_fn=log,
+        env_main(limite=limite, test=test, stop_event=arret, log_fn=log,
                  user_id=user_id, on_progress=on_progress, mode=mode)
 
-    return _lancer_spontanees(user_id, "envoyer", f"Envoi en cours (limite: {limite})...",
-                              f"▶ Envoi démarré — limite {limite} {'[TEST]' if body.test else ''}",
-                              travail, "Envoi terminé !", "✅ Envoi terminé", "envoi")
+    reponse = _lancer_spontanees(user_id, "envoyer", message, debut, travail,
+                                 "Envoi de test terminé !" if test else "Envoi terminé !",
+                                 "✅ Envoi terminé", "envoi", mode_test=test)
+    if isinstance(reponse, dict):
+        reponse["mode_test"] = test
+    return reponse
 
 @prive.get("/api/spontanees/statut")
 def api_spontanees_etat(user: User = Depends(utilisateur_requis)):
