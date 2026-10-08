@@ -192,25 +192,42 @@ class Collecte:
         for o in resultats:
             self.offres.setdefault(o.get("id") or id(o), o)
 
-    def recuperer(self, params: dict, etape: int = 0) -> int:
-        """Récupère toutes les offres de params ; renvoie le nombre couvert."""
+    def _premiere_page(self, params):
+        """(total, offres) de la première page, None si la requête échoue."""
         try:
-            total, premiere = self._page(params, 0)
+            return self._page(params, 0)
         except ErreurFT as e:
             self.erreurs += 1
             self.log(f"  ⚠️  France Travail, requête abandonnée ({_decrire(params)}) : {e}")
+            return None
+
+    def recuperer(self, params: dict, etape: int = 0, premiere_page=None) -> int:
+        """Récupère toutes les offres de params ; renvoie le nombre couvert."""
+        page = premiere_page or self._premiere_page(params)
+        if page is None:
             return 0
+        total, premiere = page
         if total > PLAFOND_REQUETE:
             for i in range(etape, len(DECOUPAGES)):
                 nom, decouper = DECOUPAGES[i]
                 sous = decouper(params)
-                if sous:
-                    print(f"  {total} offres ({_decrire(params)}) : découpage par {nom} en {len(sous)}")
-                    couvert = sum(self.recuperer(s, i) for s in sous)
-                    if couvert < total:
-                        self.log(f"  ⚠️  Découpage par {nom} : {couvert} offres retrouvées sur {total} "
-                                 f"({_decrire(params)})")
-                    return couvert
+                if not sous:
+                    continue
+                # Garde-fou : si les deux premières sous-requêtes ont chacune le
+                # total entier, le paramètre est ignoré par l'API (point de
+                # parametres_api.py faux) ; continuer multiplierait les requêtes
+                pages = [self._premiere_page(s) for s in sous[:2]]
+                if len(sous) > 1 and all(p and p[0] == total for p in pages):
+                    self.log(f"  ⚠️  Découpage par {nom} sans effet ({_decrire(sous[0])} renvoie les {total} "
+                             "offres) : paramètre ignoré par l'API ? Voir scripts/verifier_france_travail.py")
+                    continue
+                print(f"  {total} offres ({_decrire(params)}) : découpage par {nom} en {len(sous)}")
+                couvert = sum(self.recuperer(s, i, p) for s, p in zip(sous, pages) if p)
+                couvert += sum(self.recuperer(s, i) for s in sous[2:])
+                if couvert < total:
+                    self.log(f"  ⚠️  Découpage par {nom} : {couvert} offres retrouvées sur {total} "
+                             f"({_decrire(params)})")
+                return couvert
             self.non_recuperees += total - PLAFOND_REQUETE
             self.log(f"  ⚠️  {total} offres ({_decrire(params)}), aucun découpage possible : "
                      f"{total - PLAFOND_REQUETE} non récupérées")

@@ -216,3 +216,25 @@ def test_options_et_profil_par_l_api(utilisateur):
     assert r.json()["ok"] is True
     rech = client.get("/api/profil").json()["recherche"]
     assert (rech["secteurs"], rech["tailles"], rech["taille_inconnue"]) == (["62"], ["50_249"], False)
+
+
+def test_parametre_ignore_par_l_api_sans_explosion(api):
+    """Si l'API ignore grandDomaine et domaine (parametres_api.py faux), le
+    découpage par domaine est abandonné avec un message, sans multiplier
+    les requêtes ; les dates prennent le relais."""
+    api.params_reconnus -= {"grandDomaine", "domaine"}
+    api.offres = [offre(n, dept="75", domaine="M18", jours=n % 100) for n in range(3300)]
+    offres, log = recuperer()
+    assert len(offres) == 3300
+    assert "Découpage par domaine sans effet" in log.texte()
+    assert len(api.recherches) < 150
+
+
+def test_dates_ignorees_tronque_avec_message(api):
+    api.params_reconnus -= {"grandDomaine", "domaine", "minCreationDate", "maxCreationDate"}
+    api.offres = [offre(n, dept="75", domaine="M18", jours=n % 100) for n in range(3300)]
+    offres, log = recuperer(domaines=["M18"])
+    assert len(offres) == 3150
+    assert "Découpage par date de publication sans effet" in log.texte()
+    assert "150 non récupérées" in log.texte()
+    assert len(api.recherches) < 100

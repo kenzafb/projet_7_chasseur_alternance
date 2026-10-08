@@ -107,7 +107,8 @@ class FausseAPI:
 
     def filtrer(self, params):
         offres = self.offres
-        if "minCreationDate" in params or "maxCreationDate" in params:
+        dates = {"minCreationDate", "maxCreationDate"} & self.params_reconnus
+        if dates & set(params):
             if not ("minCreationDate" in params and "maxCreationDate" in params):
                 raise ValueError("les deux dates sont exigées")
             debut, fin = _date(params["minCreationDate"]), _date(params["maxCreationDate"])
