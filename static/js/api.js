@@ -36,6 +36,7 @@ export function confirmerLancement(cle, demandee, reponse) {
   let texte = regle.texte(appliquee);
   if (demandee !== undefined && demandee !== appliquee) texte += ` (demandé : ${demandee}, ramené à ${appliquee})`;
   if (reponse.mode_test) texte += ". 🧪 Mode test : tout part vers ton adresse d'expédition";
+  if (reponse.avertissement) texte += ". ⚠️ " + reponse.avertissement.replace(/\.$/, "");
   const champ = document.querySelector(`[data-limite="${cle}"]`);
   if (champ) champ.value = appliquee;
   const el = document.querySelector("[data-confirmation]");

@@ -486,6 +486,11 @@
 .domaine-case.is-checked { border-color: var(--signal); background: var(--signal-soft); }
 .domaine-case:has(input:disabled) { opacity: .55; cursor: default; }
 .domaines-choix:has(> .gd-liste) { display: block; }   /* arbre des domaines : indifférent puis grille */
+.domaines-vide {
+  margin: 0 0 12px; padding: 10px 14px; border-radius: var(--r-sm);
+  border: 1px solid var(--signal); background: var(--signal-soft); font-size: 13px; color: var(--txt);
+}
+.domaines-vide[hidden] { display: none; }
 .domaine-case--indifferent { margin-bottom: 12px; width: fit-content; }
 .secteurs-liste .domaine-case { align-items: flex-start; }
 .domaine-case--petit { padding: 6px 10px; font-size: 13px; }

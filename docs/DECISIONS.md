@@ -126,3 +126,19 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 1 et 2), validées par l'humai
 - **Décision.** Nom des paramètres de domaine, nombre de valeurs acceptées par requête, champ de tranche d'effectif et début des fenêtres de dates sont lus dans `france_travail/parametres_api.py`, et nulle part ailleurs. `scripts/verifier_france_travail.py`, lancé par l'humain, affiche les valeurs à y reporter.
 - **En attendant.** Valeurs prudentes : une requête par valeur, `grandDomaine` pour les lettres, `domaine` pour les codes, `trancheEffectifEtab`.
 - **À reconsidérer** dès que le script a tourné.
+
+## Phase 5b, points tranchés après le rapport (8 octobre 2026)
+
+### D27. Profils d'alternance sans domaine : restent « indifférent », bandeau d'invitation
+- **Décision.** Pas de migration vers M18 : un profil d'alternance sans domaine cherche tous les domaines sur France Travail (D22). Tant que la liste est vide, un bandeau dans le profil d'alternance invite à choisir des domaines ; il disparaît dès qu'un domaine est coché.
+- **Conséquence.** Le mode job n'a pas de bandeau : indifférent y est le défaut voulu.
+
+### D28. Domaines filtrants en mode job : validé
+- **Décision.** En mode job, les domaines cochés filtrent la recherche France Travail (D22, D23), ils ne sont plus une simple préférence pour l'analyse.
+
+### D29. LBA et Sirene avec un domaine non couvert : comportement conservé, signalé au lancement
+- **Décision.** Jusqu'aux phases 5c et 5d, LBA et Sirene ne cherchent que M18 et C15 ; profil indifférent : ancien défaut, informatique ; domaine sans correspondance : non cherché ; aucun domaine couvert : source ignorée. En plus des logs, la confirmation de lancement dans l'interface nomme les domaines non couverts (recherche d'offres pour LBA, récupération des entreprises pour Sirene), champ `avertissement` de la réponse.
+- **À reconsidérer** en 5c (LBA) et 5d (Sirene), quand les correspondances seront tirées des référentiels.
+
+### D30. « Garder les offres sans information de taille » cochée par défaut : validé
+- **Décision.** `taille_inconnue` vaut vrai tant que l'utilisateur ne la décoche pas (D25).

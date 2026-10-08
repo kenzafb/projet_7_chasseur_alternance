@@ -552,7 +552,12 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
             pipelines.terminer(RECHERCHE, user_id)
 
     threading.Thread(target=lancer, daemon=True).start()
-    return {"status": "démarré", "max_analyses": max_analyses}
+    reponse = {"status": "démarré", "max_analyses": max_analyses}
+    if "lba" in cfg_mode["sources"]:
+        from shared.domaines import avertissement_non_couverts, domaines_du_profil
+        if avertissement := avertissement_non_couverts(domaines_du_profil(profil), "lba"):
+            reponse["avertissement"] = avertissement
+    return reponse
 
 @prive.get("/api/statut_recherche")
 def api_statut_recherche(user: User = Depends(utilisateur_requis)):
@@ -760,6 +765,9 @@ def _avec_limite(reponse, **limite):
 def api_spontanees_fetch(body: Fetch | None = None, user: User = Depends(utilisateur_requis)):
     user_id = user.id
     maximum, note = _limite("entreprises", body.max_entreprises if body else None)
+    # Même profil que fetch_entreprises (mode alternance)
+    from shared.domaines import avertissement_non_couverts, domaines_du_profil
+    avertissement = avertissement_non_couverts(domaines_du_profil(lire_profil(user_id)), "sirene")
 
     def travail(arret, log, on_progress):
         from spontanees.fetch_entreprises import main as fetch_main
@@ -769,7 +777,8 @@ def api_spontanees_fetch(body: Fetch | None = None, user: User = Depends(utilisa
     return _avec_limite(_lancer_spontanees(
         user_id, "fetch", "Récupération des entreprises en Île-de-France...",
         f"▶ Fetch entreprises démarré (au plus {maximum} nouvelles entreprises){note}", travail,
-        "Fetch terminé !", "✅ Fetch terminé", "fetch"), max_entreprises=maximum)
+        "Fetch terminé !", "✅ Fetch terminé", "fetch"), max_entreprises=maximum,
+        **({"avertissement": avertissement} if avertissement else {}))
 
 @prive.post("/api/spontanees/scraper")
 def api_spontanees_scraper(body: Scraper | None = None, user: User = Depends(utilisateur_requis)):

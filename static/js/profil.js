@@ -243,6 +243,9 @@ function majAffichageDomaines(c) {
   c.querySelectorAll(".domaine-case").forEach(l => {
     l.classList.toggle("is-checked", l.querySelector("input").checked);
   });
+  // Bandeau d'invitation (alternance) tant qu'aucun domaine n'est choisi
+  const bandeau = c.parentElement.querySelector("[data-domaines-vide]");
+  if (bandeau) bandeau.hidden = !c.querySelector("[data-domaine-indifferent]")?.checked;
 }
 
 function lireDomainesCoches(selecteur = "[data-domaines-choix]") {

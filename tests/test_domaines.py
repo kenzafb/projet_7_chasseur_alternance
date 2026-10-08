@@ -127,3 +127,39 @@ def test_migration_0007(tmp_path):
     cx.close()
     assert json.loads(lignes[1])["domaines"] == ["informatique", "immobilier"]
     assert json.loads(lignes[2]) == {"domaines": ["informatique", "immobilier"]}
+
+
+# ─── Décisions D27 et D28 ─────────────────────────────────────────────────────
+def test_avertissement_domaines_non_couverts():
+    assert d.avertissement_non_couverts([], "lba") == ""            # indifférent : ancien défaut
+    assert d.avertissement_non_couverts(["M18", "C15"], "sirene") == ""
+    m = d.avertissement_non_couverts(["J", "M18"], "lba")
+    assert m.startswith("Domaines pas encore couverts par La Bonne Alternance : Santé (J)")
+    assert "pas cherchés pour l'instant" in m
+    m = d.avertissement_non_couverts(["J11"], "sirene")
+    assert "Sirene" in m and "(J11)" in m and "cette source est ignorée" in m
+
+
+def test_avertissement_au_lancement(utilisateur, monkeypatch):
+    client, uid = utilisateur("a@test.fr", prenom="Alice")
+    sauvegarder_profil(uid, {"recherche": {"domaines": ["J", "M18"]}})
+    monkeypatch.setattr(main, "lancer_recherche", lambda *a, **k: [])
+    monkeypatch.setattr(main, "chercher_offres_lba", lambda romes: [])
+    from tests.test_pipelines import attendre
+    r = client.post("/api/recherche").json()
+    attendre(lambda: not main.pipelines.etat("recherche", uid)["en_cours"])
+    assert "La Bonne Alternance : Santé (J)" in r["avertissement"]
+    import spontanees.fetch_entreprises as fetch
+    monkeypatch.setattr(fetch, "main", lambda **kw: None)
+    r = client.post("/api/spontanees/fetch").json()
+    assert "Sirene" in r["avertissement"] and "Santé (J)" in r["avertissement"]
+    # Tout couvert : pas d'avertissement
+    sauvegarder_profil(uid, {"recherche": {"domaines": ["M18"]}})
+    attendre(lambda: not main.pipelines.etat("spontanees", uid)["en_cours"])
+    assert "avertissement" not in client.post("/api/spontanees/fetch").json()
+
+
+def test_bandeau_domaines_vides_dans_le_profil(utilisateur):
+    client, _ = utilisateur("a@test.fr", prenom="Alice")
+    page = client.get("/").text
+    assert "data-domaines-vide hidden" in page and "Aucun domaine choisi" in page

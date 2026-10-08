@@ -132,6 +132,22 @@ def naf_codes(codes) -> list[str]:
     return _correspondance(_SIRENE_NAF, codes)
 
 
+NOMS_SOURCES = {"lba": "La Bonne Alternance", "sirene": "Sirene (candidatures spontanées)"}
+
+
+def avertissement_non_couverts(codes, source: str) -> str:
+    """Message pour l'interface au lancement (décision D27), vide si tout est couvert."""
+    manquants = domaines_sans_correspondance(codes, source)
+    if not manquants:
+        return ""
+    libelles = _libelles()
+    noms = ", ".join(f"{libelles[c]} ({c})" for c in manquants)
+    suite = ("aucun domaine du profil n'y est encore couvert, cette source est ignorée"
+             if not _correspondance({"lba": _LBA_ROMES, "sirene": _SIRENE_NAF}[source], codes)
+             else "ils n'y sont pas cherchés pour l'instant")
+    return f"Domaines pas encore couverts par {NOMS_SOURCES[source]} : {noms} ; {suite}."
+
+
 def domaines_sans_correspondance(codes, source: str) -> list[str]:
     """Domaines choisis qu'une source pas encore refondue ne sait pas chercher."""
     table = {"lba": _LBA_ROMES, "sirene": _SIRENE_NAF}[source]
