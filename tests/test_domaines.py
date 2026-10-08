@@ -1,6 +1,7 @@
 """Modèle des domaines (SPEC_SOURCES section 1) : codes France Travail,
 indifférent, anciennes clés, migration 0007, enregistrement du profil,
-LBA et Sirene inchangés pour les profils existants."""
+codes métiers de LBA tirés du référentiel (phase 5c), Sirene inchangé
+pour les profils existants (jusqu'à la phase 5d)."""
 
 import sqlite3
 
@@ -45,18 +46,25 @@ def test_libelles():
     assert "DOMAINES PRÉFÉRÉS (optionnel) : Immobilier" in contexte
 
 
-def test_lba_et_sirene_inchanges_pour_les_profils_existants():
+def test_codes_metiers_lba_tires_du_referentiel():
+    """Phase 5c : tous les métiers du référentiel dont le code commence par
+    un domaine ou un grand domaine choisi ; indifférent : aucun code."""
+    m18 = d.codes_metiers(["M18"])
+    assert len(m18) == 96 and all(c.startswith("M18") and len(c) == 5 for c in m18)
+    assert d.codes_metiers(["informatique"]) == m18                # ancienne clé comprise
+    assert len(d.codes_metiers(["C"])) == 64
+    assert d.codes_metiers(["C", "C15"]) == d.codes_metiers(["C"])   # C15 déjà dans C
+    assert d.codes_metiers([]) == []                               # indifférent : sans code
+    assert d.codes_metiers(["J", "M18"]) == sorted(d.codes_metiers(["J"]) + m18)
+
+
+def test_sirene_inchange_pour_les_profils_existants():
     """Correspondances d'avant la phase 5b, rangées sous les nouveaux codes."""
-    romes_info = [f"M18{i:02d}" for i in range(1, 11)]
-    assert d.lba_romes(["M18"]) == d.lba_romes(["informatique"]) == romes_info
-    assert d.lba_romes([]) == romes_info                          # ancien défaut
-    assert d.lba_romes(["C15"]) == ["C1501", "C1502", "C1503", "C1504"]
     assert "68.32B" in d.naf_codes(["C15"]) and len(d.naf_codes(["C15"])) == 7
     assert len(d.naf_codes([])) == 16 and d.naf_codes([]) == d.naf_codes(["M18"])
     # Domaine sans correspondance : rien de cherché, signalé
-    assert d.lba_romes(["J"]) == [] and d.naf_codes(["J11"]) == []
-    assert d.lba_romes(["J", "M18"]) == romes_info
-    assert d.domaines_sans_correspondance(["J", "M18"], "lba") == ["J"]
+    assert d.naf_codes(["J11"]) == []
+    assert d.domaines_sans_correspondance(["J", "M18"], "sirene") == ["J"]
 
 
 def test_profil_enregistre_en_codes(utilisateur):
@@ -75,18 +83,21 @@ def test_route_des_domaines(utilisateur):
     assert len(arbre) == 14 and arbre[0]["domaines"][0]["code"] == "A11"
 
 
-def test_lba_ignoree_si_aucun_domaine_pris_en_charge(utilisateur, monkeypatch):
+def test_lba_cherche_tout_domaine_et_l_indifferent(utilisateur, monkeypatch):
+    """Décision D37 : plus de domaine « non couvert » sur LBA ; un profil
+    indifférent cherche sans code métier."""
     client, uid = utilisateur("a@test.fr", prenom="Alice")
-    sauvegarder_profil(uid, {"recherche": {"domaines": ["J"]}})
-    appels = []
-    monkeypatch.setattr(main, "lancer_recherche", lambda *a, **k: [])
-    monkeypatch.setattr(main, "chercher_offres_lba", lambda romes: appels.append(romes) or [])
     from tests.test_pipelines import attendre
-    assert client.post("/api/recherche").status_code == 200
-    attendre(lambda: not main.pipelines.etat("recherche", uid)["en_cours"])
-    logs = "\n".join(str(l) for l in main.pipelines.logs(uid))
-    assert appels == []
-    assert "LBA ignorée : aucun domaine du profil" in logs and "ignorés : J" in logs
+    monkeypatch.setattr(main, "lancer_recherche", lambda *a, **k: [])
+    profils = []
+    monkeypatch.setattr(main, "rechercher_lba", lambda profil, log=print: profils.append(profil) or
+                        {"offres": [], "entreprises": [], "requetes": 0})
+    for domaines in (["J"], []):
+        sauvegarder_profil(uid, {"recherche": {"domaines": domaines}})
+        r = client.post("/api/recherche").json()
+        attendre(lambda: not main.pipelines.etat("recherche", uid)["en_cours"])
+        assert "avertissement" not in r
+    assert [p["recherche"]["domaines"] for p in profils] == [["J"], []]
 
 
 def test_migration_0007(tmp_path):
@@ -131,10 +142,9 @@ def test_migration_0007(tmp_path):
 
 # ─── Décisions D27 et D28 ─────────────────────────────────────────────────────
 def test_avertissement_domaines_non_couverts():
-    assert d.avertissement_non_couverts([], "lba") == ""            # indifférent : ancien défaut
     assert d.avertissement_non_couverts(["M18", "C15"], "sirene") == ""
-    m = d.avertissement_non_couverts(["J", "M18"], "lba")
-    assert m.startswith("Domaines pas encore couverts par La Bonne Alternance : Santé (J)")
+    m = d.avertissement_non_couverts(["J", "M18"], "sirene")
+    assert m.startswith("Domaines pas encore couverts par Sirene (candidatures spontanées) : Santé (J)")
     assert "pas cherchés pour l'instant" in m
     m = d.avertissement_non_couverts(["J11"], "sirene")
     assert "Sirene" in m and "(J11)" in m and "cette source est ignorée" in m
@@ -143,16 +153,12 @@ def test_avertissement_domaines_non_couverts():
 def test_avertissement_au_lancement(utilisateur, monkeypatch):
     client, uid = utilisateur("a@test.fr", prenom="Alice")
     sauvegarder_profil(uid, {"recherche": {"domaines": ["J", "M18"]}})
-    monkeypatch.setattr(main, "lancer_recherche", lambda *a, **k: [])
-    monkeypatch.setattr(main, "chercher_offres_lba", lambda romes: [])
-    from tests.test_pipelines import attendre
-    r = client.post("/api/recherche").json()
-    attendre(lambda: not main.pipelines.etat("recherche", uid)["en_cours"])
-    assert "La Bonne Alternance : Santé (J)" in r["avertissement"]
     import spontanees.fetch_entreprises as fetch
     monkeypatch.setattr(fetch, "main", lambda **kw: None)
+    from tests.test_pipelines import attendre
     r = client.post("/api/spontanees/fetch").json()
     assert "Sirene" in r["avertissement"] and "Santé (J)" in r["avertissement"]
+    assert "La Bonne Alternance" not in r["avertissement"]      # LBA couvre tout (D37)
     # Tout couvert : pas d'avertissement
     sauvegarder_profil(uid, {"recherche": {"domaines": ["M18"]}})
     attendre(lambda: not main.pipelines.etat("spontanees", uid)["en_cours"])

@@ -53,7 +53,8 @@ from france_travail.generateur import generer_lettre
 from france_travail.analyseur import analyser_offre, appliquer_analyse, marquer_non_analysee
 from shared.ia import ErreurIA, ErreurIABloquante, ErreurIAPassagere
 from france_travail.pdf_generator import generer_pdf_lettre, nom_telechargement
-from france_travail.scraper_lba import chercher_offres_lba
+from france_travail.scraper_lba import ignoree_pour_profil as lba_ignoree_pour_profil
+from france_travail.scraper_lba import rechercher_pour_profil as rechercher_lba
 
 # Documentation automatique désactivée ici : elle est servie plus bas par des
 # routes privées (/docs, /openapi.json), réservées aux utilisateurs connectés.
@@ -479,26 +480,18 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
             reste = max_analyses - len(analysees)
             log(f"✅ France Travail terminé : {len(analysees)} offres {traitees}")
 
-            if "lba" in cfg_mode["sources"] and reste <= 0:
-                log(f"ℹ️  LBA ignorée : limite de {max_analyses} offres {traitees} atteinte")
-                offres_lba = []
-            elif "lba" in cfg_mode["sources"]:
-                from shared.domaines import domaines_du_profil, domaines_sans_correspondance, lba_romes
-                _domaines = domaines_du_profil(profil)
-                _romes = lba_romes(_domaines)
-                if domaines_sans_correspondance(_domaines, "lba"):
-                    log("ℹ️  LBA : domaines pas encore pris en charge, ignorés : "
-                        + ", ".join(domaines_sans_correspondance(_domaines, "lba")))
-                if _romes:
-                    etat(message="Recherche La Bonne Alternance...")
-                    log("🔍 Recherche La Bonne Alternance démarrée")
-                    offres_lba = chercher_offres_lba(_romes)
-                else:
-                    log("ℹ️  LBA ignorée : aucun domaine du profil n'y est encore pris en charge")
-                    offres_lba = []
-            else:
+            # LBA (mode alternance). None : LBA ignorée, raison déjà écrite
+            # (pas de « Aucune offre LBA » en plus).
+            lba = None
+            if "lba" not in cfg_mode["sources"]:
                 log("ℹ️  LBA ignorée (mode sans alternance)")
-                offres_lba = []
+            elif reste <= 0:
+                log(f"ℹ️  LBA ignorée : limite de {max_analyses} offres {traitees} atteinte")
+            else:
+                etat(message="Recherche La Bonne Alternance...")
+                log("🔍 Recherche La Bonne Alternance démarrée")
+                lba = rechercher_lba(profil, log=log)
+            offres_lba = lba["offres"] if lba else []
 
             if offres_lba:
                 # Déduplication : refs déjà présentes en base pour cet utilisateur
@@ -536,7 +529,7 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
                         ajouter_candidature(user_id, offre, mode=mode)   # écriture base au fur et à mesure
                         ajoutees += 1
                     log(f"✅ {ajoutees} offres LBA analysées et ajoutées sur {len(nouvelles_lba)}")
-            else:
+            elif lba is not None:
                 log("ℹ️  Aucune offre LBA récupérée")
 
             etat(pourcentage=100, message="Terminé !")
@@ -554,8 +547,7 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
     threading.Thread(target=lancer, daemon=True).start()
     reponse = {"status": "démarré", "max_analyses": max_analyses}
     if "lba" in cfg_mode["sources"]:
-        from shared.domaines import avertissement_non_couverts, domaines_du_profil
-        if avertissement := avertissement_non_couverts(domaines_du_profil(profil), "lba"):
+        if avertissement := lba_ignoree_pour_profil(profil):
             reponse["avertissement"] = avertissement
     return reponse
 
@@ -765,9 +757,12 @@ def _avec_limite(reponse, **limite):
 def api_spontanees_fetch(body: Fetch | None = None, user: User = Depends(utilisateur_requis)):
     user_id = user.id
     maximum, note = _limite("entreprises", body.max_entreprises if body else None)
-    # Même profil que fetch_entreprises (mode alternance)
+    # Même profil que fetch_entreprises (mode alternance) : LBA d'abord, puis Sirene
     from shared.domaines import avertissement_non_couverts, domaines_du_profil
-    avertissement = avertissement_non_couverts(domaines_du_profil(lire_profil(user_id)), "sirene")
+    profil = lire_profil(user_id)
+    avertissement = " ".join(filter(None, [
+        lba_ignoree_pour_profil(profil),
+        avertissement_non_couverts(domaines_du_profil(profil), "sirene")]))
 
     def travail(arret, log, on_progress):
         from spontanees.fetch_entreprises import main as fetch_main

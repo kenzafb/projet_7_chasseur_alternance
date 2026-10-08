@@ -58,7 +58,7 @@ def faux_travaux(monkeypatch):
             time.sleep(0.01)
 
     monkeypatch.setattr(main, "lancer_recherche", fausse_recherche)
-    monkeypatch.setattr(main, "chercher_offres_lba", lambda romes: [])
+    monkeypatch.setattr(main, "rechercher_lba", lambda profil, log=print: {"offres": [], "entreprises": [], "requetes": 0})
     monkeypatch.setattr(spontanees.scraper_emails, "main", faux_scraper)
     yield liberer, demarres, arretes
     # Laisser finir les threads AVANT que les faux soient retirés : sinon un

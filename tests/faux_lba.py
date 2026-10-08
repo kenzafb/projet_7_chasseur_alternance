@@ -33,7 +33,8 @@ def distance_km(a, b):
 
 def offre(n, rome="M1805", lieu=(48.8566, 2.3522), cp="75012", niveau=6, partenaire="La bonne alternance",
           titre=None):
-    return {
+    """Offre au format de l'API ; niveau None : sans niveau indiqué."""
+    o = {
         "identifier": {"id": f"job{n}", "partner_label": partenaire, "partner_job_id": f"p{n}"},
         "workplace": {"name": f"Employeur {n}", "siret": f"{n:014d}",
                       "location": {"address": f"{n} RUE TEST {cp} VILLE"}},
@@ -43,6 +44,9 @@ def offre(n, rome="M1805", lieu=(48.8566, 2.3522), cp="75012", niveau=6, partena
                   "publication": {"creation": "2026-10-01T10:00:00.000Z"}},
         "_rome": rome, "_lieu": lieu, "_niveau": niveau,
     }
+    if niveau is None:
+        del o["offer"]["target_diploma"]
+    return o
 
 
 def entreprise(n, rome="M1805", lieu=(48.8566, 2.3522), cp="75012", siret=None, email=None, taille="20-49"):

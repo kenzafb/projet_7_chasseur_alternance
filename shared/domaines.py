@@ -11,9 +11,11 @@ Stockage dans le profil : liste de codes, recherche.domaines = ["M18"],
 ["C"], ou [] pour « indifférent ». Les listes viennent des référentiels
 versionnés (shared.referentiels), jamais du code.
 
-LBA et Sirene ne sont pas encore passés à ce modèle (phases 5c et 5d) :
-leurs correspondances d'avant la phase 5b sont gardées telles quelles,
-rangées sous les nouveaux codes (lba_romes, naf_codes).
+LBA cherche par codes métiers (5 caractères, référentiel metiers), qui
+commencent par le code de leur domaine : codes_metiers les en déduit.
+Sirene n'est pas encore passé à ce modèle (phase 5d) : sa correspondance
+d'avant la phase 5b est gardée telle quelle, rangée sous les nouveaux
+codes (naf_codes).
 """
 
 from functools import lru_cache
@@ -81,17 +83,25 @@ def libelles_domaines(codes) -> list[str]:
     return [libelles[c] for c in normaliser_domaines(codes)]
 
 
-# ─── Sources pas encore refondues : correspondances d'avant la phase 5b ───────
-# LBA (phase 5c) : codes ROME ; Sirene (phase 5d) : codes NAF. Un profil
-# « indifférent » garde l'ancien défaut (informatique) ; un domaine sans
-# correspondance n'est pas cherché sur ces sources.
-DOMAINE_DEFAUT_SOURCES = "M18"
+# ─── Codes métiers (La Bonne Alternance, phase 5c) ────────────────────────────
+@lru_cache(maxsize=1)
+def _metiers() -> tuple[str, ...]:
+    return tuple(sorted(m["code"] for m in referentiels.france_travail("metiers")))
 
-_LBA_ROMES = {
-    "M18": ["M1801", "M1802", "M1803", "M1804", "M1805",
-            "M1806", "M1807", "M1808", "M1809", "M1810"],
-    "C15": ["C1501", "C1502", "C1503", "C1504"],
-}
+
+def codes_metiers(codes) -> list[str]:
+    """Codes métiers des domaines et grands domaines choisis (« M18 » :
+    M1801 à M1896...), triés. Vide pour un profil indifférent."""
+    prefixes = tuple(normaliser_domaines(codes))
+    if not prefixes:
+        return []
+    return [m for m in _metiers() if m.startswith(prefixes)]
+
+
+# ─── Sirene, pas encore refondu : correspondance d'avant la phase 5b ──────────
+# Phase 5d : codes NAF. Un profil « indifférent » garde l'ancien défaut
+# (informatique) ; un domaine sans correspondance n'est pas cherché.
+DOMAINE_DEFAUT_SOURCES = "M18"
 
 _SIRENE_NAF = {
     "M18": [
@@ -122,17 +132,12 @@ def _correspondance(table: dict, codes) -> list[str]:
     return out
 
 
-def lba_romes(codes) -> list[str]:
-    """Codes ROME cherchés sur LBA ; vide si aucun domaine choisi n'a de correspondance."""
-    return _correspondance(_LBA_ROMES, codes)
-
-
 def naf_codes(codes) -> list[str]:
     """Codes NAF cherchés sur Sirene ; vide si aucun domaine choisi n'a de correspondance."""
     return _correspondance(_SIRENE_NAF, codes)
 
 
-NOMS_SOURCES = {"lba": "La Bonne Alternance", "sirene": "Sirene (candidatures spontanées)"}
+NOMS_SOURCES = {"sirene": "Sirene (candidatures spontanées)"}
 
 
 def avertissement_non_couverts(codes, source: str) -> str:
@@ -143,12 +148,12 @@ def avertissement_non_couverts(codes, source: str) -> str:
     libelles = _libelles()
     noms = ", ".join(f"{libelles[c]} ({c})" for c in manquants)
     suite = ("aucun domaine du profil n'y est encore couvert, cette source est ignorée"
-             if not _correspondance({"lba": _LBA_ROMES, "sirene": _SIRENE_NAF}[source], codes)
+             if not _correspondance({"sirene": _SIRENE_NAF}[source], codes)
              else "ils n'y sont pas cherchés pour l'instant")
     return f"Domaines pas encore couverts par {NOMS_SOURCES[source]} : {noms} ; {suite}."
 
 
 def domaines_sans_correspondance(codes, source: str) -> list[str]:
     """Domaines choisis qu'une source pas encore refondue ne sait pas chercher."""
-    table = {"lba": _LBA_ROMES, "sirene": _SIRENE_NAF}[source]
+    table = {"sirene": _SIRENE_NAF}[source]
     return [c for c in normaliser_domaines(codes) if c not in table]

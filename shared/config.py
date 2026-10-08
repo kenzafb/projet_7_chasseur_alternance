@@ -144,10 +144,39 @@ FT_REGION = "11"
 DEPTS_IDF             = {"75", "77", "78", "91", "92", "93", "94", "95"}
 DEPTS_PETITE_COURONNE = {"92", "93", "94"}
 
-# La Bonne Alternance : recherche par rayon autour de Paris
-LBA_LATITUDE  = 48.8566
-LBA_LONGITUDE = 2.3522
-LBA_RAYON_KM  = 60
+# La Bonne Alternance : plusieurs centres à rayon réduit plutôt qu'un cercle
+# de 60 km autour de Paris (qui débordait sur l'Oise et manquait l'est de la
+# Seine-et-Marne). Rayon court là où les offres sont denses (plafond de 150
+# résultats par source et par requête), plus large en grande couronne.
+# Les cercles se chevauchent : résultats dédoublonnés. Rayons ramenés à
+# parametres_lba.RAYON_MAX_KM. (nom, latitude, longitude, rayon en km)
+LBA_CENTRES = [
+    ("Paris",                 48.8566, 2.3522,  8),
+    ("Nanterre",              48.8924, 2.2069, 10),
+    ("Clamart",               48.8000, 2.2667, 10),
+    ("Bobigny",               48.9077, 2.4397, 10),
+    ("Créteil",               48.7904, 2.4556, 10),
+    ("Versailles",            48.8049, 2.1204, 18),
+    ("Cergy",                 49.0364, 2.0761, 20),
+    ("Roissy",                49.0097, 2.5479, 20),
+    ("Marne-la-Vallée",       48.8486, 2.6347, 18),
+    ("Évry",                  48.6296, 2.4410, 20),
+    ("Melun",                 48.5421, 2.6554, 20),
+    ("Meaux",                 48.9601, 2.8788, 20),
+    ("Coulommiers",           48.8130, 3.0840, 20),
+    ("Provins",               48.5600, 3.2990, 25),
+    ("Fontainebleau",         48.4047, 2.7016, 22),
+    ("Nemours",               48.2667, 2.6970, 20),
+    ("Étampes",               48.4346, 2.1615, 22),
+    ("Rambouillet",           48.6440, 1.8300, 25),
+    ("Mantes-la-Jolie",       48.9906, 1.7171, 25),
+]
+
+# Redécoupage d'un cercle au plafond (150 résultats) : sept cercles de rayon
+# moitié, pas en dessous de ce rayon (km) ; au-delà, le cercle est signalé
+LBA_RAYON_MIN_KM = 1
+# Requêtes LBA au plus par recherche (redécoupages compris), environ 3 min
+LBA_REQUETES_MAX = 300
 
 # INSEE Sirene : départements interrogés pour les candidatures spontanées
 SIRENE_DEPARTEMENTS = [
