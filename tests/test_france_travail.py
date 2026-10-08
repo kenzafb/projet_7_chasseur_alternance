@@ -250,3 +250,14 @@ def test_dates_ignorees_tronque_avec_message(api):
     assert "Découpage par date sans effet" in log.texte()
     assert "150 non récupérées" in log.texte()
     assert len(api.recherches) < 100
+
+
+def test_secteurs_par_paquets_de_deux(api):
+    """secteurActivite accepte deux valeurs par requête (vérifié le 8 octobre 2026)."""
+    c = criteres(secteurs=["62", "68", "86"])
+    assert sorted(r["secteurActivite"] for r in scraper.requetes_initiales(c["filtres"], c["domaines"])) == [
+        "62,68", "86"]
+    api.max_valeurs = {"secteurActivite": 2}
+    api.offres = [offre(1, secteur="62"), offre(2, secteur="68"), offre(3, secteur="86"), offre(4, secteur="47")]
+    offres, log = recuperer(secteurs=["62", "68", "86"])
+    assert sorted(o["id"] for o in offres) == ["FT1", "FT2", "FT3"] and "⚠️" not in log.texte()

@@ -1,5 +1,5 @@
 {
-  "verifie_le": "2026-10-08T21:13:49+00:00",
+  "verifie_le": "2026-10-08T21:22:26+00:00",
   "plage_de_comptage": "0-0",
   "domaine": {
     "base": {
@@ -7,7 +7,7 @@
         "region": "11"
       },
       "statut": 206,
-      "total": 66929
+      "total": 66932
     },
     "essais": [
       {
@@ -90,35 +90,35 @@
           "E": 526,
           "F": 5110,
           "G": 3920,
-          "H": 5995,
+          "H": 5996,
           "I": 5315,
           "J": 8056,
           "K": 11661,
           "L": 186,
           "M": 3207,
-          "N": 3854
+          "N": 3856
         },
-        "somme": 56979,
-        "total_sans_filtre": 66929
+        "somme": 56982,
+        "total_sans_filtre": 66932
       },
       "departements": {
         "totaux": {
           "75": 14352,
           "77": 7705,
           "78": 8199,
-          "91": 6730,
+          "91": 6733,
           "92": 10190,
           "93": 5517,
           "94": 5933,
           "95": 5405
         },
-        "somme": 64031,
-        "total_sans_filtre": 66929
+        "somme": 64034,
+        "total_sans_filtre": 66932
       }
     }
   },
   "multiples": {
-    "natureContrat": {
+    "natureContrat=E2,FS": {
       "liste": {
         "params": {
           "region": "11",
@@ -130,30 +130,32 @@
       "refuse": false,
       "max": 2,
       "verdict": "acceptée, OU des valeurs (3313, somme des valeurs seules 3313)",
+      "param": "natureContrat",
       "seules": {
         "E2": 2541,
         "FS": 772
       }
     },
-    "typeContrat": {
+    "typeContrat=CDD,MIS,SAI": {
       "liste": {
         "params": {
           "region": "11",
           "typeContrat": "CDD,MIS,SAI"
         },
         "statut": 206,
-        "total": 21642
+        "total": 21645
       },
       "refuse": false,
       "max": 3,
-      "verdict": "acceptée, OU des valeurs (21642, somme des valeurs seules 21642)",
+      "verdict": "acceptée, OU des valeurs (21645, somme des valeurs seules 21645)",
+      "param": "typeContrat",
       "seules": {
         "CDD": 10797,
-        "MIS": 10798,
+        "MIS": 10801,
         "SAI": 47
       }
     },
-    "theme": {
+    "theme=13,17": {
       "liste": {
         "params": {
           "region": "11",
@@ -166,32 +168,34 @@
       "refuse": true,
       "max": null,
       "verdict": "liste refusée (400) : Valeur du paramètre « theme » incorrecte.",
+      "param": "theme",
       "seules": {
         "13": 1201,
         "17": 8535
       }
     },
-    "grandDomaine": {
+    "grandDomaine=M,C,J,D,H": {
       "liste": {
         "params": {
           "region": "11",
           "grandDomaine": "M,C,J,D,H"
         },
         "statut": 206,
-        "total": 25474
+        "total": 25475
       },
       "refuse": false,
       "max": 5,
-      "verdict": "acceptée, OU des valeurs (25474, somme des valeurs seules 25474)",
+      "verdict": "acceptée, OU des valeurs (25475, somme des valeurs seules 25475)",
+      "param": "grandDomaine",
       "seules": {
         "M": 3207,
         "C": 1025,
         "J": 8056,
         "D": 7191,
-        "H": 5995
+        "H": 5996
       }
     },
-    "domaine": {
+    "domaine=M18,C15,M13,J11,D12": {
       "liste": {
         "params": {
           "region": "11",
@@ -218,6 +222,7 @@
         "max": null,
         "verdict": "liste refusée (400) : Valeur du paramètre « domaine » incorrecte."
       },
+      "param": "domaine",
       "seules": {
         "M18": 3142,
         "C15": 1940,
@@ -226,7 +231,7 @@
         "D12": 1518
       }
     },
-    "secteurActivite": {
+    "secteurActivite=62,68,86,47,41": {
       "liste": {
         "params": {
           "region": "11",
@@ -237,8 +242,8 @@
         "message": "Format du paramètre « secteurActivite » incorrect. 2 chaînes de caractères séparées par des virgules maximum."
       },
       "refuse": true,
-      "max": null,
-      "verdict": "liste refusée (400) : Format du paramètre « secteurActivite » incorrect. 2 chaînes de caractères séparées par des virgules",
+      "max": 2,
+      "verdict": "liste refusée (400) : Format du paramètre « secteurActivite » incorrect. 2 chaînes de caractères séparées par des virgules ; deux valeurs acceptées",
       "essai_deux_valeurs": {
         "liste": {
           "params": {
@@ -249,15 +254,34 @@
           "total": 1289
         },
         "refuse": false,
-        "max": null,
-        "verdict": "incohérent (1289 ; valeurs seules {'62': 614, '68': 675, '86': 1034, '47': 1870, '41': 133})"
+        "max": 2,
+        "verdict": "acceptée, OU des valeurs (1289, somme des valeurs seules 1289)"
       },
+      "param": "secteurActivite",
       "seules": {
         "62": 614,
         "68": 675,
         "86": 1034,
         "47": 1870,
         "41": 133
+      }
+    },
+    "secteurActivite=62,68": {
+      "liste": {
+        "params": {
+          "region": "11",
+          "secteurActivite": "62,68"
+        },
+        "statut": 206,
+        "total": 1289
+      },
+      "refuse": false,
+      "max": 2,
+      "verdict": "acceptée, OU des valeurs (1289, somme des valeurs seules 1289)",
+      "param": "secteurActivite",
+      "seules": {
+        "62": 614,
+        "68": 675
       }
     }
   },
@@ -285,20 +309,20 @@
             30
           ],
           [
+            "50 à 99 salariés",
+            24
+          ],
+          [
             "3 à 5 salariés",
             24
           ],
           [
-            "50 à 99 salariés",
-            23
+            "0 salarié (n'ayant pas d'effectif au 31/12 mais ayant employé des salariés au cours de l'année de référence)",
+            20
           ],
           [
             "100 à 199 salariés",
-            20
-          ],
-          [
-            "0 salarié (n'ayant pas d'effectif au 31/12 mais ayant employé des salariés au cours de l'année de référence)",
-            20
+            19
           ],
           [
             "250 à 499 salariés",
@@ -368,12 +392,12 @@
       "dureeTravailLibelle": 290,
       "dureeTravailLibelleConverti": 290,
       "trancheEffectifEtab": 287,
-      "competences": 271,
-      "qualitesProfessionnelles": 189,
-      "deplacementLibelle": 165,
-      "deplacementCode": 160,
-      "accessibleTH": 88,
-      "formations": 63,
+      "competences": 270,
+      "qualitesProfessionnelles": 188,
+      "deplacementLibelle": 164,
+      "deplacementCode": 159,
+      "accessibleTH": 87,
+      "formations": 62,
       "permis": 60,
       "langues": 51,
       "experienceCommentaire": 12
@@ -398,24 +422,73 @@
     "fenetre_7_jours": {
       "params": {
         "region": "11",
-        "minCreationDate": "2026-10-01T21:13:47Z",
-        "maxCreationDate": "2026-10-08T21:13:47Z"
+        "minCreationDate": "2026-10-01T21:22:21Z",
+        "maxCreationDate": "2026-10-08T21:22:21Z"
       },
       "statut": 206,
-      "total": 17458,
+      "total": 17522,
       "effet": "filtre"
+    },
+    "fenetre_fin_maintenant": {
+      "params": {
+        "region": "11",
+        "minCreationDate": "2000-01-01T00:00:00Z",
+        "maxCreationDate": "2026-10-08T21:22:21Z"
+      },
+      "statut": 206,
+      "total": 66790,
+      "effet": "filtre"
+    },
+    "fenetre_fin_plus_3h": {
+      "params": {
+        "region": "11",
+        "minCreationDate": "2000-01-01T00:00:00Z",
+        "maxCreationDate": "2026-10-09T00:22:21Z"
+      },
+      "statut": 206,
+      "total": 66932,
+      "effet": "ignoré (total inchangé)"
     },
     "fenetre_complete": {
       "params": {
         "region": "11",
         "minCreationDate": "2000-01-01T00:00:00Z",
-        "maxCreationDate": "2026-10-08T21:13:47Z"
+        "maxCreationDate": "2026-10-09T21:22:21Z"
       },
       "statut": 206,
-      "total": 66709,
+      "total": 66932,
+      "effet": "ignoré (total inchangé)"
+    },
+    "moitie_avant": {
+      "params": {
+        "region": "11",
+        "minCreationDate": "2000-01-01T00:00:00Z",
+        "maxCreationDate": "2026-10-05T21:22:21Z"
+      },
+      "statut": 206,
+      "total": 56937,
       "effet": "filtre"
     },
-    "fenetre_complete_couvre_tout": false
+    "moitie_apres": {
+      "params": {
+        "region": "11",
+        "minCreationDate": "2026-10-05T21:22:21Z",
+        "maxCreationDate": "2026-10-09T21:22:21Z"
+      },
+      "statut": 206,
+      "total": 9995,
+      "effet": "filtre"
+    },
+    "total_sans_dates": {
+      "params": {
+        "region": "11"
+      },
+      "statut": 206,
+      "total": 66932,
+      "effet": "ignoré (total inchangé)"
+    },
+    "fenetre_complete_couvre_tout": true,
+    "moities_moins_complete": 0
   },
   "propositions": {
     "PARAM_GRAND_DOMAINE": "grandDomaine",
@@ -425,7 +498,7 @@
       "typeContrat": 3,
       "grandDomaine": 5,
       "domaine": 1,
-      "secteurActivite": 1,
+      "secteurActivite": 2,
       "theme": 1
     },
     "CHAMP_TRANCHE_EFFECTIF": "trancheEffectifEtab"

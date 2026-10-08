@@ -163,3 +163,9 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 1 et 2), validées par l'humai
 
 ### D34. Offres écartées par la taille non marquées vues ; secteur employeur en alternance : validés
 - **Décision.** Une offre écartée par le filtre de taille n'est pas marquée vue : elle revient si l'utilisateur change de taille. Le secteur de l'employeur est proposé en option dans les deux modes, vide par défaut.
+
+## Phase 5b, seconde vérification de l'API (8 octobre 2026)
+
+### D35. Fuseau des dates confirmé ; secteurActivite à deux valeurs
+- **Fuseau.** L'API lit `minCreationDate` et `maxCreationDate` en heure de Paris malgré le « Z » : fenêtre finissant à maintenant (UTC) 66790 offres, finissant à maintenant plus 3 h 66932, le total sans dates. La marge de fin de 24 h de D31 est conservée (elle couvre l'heure d'hiver comme l'heure d'été). Découpage exact : les deux moitiés font 56937 + 9995 = 66932.
+- **secteurActivite.** Deux valeurs acceptées (`62,68` : 1289 = 614 + 675), cinq refusées : `VALEURS_PAR_REQUETE["secteurActivite"]` passe à 2. Clôt D33.

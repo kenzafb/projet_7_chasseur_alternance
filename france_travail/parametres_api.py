@@ -31,7 +31,7 @@ VALEURS_PAR_REQUETE = {
     "typeContrat":     3,   # CDD,MIS,SAI : OU des trois (21642)
     "grandDomaine":    5,   # cinq lettres : OU (25474)
     "domaine":         1,   # liste refusée (400)
-    "secteurActivite": 1,   # liste de cinq refusée : « 2 chaînes séparées par des virgules » (à revérifier)
+    "secteurActivite": 2,   # 62,68 : OU (1289 = 614 + 675) ; cinq refusées (« 2 chaînes »)
     "theme":           1,   # liste refusée (400)
 }
 
@@ -48,9 +48,11 @@ DATE_PLUS_ANCIENNE = "2000-01-01T00:00:00Z"
 # Fin : maintenant plus cette marge. Le 8 octobre 2026, la fenêtre
 # [2000, maintenant en UTC] ramenait 66709 offres sur 66929 : il manquait
 # environ deux heures d'offres (17458 en 7 jours, soit une centaine par
-# heure), l'écart de l'heure de Paris en été. L'API lit sans doute les
-# dates en heure de Paris malgré le « Z ». Une marge d'un jour couvre tout
-# décalage de fuseau ; scripts/verifier_france_travail.py le contrôle.
+# heure), l'écart de l'heure de Paris en été. Confirmé le même jour : fin
+# à maintenant 66790, fin à maintenant plus 3 h 66932, le total. L'API lit
+# les dates en heure de Paris malgré le « Z ». Une marge d'un jour couvre
+# tout décalage (heure d'hiver comprise) ; scripts/verifier_france_travail.py
+# le contrôle.
 MARGE_FIN_FENETRE_HEURES = 24
 # Plus petite fenêtre découpée : au-delà, la tranche est récupérée jusqu'au
 # plafond et le reste signalé (une heure compte une centaine d'offres en IDF)
