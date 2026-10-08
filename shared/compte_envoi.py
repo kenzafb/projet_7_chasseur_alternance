@@ -119,16 +119,14 @@ def tester(user_id: int) -> dict:
             "compte": compte_envoi_db.lire_compte(user_id)}
 
 
-def envoyer_mail_test(user_id: int, adresse_utilisateur: str, destinataire: str | None) -> dict:
-    """Mail de test vers l'utilisateur lui-même : son adresse de connexion ou
-    l'adresse d'expédition du compte, rien d'autre. Compte dans le plafond."""
+def envoyer_mail_test(user_id: int, destinataire: str | None = None) -> dict:
+    """Mail de test vers l'adresse d'expédition du compte, et elle seule
+    (comme le mode test, décision D9). Compte dans le plafond."""
     compte = _compte_complet(user_id)
-    siennes = {a.strip().lower() for a in (adresse_utilisateur, compte["adresse"]) if a}
-    dest = (destinataire or adresse_utilisateur or "").strip().lower()
-    if dest not in siennes:
+    dest = compte["adresse"].strip().lower()
+    if destinataire and destinataire.strip().lower() != dest:
         raise ErreurUtilisateur(
-            "Le mail de test ne peut partir que vers ta propre adresse "
-            "(adresse de connexion ou adresse d'expédition).")
+            "Le mail de test ne peut partir que vers l'adresse d'expédition du compte.")
     jour = compte_envoi_db.reserver_envoi(user_id, config.PLAFOND_ENVOIS_JOUR)
     if jour is None:
         raise ErreurUtilisateur(

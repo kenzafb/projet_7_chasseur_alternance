@@ -26,6 +26,10 @@ def attendre(condition, delai=5.0):
 def a_et_b(utilisateur):
     client_a, id_a = utilisateur("a@test.fr", prenom="Alice", nom="A")
     client_b, id_b = utilisateur("b@test.fr", prenom="Bob", nom="B")
+    # Une entreprise à scraper chacun : sans elle, le scraper refuse de démarrer
+    from database.entreprises_db import ajouter_entreprises
+    for uid in (id_a, id_b):
+        ajouter_entreprises(uid, [{"siret": "S1", "nom": "ACME"}])
     return client_a, id_a, client_b, id_b
 
 

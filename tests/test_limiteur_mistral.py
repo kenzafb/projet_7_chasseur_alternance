@@ -57,9 +57,10 @@ def test_les_retries_passent_aussi_par_le_limiteur(instants, mistral, monkeypatc
     assert instants[1] - instants[0] >= INTERVALLE - 0.01
 
 
-def test_analyse_lba_passe_par_le_limiteur(monkeypatch):
+def test_analyse_lba_passe_par_le_limiteur(monkeypatch, mistral):
     """La boucle LBA de main.py appelle analyser_offre sans pause propre :
     c'est le limiteur qui l'espace."""
+    mistral.reponse = '{"score": 6, "eligible": true}'
     appels = []
     monkeypatch.setattr(shared.ia, "limiteur", type("L", (), {"attendre": lambda self: appels.append(1)})())
     analyser_offre({"titre": "Dev", "description": "..."}, {"prenom": "A"})

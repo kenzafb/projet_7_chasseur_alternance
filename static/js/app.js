@@ -71,7 +71,14 @@ const modal = {
     if (!lettre) {
       this.area().value = "Génération en cours…";
       this.el().classList.add("is-open");
-      try { lettre = (await api.genererLettre(id)).lettre; } catch (e) { lettre = "Erreur : " + e.message; }
+      try {
+        lettre = (await api.genererLettre(id)).lettre;
+      } catch (e) {
+        // Rien à enregistrer : pas de texte d'erreur dans la zone de la lettre
+        this.fermer();
+        alert("Lettre non générée : " + e.message);
+        return;
+      }
     }
     this.area().value = lettre;
     this.el().classList.add("is-open");
@@ -117,6 +124,21 @@ let minuteur = null;     // prochain poll programmé
 let enVol = false;       // une requête de statut est en cours
 let aRelancer = false;   // surveiller() appelé pendant cette requête
 
+/* Erreur d'un pipeline (clé Mistral refusée, modèle non autorisé...) :
+   affichée dans le bandeau de confirmation jusqu'à un clic, une seule fois */
+const erreursVues = new Set();
+function signalerErreur(etat) {
+  const texte = etat && !etat.en_cours && typeof etat.message === "string" ? etat.message : "";
+  if (!texte.startsWith("Erreur") || erreursVues.has(texte)) return;
+  erreursVues.add(texte);
+  const el = document.querySelector("[data-confirmation]");
+  if (!el) return;
+  clearTimeout(confirmerLancement._minuteur);
+  el.textContent = "❌ " + texte + " (clique pour fermer)";
+  el.classList.add("is-erreur");
+  el.hidden = false;
+}
+
 function surveiller() {
   if (enVol) { aRelancer = true; return; }
   clearTimeout(minuteur);
@@ -130,6 +152,8 @@ async function pollEtat() {
   try {
     const { recherche: rech, spontanees: sp } = await api.statutPipelines();
     actif = rech.en_cours || sp.en_cours;
+    signalerErreur(rech);
+    signalerErreur(sp);
     const bar = document.querySelector("[data-runbar]");
     bar.classList.toggle("is-on", actif);
     if (actif) {
@@ -304,6 +328,9 @@ function brancher() {
       try { await api.spStop(); Spontanees.charger(); } catch (_) {}
       surveiller();
     }));
+  // Bandeau de confirmation ou d'erreur : un clic le ferme
+  const bandeau = document.querySelector("[data-confirmation]");
+  if (bandeau) bandeau.addEventListener("click", () => { bandeau.hidden = true; });
   // Retour sur l'onglet : un pipeline a pu être lancé ailleurs (autre onglet)
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") surveiller();

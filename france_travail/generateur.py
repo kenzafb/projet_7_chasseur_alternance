@@ -2,7 +2,7 @@ import re
 import json
 import string
 from database.dates import maintenant_affichage
-from shared.ia import appeler_mistral
+from shared.ia import ErreurIAPassagere, appeler_mistral
 from shared.erreurs import ErreurUtilisateur, exiger_profil, CHAMPS_IDENTITE
 
 # ─── Lettre de motivation fixe ────────────────────────────────────────────────
@@ -212,44 +212,43 @@ def generer_lettre(offre, profil, mode="alternance"):
     )
 
 
-    try:
-        # Un seul essai, pas de retry (comportement historique)
-        response = appeler_mistral(
-            [{"role": "user", "content": prompt}],
-            tentatives=1,
-            response_format={"type": "json_object"},
-            temperature=0.6,
-        )
-        finish = response.choices[0].finish_reason
-        texte = re.sub(r'```json\s*', '', response.choices[0].message.content or "")
-        texte = re.sub(r'```\s*', '', texte).strip()
-        if finish != "stop":
-            print(f"  ⚠️  Mistral finish_reason={finish} — réponse potentiellement tronquée")
-        result = json_parse(texte)
+    # Un seul essai, pas de retry (comportement historique). ErreurIABloquante
+    # et ErreurIAPassagere remontent : pas de lettre sans paragraphe rédigé.
+    response = appeler_mistral(
+        [{"role": "user", "content": prompt}],
+        usage="lettre",
+        tentatives=1,
+        response_format={"type": "json_object"},
+        temperature=0.6,
+    )
+    finish = response.choices[0].finish_reason
+    texte = re.sub(r'```json\s*', '', response.choices[0].message.content or "")
+    texte = re.sub(r'```\s*', '', texte).strip()
+    if finish != "stop":
+        print(f"  ⚠️  Mistral finish_reason={finish} — réponse potentiellement tronquée")
+    result = json_parse(texte)
+    if not isinstance(result, dict):
+        result = {}
 
-        contact    = result.get("contact_entreprise", nom_entreprise)
-        paragraphe = result.get("paragraphe_entreprise", "")
+    contact    = result.get("contact_entreprise", nom_entreprise)
+    paragraphe = result.get("paragraphe_entreprise", "")
 
-        # ── Nettoyage défensif du bloc contact ────────────────────────────────
-        contact = _nettoyer_contact(contact)
-        # Entreprise masquée par France Travail (~1 offre sur 2) :
-        # on bascule sur une formule neutre plutôt qu'un nom bidon.
-        noms_vides = {"", "inconnue", "inconnu", "non précisé", "non precise",
-                      "non renseigné", "non renseigne", "n/a", "na"}
-        if not contact or nom_entreprise.strip().lower() in noms_vides:
-            ville = (offre.get("lieu", "") or "").strip()
-            contact = "À l'attention du service recrutement"
-            if ville:
-                contact += "\n" + ville
+    # ── Nettoyage défensif du bloc contact ────────────────────────────────
+    contact = _nettoyer_contact(contact)
+    # Entreprise masquée par France Travail (~1 offre sur 2) :
+    # on bascule sur une formule neutre plutôt qu'un nom bidon.
+    noms_vides = {"", "inconnue", "inconnu", "non précisé", "non precise",
+                  "non renseigné", "non renseigne", "n/a", "na"}
+    if not contact or nom_entreprise.strip().lower() in noms_vides:
+        ville = (offre.get("lieu", "") or "").strip()
+        contact = "À l'attention du service recrutement"
+        if ville:
+            contact += "\n" + ville
 
-        # ── Alerte si paragraphe manquant ─────────────────────────────────────
-        if not paragraphe:
-            print(f"  ⚠️  paragraphe_entreprise vide pour '{nom_entreprise}' — JSON reçu : {result}")
-
-    except Exception as e:
-        print(f"  Erreur génération IA : {e}")
-        contact    = nom_entreprise
-        paragraphe = ""
+    # ── Paragraphe manquant : pas de lettre incomplète ────────────────────
+    if not paragraphe:
+        raise ErreurIAPassagere(
+            "Mistral n'a pas rédigé le paragraphe sur l'entreprise : réessaie.")
 
     lettre = template.format(
         contact_entreprise=contact,

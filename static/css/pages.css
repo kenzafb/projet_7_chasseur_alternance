@@ -448,6 +448,8 @@
   padding: 10px 14px; margin-bottom: 14px; font-size: 13px; font-weight: 600; color: var(--txt);
 }
 .confirmation[hidden] { display: none; }
+.confirmation { cursor: pointer; }
+.confirmation.is-erreur { border-color: var(--rouge); background: var(--rouge-soft); }
 /* Limite de la recherche d'offres, réglée avant de lancer */
 .limite-lancement { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-size: 13px; color: var(--txt-muted); }
 .limite-lancement input {

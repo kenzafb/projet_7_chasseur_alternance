@@ -28,8 +28,8 @@ import requests
 from bs4 import BeautifulSoup
 from ddgs import DDGS
 from ddgs.exceptions import RatelimitException
-from shared.config import MODELE_MISTRAL
-from shared.ia import appeler_mistral
+from shared.config import modele_mistral
+from shared.ia import ErreurIABloquante, ErreurIAPassagere, appeler_mistral, reponse_json
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -375,46 +375,31 @@ def mistral_extraire_contact(texte_page, nom_entreprise, emails_bruts,
 
     MAX_RETRIES = 20
 
-    def _est_rate_limit(e):
-        err = str(e)
-        return "429" in err or "rate_limit" in err.lower() or "rate limited" in err.lower()
-
+    # Retry sur les erreurs passagères : 20 tentatives, attente 60s doublée à
+    # chaque fois (max 300s). ErreurIABloquante et ErreurIAPassagere remontent :
+    # l'appelant garde alors les emails lus dans la page, non validés.
+    response = appeler_mistral(
+        [
+            {"role": "system", "content": (
+                "Tu es un expert en extraction de données de contact. "
+                "Tu réponds UNIQUEMENT en JSON valide sans backticks ni markdown. "
+                "Tu ne génères JAMAIS d'emails si tu n'en trouves pas dans le contenu fourni."
+            )},
+            {"role": "user", "content": prompt},
+        ],
+        usage="extraction",
+        tentatives=MAX_RETRIES,
+        attente=lambda n: min(60 * 2 ** (n - 1), 300),
+        on_attente=lambda t, n, s: print(
+            f"    ⚠️  Mistral indisponible (tentative {t}/{n}) — attente {s}s..."),
+        response_format={"type": "json_object"},
+    )
     try:
-        # Retry sur rate limit : 20 tentatives, attente 60s doublée à chaque fois (max 300s)
-        response = appeler_mistral(
-            [
-                {"role": "system", "content": (
-                    "Tu es un expert en extraction de données de contact. "
-                    "Tu réponds UNIQUEMENT en JSON valide sans backticks ni markdown. "
-                    "Tu ne génères JAMAIS d'emails si tu n'en trouves pas dans le contenu fourni."
-                )},
-                {"role": "user", "content": prompt},
-            ],
-            tentatives=MAX_RETRIES,
-            attente=lambda n: min(60 * 2 ** (n - 1), 300),
-            rate_limit=_est_rate_limit,
-            on_attente=lambda t, n, s: print(
-                f"    ⚠️  Rate limit Mistral (tentative {t}/{n}) — attente {s}s..."),
-            response_format={"type": "json_object"},
-        )
-    except Exception as e:
-        if _est_rate_limit(e):
-            print(f"    ⚠️  Mistral inaccessible après {MAX_RETRIES} tentatives — entreprise ignorée")
-        else:
-            print(f"    ⚠️  Erreur Mistral non-récupérable : {e}")
-            time.sleep(PAUSE_MISTRAL)
-        return {"emails": [], "telephones": [], "contact_rh": None, "fiable": True}
-
-    try:
-        texte  = re.sub(r'```(?:json)?\s*', '', response.choices[0].message.content).strip()
-        result = json.loads(texte)
-        dbg(f"Mistral → {result}")
+        result = reponse_json(response)
+    finally:
         time.sleep(PAUSE_MISTRAL)
-        return result
-    except Exception as e:
-        print(f"    ⚠️  Mistral parse erreur : {e}")
-        time.sleep(PAUSE_MISTRAL)
-        return {"emails": [], "telephones": [], "contact_rh": None, "fiable": True}
+    dbg(f"Mistral → {result}")
+    return result
 
 
 # ─── Analyse du nom / correspondance domaine ─────────────────────────────────
@@ -640,7 +625,20 @@ def lire_sitemap(url_racine):
     return urls_trouvees[:5]
 
 
-def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None):
+def meilleurs_emails(emails):
+    """Emails valides et utiles au recrutement, les 5 mieux notés."""
+    valides = [e for e in emails if est_email_valide(e)]
+    # FIX 10 — exclure les emails scorés à 0 (inutiles pour le recrutement)
+    valides = [e for e in valides if scorer_email(e) > 0]
+    return sorted(dict.fromkeys(valides), key=scorer_email, reverse=True)[:5]
+
+
+def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
+    """Emails, téléphones et contact d'une entreprise. Avec l'IA (ia=True),
+    Mistral valide et complète ce que la page donne ; s'il échoue, ou sans
+    IA, les emails lus directement dans les pages (regex, déobfuscation)
+    sont gardés avec valide_ia=False. Une erreur bloquante est signalée dans
+    "ia_bloquee" (message) au lieu d'être levée."""
     url_site = url_site.strip().rstrip("/")
     if not url_site.startswith("http"):
         url_site = "https://" + url_site
@@ -686,7 +684,8 @@ def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None):
         html, url_finale = get_page(alt)
 
     if not html and not pages_texte:
-        return {"emails": [], "telephones": [], "contact_rh": None, "url_finale": None, "fiable": True}
+        return {"emails": [], "telephones": [], "contact_rh": None, "url_finale": None, "fiable": True,
+                "valide_ia": True}
 
     vus = {url_racine, url_site, url_finale or url_site}
 
@@ -741,30 +740,37 @@ def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None):
     texte_pour_mistral = texte_pour_mistral[:2000]
     html_contact_brut_tronque = html_contact_brut[:3000] if html_contact_brut else None
 
-    resultat = mistral_extraire_contact(
-        texte_pour_mistral,
-        nom_entreprise,
-        emails_bruts_uniques,
-        html_contact=html_contact_brut_tronque,
-    )
+    # Sans IA : ce que la page donne directement, non validé
+    sans_ia = {"emails": meilleurs_emails(emails_bruts_uniques), "telephones": [], "contact_rh": None,
+               "url_finale": url_finale or url_racine, "fiable": True, "valide_ia": False}
+    if not ia:
+        return sans_ia
+    try:
+        resultat = mistral_extraire_contact(
+            texte_pour_mistral,
+            nom_entreprise,
+            emails_bruts_uniques,
+            html_contact=html_contact_brut_tronque,
+        )
+    except ErreurIABloquante as e:
+        return {**sans_ia, "ia_bloquee": str(e)}
+    except ErreurIAPassagere as e:
+        return {**sans_ia, "erreur_ia": str(e)}
 
-    emails_finals = [e for e in resultat.get("emails", []) if est_email_valide(e)]
-    # FIX 10 — exclure les emails scorés à 0 (inutiles pour le recrutement)
-    emails_finals = [e for e in emails_finals if scorer_email(e) > 0]
-    emails_finals = sorted(emails_finals, key=scorer_email, reverse=True)[:5]
-
+    emails = resultat.get("emails")
     return {
-        "emails":     emails_finals,
-        "telephones": resultat.get("telephones", []),
+        "emails":     meilleurs_emails(emails if isinstance(emails, list) else []),
+        "telephones": resultat.get("telephones") if isinstance(resultat.get("telephones"), list) else [],
         "contact_rh": resultat.get("contact_rh"),
         "url_finale": url_finale or url_racine,
-        "fiable":     resultat.get("fiable", True),
+        "fiable":     resultat.get("fiable", True) is not False,
+        "valide_ia":  True,
     }
 
 
 # ─── Chargement / sauvegarde ──────────────────────────────────────────────────
 
-from database.entreprises_db import lire_entreprises, sauvegarder_enrichissement
+from database.entreprises_db import a_scraper, lire_entreprises, sauvegarder_enrichissement
 
 def charger_entreprises(user_id):
     """Lit les entreprises de l'utilisateur depuis la BASE."""
@@ -784,7 +790,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
     """Cherche site, emails et contact des entreprises pas encore traitées,
     au plus max_scrapees par lancement (None : toutes)."""
     _log = log_fn or print
-    _log(f"Scraper Emails v15 | Mistral = {MODELE_MISTRAL} | Moteur = DDG")
+    _log(f"Scraper Emails v15 | Mistral = {modele_mistral('extraction')} | Moteur = DDG")
     if DEBUG:
         _log("  [Mode DEBUG activé — logs DDG détaillés]")
 
@@ -794,12 +800,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
     deja_emails  = sum(1 for e in entreprises if e.get("emails_trouves"))
     deja_traites = sum(1 for e in entreprises if e.get("traite"))
 
-    a_traiter = [
-        e for e in entreprises
-        if not e.get("traite")
-        and not e.get("emails_trouves")
-        and not e.get("mail_envoye")
-    ]
+    a_traiter = [e for e in entreprises if a_scraper(e)]
 
     _log(f"Total : {total} | Déjà traités : {deja_traites} | Avec emails : {deja_emails} | Envoyés : {deja_envoyes}")
     _log(f"Queue : {len(a_traiter)} à traiter")
@@ -813,6 +814,18 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
         return
 
     traites_ce_run = 0
+    ia_active = True   # coupée pour tout le lancement sur une erreur Mistral bloquante
+
+    def extraire(url, nom, dirigeant):
+        nonlocal ia_active
+        resultat = scraper_et_extraire(url, nom, dirigeant=dirigeant, ia=ia_active)
+        if resultat.get("ia_bloquee") and ia_active:
+            ia_active = False   # un seul message, pas un par entreprise
+            _log(f"❌ Mistral refuse les appels : {resultat['ia_bloquee']} Suite du lancement sans IA : "
+                 "emails lus directement dans les pages, non validés.")
+        elif resultat.get("erreur_ia"):
+            _log(f"  ⚠️  Mistral : {resultat['erreur_ia']} Emails de la page gardés, non validés par l'IA.")
+        return resultat
 
     try:
         for e in entreprises:
@@ -851,7 +864,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
                     traites_ce_run += 1
                     continue
 
-            resultat = scraper_et_extraire(url, nom, dirigeant=dirigeant)
+            resultat = extraire(url, nom, dirigeant)
 
             if not resultat.get("fiable", True):
                 tentatives = e.get("tentatives_site", 0)
@@ -864,7 +877,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
                     url, source_site = chercher_site(e, url_exclue=url_echouee)
                     if url:
                         e["site_web"] = url
-                        resultat = scraper_et_extraire(url, nom, dirigeant=dirigeant)
+                        resultat = extraire(url, nom, dirigeant)
                         if not resultat.get("fiable", True):
                             _log(f"  ❌ Toujours non fiable")
                             e["emails_trouves"] = []; e["telephones"] = []
@@ -885,8 +898,9 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
             telephones = resultat.get("telephones", [])
             contact    = resultat.get("contact_rh")
 
+            non_valides = bool(emails) and not resultat.get("valide_ia", True)
             if emails:
-                _log(f"  ✅ {', '.join(emails)}")
+                _log(f"  ✅ {', '.join(emails)}" + (" (non validés par l'IA)" if non_valides else ""))
             else:
                 _log(f"  ⚠️  Aucun email")
 
@@ -894,6 +908,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
             e["telephones"]       = telephones
             e["telephone"]        = telephones[0] if telephones else None
             e["contact_rh"]       = contact
+            e["emails_non_valides"] = non_valides
             e["url_scrapee"]      = resultat.get("url_finale") or url
             e["source_recherche"] = source_site
             e["traite"]           = True

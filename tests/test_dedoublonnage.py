@@ -56,8 +56,9 @@ def test_offres_vues_separees_par_mode(a_et_b, france_travail_simule):
     assert lire_offres_vues(id_a, "alternance") == lire_offres_vues(id_a, "job")
 
 
-def test_recherche_complete_ecrit_les_candidatures_de_chacun(a_et_b, france_travail_simule):
+def test_recherche_complete_ecrit_les_candidatures_de_chacun(a_et_b, france_travail_simule, mistral):
     id_a, id_b = a_et_b
+    mistral.reponse = '{"score": 7, "eligible": true, "resume": "ok"}'
     for uid in (id_a, id_b):
         lancer_recherche(uid, {"prenom": "X"}, on_offre=lambda o, u=uid: ajouter_candidature(u, o))
     assert {c["id"] for c in lire_candidatures(id_a)} == {c["id"] for c in lire_candidatures(id_b)}

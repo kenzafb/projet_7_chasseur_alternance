@@ -108,7 +108,19 @@ def limite_lancement(cle: str, demandee) -> int:
     return max(1, min(int(demandee), regle["max"]))
 
 # ─── IA ───────────────────────────────────────────────────────────────────────
-MODELE_MISTRAL = "mistral-large-latest"
+# Modèle par usage : MODELE_MISTRAL_<USAGE> du .env, sinon MODELE_MISTRAL, sinon
+# le défaut de l'usage. scripts/verifier_mistral.py teste ceux de la clé.
+USAGES_MISTRAL = {
+    "analyse":    "mistral-medium-latest",   # notation des offres
+    "lettre":     "mistral-medium-latest",   # paragraphe des lettres de motivation
+    "extraction": "mistral-small-latest",    # emails et contacts des pages d'entreprise
+}
+
+def modele_mistral(usage: str) -> str:
+    """Modèle Mistral d'un usage, relu dans l'environnement à chaque appel."""
+    return (os.getenv(f"MODELE_MISTRAL_{usage.upper()}", "").strip()
+            or os.getenv("MODELE_MISTRAL", "").strip()
+            or USAGES_MISTRAL[usage])
 # Intervalle minimum entre deux appels Mistral, commun à tout le processus
 # (tous utilisateurs et pipelines confondus). Surchargeable dans le .env.
 MISTRAL_INTERVALLE_MIN_S = float(os.getenv("MISTRAL_INTERVALLE_MIN_S") or 2.0)

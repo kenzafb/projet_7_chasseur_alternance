@@ -219,26 +219,28 @@ def test_verification_d_une_configuration_modifiee_entre_temps(ada, smtp_simule,
 
 
 # ─── Mail de test ─────────────────────────────────────────────────────────────
-def test_mail_de_test_vers_soi_uniquement(ada, smtp_simule):
+def test_mail_de_test_vers_l_adresse_d_expedition_uniquement(ada, smtp_simule):
+    """Décision D9 : comme le mode test, le mail de test part vers l'adresse
+    d'expédition, plus vers l'adresse de connexion."""
     client, _ = ada
     smtp_simule.comptes["ada@gmail.com"] = MDP_GMAIL
     client.post("/api/compte_envoi", json=GMAIL)
 
-    for autre in ["victime@exemple.fr", "ADA@test.fr.evil.com", "ada@test.fr, victime@exemple.fr"]:
+    for autre in ["victime@exemple.fr", "ADA@test.fr.evil.com", "ada@test.fr, victime@exemple.fr",
+                  "ada@test.fr"]:   # l'adresse de connexion non plus
         r = client.post("/api/compte_envoi/mail_test", json={"destinataire": autre})
-        assert r.status_code == 400 and "ta propre adresse" in r.json()["erreur"]
+        assert r.status_code == 400 and "adresse d'expédition" in r.json()["erreur"]
     assert smtp_simule.messages == []
 
-    r = client.post("/api/compte_envoi/mail_test").json()   # défaut : adresse de connexion
+    r = client.post("/api/compte_envoi/mail_test").json()   # défaut : adresse d'expédition
     assert r["ok"] is True and r["compte"]["verifie"] is True
     r = client.post("/api/compte_envoi/mail_test", json={"destinataire": "Ada@Gmail.com"}).json()
     assert r["ok"] is True
     envoyes = [(i, f, t) for i, f, t, _ in smtp_simule.messages]
-    assert envoyes == [("ada@gmail.com", "ada@gmail.com", ["ada@test.fr"]),
-                       ("ada@gmail.com", "ada@gmail.com", ["ada@gmail.com"])]
+    assert envoyes == [("ada@gmail.com", "ada@gmail.com", ["ada@gmail.com"])] * 2
     message = smtp_simule.messages[0][3]
     assert message["From"] == "Ada L <ada@gmail.com>"
-    assert message["To"] == "ada@test.fr"
+    assert message["To"] == "ada@gmail.com"
     _sans_mot_de_passe(message.as_string(), MDP, MDP_GMAIL)
 
 

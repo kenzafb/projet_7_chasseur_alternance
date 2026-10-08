@@ -18,12 +18,13 @@ Pour chaque étape : **Faire**, **Observer** (ce qui doit se passer), **Échec s
    alembic current          # attendu : 0006 (head)
    ```
 3. Vérifier dans `.env` la présence de : `SECRET_KEY`, `DATABASE_URL` (la base v2), `CODE_INVITATION`, `CLE_CHIFFREMENT`, `MISTRAL_API_KEY`, `FT_CLIENT_ID`, `FT_CLIENT_SECRET`, `LBA_API_KEY`, `INSEE_API_KEY`. Ne pas y laisser `GMAIL_SENDER` ni `GMAIL_APP_PASSWORD` (plus lus).
-4. Lancer l'application **sans `--reload`** (le rechargement tue les pipelines en cours à chaque modification de fichier) et garder le terminal visible : c'est là que s'affichent les logs des pipelines, préfixés `[user N]`.
+4. Vérifier les modèles Mistral (appels réels, quelques tokens) : `venv/bin/python scripts/verifier_mistral.py`. Attendu : une ligne `OK` par usage (analyse, lettre, extraction) et « Tout est prêt. ». Sinon, choisir dans la liste affichée un modèle qui répond et le mettre dans `.env` (`MODELE_MISTRAL` ou `MODELE_MISTRAL_<USAGE>`).
+5. Lancer l'application **sans `--reload`** (le rechargement tue les pipelines en cours à chaque modification de fichier) et garder le terminal visible : c'est là que s'affichent les logs des pipelines, préfixés `[user N]`.
    ```bash
    uvicorn main:app --port 5002
    ```
-5. Préparer deux navigateurs indépendants : une fenêtre normale pour A, une fenêtre de navigation privée (ou un autre navigateur) pour B. Les deux sessions doivent rester ouvertes en même temps.
-6. Avoir accès à la boîte de réception de l'adresse d'expédition de A (celle du compte Gmail utilisé pour l'envoi).
+6. Préparer deux navigateurs indépendants : une fenêtre normale pour A, une fenêtre de navigation privée (ou un autre navigateur) pour B. Les deux sessions doivent rester ouvertes en même temps.
+7. Avoir accès à la boîte de réception de l'adresse d'expédition de A (celle du compte Gmail utilisé pour l'envoi).
 
 **Observer** au démarrage : `Application startup complete`, et **pas** de ligne `⚠️  Envoi de mails désactivé`.
 **Échec si** : l'application refuse de démarrer (`SECRET_KEY`), `alembic current` n'affiche pas `0006 (head)`, ou l'avertissement sur `CLE_CHIFFREMENT` apparaît.

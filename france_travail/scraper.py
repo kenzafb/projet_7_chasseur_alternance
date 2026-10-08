@@ -166,9 +166,10 @@ def _normaliser(bruts: list) -> list:
 
 
 def chercher_offres(user_id, grands_domaines=None, ft_params=None, filtrer_domaines=True,
-                    mode="alternance", limite_lot=None) -> list:
-    """Offres FT pas encore vues par cet utilisateur dans ce mode. Les offres
-    retenues (et, hors lots, toutes celles reçues) sont marquées vues en base."""
+                    mode="alternance", limite_lot=None, marquer=True) -> list:
+    """Offres FT pas encore vues par cet utilisateur dans ce mode. Si marquer,
+    les offres retenues (et, hors lots, toutes celles reçues) sont marquées
+    vues en base ; sinon l'appelant les marque une à une après analyse."""
     # ft_params : paramètres FT spécifiques au mode (E2 pour alternance, CDD pour job)
     if ft_params is None:
         ft_params = {"natureContrat": "E2"}   # défaut alternance (rétrocompat)
@@ -206,8 +207,9 @@ def chercher_offres(user_id, grands_domaines=None, ft_params=None, filtrer_domai
     # Mode job : on traite par LOTS (ex. 100/run) pour ne pas tout analyser d'un coup
     if limite_lot:
         toutes_offres = toutes_offres[:limite_lot]
-        marquer_offres_vues(user_id, mode, {o["id"] for o in toutes_offres})
-    else:
+        if marquer:
+            marquer_offres_vues(user_id, mode, {o["id"] for o in toutes_offres})
+    elif marquer:
         marquer_offres_vues(user_id, mode, {o["id"] for o in candidates})
 
     print(f"\n{len(toutes_offres)} nouvelles offres FT trouvées (hors déjà vues) !\n")

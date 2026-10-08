@@ -83,6 +83,8 @@ python -m spontanees.envoyeur --user 1 --limite 10 --test
 
 **Limites par lancement**, réglées dans l'interface au moment de lancer, bornées par le serveur (`LIMITES_LANCEMENT` dans `shared/config.py`) : offres analysées par Mistral (30 par défaut, 200 au plus, France Travail et LBA ensemble), nouvelles entreprises récupérées (200, 5000), entreprises scrapées (20, 200), mails envoyés (10, 50).
 
+**Modèles Mistral.** Un par usage : `MODELE_MISTRAL_ANALYSE`, `MODELE_MISTRAL_LETTRE`, `MODELE_MISTRAL_EXTRACTION`, sinon `MODELE_MISTRAL` pour tous, sinon `mistral-medium-latest` (analyse, lettre) et `mistral-small-latest` (extraction). `python scripts/verifier_mistral.py` liste les modèles de la clé et teste ceux configurés (appels réels). Une erreur Mistral ne produit jamais de note ni de lettre inventée : clé refusée ou modèle non autorisé arrêtent le pipeline avec un message clair, une erreur passagère fait sauter l'offre, qui reviendra au lancement suivant.
+
 Procédure de test réel de bout en bout : `docs/RECETTE.md`. Décisions prises hors du code : `docs/DECISIONS.md`.
 
 ## Tests

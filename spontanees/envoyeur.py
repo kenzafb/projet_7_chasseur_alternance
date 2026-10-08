@@ -122,6 +122,32 @@ def sauvegarder_json(user_id, data):
     sauvegarder_entreprises(user_id, data)
 
 
+def adresses_deja_contactees(user_id, mode, entreprises) -> set:
+    """Adresses à ne plus viser dans ce mode : celles de emails_contactes, et
+    les destinataires enregistrés sur les entreprises du mode (au cas où)."""
+    deja = lire_emails_contactes(user_id, mode)
+    for e in entreprises:
+        if e.get("mode") == mode and e.get("mail_envoye") and e.get("mail_destinataires"):
+            deja.update(normaliser_email(a) for a in e["mail_destinataires"])
+    return deja
+
+
+def adresses_nouvelles(entreprise, deja) -> list[str]:
+    """Adresses de l'entreprise pas encore contactées, normalisées, sans doublon."""
+    uniques = dict.fromkeys(normaliser_email(a) for a in entreprise.get("emails_trouves") or []
+                            if a and a.strip())
+    return [a for a in uniques if a not in deja]
+
+
+def compter_a_envoyer(user_id, mode) -> int:
+    """Entreprises avec email, pas encore envoyées, dont au moins une adresse
+    n'a pas été contactée dans ce mode : le maximum utile d'un envoi."""
+    entreprises = charger_json(user_id)
+    deja = adresses_deja_contactees(user_id, mode, entreprises)
+    return sum(1 for e in entreprises
+               if e.get("emails_trouves") and not e.get("mail_envoye") and adresses_nouvelles(e, deja))
+
+
 # ─── Envoi mail ───────────────────────────────────────────────────────────────
 
 class EnvoiInterrompu(Exception):
@@ -181,14 +207,8 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
     entreprises = charger_json(user_id)
 
     # ── Déduplication : adresses contactées + champ mail_destinataires ───────
-    emails_deja_envoyes = lire_emails_contactes(user_id, mode)
-    nb_contactes = len(emails_deja_envoyes)
-
-    # Ajoute aussi les destinataires enregistrés sur les entreprises du mode (au cas où)
-    for e in entreprises:
-        if e.get("mode") == mode and e.get("mail_envoye") and e.get("mail_destinataires"):
-            for addr in e["mail_destinataires"]:
-                emails_deja_envoyes.add(normaliser_email(addr))
+    nb_contactes = len(lire_emails_contactes(user_id, mode))
+    emails_deja_envoyes = adresses_deja_contactees(user_id, mode, entreprises)
 
     _log(f"Déduplication : {nb_contactes} adresses déjà contactées + "
          f"{len(emails_deja_envoyes) - nb_contactes} depuis les entreprises "
@@ -232,15 +252,11 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
         nom = (e.get("nom_commercial") or e.get("nom", "?"))[:50]
 
         # ── Déduplication : ne garder que les emails pas encore contactés ─────
-        emails_bruts = e.get("emails_trouves", [])
         emails_uniques = list(dict.fromkeys(
-            normaliser_email(addr) for addr in emails_bruts
+            normaliser_email(addr) for addr in e.get("emails_trouves", [])
             if addr and addr.strip()
         ))
-        emails_nouveaux = [
-            addr for addr in emails_uniques
-            if addr not in emails_deja_envoyes
-        ]
+        emails_nouveaux = adresses_nouvelles(e, emails_deja_envoyes)
 
         if not emails_nouveaux:
             _log(f"  ⏭️  {nom} — tous les emails déjà contactés, skip")

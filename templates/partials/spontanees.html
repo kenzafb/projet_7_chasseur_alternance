@@ -67,9 +67,9 @@
         <span class="pipe__progress-pct" data-step-progress-pct></span>
       </div>
       <label class="pipe__nombre">
-        <span>Entreprises à scraper au plus (max {{ limites.scrapees.max }})</span>
+        <span>Entreprises à scraper au plus (<span data-limite-max="scrapees">max {{ limites.scrapees.max }}</span>)</span>
         <input type="number" data-limite="scrapees" value="{{ limites.scrapees.defaut }}"
-               min="1" max="{{ limites.scrapees.max }}">
+               min="1" max="{{ limites.scrapees.max }}" data-plafond="{{ limites.scrapees.max }}">
       </label>
       <button class="pipe__btn" data-action="scraper">Lancer</button>
       <button class="pipe__stop" data-stop>Arrêter</button>
@@ -89,9 +89,9 @@
         <span class="pipe__progress-pct" data-step-progress-pct></span>
       </div>
       <label class="pipe__nombre">
-        <span>Nombre de mails à envoyer (max {{ limites.mails.max }})</span>
+        <span>Nombre de mails à envoyer (<span data-limite-max="mails">max {{ limites.mails.max }}</span>)</span>
         <input type="number" data-limite="mails" value="{{ limites.mails.defaut }}"
-               min="1" max="{{ limites.mails.max }}">
+               min="1" max="{{ limites.mails.max }}" data-plafond="{{ limites.mails.max }}">
       </label>
       <button class="pipe__btn pipe__btn--signal" data-action="envoyer">Lancer</button>
       <button class="pipe__stop" data-stop>Arrêter</button>

@@ -38,6 +38,7 @@ export function confirmerLancement(cle, demandee, reponse) {
   if (champ) champ.value = appliquee;
   const el = document.querySelector("[data-confirmation]");
   if (!el) return;
+  el.classList.remove("is-erreur");
   el.textContent = texte + ".";
   el.hidden = false;
   clearTimeout(confirmerLancement._minuteur);

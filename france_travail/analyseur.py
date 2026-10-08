@@ -1,7 +1,7 @@
 import time
 import json
 import re
-from shared.ia import appeler_mistral
+from shared.ia import ErreurIABloquante, ErreurIAPassagere, appeler_mistral, reponse_json
 from shared.erreurs import exiger_profil
 
 PAUSE_MISTRAL = 10 # secondes entre chaque appel Mistral (rate limit)
@@ -151,37 +151,21 @@ def _analyser_offre_job(offre, profil):
         '"resume": "max 12 mots factuels"}'
     )
 
-    try:
-        # Appel Mistral avec retry sur rate limit (4 tentatives, pauses 15s, 30s, 45s)
-        response = appeler_mistral(
-            [
-                {"role": "system", "content": (
-                    "Tu es un recruteur spécialisé dans les jobs courts et missions. "
-                    "Tu reponds UNIQUEMENT en JSON valide sans backticks. "
-                    "Tu ignores totalement la date de debut et la disponibilite dans ta notation."
-                )},
-                {"role": "user", "content": prompt},
-            ],
-            response_format={"type": "json_object"},
-        )
-        texte = response.choices[0].message.content
-        texte = re.sub(r'```json\s*', '', texte)
-        texte = re.sub(r'```\s*', '', texte)
-        result = json.loads(texte)
-        if "score" in result:
-            result["score"] = max(1, min(10, int(result["score"])))
-        if not result.get("eligible", True):
-            result["score"] = min(result["score"], 2)
-            result["verdict"] = "faible"
-        if not result.get("domaine"):
-            result["domaine"] = "Non classé"
-        return result
-    except Exception as e:
-        print(f"  Erreur analyse job : {e}")
-        return {
-            "score": 5, "verdict": "erreur", "eligible": True,
-            "points_forts": [], "points_faibles": [], "domaine": "Non classé", "resume": "Erreur analyse"
-        }
+    # Appel Mistral avec retry sur les erreurs passagères (4 tentatives, pauses 15s, 30s, 45s).
+    # ErreurIABloquante / ErreurIAPassagere remontent : jamais de note inventée.
+    response = appeler_mistral(
+        [
+            {"role": "system", "content": (
+                "Tu es un recruteur spécialisé dans les jobs courts et missions. "
+                "Tu reponds UNIQUEMENT en JSON valide sans backticks. "
+                "Tu ignores totalement la date de debut et la disponibilite dans ta notation."
+            )},
+            {"role": "user", "content": prompt},
+        ],
+        usage="analyse",
+        response_format={"type": "json_object"},
+    )
+    return _valider_analyse(reponse_json(response))
 
 
 def analyser_offre(offre, profil, mode="alternance"):
@@ -275,42 +259,49 @@ def analyser_offre(offre, profil, mode="alternance"):
         for mot in ECOLES_MOTS_CLES
     )
 
+    # Appel Mistral avec retry sur les erreurs passagères (4 tentatives, pauses 15s, 30s, 45s).
+    # ErreurIABloquante / ErreurIAPassagere remontent : jamais de note inventée.
+    response = appeler_mistral(
+        [
+            {"role": "system", "content": (
+                "Tu es un recruteur spécialisé en alternance. Tu reponds UNIQUEMENT en JSON valide sans backticks. "
+                "Tu ignores totalement la date de debut et la disponibilite dans ta notation."
+            )},
+            {"role": "user", "content": prompt},
+        ],
+        usage="analyse",
+        response_format={"type": "json_object"},
+        on_attente=lambda t, n, s: print(
+            f"     Mistral indisponible - pause {s}s puis nouvelle tentative ({t}/{n - 1})"),
+    )
+    result = _valider_analyse(reponse_json(response))
+    if est_ecole:
+        result["statut_auto"] = "archive"
+        print(f"     → Archivée automatiquement (école/CFA détectée)")
+    return result
+
+def _valider_analyse(result: dict) -> dict:
+    """Analyse renvoyée par Mistral, contrôlée : un score entier de 1 à 10 est
+    exigé (sinon ErreurIAPassagere, l'offre sera reprise), le reste est
+    normalisé. Aucune valeur de repli pour le score ou l'éligibilité."""
     try:
-        # Appel Mistral avec retry sur rate limit (4 tentatives, pauses 15s, 30s, 45s)
-        response = appeler_mistral(
-            [
-                {"role": "system", "content": (
-                    "Tu es un recruteur spécialisé en alternance. Tu reponds UNIQUEMENT en JSON valide sans backticks. "
-                    "Tu ignores totalement la date de debut et la disponibilite dans ta notation."
-                )},
-                {"role": "user", "content": prompt},
-            ],
-            response_format={"type": "json_object"},
-            on_attente=lambda t, n, s: print(
-                f"     Rate limit - pause {s}s puis nouvelle tentative ({t}/{n - 1})"),
-        )
-        texte = response.choices[0].message.content
-        texte = re.sub(r'```json\s*', '', texte)
-        texte = re.sub(r'```\s*', '', texte)
-        result = json.loads(texte)
-        if "score" in result:
-            result["score"] = max(1, min(10, int(result["score"])))
-        if not result.get("eligible", True):
-            result["score"] = min(result["score"], 2)
-            result["verdict"] = "faible"
-        # Domaine : on garde la catégorie libre donnée par l'IA (ou "Non classé" si vide)
-        if not result.get("domaine"):
-            result["domaine"] = "Non classé"
-        if est_ecole:
-            result["statut_auto"] = "archive"
-            print(f"     → Archivée automatiquement (école/CFA détectée)")
-        return result
-    except Exception as e:
-        print(f"  Erreur analyse : {e}")
-        return {
-            "score": 5, "verdict": "erreur", "eligible": True,
-            "points_forts": [], "points_faibles": [], "domaine": "Non classé", "resume": "Erreur analyse"
-        }
+        score = int(result["score"])
+    except (KeyError, TypeError, ValueError):
+        raise ErreurIAPassagere("Réponse de Mistral sans score exploitable") from None
+    result["score"] = max(1, min(10, score))
+    result["eligible"] = bool(result.get("eligible", True))
+    if not result["eligible"]:
+        result["score"] = min(result["score"], 2)
+    result["verdict"] = score_to_verdict(result["score"])
+    for cle in ("points_forts", "points_faibles"):
+        if not isinstance(result.get(cle), list):
+            result[cle] = []
+    # Domaine : on garde la catégorie libre donnée par l'IA (ou "Non classé" si vide)
+    if not result.get("domaine"):
+        result["domaine"] = "Non classé"
+    result["resume"] = str(result.get("resume") or "")
+    return result
+
 
 def score_to_verdict(score):
     if score >= 9: return "excellent"
@@ -318,6 +309,36 @@ def score_to_verdict(score):
     if score >= 5: return "moyen"
     if score >= 3: return "faible"
     return "ineligible"
+
+# ─── Offres réservées à un public spécifique (BOETH, RQTH) ────────────────────
+# La mention d'égalité des chances (« ce poste est ouvert aux personnes en
+# situation de handicap », « à compétences égales ») est présente sur une
+# grande partie des offres : elle ne réserve rien. Seules des tournures de
+# réservation ou d'exigence explicites archivent l'offre.
+_PUBLIC = (r"(?:boeth|rqth|travailleurs? handicap[eé]s?|situation de handicap|obligation d'emploi"
+           r"|reconnaissance de la qualit[eé] de travailleur handicap[eé])")
+_RESERVATIONS = [re.compile(motif) for motif in (
+    # « réservé(e)(s) / exclusivement / uniquement / seulement aux ... BOETH »
+    rf"(?:r[eé]serv[eé]e?s?|exclusivement|uniquement|seulement)\s+(?:(?:ouverte?s?|accessibles?)\s+)?"
+    rf"(?:aux?|à la|à des|à une|pour les?|pour des)\s+[^.;:!?\n]{{0,80}}?{_PUBLIC}",
+    # « offre destinée aux travailleurs handicapés »
+    rf"destin[eé]e?s?\s+(?:exclusivement\s+|uniquement\s+)?(?:aux?|à des)\s+[^.;:!?\n]{{0,40}}?{_PUBLIC}",
+    # « offre / poste / recrutement BOETH » ou « offre réservée BOETH »
+    rf"(?:offre|poste|recrutement|emploi)s?\s+(?:r[eé]serv[eé]e?s?\s+)?(?:aux?\s+)?(?:boeth|rqth)\b",
+    # « RQTH obligatoire / exigée / requise / indispensable / impérative »
+    rf"{_PUBLIC}[^.;:!?\n]{{0,40}}?\b(?:obligatoire|exig[eé]e?s?|requise?s?|indispensable|imp[eé]rati(?:f|ve|vement))",
+    # « vous devez être bénéficiaire de l'obligation d'emploi / titulaire d'une RQTH »
+    rf"(?:devez|doit|doivent|il faut|n[eé]cessaire d')\s*(?:être|etre|disposer d'une|avoir (?:une|la))\s+"
+    rf"[^.;:!?\n]{{0,40}}?{_PUBLIC}",
+)]
+
+
+def reserve_public_specifique(texte: str) -> bool:
+    """Vrai si l'offre est réservée aux bénéficiaires de l'obligation d'emploi
+    (BOETH, RQTH...), et non simplement ouverte à tous."""
+    t = (texte or "").lower().replace("’", "'")
+    return any(motif.search(t) for motif in _RESERVATIONS)
+
 
 def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
     """
@@ -341,7 +362,7 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
             _log(f"     -> Archivée automatiquement (inéligible score {offre['score']})")
     else:
         # Mode alternance : règles complètes
-        if "boeth" in desc_lower or "maazi" in desc_lower or "situation de handicap" in desc_lower:
+        if reserve_public_specifique(desc_lower) or reserve_public_specifique(titre_lower):
             offre["statut"] = "archive"
             offre["raison_archivage"] = "public_specifique"
             _log(f"     -> Archivée automatiquement (réservé public spécifique / BOETH)")
@@ -362,24 +383,37 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
             _log(f"     -> Archivée automatiquement (inéligible score {offre['score']})")
 
 
-def analyser_offres(offres, profil, callback=None, mode="alternance"):
+def appliquer_analyse(offre, analyse, mode="alternance", verbeux=True):
+    """Recopie dans l'offre une analyse réussie (validée par _valider_analyse)
+    puis applique l'archivage automatique."""
+    offre.update({
+        "score":          analyse["score"],
+        "verdict":        analyse["verdict"],
+        "eligible":       analyse["eligible"],
+        "points_forts":   analyse["points_forts"],
+        "points_faibles": analyse["points_faibles"],
+        "domaine":        analyse["domaine"],
+        "resume_analyse": analyse["resume"],
+    })
+    appliquer_archivage_auto(offre, analyse, mode=mode, verbeux=verbeux)
+
+
+def analyser_offres(offres, profil, callback=None, mode="alternance", log_fn=None):
+    """Analyse les offres une à une ; callback(i, total, offre) pour chaque
+    offre analysée. Erreur passagère (quota, serveur, réponse illisible) :
+    l'offre est sautée, le callback n'est pas appelé (ni écrite ni marquée
+    vue : elle reviendra). ErreurIABloquante : remonte, le pipeline s'arrête."""
+    _log = log_fn or print
     offres_analysees = []
     for i, offre in enumerate(offres, 1):
         print(f"  [{i}/{len(offres)}] {offre['titre'][:50]}...")
-        analyse = analyser_offre(offre, profil, mode=mode)
-        offre.update({
-            "score": analyse.get("score", 5),
-            "verdict": analyse.get("verdict", "moyen"),
-            "eligible": analyse.get("eligible", True),
-            "points_forts": analyse.get("points_forts", []),
-            "points_faibles": analyse.get("points_faibles", []),
-            "domaine": analyse.get("domaine", "Non classé"),
-            "resume_analyse": analyse.get("resume", "")
-        })
-        offre["verdict"] = score_to_verdict(offre["score"])
-
-        # Archivage auto avec raison — dépend du mode
-        appliquer_archivage_auto(offre, analyse, mode=mode)
+        try:
+            analyse = analyser_offre(offre, profil, mode=mode)
+        except ErreurIAPassagere as e:
+            _log(f"  ⚠️  Offre sautée, « {offre['titre'][:50]} » : {e}. Elle reviendra au prochain lancement.")
+            time.sleep(PAUSE_MISTRAL)
+            continue
+        appliquer_analyse(offre, analyse, mode=mode)
         eligible_str = "eligible" if offre["eligible"] else "INELIGIBLE"
         print(f"     Score : {offre['score']}/10 — {offre['verdict']} — {eligible_str}")
         offres_analysees.append(offre)

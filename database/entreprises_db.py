@@ -92,7 +92,9 @@ def calculer_stats(user_id: int) -> dict:
 # attendent au niveau racine du dict.
 _CHAMPS_EXTRA_REMONTES = ["nom", "mail_destinataires", "mail_note", "url_scrapee", "source_recherche"]
 # Champs du scraper gardés dans extra (bug 5 : ils étaient perdus)
-_CHAMPS_EXTRA_SCRAPER = ("telephone", "url_scrapee", "source_recherche", "tentatives_site")
+# emails_non_valides : emails lus dans la page sans validation par Mistral
+_CHAMPS_EXTRA_SCRAPER = ("telephone", "url_scrapee", "source_recherche", "tentatives_site",
+                         "emails_non_valides")
 
 
 def _entreprise_vers_dict(e) -> dict:
@@ -117,10 +119,26 @@ def _entreprise_vers_dict(e) -> dict:
     for champ in _CHAMPS_EXTRA_REMONTES:
         d[champ] = extra.get(champ, "")
     d["tentatives_site"] = int(extra.get("tentatives_site") or 0)
+    d["emails_non_valides"] = bool(extra.get("emails_non_valides"))
     # On garde extra complet aussi, au cas où
     d["_extra"] = extra
     d["_id"] = e.id   # id technique en base, pour réécrire précisément
     return d
+
+
+def a_scraper(e: dict) -> bool:
+    """Entreprise que le scraper doit encore traiter."""
+    return not (e.get("traite") or e.get("emails_trouves") or e.get("mail_envoye"))
+
+
+def compter_a_scraper(user_id: int) -> int:
+    """Nombre d'entreprises à scraper : le maximum utile d'un lancement."""
+    db = SessionLocal()
+    try:
+        return sum(1 for e in db.query(Entreprise).filter_by(user_id=user_id)
+                   if not (e.traite or e.emails_trouves or e.mail_envoye))
+    finally:
+        db.close()
 
 
 def lire_entreprises(user_id: int) -> list[dict]:

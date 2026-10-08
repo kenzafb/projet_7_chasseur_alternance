@@ -50,7 +50,8 @@ from database.dates import maintenant_utc
 # ─── Modules métier ───────────────────────────────────────────────
 from france_travail.main import lancer_recherche
 from france_travail.generateur import generer_lettre
-from france_travail.analyseur import analyser_offre, score_to_verdict, appliquer_archivage_auto
+from france_travail.analyseur import analyser_offre, appliquer_analyse
+from shared.ia import ErreurIA, ErreurIABloquante, ErreurIAPassagere
 from france_travail.pdf_generator import generer_pdf_lettre, nom_telechargement
 from france_travail.scraper_lba import chercher_offres_lba
 
@@ -112,6 +113,14 @@ def chiffrement_indisponible(request: Request, exc: ChiffrementIndisponible):
     """CLE_CHIFFREMENT absente ou invalide : l'app tourne, mais configuration
     et envoi de mails sont désactivés (503, message lisible)."""
     return JSONResponse({"erreur": str(exc)}, status_code=503)
+
+
+@app.exception_handler(ErreurIA)
+def erreur_ia(request: Request, exc: ErreurIA):
+    """Échec Mistral sur une route directe (lettre, réanalyse) : rien n'est
+    enregistré. 503 si la configuration est en cause, 502 sinon."""
+    statut = 503 if isinstance(exc, ErreurIABloquante) else 502
+    return JSONResponse({"erreur": str(exc)}, status_code=statut)
 
 
 if raison_indisponible():
@@ -181,10 +190,13 @@ class TelechargerPdf(BaseModel):
     lettre: str | None = None
 
 # Limites d'un lancement : absentes = défaut, bornées par config.limite_lancement
-def _limite(cle: str, demandee) -> tuple[int, str]:
-    """Limite appliquée à un lancement, et la précision à journaliser quand
-    la valeur demandée a été ramenée dans les bornes (décision D6)."""
+def _limite(cle: str, demandee, disponibles: int | None = None) -> tuple[int, str]:
+    """Limite appliquée à un lancement, bornée par le plafond et, s'il est
+    donné, par le nombre d'éléments disponibles ; et la précision à
+    journaliser quand la valeur demandée a été ramenée (décision D6)."""
     appliquee = config.limite_lancement(cle, demandee)
+    if disponibles is not None:
+        appliquee = min(appliquee, disponibles)
     if demandee is None or demandee == appliquee:
         return appliquee, ""
     return appliquee, f" (demandé : {demandee}, ramené à {appliquee})"
@@ -407,8 +419,8 @@ def api_compte_envoi_mode_test(body: ModeTest, user: User = Depends(utilisateur_
 
 @prive.post("/api/compte_envoi/mail_test")
 def api_compte_envoi_mail_test(body: MailTest | None = None, user: User = Depends(utilisateur_requis)):
-    """Mail de test, uniquement vers l'utilisateur lui-même (défaut : son adresse de connexion)."""
-    return compte_envoi.envoyer_mail_test(user.id, user.email, body.destinataire if body else None)
+    """Mail de test, uniquement vers l'adresse d'expédition du compte."""
+    return compte_envoi.envoyer_mail_test(user.id, body.destinataire if body else None)
 
 
 # ─── France Travail + La Bonne Alternance ────────────────────────────────────
@@ -442,7 +454,7 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
             etat(message="Recherche France Travail...")
             log(f"🔍 Recherche France Travail démarrée (au plus {max_analyses} offres analysées){note}")
             analysees = lancer_recherche(user_id, profil, analyser=True, max_analyse=max_analyses,
-                                         on_offre=ecrire_en_base, mode=mode) or []
+                                         on_offre=ecrire_en_base, mode=mode, log_fn=log) or []
             reste = max_analyses - len(analysees)
             log(f"✅ France Travail terminé : {len(analysees)} offres analysées")
 
@@ -472,33 +484,32 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
                 if nouvelles_lba:
                     etat(message=f"Analyse de {len(nouvelles_lba)} offres LBA...")
                     log("🧠 Analyse des offres LBA...")
+                    ajoutees = 0
                     for i, offre in enumerate(nouvelles_lba, 1):
+                        etat(message=f"Analyse LBA {i}/{len(nouvelles_lba)}...",
+                             pourcentage=40 + round(i / len(nouvelles_lba) * 60))
                         try:
-                            etat(message=f"Analyse LBA {i}/{len(nouvelles_lba)}...",
-                                 pourcentage=40 + round(i / len(nouvelles_lba) * 60))
                             # Pas de pause ici : shared.ia espace déjà les appels Mistral
                             analyse = analyser_offre(offre, profil)
-                            score = analyse.get("score", 5)
-                            offre.update({
-                                "score":          score,
-                                "verdict":        score_to_verdict(score),
-                                "eligible":       analyse.get("eligible", True),
-                                "points_forts":   analyse.get("points_forts", []),
-                                "points_faibles": analyse.get("points_faibles", []),
-                                "domaine":        analyse.get("domaine", "Autre IT"),
-                                "resume_analyse": analyse.get("resume", ""),
-                            })
-                            # Archivage auto avec raison (mêmes règles qu'analyser_offres, sans log)
-                            appliquer_archivage_auto(offre, analyse, verbeux=False)
-                        except Exception as e:
-                            log(f"  ⚠️ Erreur analyse LBA {offre.get('titre', '?')[:40]} : {e}")
+                        except ErreurIAPassagere as e:
+                            # Ni écrite ni archivée : elle reviendra au prochain lancement
+                            log(f"  ⚠️  Offre LBA sautée, « {offre.get('titre', '?')[:50]} » : {e}. "
+                                "Elle reviendra au prochain lancement.")
+                            continue
+                        # Archivage auto avec raison (mêmes règles qu'analyser_offres, sans log)
+                        appliquer_analyse(offre, analyse, verbeux=False)
                         ajouter_candidature(user_id, offre, mode=mode)   # écriture base au fur et à mesure
-                    log(f"✅ {len(nouvelles_lba)} offres LBA ajoutées et analysées")
+                        ajoutees += 1
+                    log(f"✅ {ajoutees} offres LBA analysées et ajoutées sur {len(nouvelles_lba)}")
             else:
                 log("ℹ️  Aucune offre LBA récupérée")
 
             etat(pourcentage=100, message="Terminé !")
             log("✅ Recherche complète terminée")
+        except ErreurIABloquante as e:
+            # Clé refusée, modèle non autorisé... : arrêt immédiat, rien d'inventé
+            etat(message=f"Erreur : {e}")
+            log(f"❌ Recherche arrêtée : {e}")
         except Exception as e:
             etat(message=f"Erreur : {e}")
             log(f"❌ Erreur recherche : {e}")
@@ -534,14 +545,15 @@ def api_analyser(body: OffreId, request: Request, user: User = Depends(utilisate
     if not offre:
         return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
     profil = lire_profil(user.id, mode=mode_courant(request))
+    # ErreurIA : réponse 502/503 (gestionnaire plus haut), l'offre n'est pas touchée
     analyse = analyser_offre(offre, profil, mode=mode_courant(request))
     modifs = {
-        "score":          analyse.get("score", 5),
-        "verdict":        analyse.get("verdict", "moyen"),
-        "eligible":       analyse.get("eligible", True),
-        "points_forts":   analyse.get("points_forts", []),
-        "points_faibles": analyse.get("points_faibles", []),
-        "resume_analyse": analyse.get("resume", ""),
+        "score":          analyse["score"],
+        "verdict":        analyse["verdict"],
+        "eligible":       analyse["eligible"],
+        "points_forts":   analyse["points_forts"],
+        "points_faibles": analyse["points_faibles"],
+        "resume_analyse": analyse["resume"],
     }
     if analyse.get("statut_auto") == "archive":
         modifs["statut"] = "archive"
@@ -638,6 +650,11 @@ def api_spontanees_statut(request: Request, body: dict = Body(...), user: User =
 def api_spontanees_stats(request: Request, user: User = Depends(utilisateur_requis)):
     # Lecture des stats depuis la base
     stats = calculer_stats(user.id)
+    # Maximums utiles des lancements (le serveur les applique aussi)
+    from database.entreprises_db import compter_a_scraper
+    from spontanees.envoyeur import compter_a_envoyer
+    stats["a_scraper"] = compter_a_scraper(user.id)
+    stats["a_envoyer"] = compter_a_envoyer(user.id, mode_courant(request))
     # On ajoute l'état du pipeline de l'utilisateur, géré en mémoire
     etat = pipelines.etat(SPONTANEES, user.id)
     stats.update({cle: etat[cle] for cle in ("en_cours", "etape", "message", "pourcentage", "mode_test")})
@@ -713,7 +730,11 @@ def api_spontanees_fetch(body: Fetch | None = None, user: User = Depends(utilisa
 @prive.post("/api/spontanees/scraper")
 def api_spontanees_scraper(body: Scraper | None = None, user: User = Depends(utilisateur_requis)):
     user_id = user.id
-    maximum, note = _limite("scrapees", body.max_scrapees if body else None)
+    from database.entreprises_db import compter_a_scraper
+    disponibles = compter_a_scraper(user_id)
+    if not disponibles:
+        raise ErreurUtilisateur("Aucune entreprise à scraper : lance d'abord « Récupérer ».")
+    maximum, note = _limite("scrapees", body.max_scrapees if body else None, disponibles)
 
     def travail(arret, log, on_progress):
         from spontanees.scraper_emails import main as scraper_main
@@ -730,13 +751,17 @@ def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends
     user_id = user.id
     mode = mode_courant(request)   # capturé avant le thread
     # Plafond de sécurité par lancement (réputation du compte d'envoi)
-    limite, note = _limite("mails", body.limite)
     # Refus clair AVANT tout lancement : pas de clé (503), pas de compte ou
-    # compte jamais vérifié (400), plafond du jour déjà atteint (400)
+    # compte jamais vérifié (400), plafond du jour déjà atteint (400), rien à envoyer (400)
     compte = compte_envoi.exiger_compte_verifie(user_id)
     if compte_envoi_db.envois_du_jour(user_id) >= config.PLAFOND_ENVOIS_JOUR:
         raise ErreurUtilisateur(f"Plafond de {config.PLAFOND_ENVOIS_JOUR} mails par jour atteint : "
                                 "les envois reprendront demain.")
+    from spontanees.envoyeur import compter_a_envoyer
+    disponibles = compter_a_envoyer(user_id, mode)
+    if not disponibles:
+        raise ErreurUtilisateur("Rien à envoyer : aucune entreprise avec un email non contacté dans ce mode.")
+    limite, note = _limite("mails", body.limite, disponibles)
     # Mode test : option du compte d'envoi, ou demandé pour ce lancement
     test = bool(body.test or compte["mode_test"])
     if test:

@@ -37,7 +37,7 @@ def _resultat(url, fiable=True, emails=("rh@acme.fr",), contact=None):
 def test_scraper_conserve_site_page_et_source(user_id, monkeypatch):
     ajouter_entreprises(user_id, [{"siret": "S1", "nom": "ACME"}])
     monkeypatch.setattr(scraper_emails, "chercher_site", lambda e, url_exclue=None: ("https://acme.fr", "ddg"))
-    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda url, nom, dirigeant=None: _resultat(url))
+    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda url, nom, dirigeant=None, **_: _resultat(url))
     scraper_emails.main(user_id, log_fn=lambda m: None)
 
     e = lire_entreprises(user_id)[0]
@@ -53,7 +53,7 @@ def test_scraper_conserve_les_tentatives_apres_un_site_non_fiable(user_id, monke
     sites = iter([("https://faux-acme.fr", "ddg"), ("https://acme.fr", "ddg")])
     monkeypatch.setattr(scraper_emails, "chercher_site", lambda e, url_exclue=None: next(sites))
     monkeypatch.setattr(scraper_emails, "scraper_et_extraire",
-                        lambda url, nom, dirigeant=None: _resultat(url, fiable="faux" not in url))
+                        lambda url, nom, dirigeant=None, **_: _resultat(url, fiable="faux" not in url))
     scraper_emails.main(user_id, log_fn=lambda m: None)
 
     e = lire_entreprises(user_id)[0]
@@ -69,7 +69,7 @@ def test_site_connu_reutilise_sans_nouvelle_recherche(user_id, monkeypatch):
     sauvegarder_enrichissement(user_id, liste)
     monkeypatch.setattr(scraper_emails, "chercher_site",
                         lambda e, url_exclue=None: pytest.fail("recherche du site inutile"))
-    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda url, nom, dirigeant=None: _resultat(url))
+    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda url, nom, dirigeant=None, **_: _resultat(url))
     scraper_emails.main(user_id, log_fn=lambda m: None)
     assert lire_entreprises(user_id)[0]["source_recherche"] == "existant"
 
@@ -174,7 +174,7 @@ def test_ancien_json_relu_comme_texte(user_id):
 def test_scraper_ecrit_le_contact_normalise(user_id, monkeypatch):
     ajouter_entreprises(user_id, [{"siret": "S1", "nom": "ACME"}])
     monkeypatch.setattr(scraper_emails, "chercher_site", lambda e, url_exclue=None: ("https://acme.fr", "ddg"))
-    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda url, nom, dirigeant=None: _resultat(
+    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda url, nom, dirigeant=None, **_: _resultat(
         url, contact=[{"prenom": "Ana", "nom": "Lopez", "poste": "DRH"}]))
     scraper_emails.main(user_id, log_fn=lambda m: None)
     assert _brut(user_id, "contact_rh") == ["Ana Lopez (DRH)"]

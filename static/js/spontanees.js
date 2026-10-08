@@ -101,6 +101,26 @@ function rendreModeTest() {
   if (adr) adr.textContent = compte ? compte.adresse : "ton adresse d'expédition";
 }
 
+/* Maximum d'un lancement : le plafond, borné par ce qui reste à traiter
+   (entreprises à scraper, entreprises à contacter dans ce mode) */
+function rendreMaximums() {
+  const dispo = { scrapees: stats?.a_scraper, mails: stats?.a_envoyer };
+  const textes = { scrapees: "aucune entreprise à scraper", mails: "aucune entreprise à contacter" };
+  for (const [cle, n] of Object.entries(dispo)) {
+    const champ = document.querySelector(`[data-limite="${cle}"]`);
+    const etiquette = document.querySelector(`[data-limite-max="${cle}"]`);
+    if (!champ || typeof n !== "number") continue;
+    const plafond = parseInt(champ.dataset.plafond, 10) || n;
+    const maximum = Math.min(plafond, n);
+    champ.max = String(Math.max(maximum, 1));
+    if (maximum >= 1 && parseInt(champ.value, 10) > maximum) champ.value = maximum;
+    if (etiquette) {
+      etiquette.textContent = maximum < 1 ? textes[cle]
+        : `max ${maximum}${maximum < plafond ? `, ${n} disponible${n > 1 ? "s" : ""}` : ""}`;
+    }
+  }
+}
+
 function fmt(n) { return (n ?? 0).toLocaleString("fr-FR"); }
 function esc(s) {
   return String(s).replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
@@ -111,6 +131,7 @@ export const Spontanees = {
     try { stats = await api.spStats(); } catch (_) { stats = null; }
     try { compte = (await api.compteEnvoi()).compte; } catch (_) { compte = null; }
     rendreModeTest();
+    rendreMaximums();
     rendreKpis();
     rendreTable();
     rendrePipe();
