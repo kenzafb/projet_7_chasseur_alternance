@@ -205,17 +205,55 @@ def extraire_infos(etab):
 
 from database.entreprises_db import ajouter_entreprises
 
+def entreprises_lba(user_id, profil, max_entreprises=None, stop_event=None, log_fn=print) -> int:
+    """Entreprises à fort potentiel de La Bonne Alternance, ajoutées avant
+    celles de Sirene (SPEC_SOURCES section 3). Retourne le nombre de
+    nouvelles entreprises ajoutées (au plus max_entreprises)."""
+    from france_travail.scraper_lba import rechercher_pour_profil
+    from database.entreprises_db import cles_connues
+    log_fn("🔍 La Bonne Alternance : entreprises à fort potentiel d'embauche d'alternants")
+    # Cercles au plafond de 150 entreprises redécoupés (décision D36), jusqu'à
+    # max_entreprises nouvelles
+    lba = rechercher_pour_profil(profil, log=log_fn, stop_event=stop_event, redecouper_entreprises=True,
+                                 objectif_entreprises=max_entreprises, connus=cles_connues(user_id))
+    if not lba or not lba["entreprises"]:
+        if lba is not None:
+            log_fn("ℹ️  Aucune entreprise à fort potentiel trouvée sur LBA")
+        return 0
+    from database.entreprises_db import ajouter_entreprises_lba
+    b = ajouter_entreprises_lba(user_id, lba["entreprises"], maximum=max_entreprises)
+    log_fn(f"🏢 LBA : {b['ajoutees']} nouvelles entreprises à fort potentiel"
+           + (f" (dont {b['avec_email']} avec un email fourni par LBA)" if b["avec_email"] else "")
+           + (f", {b['deja_connues']} déjà connues" if b["deja_connues"] else "")
+           + (f" dont {b['passees_en_lba']} passées en priorité" if b["passees_en_lba"] else "")
+           + (f", {b['non_ajoutees']} laissées pour le prochain lancement (limite)" if b["non_ajoutees"] else ""))
+    return b["ajoutees"]
+
+
 def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_fn=None):
-    """Ajoute en base au plus max_entreprises NOUVELLES entreprises (None : toutes)."""
+    """Ajoute en base au plus max_entreprises NOUVELLES entreprises (None :
+    toutes) : d'abord les entreprises à fort potentiel de La Bonne
+    Alternance, puis celles de Sirene pour le reste de la limite."""
     _log = log_fn or print
+    from database.profil_db import lire_profil
+    profil = lire_profil(user_id)
+
+    ajoutees_lba = entreprises_lba(user_id, profil, max_entreprises, stop_event, _log)
+    if max_entreprises is not None:
+        max_entreprises -= ajoutees_lba
+        if max_entreprises <= 0:
+            _log("⏹️  Limite de nouvelles entreprises atteinte avec La Bonne Alternance : Sirene non interrogé.")
+            return
+    if stop_event and stop_event.is_set():
+        return
+
     if not INSEE_API_KEY:
         _log("❌  INSEE_API_KEY manquante dans le .env — arrêt.")
         return
 
     # Codes NAF selon le domaine de l'utilisateur (lu depuis son profil)
     from shared.domaines import domaines_du_profil, domaines_sans_correspondance, naf_codes
-    from database.profil_db import lire_profil
-    _domaines = domaines_du_profil(lire_profil(user_id))
+    _domaines = domaines_du_profil(profil)
     codes_naf = naf_codes(_domaines)
     print(f"  Domaines du profil : {_domaines or '(défaut)'} → {len(codes_naf)} codes NAF")
     if domaines_sans_correspondance(_domaines, "sirene"):

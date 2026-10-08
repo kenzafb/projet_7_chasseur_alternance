@@ -480,8 +480,9 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
             reste = max_analyses - len(analysees)
             log(f"✅ France Travail terminé : {len(analysees)} offres {traitees}")
 
-            # LBA (mode alternance). None : LBA ignorée, raison déjà écrite
-            # (pas de « Aucune offre LBA » en plus).
+            # LBA (mode alternance) : offres, et entreprises à fort potentiel
+            # versées dans les candidatures spontanées. None : LBA ignorée,
+            # raison déjà écrite (pas de « Aucune offre LBA » en plus).
             lba = None
             if "lba" not in cfg_mode["sources"]:
                 log("ℹ️  LBA ignorée (mode sans alternance)")
@@ -492,6 +493,14 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
                 log("🔍 Recherche La Bonne Alternance démarrée")
                 lba = rechercher_lba(profil, log=log)
             offres_lba = lba["offres"] if lba else []
+
+            if lba and lba["entreprises"]:
+                from database.entreprises_db import ajouter_entreprises_lba
+                b = ajouter_entreprises_lba(user_id, lba["entreprises"])
+                log(f"🏢 LBA : {b['ajoutees']} entreprises à fort potentiel ajoutées aux candidatures spontanées"
+                    + (f" (dont {b['avec_email']} avec un email fourni par LBA)" if b["avec_email"] else "")
+                    + (f", {b['deja_connues']} déjà connues" if b["deja_connues"] else "")
+                    + (f" dont {b['passees_en_lba']} passées en priorité" if b["passees_en_lba"] else ""))
 
             if offres_lba:
                 # Déduplication : refs déjà présentes en base pour cet utilisateur

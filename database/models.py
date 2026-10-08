@@ -185,6 +185,9 @@ class Entreprise(Base):
     siren          = Column(String(20),  index=True, default="")
     site_web       = Column(Text, default="")
     secteur        = Column(String(200), default="")
+    # sirene, ou lba : entreprise à fort potentiel de La Bonne Alternance,
+    # traitée et affichée avant les autres (database.entreprises_db)
+    source         = Column(String(20), nullable=False, default="sirene", server_default="sirene")
 
     emails_trouves = Column(JSON, default=list)
     telephones     = Column(JSON, default=list)

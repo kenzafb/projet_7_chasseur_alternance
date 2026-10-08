@@ -15,13 +15,16 @@ function ligne(e) {
     : aEmail
       ? `<span class="chip chip--ft">à envoyer</span>`
       : `<span class="chip chip--gris">ignoré</span>`;
+  // Entreprise à fort potentiel de La Bonne Alternance : traitée en priorité
+  const lba = e.lba ? ` <span class="chip chip--lba" title="Fort potentiel d'embauche d'alternants (La Bonne Alternance)">LBA</span>` : "";
+  const origine = aEmail && e.email_lba ? ` <span class="trow__sub">(fourni par LBA)</span>` : "";
   return `
     <div class="trow">
       <div>
-        <div class="trow__name">${esc(e.nom || "—")}</div>
+        <div class="trow__name">${esc(e.nom || "—")}${lba}</div>
         <div class="trow__sub">${esc(e.ville || "")}</div>
       </div>
-      <div class="trow__mail ${aEmail ? "" : "trow__mail--none"}">${aEmail ? esc(e.email) : "non trouvé"}</div>
+      <div class="trow__mail ${aEmail ? "" : "trow__mail--none"}">${aEmail ? esc(e.email) : "non trouvé"}${origine}</div>
       <div>${statut}</div>
     </div>`;
 }
@@ -29,9 +32,11 @@ function ligne(e) {
 function rendreTable() {
   const el = document.querySelector('[data-list="spontanees"]');
   if (!el || !stats) return;
-  let items = stats.dernieres || [];
+  // Prochaines entreprises (LBA d'abord, ordre du scraper et de l'envoyeur), puis les dernières envoyées
+  let items = [...(stats.prochaines || []), ...(stats.dernieres || [])];
   if (filtre === "email")  items = items.filter(e => e.email);
   if (filtre === "envoye") items = items.filter(e => e.envoye);
+  if (filtre === "lba")    items = items.filter(e => e.lba);
 
   el.innerHTML = items.length
     ? items.map(ligne).join("")
@@ -49,6 +54,7 @@ function rendreKpis() {
   set("mail_envoye", fmt(stats.mail_envoye));
   const taux = stats.raw ? Math.round((stats.avec_email / stats.raw) * 100) : 0;
   set("taux_email", `${taux}% de la base`);
+  set("lba", stats.lba ? `dont ${fmt(stats.lba)} à fort potentiel (LBA)` : "dans la base");
 
   // compteur sidebar + pied
   const c = document.querySelector('[data-count="spontanees"]');
