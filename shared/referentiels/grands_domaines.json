@@ -1,0 +1,20 @@
+{
+  "source": "Nomenclature ROME de France Travail : les 14 grands domaines (première lettre des codes du référentiel domaines). L'API ne les publie pas en référentiel ; libellés repris de docs/SPEC_SOURCES.md, section 1.1.",
+  "redige_le": "2026-10-08",
+  "donnees": [
+    {"code": "A", "libelle": "Agriculture et pêche, espaces naturels et espaces verts, soins aux animaux"},
+    {"code": "B", "libelle": "Arts et façonnage d'ouvrages d'art"},
+    {"code": "C", "libelle": "Banque, assurance, immobilier"},
+    {"code": "D", "libelle": "Commerce, vente et grande distribution"},
+    {"code": "E", "libelle": "Communication, média et multimédia"},
+    {"code": "F", "libelle": "Construction, bâtiment et travaux publics"},
+    {"code": "G", "libelle": "Hôtellerie-restauration, tourisme, loisirs et animation"},
+    {"code": "H", "libelle": "Industrie"},
+    {"code": "I", "libelle": "Installation et maintenance"},
+    {"code": "J", "libelle": "Santé"},
+    {"code": "K", "libelle": "Services à la personne et à la collectivité"},
+    {"code": "L", "libelle": "Spectacle"},
+    {"code": "M", "libelle": "Support à l'entreprise"},
+    {"code": "N", "libelle": "Transport et logistique"}
+  ]
+}
