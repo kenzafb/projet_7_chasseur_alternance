@@ -1,0 +1,349 @@
+{
+  "parametres": {
+    "region": "11"
+  },
+  "interroge_le": "2026-10-08T20:26:19+00:00",
+  "statut": 206,
+  "content_range": "offres 0-149/66915",
+  "accept_range": "150",
+  "total": 66915,
+  "filtres": {
+    "typeContrat": [
+      {
+        "valeur": "CCE",
+        "nombre": 329,
+        "libelle": "Profession commerciale"
+      },
+      {
+        "valeur": "CDD",
+        "nombre": 10800,
+        "libelle": "Contrat à durée déterminée"
+      },
+      {
+        "valeur": "CDI",
+        "nombre": 42452,
+        "libelle": "Contrat à durée indéterminée"
+      },
+      {
+        "valeur": "DDI",
+        "nombre": 32,
+        "libelle": "Contrat durée déterminée insertion"
+      },
+      {
+        "valeur": "DDT",
+        "nombre": 2,
+        "libelle": "CDD Tremplin"
+      },
+      {
+        "valeur": "DIN",
+        "nombre": 37,
+        "libelle": "CDI Intérimaire"
+      },
+      {
+        "valeur": "FRA",
+        "nombre": 158,
+        "libelle": "Franchise"
+      },
+      {
+        "valeur": "LIB",
+        "nombre": 2261,
+        "libelle": "Profession libérale"
+      },
+      {
+        "valeur": "MIS",
+        "nombre": 10795,
+        "libelle": "Mission intérimaire"
+      },
+      {
+        "valeur": "REP",
+        "nombre": 1,
+        "libelle": "Reprise d'entreprise"
+      },
+      {
+        "valeur": "SAI",
+        "nombre": 47,
+        "libelle": "Contrat travail saisonnier"
+      },
+      {
+        "valeur": "TTI",
+        "nombre": 1,
+        "libelle": "Contrat travail temporaire insertion"
+      }
+    ],
+    "experience": [
+      {
+        "valeur": "0",
+        "nombre": 3370
+      },
+      {
+        "valeur": "4",
+        "nombre": 31332
+      },
+      {
+        "valeur": "1",
+        "nombre": 2238
+      },
+      {
+        "valeur": "2",
+        "nombre": 23813
+      },
+      {
+        "valeur": "3",
+        "nombre": 6162
+      }
+    ],
+    "qualification": [
+      {
+        "valeur": "0",
+        "nombre": 21522
+      },
+      {
+        "valeur": "9",
+        "nombre": 4445
+      },
+      {
+        "valeur": "X",
+        "nombre": 40948
+      }
+    ],
+    "natureContrat": [
+      {
+        "valeur": "CC",
+        "nombre": 59,
+        "libelle": "CDI de chantier ou d'opération"
+      },
+      {
+        "valeur": "CI",
+        "nombre": 75,
+        "libelle": "Contrat intermittent"
+      },
+      {
+        "valeur": "CU",
+        "nombre": 60,
+        "libelle": "Contrat d'usage"
+      },
+      {
+        "valeur": "E1",
+        "nombre": 60545,
+        "libelle": "Contrat travail"
+      },
+      {
+        "valeur": "E2",
+        "nombre": 2541,
+        "libelle": "Contrat apprentissage"
+      },
+      {
+        "valeur": "EE",
+        "nombre": 2,
+        "libelle": "Contrat d'Engagement Educatif"
+      },
+      {
+        "valeur": "FA",
+        "nombre": 4,
+        "libelle": "Act. Formation pré.recrut."
+      },
+      {
+        "valeur": "FS",
+        "nombre": 772,
+        "libelle": "Cont. professionnalisation"
+      },
+      {
+        "valeur": "FT",
+        "nombre": 24,
+        "libelle": "CUI - CAE"
+      },
+      {
+        "valeur": "FU",
+        "nombre": 2,
+        "libelle": "CUI - CIE"
+      },
+      {
+        "valeur": "FV",
+        "nombre": 26,
+        "libelle": "Prépa.opérationnel.emploi"
+      },
+      {
+        "valeur": "FW",
+        "nombre": 1,
+        "libelle": "Emploi Avenir non marchand"
+      },
+      {
+        "valeur": "I1",
+        "nombre": 51,
+        "libelle": "Insertion par l'activ.éco."
+      },
+      {
+        "valeur": "NS",
+        "nombre": 2749,
+        "libelle": "Emploi non salarié"
+      },
+      {
+        "valeur": "PS",
+        "nombre": 4,
+        "libelle": "Portage salarial"
+      }
+    ]
+  },
+  "filtres_possibles_bruts": [
+    {
+      "filtre": "typeContrat",
+      "agregation": [
+        {
+          "valeurPossible": "CCE",
+          "nbResultats": 329
+        },
+        {
+          "valeurPossible": "CDD",
+          "nbResultats": 10800
+        },
+        {
+          "valeurPossible": "CDI",
+          "nbResultats": 42452
+        },
+        {
+          "valeurPossible": "DDI",
+          "nbResultats": 32
+        },
+        {
+          "valeurPossible": "DDT",
+          "nbResultats": 2
+        },
+        {
+          "valeurPossible": "DIN",
+          "nbResultats": 37
+        },
+        {
+          "valeurPossible": "FRA",
+          "nbResultats": 158
+        },
+        {
+          "valeurPossible": "LIB",
+          "nbResultats": 2261
+        },
+        {
+          "valeurPossible": "MIS",
+          "nbResultats": 10795
+        },
+        {
+          "valeurPossible": "REP",
+          "nbResultats": 1
+        },
+        {
+          "valeurPossible": "SAI",
+          "nbResultats": 47
+        },
+        {
+          "valeurPossible": "TTI",
+          "nbResultats": 1
+        }
+      ]
+    },
+    {
+      "filtre": "experience",
+      "agregation": [
+        {
+          "valeurPossible": "0",
+          "nbResultats": 3370
+        },
+        {
+          "valeurPossible": "4",
+          "nbResultats": 31332
+        },
+        {
+          "valeurPossible": "1",
+          "nbResultats": 2238
+        },
+        {
+          "valeurPossible": "2",
+          "nbResultats": 23813
+        },
+        {
+          "valeurPossible": "3",
+          "nbResultats": 6162
+        }
+      ]
+    },
+    {
+      "filtre": "qualification",
+      "agregation": [
+        {
+          "valeurPossible": "0",
+          "nbResultats": 21522
+        },
+        {
+          "valeurPossible": "9",
+          "nbResultats": 4445
+        },
+        {
+          "valeurPossible": "X",
+          "nbResultats": 40948
+        }
+      ]
+    },
+    {
+      "filtre": "natureContrat",
+      "agregation": [
+        {
+          "valeurPossible": "CC",
+          "nbResultats": 59
+        },
+        {
+          "valeurPossible": "CI",
+          "nbResultats": 75
+        },
+        {
+          "valeurPossible": "CU",
+          "nbResultats": 60
+        },
+        {
+          "valeurPossible": "E1",
+          "nbResultats": 60545
+        },
+        {
+          "valeurPossible": "E2",
+          "nbResultats": 2541
+        },
+        {
+          "valeurPossible": "EE",
+          "nbResultats": 2
+        },
+        {
+          "valeurPossible": "FA",
+          "nbResultats": 4
+        },
+        {
+          "valeurPossible": "FS",
+          "nbResultats": 772
+        },
+        {
+          "valeurPossible": "FT",
+          "nbResultats": 24
+        },
+        {
+          "valeurPossible": "FU",
+          "nbResultats": 2
+        },
+        {
+          "valeurPossible": "FV",
+          "nbResultats": 26
+        },
+        {
+          "valeurPossible": "FW",
+          "nbResultats": 1
+        },
+        {
+          "valeurPossible": "I1",
+          "nbResultats": 51
+        },
+        {
+          "valeurPossible": "NS",
+          "nbResultats": 2749
+        },
+        {
+          "valeurPossible": "PS",
+          "nbResultats": 4
+        }
+      ]
+    }
+  ]
+}

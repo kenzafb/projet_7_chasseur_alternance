@@ -1,0 +1,447 @@
+{
+  "route": "/referentiel/domaines",
+  "telecharge_le": "2026-10-08T20:26:10+00:00",
+  "nombre": 110,
+  "donnees": [
+    {
+      "code": "A11",
+      "libelle": "Engins agricoles et forestiers"
+    },
+    {
+      "code": "A12",
+      "libelle": "Espaces naturels et espaces verts"
+    },
+    {
+      "code": "A13",
+      "libelle": "Etudes et assistance technique"
+    },
+    {
+      "code": "A14",
+      "libelle": "Production"
+    },
+    {
+      "code": "A15",
+      "libelle": "Soins aux animaux"
+    },
+    {
+      "code": "B11",
+      "libelle": "Arts plastiques"
+    },
+    {
+      "code": "B12",
+      "libelle": "Céramique"
+    },
+    {
+      "code": "B13",
+      "libelle": "Décoration"
+    },
+    {
+      "code": "B14",
+      "libelle": "Fibres et papier"
+    },
+    {
+      "code": "B15",
+      "libelle": "Instruments de musique"
+    },
+    {
+      "code": "B16",
+      "libelle": "Métal, verre, bijouterie et horlogerie"
+    },
+    {
+      "code": "B17",
+      "libelle": "Taxidermie"
+    },
+    {
+      "code": "B18",
+      "libelle": "Tissu et cuirs"
+    },
+    {
+      "code": "C11",
+      "libelle": "Assurance"
+    },
+    {
+      "code": "C12",
+      "libelle": "Banque"
+    },
+    {
+      "code": "C13",
+      "libelle": "Finance"
+    },
+    {
+      "code": "C14",
+      "libelle": "Gestion administrative banque et assurances"
+    },
+    {
+      "code": "C15",
+      "libelle": "Immobilier"
+    },
+    {
+      "code": "D11",
+      "libelle": "Commerce alimentaire et métiers de bouche"
+    },
+    {
+      "code": "D12",
+      "libelle": "Commerce non alimentaire et de prestations de confort"
+    },
+    {
+      "code": "D13",
+      "libelle": "Direction de magasin de détail"
+    },
+    {
+      "code": "D14",
+      "libelle": "Force de vente"
+    },
+    {
+      "code": "D15",
+      "libelle": "Grande distribution"
+    },
+    {
+      "code": "E11",
+      "libelle": "Edition et communication"
+    },
+    {
+      "code": "E12",
+      "libelle": "Images et sons"
+    },
+    {
+      "code": "E13",
+      "libelle": "Industries graphiques"
+    },
+    {
+      "code": "E14",
+      "libelle": "Publicité"
+    },
+    {
+      "code": "F11",
+      "libelle": "Conception et études"
+    },
+    {
+      "code": "F12",
+      "libelle": "Conduite et encadrement de chantier - travaux"
+    },
+    {
+      "code": "F13",
+      "libelle": "Engins de chantier"
+    },
+    {
+      "code": "F14",
+      "libelle": "Extraction"
+    },
+    {
+      "code": "F15",
+      "libelle": "Montage de structures"
+    },
+    {
+      "code": "F16",
+      "libelle": "Second oeuvre"
+    },
+    {
+      "code": "F17",
+      "libelle": "Travaux et gros oeuvre"
+    },
+    {
+      "code": "G11",
+      "libelle": "Accueil et promotion touristique"
+    },
+    {
+      "code": "G12",
+      "libelle": "Animation d'activités de loisirs"
+    },
+    {
+      "code": "G13",
+      "libelle": "Conception, commercialisation et vente de produits touristiques"
+    },
+    {
+      "code": "G14",
+      "libelle": "Gestion et direction"
+    },
+    {
+      "code": "G15",
+      "libelle": "Personnel d'étage en hôtellerie"
+    },
+    {
+      "code": "G16",
+      "libelle": "Production culinaire"
+    },
+    {
+      "code": "G17",
+      "libelle": "Accueil en hôtellerie"
+    },
+    {
+      "code": "G18",
+      "libelle": "Service"
+    },
+    {
+      "code": "H11",
+      "libelle": "Affaires et support technique client"
+    },
+    {
+      "code": "H12",
+      "libelle": "Conception, recherche, études et développement"
+    },
+    {
+      "code": "H13",
+      "libelle": "Hygiène Sécurité Environnement -HSE- industriels"
+    },
+    {
+      "code": "H14",
+      "libelle": "Méthodes et gestion industrielles"
+    },
+    {
+      "code": "H15",
+      "libelle": "Qualité et analyses industrielles"
+    },
+    {
+      "code": "H21",
+      "libelle": "Alimentaire"
+    },
+    {
+      "code": "H22",
+      "libelle": "Bois"
+    },
+    {
+      "code": "H23",
+      "libelle": "Chimie et pharmacie"
+    },
+    {
+      "code": "H24",
+      "libelle": "Cuir et textile"
+    },
+    {
+      "code": "H25",
+      "libelle": "Direction, encadrement et pilotage de fabrication et production industrielles"
+    },
+    {
+      "code": "H26",
+      "libelle": "Electronique et électricité"
+    },
+    {
+      "code": "H27",
+      "libelle": "Energie"
+    },
+    {
+      "code": "H28",
+      "libelle": "Matériaux de construction, céramique et verre"
+    },
+    {
+      "code": "H29",
+      "libelle": "Mécanique, travail des métaux et outillage"
+    },
+    {
+      "code": "H31",
+      "libelle": "Papier et carton"
+    },
+    {
+      "code": "H32",
+      "libelle": "Plastique, caoutchouc"
+    },
+    {
+      "code": "H33",
+      "libelle": "Préparation et conditionnement"
+    },
+    {
+      "code": "H34",
+      "libelle": "Traitements thermiques et traitements de surfaces"
+    },
+    {
+      "code": "I11",
+      "libelle": "Encadrement"
+    },
+    {
+      "code": "I12",
+      "libelle": "Entretien technique"
+    },
+    {
+      "code": "I13",
+      "libelle": "Equipements de production, équipements collectifs"
+    },
+    {
+      "code": "I14",
+      "libelle": "Equipements domestiques et informatique"
+    },
+    {
+      "code": "I15",
+      "libelle": "Travaux d'accès difficile"
+    },
+    {
+      "code": "I16",
+      "libelle": "Véhicules, engins, aéronefs"
+    },
+    {
+      "code": "J11",
+      "libelle": "Praticiens médicaux"
+    },
+    {
+      "code": "J12",
+      "libelle": "Praticiens médico-techniques"
+    },
+    {
+      "code": "J13",
+      "libelle": "Professionnels médico-techniques"
+    },
+    {
+      "code": "J14",
+      "libelle": "Rééducation et appareillage"
+    },
+    {
+      "code": "J15",
+      "libelle": "Soins paramédicaux"
+    },
+    {
+      "code": "K11",
+      "libelle": "Accompagnement de la personne"
+    },
+    {
+      "code": "K12",
+      "libelle": "Action sociale, socio-éducative et socio-culturelle"
+    },
+    {
+      "code": "K13",
+      "libelle": "Aide à la vie quotidienne"
+    },
+    {
+      "code": "K14",
+      "libelle": "Conception et mise en oeuvre des politiques publiques"
+    },
+    {
+      "code": "K15",
+      "libelle": "Contrôle public"
+    },
+    {
+      "code": "K16",
+      "libelle": "Culture et gestion documentaire"
+    },
+    {
+      "code": "K17",
+      "libelle": "Défense, sécurité publique et secours"
+    },
+    {
+      "code": "K18",
+      "libelle": "Développement territorial et emploi"
+    },
+    {
+      "code": "K19",
+      "libelle": "Droit"
+    },
+    {
+      "code": "K21",
+      "libelle": "Formation initiale et continue"
+    },
+    {
+      "code": "K22",
+      "libelle": "Nettoyage et propreté industriels"
+    },
+    {
+      "code": "K23",
+      "libelle": "Propreté et environnement urbain"
+    },
+    {
+      "code": "K24",
+      "libelle": "Recherche"
+    },
+    {
+      "code": "K25",
+      "libelle": "Sécurité privée"
+    },
+    {
+      "code": "K26",
+      "libelle": "Services funéraires"
+    },
+    {
+      "code": "L11",
+      "libelle": "Animation de spectacles"
+    },
+    {
+      "code": "L12",
+      "libelle": "Artistes - interprètes du spectacle"
+    },
+    {
+      "code": "L13",
+      "libelle": "Conception et production de spectacles"
+    },
+    {
+      "code": "L14",
+      "libelle": "Sport professionnel"
+    },
+    {
+      "code": "L15",
+      "libelle": "Techniciens du spectacle"
+    },
+    {
+      "code": "M11",
+      "libelle": "Achats"
+    },
+    {
+      "code": "M12",
+      "libelle": "Comptabilité et gestion"
+    },
+    {
+      "code": "M13",
+      "libelle": "Direction d'entreprise"
+    },
+    {
+      "code": "M14",
+      "libelle": "Organisation et études"
+    },
+    {
+      "code": "M15",
+      "libelle": "Ressources humaines"
+    },
+    {
+      "code": "M16",
+      "libelle": "Secrétariat et assistance"
+    },
+    {
+      "code": "M17",
+      "libelle": "Stratégie commerciale, marketing et supervision des ventes"
+    },
+    {
+      "code": "M18",
+      "libelle": "Systèmes d'information et de télécommunication"
+    },
+    {
+      "code": "N11",
+      "libelle": "Magasinage, manutention des charges et déménagement"
+    },
+    {
+      "code": "N12",
+      "libelle": "Organisation de la circulation des marchandises"
+    },
+    {
+      "code": "N13",
+      "libelle": "Personnel d'encadrement de la logistique"
+    },
+    {
+      "code": "N21",
+      "libelle": "Personnel navigant du transport aérien"
+    },
+    {
+      "code": "N22",
+      "libelle": "Personnel sédentaire du transport aérien"
+    },
+    {
+      "code": "N31",
+      "libelle": "Personnel navigant du transport maritime et fluvial"
+    },
+    {
+      "code": "N32",
+      "libelle": "Personnel sédentaire du transport maritime et fluvial"
+    },
+    {
+      "code": "N41",
+      "libelle": "Personnel de conduite du transport routier"
+    },
+    {
+      "code": "N42",
+      "libelle": "Personnel d'encadrement du transport routier"
+    },
+    {
+      "code": "N43",
+      "libelle": "Personnel navigant du transport terrestre"
+    },
+    {
+      "code": "N44",
+      "libelle": "Personnel sédentaire du transport ferroviaire et réseau filo guidé"
+    }
+  ]
+}

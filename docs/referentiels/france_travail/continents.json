@@ -1,0 +1,27 @@
+{
+  "route": "/referentiel/continents",
+  "telecharge_le": "2026-10-08T20:26:17+00:00",
+  "nombre": 5,
+  "donnees": [
+    {
+      "code": "991",
+      "libelle": "Europe"
+    },
+    {
+      "code": "992",
+      "libelle": "Asie"
+    },
+    {
+      "code": "993",
+      "libelle": "Afrique"
+    },
+    {
+      "code": "994",
+      "libelle": "Amérique"
+    },
+    {
+      "code": "995",
+      "libelle": "Océanie"
+    }
+  ]
+}

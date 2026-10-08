@@ -1,0 +1,217 @@
+{
+  "route": "/referentiel/langues",
+  "telecharge_le": "2026-10-08T20:26:15+00:00",
+  "nombre": 70,
+  "donnees": [
+    {
+      "libelle": "Autre Asia"
+    },
+    {
+      "libelle": "Afrikaans"
+    },
+    {
+      "libelle": "Amharique"
+    },
+    {
+      "libelle": "Arabe"
+    },
+    {
+      "libelle": "Azeri / Azerbaïdjanais"
+    },
+    {
+      "libelle": "Bielorusse"
+    },
+    {
+      "libelle": "Bengali"
+    },
+    {
+      "libelle": "Bulgare"
+    },
+    {
+      "libelle": "Tchèque"
+    },
+    {
+      "libelle": "Danois"
+    },
+    {
+      "libelle": "Allemand"
+    },
+    {
+      "libelle": "Grec"
+    },
+    {
+      "libelle": "Anglais"
+    },
+    {
+      "libelle": "Estonien"
+    },
+    {
+      "libelle": "Persan"
+    },
+    {
+      "libelle": "Finnois"
+    },
+    {
+      "libelle": "Français"
+    },
+    {
+      "libelle": "Hebreu"
+    },
+    {
+      "libelle": "Hindi"
+    },
+    {
+      "libelle": "Croate"
+    },
+    {
+      "libelle": "Hongrois"
+    },
+    {
+      "libelle": "Arménien"
+    },
+    {
+      "libelle": "Indonésien"
+    },
+    {
+      "libelle": "Islandais"
+    },
+    {
+      "libelle": "Italien"
+    },
+    {
+      "libelle": "Japonais"
+    },
+    {
+      "libelle": "Géorgien"
+    },
+    {
+      "libelle": "Kazakh"
+    },
+    {
+      "libelle": "Khmer"
+    },
+    {
+      "libelle": "Coréen"
+    },
+    {
+      "libelle": "Lao"
+    },
+    {
+      "libelle": "Letton"
+    },
+    {
+      "libelle": "Lituanien"
+    },
+    {
+      "libelle": "Luxembourgeois"
+    },
+    {
+      "libelle": "Polynésien"
+    },
+    {
+      "libelle": "Macédonien"
+    },
+    {
+      "libelle": "Malgache"
+    },
+    {
+      "libelle": "Maltais"
+    },
+    {
+      "libelle": "Mongol"
+    },
+    {
+      "libelle": "Malais"
+    },
+    {
+      "libelle": "Birman"
+    },
+    {
+      "libelle": "Neerlandais"
+    },
+    {
+      "libelle": "Norvégien"
+    },
+    {
+      "libelle": "Polonais"
+    },
+    {
+      "libelle": "Portugais"
+    },
+    {
+      "libelle": "Roumain"
+    },
+    {
+      "libelle": "Russe"
+    },
+    {
+      "libelle": "Langues des signes"
+    },
+    {
+      "libelle": "Cinghalais"
+    },
+    {
+      "libelle": "Autre Slave"
+    },
+    {
+      "libelle": "Slovaque"
+    },
+    {
+      "libelle": "Slovène"
+    },
+    {
+      "libelle": "Espagnol"
+    },
+    {
+      "libelle": "Albanais"
+    },
+    {
+      "libelle": "Serbe"
+    },
+    {
+      "libelle": "Swahili"
+    },
+    {
+      "libelle": "Suédois"
+    },
+    {
+      "libelle": "Tamoul"
+    },
+    {
+      "libelle": "Tadjik"
+    },
+    {
+      "libelle": "Tagalog"
+    },
+    {
+      "libelle": "Thai"
+    },
+    {
+      "libelle": "Turkmène"
+    },
+    {
+      "libelle": "Turc"
+    },
+    {
+      "libelle": "Ukrainien"
+    },
+    {
+      "libelle": "Ourdou"
+    },
+    {
+      "libelle": "Ouzbek"
+    },
+    {
+      "libelle": "Vietnamien"
+    },
+    {
+      "libelle": "Wolof"
+    },
+    {
+      "libelle": "Chinois (Mandarin)"
+    },
+    {
+      "libelle": "Zoulou"
+    }
+  ]
+}

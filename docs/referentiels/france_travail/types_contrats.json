@@ -1,0 +1,55 @@
+{
+  "route": "/referentiel/typesContrats",
+  "telecharge_le": "2026-10-08T20:26:12+00:00",
+  "nombre": 12,
+  "donnees": [
+    {
+      "code": "CCE",
+      "libelle": "Profession commerciale"
+    },
+    {
+      "code": "CDD",
+      "libelle": "Contrat à durée déterminée"
+    },
+    {
+      "code": "CDI",
+      "libelle": "Contrat à durée indéterminée"
+    },
+    {
+      "code": "DDI",
+      "libelle": "Contrat durée déterminée insertion"
+    },
+    {
+      "code": "DIN",
+      "libelle": "CDI Intérimaire"
+    },
+    {
+      "code": "FRA",
+      "libelle": "Franchise"
+    },
+    {
+      "code": "LIB",
+      "libelle": "Profession libérale"
+    },
+    {
+      "code": "MIS",
+      "libelle": "Mission intérimaire"
+    },
+    {
+      "code": "REP",
+      "libelle": "Reprise d'entreprise"
+    },
+    {
+      "code": "SAI",
+      "libelle": "Contrat travail saisonnier"
+    },
+    {
+      "code": "TTI",
+      "libelle": "Contrat travail temporaire insertion"
+    },
+    {
+      "code": "DDT",
+      "libelle": "CDD Tremplin"
+    }
+  ]
+}

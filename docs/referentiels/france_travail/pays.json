@@ -1,0 +1,795 @@
+{
+  "route": "/referentiel/pays",
+  "telecharge_le": "2026-10-08T20:26:17+00:00",
+  "nombre": 197,
+  "donnees": [
+    {
+      "code": "99101",
+      "libelle": "Danemark"
+    },
+    {
+      "code": "99103",
+      "libelle": "Norvège"
+    },
+    {
+      "code": "99104",
+      "libelle": "Suède"
+    },
+    {
+      "code": "99105",
+      "libelle": "Finlande"
+    },
+    {
+      "code": "99113",
+      "libelle": "Liechtenstein"
+    },
+    {
+      "code": "99217",
+      "libelle": "Japon"
+    },
+    {
+      "code": "99128",
+      "libelle": "Saint-Marin"
+    },
+    {
+      "code": "99130",
+      "libelle": "Andorre"
+    },
+    {
+      "code": "99131",
+      "libelle": "Belgique"
+    },
+    {
+      "code": "99132",
+      "libelle": "Royaume-Uni"
+    },
+    {
+      "code": "99135",
+      "libelle": "Pays-Bas"
+    },
+    {
+      "code": "99136",
+      "libelle": "Irlande"
+    },
+    {
+      "code": "99137",
+      "libelle": "Luxembourg"
+    },
+    {
+      "code": "99138",
+      "libelle": "Monaco"
+    },
+    {
+      "code": "99139",
+      "libelle": "Portugal"
+    },
+    {
+      "code": "99140",
+      "libelle": "Suisse"
+    },
+    {
+      "code": "99201",
+      "libelle": "Arabie saoudite"
+    },
+    {
+      "code": "99208",
+      "libelle": "Turquie"
+    },
+    {
+      "code": "99219",
+      "libelle": "Thaïlande"
+    },
+    {
+      "code": "99302",
+      "libelle": "Libéria"
+    },
+    {
+      "code": "99401",
+      "libelle": "Canada"
+    },
+    {
+      "code": "99404",
+      "libelle": "États-Unis"
+    },
+    {
+      "code": "99405",
+      "libelle": "Mexique"
+    },
+    {
+      "code": "99406",
+      "libelle": "Costa Rica"
+    },
+    {
+      "code": "99407",
+      "libelle": "Cuba"
+    },
+    {
+      "code": "99408",
+      "libelle": "République dominicaine"
+    },
+    {
+      "code": "99409",
+      "libelle": "Guatémala"
+    },
+    {
+      "code": "99410",
+      "libelle": "Haïti"
+    },
+    {
+      "code": "99411",
+      "libelle": "Honduras"
+    },
+    {
+      "code": "99412",
+      "libelle": "Nicaragua"
+    },
+    {
+      "code": "99413",
+      "libelle": "Panama"
+    },
+    {
+      "code": "99414",
+      "libelle": "Salvador"
+    },
+    {
+      "code": "99415",
+      "libelle": "Argentine"
+    },
+    {
+      "code": "99416",
+      "libelle": "Brésil"
+    },
+    {
+      "code": "99417",
+      "libelle": "Chili"
+    },
+    {
+      "code": "99419",
+      "libelle": "Colombie"
+    },
+    {
+      "code": "99420",
+      "libelle": "Équateur"
+    },
+    {
+      "code": "99421",
+      "libelle": "Paraguay"
+    },
+    {
+      "code": "99422",
+      "libelle": "Pérou"
+    },
+    {
+      "code": "99423",
+      "libelle": "Uruguay"
+    },
+    {
+      "code": "99424",
+      "libelle": "Vénézuéla"
+    },
+    {
+      "code": "99501",
+      "libelle": "Australie"
+    },
+    {
+      "code": "99502",
+      "libelle": "Nouvelle-Zélande"
+    },
+    {
+      "code": "99100",
+      "libelle": "France"
+    },
+    {
+      "code": "99205",
+      "libelle": "Liban"
+    },
+    {
+      "code": "99231",
+      "libelle": "Indonésie"
+    },
+    {
+      "code": "99110",
+      "libelle": "Autriche"
+    },
+    {
+      "code": "99222",
+      "libelle": "Jordanie"
+    },
+    {
+      "code": "99127",
+      "libelle": "Italie"
+    },
+    {
+      "code": "99220",
+      "libelle": "Philippines"
+    },
+    {
+      "code": "99207",
+      "libelle": "Israël"
+    },
+    {
+      "code": "99214",
+      "libelle": "Bhoutan"
+    },
+    {
+      "code": "99216",
+      "libelle": "Chine"
+    },
+    {
+      "code": "99223",
+      "libelle": "Inde"
+    },
+    {
+      "code": "99238",
+      "libelle": "Corée du Nord"
+    },
+    {
+      "code": "99239",
+      "libelle": "Corée du Sud"
+    },
+    {
+      "code": "99234",
+      "libelle": "Cambodge"
+    },
+    {
+      "code": "99343",
+      "libelle": "Soudan"
+    },
+    {
+      "code": "99350",
+      "libelle": "Maroc"
+    },
+    {
+      "code": "99351",
+      "libelle": "Tunisie"
+    },
+    {
+      "code": "99213",
+      "libelle": "Pakistan"
+    },
+    {
+      "code": "99329",
+      "libelle": "Ghana"
+    },
+    {
+      "code": "99203",
+      "libelle": "Irak"
+    },
+    {
+      "code": "99330",
+      "libelle": "Guinée"
+    },
+    {
+      "code": "99345",
+      "libelle": "Togo"
+    },
+    {
+      "code": "99333",
+      "libelle": "Madagascar"
+    },
+    {
+      "code": "99337",
+      "libelle": "Niger"
+    },
+    {
+      "code": "99326",
+      "libelle": "Côte d’Ivoire"
+    },
+    {
+      "code": "99344",
+      "libelle": "Tchad"
+    },
+    {
+      "code": "99328",
+      "libelle": "Gabon"
+    },
+    {
+      "code": "99341",
+      "libelle": "Sénégal"
+    },
+    {
+      "code": "99335",
+      "libelle": "Mali"
+    },
+    {
+      "code": "99338",
+      "libelle": "Nigéria"
+    },
+    {
+      "code": "99336",
+      "libelle": "Mauritanie"
+    },
+    {
+      "code": "99342",
+      "libelle": "Sierra Leone"
+    },
+    {
+      "code": "99240",
+      "libelle": "Koweït"
+    },
+    {
+      "code": "99206",
+      "libelle": "Syrie"
+    },
+    {
+      "code": "99322",
+      "libelle": "Cameroun"
+    },
+    {
+      "code": "99340",
+      "libelle": "Rwanda"
+    },
+    {
+      "code": "99352",
+      "libelle": "Algérie"
+    },
+    {
+      "code": "99426",
+      "libelle": "Jamaïque"
+    },
+    {
+      "code": "99433",
+      "libelle": "Trinité-et-Tobago"
+    },
+    {
+      "code": "99339",
+      "libelle": "Ouganda"
+    },
+    {
+      "code": "99227",
+      "libelle": "Malaisie"
+    },
+    {
+      "code": "99332",
+      "libelle": "Kenya"
+    },
+    {
+      "code": "99309",
+      "libelle": "Tanzanie"
+    },
+    {
+      "code": "99334",
+      "libelle": "Malawi"
+    },
+    {
+      "code": "99346",
+      "libelle": "Zambie"
+    },
+    {
+      "code": "99304",
+      "libelle": "Gambie"
+    },
+    {
+      "code": "99229",
+      "libelle": "Maldives"
+    },
+    {
+      "code": "99226",
+      "libelle": "Singapour"
+    },
+    {
+      "code": "99303",
+      "libelle": "Afrique du Sud"
+    },
+    {
+      "code": "99428",
+      "libelle": "Guyana"
+    },
+    {
+      "code": "99347",
+      "libelle": "Botswana"
+    },
+    {
+      "code": "99348",
+      "libelle": "Lesotho"
+    },
+    {
+      "code": "99321",
+      "libelle": "Burundi"
+    },
+    {
+      "code": "99434",
+      "libelle": "Barbade"
+    },
+    {
+      "code": "99507",
+      "libelle": "Nauru"
+    },
+    {
+      "code": "99390",
+      "libelle": "Maurice"
+    },
+    {
+      "code": "99391",
+      "libelle": "Swaziland"
+    },
+    {
+      "code": "99314",
+      "libelle": "Guinée équatoriale"
+    },
+    {
+      "code": "99509",
+      "libelle": "Tonga"
+    },
+    {
+      "code": "99250",
+      "libelle": "Oman"
+    },
+    {
+      "code": "99246",
+      "libelle": "Bangladesh"
+    },
+    {
+      "code": "99301",
+      "libelle": "Égypte"
+    },
+    {
+      "code": "99248",
+      "libelle": "Qatar"
+    },
+    {
+      "code": "99247",
+      "libelle": "Émirats arabes unis"
+    },
+    {
+      "code": "99436",
+      "libelle": "Bahamas"
+    },
+    {
+      "code": "99435",
+      "libelle": "Grenade"
+    },
+    {
+      "code": "99392",
+      "libelle": "Guinée-Bissao"
+    },
+    {
+      "code": "99126",
+      "libelle": "Grèce"
+    },
+    {
+      "code": "99144",
+      "libelle": "Malte"
+    },
+    {
+      "code": "99235",
+      "libelle": "Sri Lanka"
+    },
+    {
+      "code": "99393",
+      "libelle": "Mozambique"
+    },
+    {
+      "code": "99396",
+      "libelle": "Cap-Vert"
+    },
+    {
+      "code": "99394",
+      "libelle": "Sao Tomé-et-Principe"
+    },
+    {
+      "code": "99134",
+      "libelle": "Espagne"
+    },
+    {
+      "code": "99437",
+      "libelle": "Suriname"
+    },
+    {
+      "code": "99327",
+      "libelle": "Bénin"
+    },
+    {
+      "code": "99241",
+      "libelle": "Laos"
+    },
+    {
+      "code": "99398",
+      "libelle": "Seychelles"
+    },
+    {
+      "code": "99243",
+      "libelle": "Vietnam"
+    },
+    {
+      "code": "99399",
+      "libelle": "Djibouti"
+    },
+    {
+      "code": "99512",
+      "libelle": "Salomon"
+    },
+    {
+      "code": "99511",
+      "libelle": "Tuvalu"
+    },
+    {
+      "code": "99438",
+      "libelle": "Dominique"
+    },
+    {
+      "code": "99439",
+      "libelle": "Sainte-Lucie"
+    },
+    {
+      "code": "99204",
+      "libelle": "Iran"
+    },
+    {
+      "code": "99513",
+      "libelle": "Kiribati"
+    },
+    {
+      "code": "99323",
+      "libelle": "Centrafrique"
+    },
+    {
+      "code": "99440",
+      "libelle": "Saint-Vincent-et-les-Grenadines"
+    },
+    {
+      "code": "99310",
+      "libelle": "Zimbabwe"
+    },
+    {
+      "code": "99514",
+      "libelle": "Vanuatu"
+    },
+    {
+      "code": "99429",
+      "libelle": "Bélize"
+    },
+    {
+      "code": "99441",
+      "libelle": "Antigua-et-Barbuda"
+    },
+    {
+      "code": "99442",
+      "libelle": "Saint-Christophe-et-Niévès"
+    },
+    {
+      "code": "99331",
+      "libelle": "Burkina"
+    },
+    {
+      "code": "99236",
+      "libelle": "Taïwan"
+    },
+    {
+      "code": "99261",
+      "libelle": "Palestine"
+    },
+    {
+      "code": "99114",
+      "libelle": "Roumanie"
+    },
+    {
+      "code": "99122",
+      "libelle": "Pologne"
+    },
+    {
+      "code": "99251",
+      "libelle": "Yémen"
+    },
+    {
+      "code": "99108",
+      "libelle": "Lituanie"
+    },
+    {
+      "code": "99311",
+      "libelle": "Namibie"
+    },
+    {
+      "code": "99109",
+      "libelle": "Allemagne"
+    },
+    {
+      "code": "99111",
+      "libelle": "Bulgarie"
+    },
+    {
+      "code": "99515",
+      "libelle": "Marshall"
+    },
+    {
+      "code": "99516",
+      "libelle": "Micronésie"
+    },
+    {
+      "code": "99125",
+      "libelle": "Albanie"
+    },
+    {
+      "code": "99119",
+      "libelle": "Croatie"
+    },
+    {
+      "code": "99145",
+      "libelle": "Slovénie"
+    },
+    {
+      "code": "99106",
+      "libelle": "Estonie"
+    },
+    {
+      "code": "99155",
+      "libelle": "Ukraine"
+    },
+    {
+      "code": "99148",
+      "libelle": "Biélorussie"
+    },
+    {
+      "code": "99151",
+      "libelle": "Moldavie"
+    },
+    {
+      "code": "99253",
+      "libelle": "Azerbaïdjan"
+    },
+    {
+      "code": "99257",
+      "libelle": "Kirghizstan"
+    },
+    {
+      "code": "99258",
+      "libelle": "Ouzbékistan"
+    },
+    {
+      "code": "99259",
+      "libelle": "Tadjikistan"
+    },
+    {
+      "code": "99252",
+      "libelle": "Arménie"
+    },
+    {
+      "code": "99260",
+      "libelle": "Turkménistan"
+    },
+    {
+      "code": "99107",
+      "libelle": "Lettonie"
+    },
+    {
+      "code": "99256",
+      "libelle": "Kazakhstan"
+    },
+    {
+      "code": "99123",
+      "libelle": "Russie"
+    },
+    {
+      "code": "99242",
+      "libelle": "Mongolie"
+    },
+    {
+      "code": "99324",
+      "libelle": "Congo"
+    },
+    {
+      "code": "99395",
+      "libelle": "Angola"
+    },
+    {
+      "code": "99117",
+      "libelle": "Slovaquie"
+    },
+    {
+      "code": "99317",
+      "libelle": "Érythrée"
+    },
+    {
+      "code": "99254",
+      "libelle": "Chypre"
+    },
+    {
+      "code": "99517",
+      "libelle": "Palaos"
+    },
+    {
+      "code": "99315",
+      "libelle": "Éthiopie"
+    },
+    {
+      "code": "99255",
+      "libelle": "Géorgie"
+    },
+    {
+      "code": "99118",
+      "libelle": "Bosnie-Herzégovine"
+    },
+    {
+      "code": "99312",
+      "libelle": "République démocratique du Congo"
+    },
+    {
+      "code": "99506",
+      "libelle": "Samoa"
+    },
+    {
+      "code": "99397",
+      "libelle": "Comores"
+    },
+    {
+      "code": "99249",
+      "libelle": "Bahreïn"
+    },
+    {
+      "code": "99262",
+      "libelle": "Timor oriental"
+    },
+    {
+      "code": "99212",
+      "libelle": "Afghanistan"
+    },
+    {
+      "code": "99120",
+      "libelle": "Monténégro"
+    },
+    {
+      "code": "99121",
+      "libelle": "Serbie"
+    },
+    {
+      "code": "99157",
+      "libelle": "Kosovo"
+    },
+    {
+      "code": "99418",
+      "libelle": "Bolivie"
+    },
+    {
+      "code": "99224",
+      "libelle": "Birmanie"
+    },
+    {
+      "code": "99349",
+      "libelle": "Soudan du Sud"
+    },
+    {
+      "code": "99316",
+      "libelle": "Libye"
+    },
+    {
+      "code": "99112",
+      "libelle": "Hongrie"
+    },
+    {
+      "code": "99318",
+      "libelle": "Somalie"
+    },
+    {
+      "code": "99156",
+      "libelle": "Macédoine du Nord"
+    },
+    {
+      "code": "99116",
+      "libelle": "Tchéquie"
+    },
+    {
+      "code": "99129",
+      "libelle": "Vatican"
+    },
+    {
+      "code": "99225",
+      "libelle": "Brunei"
+    },
+    {
+      "code": "99510",
+      "libelle": "Papouasie-Nouvelle-Guinée"
+    },
+    {
+      "code": "99508",
+      "libelle": "Fidji"
+    },
+    {
+      "code": "99215",
+      "libelle": "Népal"
+    },
+    {
+      "code": "99102",
+      "libelle": "Islande"
+    }
+  ]
+}

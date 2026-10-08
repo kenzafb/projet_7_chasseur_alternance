@@ -1,0 +1,83 @@
+{
+  "route": "/referentiel/naturesContrats",
+  "telecharge_le": "2026-10-08T20:26:12+00:00",
+  "nombre": 19,
+  "donnees": [
+    {
+      "code": "CC",
+      "libelle": "CDI de chantier ou d'opération"
+    },
+    {
+      "code": "CI",
+      "libelle": "Contrat intermittent"
+    },
+    {
+      "code": "CU",
+      "libelle": "Contrat d'usage"
+    },
+    {
+      "code": "E1",
+      "libelle": "Contrat travail"
+    },
+    {
+      "code": "E2",
+      "libelle": "Contrat apprentissage"
+    },
+    {
+      "code": "EE",
+      "libelle": "Contrat d'Engagement Educatif"
+    },
+    {
+      "code": "ER",
+      "libelle": "Engagement à servir dans la réserve"
+    },
+    {
+      "code": "FA",
+      "libelle": "Act. Formation pré.recrut."
+    },
+    {
+      "code": "FJ",
+      "libelle": "Contrat pacte"
+    },
+    {
+      "code": "FS",
+      "libelle": "Cont. professionnalisation"
+    },
+    {
+      "code": "FX",
+      "libelle": "Emploi Avenir marchand"
+    },
+    {
+      "code": "FY",
+      "libelle": "Emploi Avenir Professeur"
+    },
+    {
+      "code": "I1",
+      "libelle": "Insertion par l'activ.éco."
+    },
+    {
+      "code": "FT",
+      "libelle": "CUI - CAE"
+    },
+    {
+      "code": "FU",
+      "libelle": "CUI - CIE"
+    },
+    {
+      "code": "FV",
+      "libelle": "Prépa.opérationnel.emploi"
+    },
+    {
+      "code": "FW",
+      "libelle": "Emploi Avenir non marchand"
+    },
+    {
+      "code": "NS",
+      "libelle": "Emploi non salarié"
+    },
+    {
+      "code": "PS",
+      "libelle": "Portage salarial"
+    }
+  ]
+}

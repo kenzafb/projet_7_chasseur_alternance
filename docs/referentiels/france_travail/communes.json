@@ -1,0 +1,129 @@
+{
+  "route": "/referentiel/communes",
+  "telecharge_le": "2026-10-08T20:26:18+00:00",
+  "nombre": 35015,
+  "donnees": [
+    {
+      "code": "75101",
+      "libelle": "Paris 1er Arrondissement",
+      "codePostal": "75001",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75102",
+      "libelle": "Paris 2e Arrondissement",
+      "codePostal": "75093",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75103",
+      "libelle": "Paris 3e Arrondissement",
+      "codePostal": "75003",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75104",
+      "libelle": "Paris 4e Arrondissement",
+      "codePostal": "75004",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75105",
+      "libelle": "Paris 5e Arrondissement",
+      "codePostal": "75005",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75106",
+      "libelle": "Paris 6e Arrondissement",
+      "codePostal": "75006",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75107",
+      "libelle": "Paris 7e Arrondissement",
+      "codePostal": "75007",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75108",
+      "libelle": "Paris 8e Arrondissement",
+      "codePostal": "69931",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75109",
+      "libelle": "Paris 9e Arrondissement",
+      "codePostal": "75009",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75110",
+      "libelle": "Paris 10e Arrondissement",
+      "codePostal": "75010",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75111",
+      "libelle": "Paris 11e Arrondissement",
+      "codePostal": "75011",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75112",
+      "libelle": "Paris 12e Arrondissement",
+      "codePostal": "75012",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75113",
+      "libelle": "Paris 13e Arrondissement",
+      "codePostal": "75013",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75114",
+      "libelle": "Paris 14e Arrondissement",
+      "codePostal": "75014",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75115",
+      "libelle": "Paris 15e Arrondissement",
+      "codePostal": "75015",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75116",
+      "libelle": "Paris 16e Arrondissement",
+      "codePostal": "75016",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75117",
+      "libelle": "Paris 17e Arrondissement",
+      "codePostal": "75017",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75118",
+      "libelle": "Paris 18e Arrondissement",
+      "codePostal": "75018",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75119",
+      "libelle": "Paris 19e Arrondissement",
+      "codePostal": "75019",
+      "codeDepartement": "75"
+    },
+    {
+      "code": "75120",
+      "libelle": "Paris 20e Arrondissement",
+      "codePostal": "75972",
+      "codeDepartement": "75"
+    }
+  ],
+  "resume_seulement": true,
+  "raison": "liste de plus de 1000000 octets, seuls les 20 premiers éléments sont gardés"
+}

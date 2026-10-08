@@ -1,0 +1,87 @@
+{
+  "route": "/referentiel/permis",
+  "telecharge_le": "2026-10-08T20:26:14+00:00",
+  "nombre": 20,
+  "donnees": [
+    {
+      "code": "A",
+      "libelle": "Moto"
+    },
+    {
+      "code": "AM",
+      "libelle": "Cyclomoteur <= 50 cm3"
+    },
+    {
+      "code": "A1",
+      "libelle": "Motocyclette <=125 cm3"
+    },
+    {
+      "code": "A2",
+      "libelle": "Moto <= 600 cm3"
+    },
+    {
+      "code": "B",
+      "libelle": "Véhicule léger"
+    },
+    {
+      "code": "BE",
+      "libelle": "Véhicule léger + remorque  (PTAC > 4,25 T)"
+    },
+    {
+      "code": "B1",
+      "libelle": "Quadricycle"
+    },
+    {
+      "code": "B79",
+      "libelle": "B mention 79.06 (= EB)"
+    },
+    {
+      "code": "B96",
+      "libelle": "B mention 96 - VL + remorque (PTAC < 4,25 T)"
+    },
+    {
+      "code": "C",
+      "libelle": "Poids lourd"
+    },
+    {
+      "code": "CE",
+      "libelle": "Poids lourd + remorque  (= EC)"
+    },
+    {
+      "code": "C1E",
+      "libelle": "Poids lourd < 7,5 T + remorque"
+    },
+    {
+      "code": "C1",
+      "libelle": "Poids lourd < 7,5 T"
+    },
+    {
+      "code": "D",
+      "libelle": "Transport de personnes"
+    },
+    {
+      "code": "DE",
+      "libelle": "Transport de personnes + remorque (= ED)"
+    },
+    {
+      "code": "D1E",
+      "libelle": "Transport de personnes <= 16 P + remorque"
+    },
+    {
+      "code": "D1",
+      "libelle": "Transport de personnes <= 16 places"
+    },
+    {
+      "code": "EB",
+      "libelle": "Véhicule léger + remorque"
+    },
+    {
+      "code": "EC",
+      "libelle": "Poids lourd + remorque"
+    },
+    {
+      "code": "ED",
+      "libelle": "Transport de personnes + remorque"
+    }
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "parametres": {
+    "region": "11"
+  },
+  "teste_le": "2026-10-08T20:26:25+00:00",
+  "essais": [
+    {
+      "range": "0-149",
+      "statut": 206,
+      "content_range": "offres 0-149/66915",
+      "accept_range": "150",
+      "nombre_resultats": 150
+    },
+    {
+      "range": "0-199",
+      "statut": 400,
+      "content_range": "",
+      "accept_range": "150",
+      "message": "La plage de résultats demandée est trop importante."
+    },
+    {
+      "range": "1000-1149",
+      "statut": 206,
+      "content_range": "offres 1000-1149/66915",
+      "accept_range": "150",
+      "nombre_resultats": 150
+    },
+    {
+      "range": "1050-1199",
+      "statut": 206,
+      "content_range": "offres 1050-1199/66915",
+      "accept_range": "150",
+      "nombre_resultats": 150
+    },
+    {
+      "range": "1150-1299",
+      "statut": 206,
+      "content_range": "offres 1150-1299/66915",
+      "accept_range": "150",
+      "nombre_resultats": 150
+    },
+    {
+      "range": "2000-2149",
+      "statut": 206,
+      "content_range": "offres 2000-2149/66915",
+      "accept_range": "150",
+      "nombre_resultats": 150
+    },
+    {
+      "range": "3000-3149",
+      "statut": 206,
+      "content_range": "offres 3000-3149/66915",
+      "accept_range": "150",
+      "nombre_resultats": 150
+    },
+    {
+      "range": "3150-3299",
+      "statut": 400,
+      "content_range": "",
+      "accept_range": "150",
+      "message": "La position de début doit être inférieure ou égale à 3000."
+    }
+  ],
+  "plages_acceptees": [
+    "0-149",
+    "1000-1149",
+    "1050-1199",
+    "1150-1299",
+    "2000-2149",
+    "3000-3149"
+  ],
+  "dernier_index_obtenu": 3149
+}

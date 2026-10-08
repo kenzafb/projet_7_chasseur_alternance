@@ -1,0 +1,75 @@
+{
+  "route": "/referentiel/themes",
+  "telecharge_le": "2026-10-08T20:26:13+00:00",
+  "nombre": 17,
+  "donnees": [
+    {
+      "code": "01",
+      "libelle": "Métiers de l'environnement et du développement durable"
+    },
+    {
+      "code": "02",
+      "libelle": "Métiers de la défense et de la sécurité publique (hors logistique, santé, tertiaire, restauration)"
+    },
+    {
+      "code": "03",
+      "libelle": "Métiers du patrimoine et de la restauration d'oeuvres d'art"
+    },
+    {
+      "code": "04",
+      "libelle": "Métiers de l'intelligence économique"
+    },
+    {
+      "code": "05",
+      "libelle": "Métiers de la recherche"
+    },
+    {
+      "code": "06",
+      "libelle": "Métiers de la mer, du nautisme et de la construction navale"
+    },
+    {
+      "code": "07",
+      "libelle": "Métiers de l'aéronautique"
+    },
+    {
+      "code": "08",
+      "libelle": "Métiers de la sécurité publique et privée"
+    },
+    {
+      "code": "09",
+      "libelle": "Métiers du multimédia"
+    },
+    {
+      "code": "10",
+      "libelle": "Métiers de l'humanitaire (hors santé et tertiaire)"
+    },
+    {
+      "code": "11",
+      "libelle": "Métiers du nucléaire"
+    },
+    {
+      "code": "12",
+      "libelle": "Métiers auprès des enfants"
+    },
+    {
+      "code": "13",
+      "libelle": "Métiers saisonniers, de vacances / Jobs d'été"
+    },
+    {
+      "code": "14",
+      "libelle": "Métiers des services à la personne à domicile"
+    },
+    {
+      "code": "15",
+      "libelle": "Métiers du sport et autour du sport"
+    },
+    {
+      "code": "16",
+      "libelle": "Métiers de l'ingénierie"
+    },
+    {
+      "code": "17",
+      "libelle": "Métiers accessibles sans diplôme et sans expérience"
+    }
+  ]
+}
