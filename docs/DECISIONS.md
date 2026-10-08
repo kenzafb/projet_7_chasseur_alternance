@@ -116,7 +116,7 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 1 et 2), validées par l'humai
 ### D23. Filtres France Travail par mode
 - **Décision.** Alternance : `natureContrat` E2 et FS (contrat de professionnalisation ajouté), aucun filtre de qualification. Job : `typeContrat` CDD, MIS, SAI, filtre `qualification=0` retiré (il écartait les offres « X », 61 % du total en IDF). Domaines du profil dans les deux modes. Options : secteur de l'employeur (88 divisions NAF) dans les deux modes ; thèmes 13 (saisonniers) et 17 (sans diplôme ni expérience) en mode job, décochés par défaut. Stage : aucune recherche France Travail (le mode n'existe pas encore).
 
-### D24. Rien de tronqué en silence : découpage adaptatif
+### D24. Rien de tronqué en silence : découpage adaptatif (découpage remplacé par D31)
 - **Décision.** Au-delà de 3150 offres par requête (150 par page, début au plus 3000, mesuré le 8 octobre 2026), la requête est redécoupée par département d'IDF, puis par domaine, puis par fenêtre de publication, avec dédoublonnage par identifiant. Une troncature ou une perte restante est écrite dans les logs du pipeline.
 
 ### D25. Taille d'entreprise filtrée après récupération
@@ -142,3 +142,24 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 1 et 2), validées par l'humai
 
 ### D30. « Garder les offres sans information de taille » cochée par défaut : validé
 - **Décision.** `taille_inconnue` vaut vrai tant que l'utilisateur ne la décoche pas (D25).
+
+## Phase 5b, résultats de la vérification de l'API (8 octobre 2026)
+
+`scripts/verifier_france_travail.py` lancé par l'humain le 8 octobre 2026, détail dans `docs/referentiels/france_travail/verification_api.json`.
+
+### D31. Découpage par date de création seulement (remplace le découpage de D24)
+- **Constat.** Découper par domaine ou par département perd des offres : la somme des 14 grands domaines fait 56979 sur 66929 (offres sans domaine), celle des 8 départements 64031 sur 66929 (offres sans département).
+- **Décision.** Au-delà de 3150 offres, la requête est découpée uniquement par date de création : période coupée en deux, récursivement, tant qu'une tranche dépasse le plafond, jusqu'à l'heure. Départements et domaines ne servent qu'aux filtres choisis par l'utilisateur, jamais au découpage. L'étape « valeur » disparaît. Le principe de D24 reste : rien n'est tronqué en silence.
+- **Fenêtre.** La fenêtre complète arrêtée à maintenant (UTC) ramenait 66709 offres sur 66929. L'écart vaut environ deux heures d'offres (17458 en 7 jours, une centaine par heure) : l'API lit vraisemblablement les dates en heure de Paris. La fenêtre finit désormais à maintenant plus 24 h (`MARGE_FIN_FENETRE_HEURES`) ; les deux moitiés partagent leur borne (offre à la borne lue deux fois, dédoublonnée, quelle que soit l'inclusion des bornes). Le script compare désormais les fins « maintenant », « plus 3 h » et « plus la marge » au total sans dates, pour confirmer la cause.
+- **Bilan.** Après chaque recherche découpée, les logs donnent le total annoncé par l'API, le nombre d'offres distinctes récupérées et l'écart (attendu : quelques offres publiées ou retirées pendant la recherche).
+
+### D32. Valeurs de `parametres_api.py` vérifiées
+- **Décision.** `grandDomaine` pour les lettres, `domaine` pour les codes (`domaine=M` refusé). Valeurs par requête : `natureContrat` 2, `typeContrat` 3, `grandDomaine` 5 (listes acceptées, OU) ; `domaine`, `theme` 1 (listes refusées) ; `secteurActivite` 1 en attendant D33. Tranche d'effectif : `trancheEffectifEtab`, présente dans 287 offres sur 300, toutes reconnues. Complète D26.
+
+### D33. secteurActivite : essai à exactement deux valeurs
+- **Constat.** La liste de cinq secteurs est refusée avec « 2 chaînes de caractères séparées par des virgules ».
+- **Décision.** Le script essaie aussi exactement deux valeurs (`62,68`). La valeur reste 1 jusqu'à ce nouveau passage du script.
+- **Note.** Le premier passage avait déjà fait un essai à deux valeurs (1289 offres, soit 614 + 675), jugé « incohérent » à cause d'un défaut du script (comparaison aux totaux des cinq valeurs), corrigé.
+
+### D34. Offres écartées par la taille non marquées vues ; secteur employeur en alternance : validés
+- **Décision.** Une offre écartée par le filtre de taille n'est pas marquée vue : elle revient si l'utilisateur change de taille. Le secteur de l'employeur est proposé en option dans les deux modes, vide par défaut.

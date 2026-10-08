@@ -95,7 +95,7 @@ Une fois, pendant la phase, `test_limiteur_mistral.py::test_appels_de_plusieurs_
 
 ## Points à valider
 
-Tranchés après le rapport : D27 (pas de migration vers M18, bandeau d'invitation dans le profil d'alternance), D28 (domaines filtrants en job), D29 (LBA et Sirene inchangés, domaines non couverts nommés dans la confirmation de lancement), D30 (taille inconnue gardée par défaut) dans `docs/DECISIONS.md`. Restent ouverts les points 5 à 7.
+Tranchés après le rapport : D27 (pas de migration vers M18, bandeau d'invitation dans le profil d'alternance), D28 (domaines filtrants en job), D29 (LBA et Sirene inchangés, domaines non couverts nommés dans la confirmation de lancement), D30 (taille inconnue gardée par défaut) dans `docs/DECISIONS.md`. Puis, après la vérification de l'API : D31 (découpage par date seulement, l'étape « valeur » du point 5 disparaît), D32 et D33 (valeurs de `parametres_api.py`), D34 (points 6 et 7 validés). Plus aucun point ouvert. Le découpage décrit en section 3 est remplacé par D31.
 
 1. **Profils d'alternance sans domaine** : ils passent d'informatique par défaut à « tous les domaines » sur France Travail (conséquence de `[]` = indifférent). Les migrer vers `M18` pour garder l'ancien comportement ?
 2. **Mode job** : les domaines cochés comme préférence filtrent désormais la recherche (spec 2.1). Un profil job existant avec `informatique` ne verra plus que des jobs M18.
