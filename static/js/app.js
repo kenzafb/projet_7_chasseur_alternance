@@ -169,7 +169,7 @@ async function sauvegarderProfil() {
 
 /* ── Recherche contextuelle (filtre les lignes de la page courante) ──────── */
 const LISTES_RECHERCHE = {
-  offres:             { liste: '[data-list="offres"]',        ligne: ".offre__card, .offre" },
+  offres:             { liste: '[data-list="offres"]',        ligne: ".offre" },
   candidatures:       { liste: '[data-list="candidatures"]',  ligne: ".suivi-row" },
   spontanees:         { liste: '[data-list="spontanees"]',    ligne: ".trow:not(.thead)" },
   "spontanees-suivi": { liste: '[data-list="suivi"]',         ligne: ".suivi-row" },

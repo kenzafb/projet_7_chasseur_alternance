@@ -78,3 +78,70 @@ def test_url_versionnee_servie(client, utilisateur):
     client_a, _ = utilisateur("a@test.fr", prenom="Alice")
     r = client_a.get(statique.url_statique("js/api.js"))
     assert r.status_code == 200 and "export const api" in r.text
+
+
+# ─── Sélecteurs des modules JS ───────────────────────────────────────────────
+# Les modules repèrent les éléments par id, attribut data-* ou classe. Chaque
+# sélecteur écrit dans un JS doit viser un élément qui existe : dans les
+# templates, ou dans le balisage que les JS génèrent eux-mêmes.
+_JS = {p.name: p.read_text(encoding="utf-8") for p in sorted((config.STATIC_DIR / "js").glob("*.js"))}
+_TEMPLATES = "\n".join(p.read_text(encoding="utf-8") for p in sorted(config.TEMPLATES_DIR.rglob("*.html")))
+_CHAINES = re.compile(r'"((?:[^"\\\n]|\\.)*)"|\'((?:[^\'\\\n]|\\.)*)\'|`((?:[^`\\]|\\.)*)`', re.S)
+_ATTRIBUT = re.compile(r'\[([a-z][\w-]*)(?:\s*=\s*"([^"]*)")?\]')
+
+
+def _selecteurs():
+    """(module, type, nom, valeur) de chaque id, attribut ou classe cherché
+    par querySelector, querySelectorAll, getElementById, closest ou matches,
+    ou rangé dans une table de sélecteurs ([data-list="..."] etc.)."""
+    trouves = set()
+    for module, source in _JS.items():
+        for m in re.finditer(r'getElementById\(\s*["\']([\w-]+)["\']', source):
+            trouves.add((module, "id", m.group(1), None))
+        for m in _CHAINES.finditer(source):
+            chaine = next(g for g in m.groups() if g is not None)
+            debut = source[max(0, m.start() - 40):m.start()]
+            appel = re.search(r'(querySelector(?:All)?|closest|matches)\(\s*$', debut)
+            if not (appel or re.match(r'^\s*[.#\[]', chaine)) or "<" in chaine:
+                continue   # ni sélecteur ni entrée d'une table de sélecteurs
+            for nom, valeur in _ATTRIBUT.findall(chaine):
+                valeur = None if not valeur or "${" in valeur else valeur
+                trouves.add((module, "attribut", nom, valeur))
+            sans_attributs = _ATTRIBUT.sub("", chaine)
+            for nom in re.findall(r'(?<![\w-])#([A-Za-z][\w-]*)', sans_attributs):
+                trouves.add((module, "id", nom, None))
+            for nom in re.findall(r'(?<![\w$-])\.([A-Za-z][\w-]*)', sans_attributs):
+                trouves.add((module, "classe", nom, None))
+    return sorted(trouves, key=lambda t: tuple(map(str, t)))
+
+
+def _balisage_js():
+    """Balisage généré par les modules : le texte de leurs balises ouvrantes."""
+    return "\n".join(re.findall(r"<[a-z][^<>]*>", "\n".join(_JS.values())))
+
+
+def _existe(type_, nom, valeur, html):
+    if type_ == "id":
+        return re.search(rf'\bid="{re.escape(nom)}"', html)
+    if type_ == "classe":
+        return re.search(rf'\bclass="[^"]*(?<![\w-]){re.escape(nom)}(?![\w-])', html)
+    if valeur is None:
+        return re.search(rf'(?<![\w-]){re.escape(nom)}(?=[\s=>/])', html)
+    return re.search(rf'(?<![\w-]){re.escape(nom)}="{re.escape(valeur)}"', html)
+
+
+def test_les_selecteurs_trouves_sont_nombreux():
+    """Garde-fou du test suivant : l'extraction voit bien les sélecteurs."""
+    trouves = _selecteurs()
+    assert len(trouves) > 60
+    assert ("app.js", "attribut", "data-runbar", None) in trouves
+    assert ("app.js", "attribut", "data-list", "offres") in trouves   # table LISTES_RECHERCHE
+    assert ("spontanees.js", "attribut", "data-sp-mode-test", None) in trouves
+
+
+def test_chaque_selecteur_des_modules_existe():
+    html = _TEMPLATES + "\n" + _balisage_js()
+    absents = [f"{module} : {type_} {nom}{'=' + valeur if valeur else ''}"
+               for module, type_, nom, valeur in _selecteurs()
+               if not _existe(type_, nom, valeur, html)]
+    assert not absents, "\n".join(absents)

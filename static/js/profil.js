@@ -140,7 +140,6 @@ function brancherPiecesJointes() {
   const fileInput = document.querySelector("[data-pj-file]");
   const fname = document.querySelector("[data-pj-fname]");
   const btnUp = document.querySelector("[data-pj-upload]");
-  const nomInput = document.querySelector("[data-pj-nom]");
   const liste = document.querySelector("[data-pj-list]");
 
   if (fileInput) fileInput.addEventListener("change", () => {
