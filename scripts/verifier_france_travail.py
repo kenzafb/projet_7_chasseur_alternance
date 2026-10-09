@@ -25,12 +25,20 @@ ses identifiants (FT_CLIENT_ID, FT_CLIENT_SECRET du .env) :
    jusqu'à maintenant, maintenant plus 3 h, maintenant plus la marge de
    parametres_api.py, comparées au total sans dates ; deux moitiés
    jointives comparées à la fenêtre complète (bornes incluses ou non).
+5. Stages (phase 6b) : France Travail n'a ni type ni nature de contrat
+   « stage ». Essai motsCles=stage en Île-de-France : nombre d'offres,
+   répartition exacte par type et par nature de contrat (un comptage par
+   code des référentiels), et sur les 150 plus récentes : types, natures,
+   part des intitulés qui contiennent « stage » ou « stagiaire », 20
+   intitulés d'exemple. Résultat dans verification_stage.json, à lire par
+   l'humain avant de brancher France Travail dans le mode stage.
+   --stage : cette étape seulement (une quarantaine de requêtes).
 
 Résultat détaillé dans docs/referentiels/france_travail/verification_api.json
 (--sortie pour un autre dossier), sans identifiant ni token. À la fin, les
 valeurs à reporter dans france_travail/parametres_api.py, seul endroit du
-code qui dépend de ces réponses. Une soixantaine de requêtes, moins d'une
-minute. Code de sortie 1 si le token ne peut pas être obtenu, 0 sinon.
+code qui dépend de ces réponses. Une centaine de requêtes, une à deux
+minutes. Code de sortie 1 si le token ne peut pas être obtenu, 0 sinon.
 """
 
 import argparse
@@ -72,6 +80,10 @@ ESSAIS_MULTIPLES = [
     ("secteurActivite", ["62", "68"]),
 ]
 MOTS_TAILLE = ("effectif", "tranche")
+# Stages : mot-clé essayé, intitulés montrés, mots qui signalent un vrai stage
+MOTS_CLES_STAGE = "stage"
+EXEMPLES_STAGE = 20
+MOTS_INTITULE_STAGE = ("stage", "stagiaire")
 FORMAT_DATE = "%Y-%m-%dT%H:%M:%SZ"
 # Écart toléré entre la fenêtre complète et le total sans dates : offres
 # publiées ou retirées entre les deux requêtes
@@ -286,6 +298,50 @@ class Verificateur:
         return essais
 
 
+    # ── 5. Stages ──
+    def stage(self) -> dict:
+        """Offres trouvées par motsCles=stage en Île-de-France : nombre,
+        répartition par type et nature de contrat, intitulés d'exemple."""
+        recherche = {**BASE, "motsCles": MOTS_CLES_STAGE}
+        total = self.compter(recherche)
+        self.afficher(f"  motsCles={MOTS_CLES_STAGE} : {total['total']} offres en Île-de-France"
+                      + (f" ({total['statut']} {total.get('message', '')[:100]})" if total["total"] is None else ""))
+        repartition = {}
+        for param, referentiel in (("typeContrat", "types_contrats"), ("natureContrat", "natures_contrats")):
+            libelles = referentiels.libelles(referentiels.france_travail(referentiel))
+            totaux = {code: self.compter({**recherche, param: code})["total"] for code in libelles}
+            non_nuls = {c: n for c, n in sorted(totaux.items(), key=lambda x: -(x[1] or 0)) if n}
+            repartition[param] = {"totaux": totaux, "somme": sum(n or 0 for n in totaux.values()),
+                                  "libelles": libelles}
+            self.afficher(f"  par {param} (somme {repartition[param]['somme']}) : "
+                          + (", ".join(f"{c} {libelles[c]} {n}" for c, n in non_nuls.items()) or "aucune"))
+        # Échantillon : les plus récentes
+        offres = []
+        r = self.ex.get(ROUTE_RECHERCHE, params={**recherche, "range": PLAGE_PAGE, "sort": "1"})
+        if r is not None and r.status_code in (200, 206):
+            try:
+                offres = r.json().get("resultats") or []
+            except ValueError:
+                pass
+        intitules = [o.get("intitule") or "" for o in offres]
+        avec_mot = sum(1 for t in intitules if any(m in t.lower() for m in MOTS_INTITULE_STAGE))
+        echantillon = {
+            "offres_lues": len(offres),
+            "typeContrat": dict(Counter(o.get("typeContrat") or "?" for o in offres).most_common()),
+            "natureContrat": dict(Counter(o.get("natureContrat") or "?" for o in offres).most_common()),
+            "alternance": sum(1 for o in offres if o.get("alternance")),
+            "intitule_avec_stage": avec_mot,
+            "exemples": intitules[:EXEMPLES_STAGE],
+        }
+        self.afficher(f"  {len(offres)} plus récentes : types {echantillon['typeContrat']}, "
+                      f"natures {echantillon['natureContrat']}, {echantillon['alternance']} en alternance, "
+                      f"{avec_mot} avec « stage » ou « stagiaire » dans l'intitulé")
+        self.afficher(f"  {min(EXEMPLES_STAGE, len(intitules))} intitulés d'exemple :")
+        for t in echantillon["exemples"]:
+            self.afficher(f"    - {t}")
+        return {"recherche": recherche, "total": total, "repartition": repartition, "echantillon": echantillon}
+
+
 def propositions(resultat: dict) -> dict:
     """Valeurs proposées pour france_travail/parametres_api.py (None : non tranché)."""
     dom = resultat["domaine"]
@@ -331,7 +387,15 @@ def resume(resultat: dict, afficher=print):
                  "voir « decoupage » dans le fichier.")
 
 
-def main(session=None, sortie=DOSSIER_SORTIE, pause=PAUSE_S, afficher=print) -> int:
+def verifier_stage(v: Verificateur, afficher=print):
+    """Étape 5, écrite à part : verification_stage.json."""
+    resultat = {"verifie_le": datetime.now(timezone.utc).isoformat(timespec="seconds"), **v.stage()}
+    chemin = v.ex.ecrire("verification_stage", resultat)
+    afficher(f"Détail des stages écrit dans {chemin} : à lire avant de brancher France Travail "
+             "dans le mode stage.")
+
+
+def main(session=None, sortie=DOSSIER_SORTIE, pause=PAUSE_S, afficher=print, seulement_stage=False) -> int:
     ex = Explorateur(session=session, sortie=sortie, pause=pause, afficher=afficher)
     try:
         ex.obtenir_token()
@@ -339,6 +403,10 @@ def main(session=None, sortie=DOSSIER_SORTIE, pause=PAUSE_S, afficher=print) -> 
         afficher(f"❌ {e}")
         return 1
     v = Verificateur(ex)
+    if seulement_stage:
+        afficher("5. Stages (motsCles) :")
+        verifier_stage(v, afficher)
+        return 0
     afficher("1. Paramètre de domaine :")
     domaine = v.domaine()
     afficher("2. Valeurs multiples :")
@@ -353,6 +421,8 @@ def main(session=None, sortie=DOSSIER_SORTIE, pause=PAUSE_S, afficher=print) -> 
     resultat["propositions"] = propositions(resultat)
     chemin = ex.ecrire("verification_api", resultat)
     afficher(f"Détail écrit dans {chemin}")
+    afficher("5. Stages (motsCles) :")
+    verifier_stage(v, afficher)
     resume(resultat, afficher)
     return 0
 
@@ -360,4 +430,6 @@ def main(session=None, sortie=DOSSIER_SORTIE, pause=PAUSE_S, afficher=print) -> 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Vérification des points ouverts de l'API France Travail.")
     parser.add_argument("--sortie", type=Path, default=DOSSIER_SORTIE, help="dossier du fichier produit")
-    sys.exit(main(sortie=parser.parse_args().sortie))
+    parser.add_argument("--stage", action="store_true", help="seulement l'essai motsCles=stage (étape 5)")
+    args = parser.parse_args()
+    sys.exit(main(sortie=args.sortie, seulement_stage=args.stage))

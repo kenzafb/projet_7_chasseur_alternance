@@ -64,7 +64,8 @@ class FausseAPI:
         # Paramètres de filtre compris par l'API simulée ; les autres sont ignorés
         self.params_reconnus = set(params_reconnus if params_reconnus is not None else (
             "region", "departement", "natureContrat", "typeContrat", "grandDomaine", "domaine",
-            "secteurActivite", "theme", "codeROME", "minCreationDate", "maxCreationDate", "qualification"))
+            "secteurActivite", "theme", "codeROME", "minCreationDate", "maxCreationDate", "qualification",
+            "motsCles"))
         # Paramètres acceptant plusieurs valeurs (OU) ; les autres : première valeur seulement,
         # ou 400 si multiples_refuses
         self.multiples = set(multiples if multiples is not None else self.params_reconnus)
@@ -106,6 +107,9 @@ class FausseAPI:
             return any(t in valeurs for t in o["_themes"])
         if param == "codeROME":
             return o["romeCode"] in valeurs
+        if param == "motsCles":   # intitulé ou description, sans casse
+            texte = f"{o['intitule']} {o.get('description', '')}".lower()
+            return any(v.lower() in texte for v in valeurs)
         if param == "qualification":
             return o.get("qualificationCode", "X") in valeurs
         return True

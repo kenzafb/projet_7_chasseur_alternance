@@ -156,3 +156,49 @@ def test_aucun_secret_et_token_refuse(api, tmp_path):
     (tmp_path / "verification_api.json").unlink()
     code, sortie, res = lancer(api, tmp_path)
     assert code == 1 and "❌" in sortie and res is None
+
+
+# ─── 5. Stages (phase 6b) ─────────────────────────────────────────────────────
+def _offres_de_stage():
+    """Trois stages, une offre qui parle de stage dans sa seule description,
+    une alternance ; « stagiaire » seul ne contient pas « stage »."""
+    o = [offre(500, nature="E1", type_contrat="CDD", titre="Stage développeur web H/F"),
+         offre(501, nature="E1", type_contrat="CDI", titre="Stage comptable"),
+         offre(502, nature="E1", type_contrat="CDD", titre="STAGE assistant RH"),
+         offre(503, nature="E1", type_contrat="CDI", titre="Technicien support"),
+         offre(504, nature="E2", type_contrat="CDD", titre="Apprenti logistique, ancien stage accepté"),
+         offre(505, nature="E1", type_contrat="CDI", titre="Stagiaire juriste")]
+    o[3]["description"] = "Possibilité d'embauche après un stage de fin d'études."
+    return o
+
+
+def test_essai_stage(api, tmp_path):
+    api.offres += _offres_de_stage()
+    code, sortie, res = lancer(api, tmp_path)
+    assert code == 0 and "decoupage" in res and "stage" not in res        # fichier à part
+    st = json.loads((tmp_path / "verification_stage.json").read_text(encoding="utf-8"))
+    assert st["recherche"]["motsCles"] == "stage"
+    assert st["total"]["total"] == 5
+    types = st["repartition"]["typeContrat"]
+    assert {c: n for c, n in types["totaux"].items() if n} == {"CDD": 3, "CDI": 2} and types["somme"] == 5
+    natures = st["repartition"]["natureContrat"]
+    assert {c: n for c, n in natures["totaux"].items() if n} == {"E1": 4, "E2": 1}
+    ech = st["echantillon"]
+    assert ech["offres_lues"] == 5 and ech["intitule_avec_stage"] == 4 and ech["alternance"] == 1
+    assert "Stagiaire juriste" not in ech["exemples"]
+    assert ech["typeContrat"] == {"CDD": 3, "CDI": 2}
+    assert "Stage développeur web H/F" in ech["exemples"] and len(ech["exemples"]) == 5
+    assert "motsCles=stage : 5 offres en Île-de-France" in sortie
+    assert "    - Stage comptable" in sortie and "CDD Contrat à durée déterminée 3" in sortie
+
+
+def test_essai_stage_seul(api, tmp_path):
+    api.offres += _offres_de_stage() + [offre(600 + n, titre=f"Stage {n}") for n in range(30)]
+    sorties = []
+    assert vf.main(session=api, sortie=tmp_path, pause=0, afficher=sorties.append, seulement_stage=True) == 0
+    assert not (tmp_path / "verification_api.json").exists()
+    st = json.loads((tmp_path / "verification_stage.json").read_text(encoding="utf-8"))
+    assert st["total"]["total"] == 35 and len(st["echantillon"]["exemples"]) == vf.EXEMPLES_STAGE
+    # Seulement des recherches avec motsCles, une par code des référentiels plus le total et l'échantillon
+    assert all(p.get("motsCles") == "stage" for p in api.recherches)
+    assert len(api.recherches) == 2 + 12 + 19
