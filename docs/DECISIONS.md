@@ -326,6 +326,7 @@ Décisions données par l'humain au lancement de la phase et mises en œuvre. Le
 ### D69. Sources du mode stage : Sirene seulement pour l'instant
 - **Décision.** Candidatures spontanées par Sirene comme en alternance (cœurs et transverses, tailles, départements). Pas de LBA (alternance uniquement). France Travail : essai `motsCles=stage` en Île-de-France ajouté à `scripts/verifier_france_travail.py` (nombre d'offres, types et natures de contrat, 20 intitulés) ; France Travail n'est pas branché dans le mode stage tant que l'humain n'a pas lu le résultat. La page Offres du mode stage dit que les offres ne sont pas encore disponibles.
 - **À reconsidérer** après lecture de `docs/referentiels/france_travail/verification_stage.json`.
+- **France Travail remplacé** par D74 : branché dans le mode stage.
 
 ### D70. « Tous les secteurs » explicite, message avant lancement, tous les modes
 - **Constat.** En job, domaine « indifférent » : « Récupérer » ne cherchait rien sur Sirene sans le dire avant le lancement, alors que l'interface affichait « indifférent ».
@@ -336,3 +337,22 @@ Décisions données par l'humain au lancement de la phase et mises en œuvre. Le
 
 ### D72. Nettoyage des adresses contactées exclues : par l'humain
 - **Décision.** Les règles de `shared/referentiels/emails_exclus.txt` (D47) s'appliquent aussi aux adresses contactées importées (par exemple `…@sentry.wixpress.com`), par la commande de nettoyage existante (`scripts/nettoyer_emails_exclus.py`), lancée par l'humain. Complète D62.
+
+## Phase 6b, résultats des scripts et points tranchés (9 octobre 2026)
+
+`scripts/verifier_france_travail.py --stage` et `scripts/verifier_sirene.py --tous-secteurs` lancés par l'humain le 9 octobre 2026 (`docs/referentiels/france_travail/verification_stage.json`, `docs/referentiels/insee/verification_tous_secteurs.json`).
+
+### D73. Points à valider de la phase 6b
+- **Validés** (points 1 à 7 et 9 à 12 du rapport) : balises communes du mail et balises du stage réservées au stage, `{missions}` comprise ; durée arrondie à la semaine la plus proche, jours compris, au moins 1 ; dates en toutes lettres, `{duree_semaines}` sans le mot ; balise vide = envoi refusé avant le premier mail ; objet et trame par défaut du stage ; « tous les secteurs » cherché en dernier, en complément, mêmes tailles que les cœurs, exclusions conservées ; « Récupérer » refusé en job et en stage sans rien à chercher, lancé en alternance pour LBA ; « sans salarié » proposée en stage ; nettoyage par suppression des lignes de `emails_contactes` ; exclusion dès l'import de l'historique ; couleur verte du stage.
+- **Point 8** : tranché par D75.
+
+### D74. France Travail branché dans le mode stage (remplace D69 pour France Travail)
+- **Constat.** `motsCles=stage` en Île-de-France : 73 offres, natures E1 55, E2 12, FS 6 (types CDI 37, CDD 34, MIS 2) ; le champ `alternance` des offres vaut vrai pour les 18 E2 et FS. Parmi les 20 intitulés d'exemple, trois désignent l'objet du poste (« Coordinateur de stages de formation », « Gestionnaire du service des stages », « Coordinateur en charge des ateliers, stages & restitution »).
+- **Décision.** Recherche par `motsCles=stage`, domaines et secteurs du profil comme dans les autres modes ; natures E2 et FS (alternance) écartées ; seuls les intitulés où « stage » ou « stagiaire » désigne le poste sont gardés (en début d'intitulé, accolé à un tiret, après une barre oblique...), ceux où il désigne l'objet du poste sont écartés. Règles dans `shared/referentiels/intitules_stage.txt`, fichier de données à compléter, testées sur les 20 intitulés de l'essai. La page Offres du mode stage affiche ces offres « non analysées » comme les autres modes.
+- **Conséquence.** En mode stage, l'archivage par mots-clés ne garde que « public réservé » : ni « stage » (le mot est attendu) ni « école ou CFA » (une école peut accueillir un stagiaire).
+
+### D75. Départements et tailles des spontanées dans le profil job
+- **Décision.** Le profil job a, comme l'alternance et le stage, les départements et les tailles des candidatures spontanées (avec l'option des effectifs inconnus), avec les mêmes valeurs par défaut que le stage : rien de coché, donc toute l'Île-de-France et toutes les tailles sauf « sans salarié », effectifs inconnus gardés. Clôt le point 7 de la phase 6a.
+
+### D76. Volume de « tous les secteurs » mesuré
+- **Décision.** `VOLUME_TOUS_SECTEURS` (`shared/naf.py`) affiche la mesure : 382 663 sièges actifs en Île-de-France hors « sans salarié », dont 67 755 à partir de 10 salariés (3 182 798 toutes tranches). La requête réelle, avec les activités exclues en ET, est acceptée par l'API (381 283).

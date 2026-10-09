@@ -139,3 +139,27 @@ Migration 0012 et nettoyage essayés sur une copie de `data/chasseur_v2.db` : mo
 10. **Nettoyage par suppression** des lignes de `emails_contactes`, sans trace en base autre que la sortie de la commande.
 11. **Exclusion dès l'import** de l'historique (792 au lieu de 798 dans le groupe a).
 12. **Couleur verte** du mode stage.
+
+## Suite : résultats des scripts et décisions (D73 à D76)
+
+Points 1 à 7 et 9 à 12 validés (D73). Résultats des scripts versionnés : `docs/referentiels/france_travail/verification_stage.json`, `docs/referentiels/insee/verification_tous_secteurs.json`.
+
+**Volume de « tous les secteurs » (D76).** `VOLUME_TOUS_SECTEURS` affiche « 382 663 entreprises en Île-de-France hors « sans salarié », dont 67 755 à partir de 10 salariés ; mesure Sirene du 9 octobre 2026 ». La clause d'exclusion en ET est acceptée par la vraie API (381 283), ce qui lève la limite correspondante.
+
+**France Travail en stage (D74).**
+- `shared/modes.py` : sources `france_travail`, filtre `motsCles=stage`, option secteurs, `ft_exclure_alternance` (le champ `alternance` couvre exactement les 12 E2 et 6 FS de l'essai : 18), `ft_intitules_stage`. Domaines du profil comme ailleurs. Le mécanisme « offres pas encore disponibles » est retiré (page Offres, bouton, refus de `/api/recherche`).
+- `shared/referentiels/intitules_stage.txt` et `shared/intitules_stage.py` : règles « + » (le stage est le poste : début d'intitulé, accolé à un tiret ou deux-points, après une barre oblique, « (stage) », « en stage ») et « - » (le stage est l'objet : « service des stages », « coordinateur de stages », « stages de formation », « stages & »). Intitulé comparé en minuscules sans accents ; gardé si une règle « + » et aucune « - ». Sur les 18 intitulés distincts des 20 de l'essai : 15 gardés, les 3 désignés par l'humain écartés.
+- `france_travail/scraper.py` : l'intitulé compte dans le lot (arrêt anticipé de D43) ; les offres écartées par l'intitulé ou l'alternance sont comptées dans les logs et, comme celles écartées par la taille, ne sont pas marquées vues.
+- `france_travail/analyseur.py` : en stage, l'archivage par mots-clés ne garde que « public réservé ». Sans ce changement, toute offre de stage aurait été archivée (règle « stage » de l'alternance), et une école qui recrute un stagiaire aurait été archivée comme « école ou CFA ».
+- Pas de taille des offres dans le profil de stage (moins de 60 offres attendues) : toutes les tailles.
+
+**Profil job (D75).** Les blocs « Taille de l'entreprise (candidatures spontanées) » et « Départements des candidatures spontanées » sont affichés dans les trois modes ; défauts du stage (rien de coché). Les avertissements des petites tailles parlent de « salarié en contrat court » en job, de « stagiaire » en stage. Aucune migration : un profil job sans ces champs a déjà ces défauts.
+
+**Tests.** 784 passent (`systemd-run --user --scope -p MemoryMax=2G venv/bin/python -m pytest -q`). Nouveaux : `test_intitules_stage.py` (les 20 intitulés de l'essai, lus dans `verification_stage.json`, et d'autres cas), recherche d'offres de stage contre l'API simulée (mot-clé, domaine, alternance et intitulés écartés, offre « non analysée » non archivée), recherche par la route en stage, archivage par mots-clés en stage, départements et tailles des spontanées en job.
+
+**Limites.**
+- L'analyse par l'IA, quand elle reviendra, n'a pas de consignes propres au stage : le stage suit les règles de l'alternance, sans l'archivage « stage ».
+- La règle des intitulés ne connaît que les tournures vues dans l'essai ; un intitulé comme « Assistant marketing stage 6 mois » (sans tiret ni parenthèse) n'est pas gardé. Le fichier se complète sans toucher au code.
+- 73 offres en Île-de-France le 9 octobre : avec les domaines et l'exclusion de l'alternance, une recherche de stage en ramènera peu.
+
+**À lancer par l'humain** : rien de nouveau (pas de migration) ; relancer l'application, puis en mode Stage : Offres, « Lancer la recherche ».
