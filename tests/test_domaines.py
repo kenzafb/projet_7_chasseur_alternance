@@ -149,5 +149,5 @@ def test_avertissement_au_lancement(utilisateur, monkeypatch):
 
 def test_bandeau_domaines_vides_dans_le_profil(utilisateur):
     client, _ = utilisateur("a@test.fr", prenom="Alice")
-    page = client.get("/").text
+    page = client.get("/alternance").text
     assert "data-domaines-vide hidden" in page and "Aucun domaine choisi" in page

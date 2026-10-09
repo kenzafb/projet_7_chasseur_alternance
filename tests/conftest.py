@@ -273,8 +273,21 @@ def base(modele_base):
 # ─── Clients ──────────────────────────────────────────────────────────────────
 @pytest.fixture
 def client():
-    with TestClient(main.app) as c:
+    with ClientDeMode(main.app) as c:
         yield c
+
+
+class ClientDeMode(TestClient):
+    """Client d'un onglet ouvert sur /<mode> : comme le front, ajoute
+    mode=<mode> à chaque appel /api/ qui n'en donne pas. mode = None : rien
+    n'est ajouté (requête sans mode)."""
+    mode = "alternance"
+
+    def request(self, method, url, *, params=None, **kwargs):
+        texte = str(url)
+        if self.mode and texte.startswith("/api/") and "mode=" not in texte and "mode" not in (params or {}):
+            params = {**dict(params or {}), "mode": self.mode}
+        return super().request(method, url, params=params, **kwargs)
 
 
 @pytest.fixture
@@ -285,7 +298,7 @@ def code_invitation(monkeypatch):
 
 def inscrire(email, **profil):
     """Crée un compte via /register et renvoie (client connecté, user_id)."""
-    c = TestClient(main.app)
+    c = ClientDeMode(main.app)
     r = c.post("/register", data={"email": email, "mot_de_passe": MOT_DE_PASSE,
                                   "code_invitation": CODE, **profil},
                follow_redirects=False)

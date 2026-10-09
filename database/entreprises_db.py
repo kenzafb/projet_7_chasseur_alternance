@@ -213,7 +213,6 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
             for e, m in prochaines_paires
         ]
         return {
-            "mode": mode,
             "raw": raw,
             "avec_email": avec_email,
             "mail_envoye": mail_envoye,

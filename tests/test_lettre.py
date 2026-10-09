@@ -24,7 +24,7 @@ def test_lettre_profil_incomplet(ada, mistral):
 
 
 def test_recherche_profil_absent_en_mode_job(ada):
-    ada.post("/api/mode", json={"mode": "job"})
+    ada.mode = "job"
     r = ada.post("/api/recherche")   # refusée avant le lancement du thread
     assert r.status_code == 400
     assert "Aucun profil pour ce mode" in r.json()["erreur"]
@@ -68,6 +68,6 @@ def test_pdf_profil_complet(ada, tmp_path):
     ada.post("/api/profil", json=PROFIL_COMPLET)
     r = ada.post("/api/telecharger_pdf", json={"id": "OFFRE-1", "lettre": "Madame, Monsieur,\n\nTexte."})
     assert r.status_code == 200
-    assert r.json()["url"] == "/api/lettre_pdf/OFFRE-1"
+    assert r.json()["url"] == "/api/lettre_pdf/OFFRE-1?mode=alternance"
     assert r.json()["nom"] == "Lettre_Ada_Lovelace_ACME.pdf"
     assert len(list((tmp_path / "pdf").glob("user_*/lettre_*.pdf"))) == 1

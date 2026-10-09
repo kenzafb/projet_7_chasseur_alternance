@@ -73,7 +73,7 @@ def test_suppression_garde_le_fichier_utilise_par_l_autre_mode(ada):
     assert lire_profil(user_id)["pieces_jointes"] == []
     assert config.chemin_piece_jointe(relatif).is_file()   # toujours utilisé en job
 
-    client.post("/api/mode", json={"mode": "job"})
+    client.mode = "job"
     client.post("/api/profil/piece/supprimer", json={"nom": "Mon CV"})
     assert not config.chemin_piece_jointe(relatif).exists()   # plus personne ne s'en sert
 

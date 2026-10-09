@@ -5,7 +5,7 @@
    - projets : [data-projets] (liste de cartes nom/url/description)
    ============================================================================ */
 
-import { api } from "./api.js";
+import { api, avecMode } from "./api.js";
 import { CompteEnvoi } from "./compte_envoi.js";
 
 const _tags = {};
@@ -123,7 +123,7 @@ function rendrePiecesJointes(pieces) {
     el.innerHTML = `
       <span class="pj-item__nom">${pj.nom}</span>
       <span class="pj-item__actions">
-        <a class="pj-item__link" href="/api/profil/piece?nom=${encodeURIComponent(pj.nom)}" target="_blank">Voir</a>
+        <a class="pj-item__link" href="${avecMode(`/api/profil/piece?nom=${encodeURIComponent(pj.nom)}`)}" target="_blank">Voir</a>
         <span class="pj-item__rm" data-pj-rm="${pj.nom}">Supprimer</span>
       </span>`;
     c.appendChild(el);

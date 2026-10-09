@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
+from tests.conftest import ClientDeMode
 from fastapi_users.password import PasswordHelper
 
 import main
@@ -114,12 +114,12 @@ def test_import_users_et_profils(ancienne_base):
 
 def test_connexion_avec_ancien_mot_de_passe(ancienne_base):
     imp.importer(str(ancienne_base), str(_cible_de_test()), sortie=lambda *_: None)
-    with TestClient(main.app) as c:
+    with ClientDeMode(main.app) as c:
         r = c.post("/login", data={"email": "user3@test.fr", "mot_de_passe": MOTS_DE_PASSE[3]},
                    follow_redirects=False)
         assert r.status_code == 303
         assert c.get("/api/profil").json()["prenom"] == "Grace"
-    with TestClient(main.app) as c:
+    with ClientDeMode(main.app) as c:
         r = c.post("/login", data={"email": "user2@test.fr", "mot_de_passe": MOTS_DE_PASSE[2]},
                    follow_redirects=False)
         assert r.status_code == 200   # user 2 non importé : connexion refusée
@@ -128,7 +128,7 @@ def test_connexion_avec_ancien_mot_de_passe(ancienne_base):
 
 def test_piece_jointe_importee_servie_par_l_app(ancienne_base):
     imp.importer(str(ancienne_base), str(_cible_de_test()), sortie=lambda *_: None)
-    with TestClient(main.app) as c:
+    with ClientDeMode(main.app) as c:
         c.post("/login", data={"email": "user1@test.fr", "mot_de_passe": MOTS_DE_PASSE[1]})
         r = c.get("/api/profil/piece", params={"nom": "CV"})
         assert r.status_code == 200 and r.content == b"%PDF-cv"

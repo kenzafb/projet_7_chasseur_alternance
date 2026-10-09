@@ -42,7 +42,7 @@ def test_plafond_des_mails_inchange():
 
 def test_interface_reprend_defauts_et_plafonds(utilisateur):
     client, _ = utilisateur("a@test.fr", prenom="Alice")
-    page = client.get("/").text
+    page = client.get("/alternance").text
     for cle, regle in config.LIMITES_LANCEMENT.items():
         if cle == "sans_ia":   # même champ que « analyses », affiché quand ANALYSE_IA=false
             continue
@@ -119,7 +119,7 @@ def test_recherche_defaut_et_plafond_serveur(utilisateur, sources, pipelines_neu
 
 def test_limite_du_mode_job_reste_un_plafond(utilisateur, sources, mistral, pipelines_neufs):
     client, user_id = utilisateur("a@test.fr", prenom="Alice")
-    client.post("/api/mode", json={"mode": "job"})
+    client.mode = "job"
     client.post("/api/profil", json={"prenom": "Alice"})
     sources.update(ft=8)
     _rechercher(client, user_id, pipelines_neufs, max_analyses=3)

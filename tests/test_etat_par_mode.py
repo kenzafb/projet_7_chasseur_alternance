@@ -98,10 +98,10 @@ def test_routes_par_mode(utilisateur, smtp_simule):
     client, uid = utilisateur("a@test.fr", prenom="Alice")
     ajouter_entreprises(uid, [{"siret": "S1", "nom": "ACME"}, {"siret": "S2", "nom": "Beta"}])
     ajouter_entreprises(uid, [{"siret": "S2"}], mode="job")
-    client.post("/api/mode", json={"mode": "job"})
+    client.mode = "job"
     stats = client.get("/api/spontanees/stats").json()
     assert stats["raw"] == 1 and [p["nom"] for p in stats["prochaines"]] == ["Beta"]
-    client.post("/api/mode", json={"mode": "alternance"})
+    client.mode = "alternance"
     assert client.get("/api/spontanees/stats").json()["raw"] == 2
 
 

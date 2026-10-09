@@ -3,7 +3,7 @@
    Navigation par onglets · topbar contextuelle · modale lettre ·
    polling de l'état des pipelines. Tout le reste vit dans les modules dédiés.
    ============================================================================ */
-import { api, limite, confirmerLancement } from "./api.js";
+import { api, limite, confirmerLancement, MODE } from "./api.js";
 import { Offres }        from "./offres.js";
 import { Candidatures }  from "./candidatures.js";
 import { Spontanees }    from "./spontanees.js";
@@ -156,6 +156,15 @@ async function pollEtat() {
     signalerErreur(sp);
     const bar = document.querySelector("[data-runbar]");
     bar.classList.toggle("is-on", actif);
+    // Un seul pipeline de chaque type par utilisateur, tous modes confondus :
+    // celui d'un autre mode (autre onglet) est signalé
+    const autre = [rech, sp].find(e => e.en_cours && e.mode && e.mode !== MODE);
+    const msg = document.querySelector("[data-runbar-msg]");
+    if (msg) {
+      msg.dataset.base ??= msg.textContent;
+      msg.textContent = autre ? `Traitement en cours en mode ${autre.mode} (autre onglet ou lancement précédent). `
+        + msg.dataset.base : msg.dataset.base;
+    }
     if (actif) {
       // La bannière garde son message fixe d'avertissement (défini dans le HTML).
       // Jauge du runbar : seulement pour la RECHERCHE (les spontanées ont leurs cartes)
@@ -360,7 +369,7 @@ recharger();
     }
     aller("profil");
     // Nettoie l'URL pour ne pas réafficher le message au prochain rechargement
-    history.replaceState(null, "", "/");
+    history.replaceState(null, "", location.pathname);
   } else {
     // Reprendre la page mémorisée dans l'URL (#candidatures, etc.), sinon Offres
     const PAGES_VALIDES = ["offres", "candidatures", "spontanees", "spontanees-suivi", "profil"];

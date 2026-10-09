@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chasseur : choisis ton mode</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <script>
+    // Anciennes URL (« /#candidatures », du temps du mode en session) : la
+    // page demandée est reprise dans le mode d'alors
+    (function () {
+      const pages = ["offres", "candidatures", "spontanees", "spontanees-suivi", "profil"];
+      const page = location.hash.replace("#", "");
+      if (pages.includes(page)) location.replace("/{{ ancien_mode }}#" + page);
+    })();
+  </script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "Inter", sans-serif; background: #15191E; color: #15191E;
+           display: grid; place-items: center; min-height: 100vh; padding: 20px 16px; }
+    .box { background: #fff; border-radius: 14px; padding: 32px 28px; width: 100%; max-width: 560px;
+           box-shadow: 0 20px 60px rgba(0,0,0,.35); }
+    h1 { font-family: "Space Grotesk", sans-serif; font-size: 22px; text-align: center; margin-bottom: 4px; }
+    .sub { text-align: center; color: #6B7682; font-size: 13px; margin-bottom: 24px; }
+    .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+    .mode { display: block; border: 1px solid #E6E8EC; border-radius: 10px; padding: 16px 14px;
+            text-decoration: none; color: inherit; transition: border-color .15s, box-shadow .15s; }
+    .mode:hover { border-color: #2F5BEA; box-shadow: 0 4px 14px rgba(47,91,234,.15); }
+    .mode__nom { font-family: "Space Grotesk", sans-serif; font-weight: 600; font-size: 16px; margin-bottom: 4px; }
+    .mode__txt { font-size: 12.5px; color: #6B7682; line-height: 1.4; }
+    .mode--bientot { opacity: .65; }
+    .mode__badge { display: inline-block; margin-top: 8px; font-size: 11px; font-weight: 600; color: #9A6406;
+                   background: #FDF3DD; border-radius: 6px; padding: 2px 7px; }
+    .alt { text-align: center; margin-top: 20px; font-size: 13px; }
+    .alt a { color: #6B7682; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <h1>Que cherches-tu ?</h1>
+    <p class="sub">Chaque mode a son profil, ses offres et ses candidatures spontanées. Tu peux en ouvrir plusieurs dans des onglets différents.</p>
+    <div class="modes">
+      {% for m in modes %}
+      <a class="mode{% if m.bientot %} mode--bientot{% endif %}" href="/{{ m.cle }}" data-mode-lien="{{ m.cle }}">
+        <div class="mode__nom">{{ m.nom }}</div>
+        <div class="mode__txt">{{ m.texte }}</div>
+        {% if m.bientot %}<span class="mode__badge">bientôt disponible</span>{% endif %}
+      </a>
+      {% endfor %}
+    </div>
+    <p class="alt"><a href="/logout">Déconnexion</a></p>
+  </div>
+</body>
+</html>

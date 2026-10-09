@@ -106,7 +106,7 @@ def test_lettre_et_reanalyse_refusees(ia_coupee, utilisateur, mistral, route):
 
 def test_interface(ia_coupee, utilisateur):
     client, _ = utilisateur("a@test.fr", prenom="Alice")
-    page = client.get("/").text
+    page = client.get("/alternance").text
     assert 'data-analyse-ia="non"' in page and "data-bandeau-ia" in page and "IA désactivée" in page
     assert 'data-action="revalider"' not in page
     js = (config.STATIC_DIR / "js" / "offres.js").read_text(encoding="utf-8")
@@ -115,7 +115,7 @@ def test_interface(ia_coupee, utilisateur):
 
 def test_interface_ia_active(utilisateur):
     client, _ = utilisateur("a@test.fr", prenom="Alice")
-    page = client.get("/").text
+    page = client.get("/alternance").text
     assert 'data-analyse-ia="oui"' in page and "data-bandeau-ia" not in page
     assert 'data-action="revalider"' in page
 
@@ -174,12 +174,12 @@ def test_limite_avec_ia_inchangee(recherche):
 
 def test_interface_affiche_le_plafond_sans_ia(ia_coupee, utilisateur):
     client, _ = utilisateur("a@test.fr", prenom="Alice")
-    page = client.get("/").text
+    page = client.get("/alternance").text
     assert "ajoutées sans analyse au plus par lancement (max 500)" in page
     assert 'value="100"' in page and 'max="500"' in page
     assert "ajoutées sans analyse" in (config.STATIC_DIR / "js" / "api.js").read_text(encoding="utf-8")
 
 
 def test_interface_plafond_avec_ia(utilisateur):
-    page = utilisateur("a@test.fr", prenom="Alice")[0].get("/").text
+    page = utilisateur("a@test.fr", prenom="Alice")[0].get("/alternance").text
     assert "Offres analysées au plus par lancement (max 200)" in page

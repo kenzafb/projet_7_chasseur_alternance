@@ -126,7 +126,7 @@ def test_objet_du_profil_dans_le_mail_envoye(utilisateur, smtp_simule, monkeypat
     from tests.conftest import compte_verifie
     client, user_id = utilisateur("ada@test.fr", prenom="Ada", nom="L")
     compte_verifie(smtp_simule, user_id, "ada@gmail.com")
-    client.post("/api/mode", json={"mode": "job"})
+    client.mode = "job"
     client.post("/api/profil", json={"email_objet": "Objet job\r\nBcc: espion@x.fr", "email_type": "Corps job"})
     assert client.get("/api/profil").json()["email_objet"].startswith("Objet job")
     ajouter_entreprises(user_id, [{"siret": "S1", "nom": "ACME"}], mode="job")

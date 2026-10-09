@@ -12,7 +12,7 @@ from shared import config
 
 
 def _page(client):
-    r = client.get("/")
+    r = client.get("/alternance")
     assert r.status_code == 200
     return r.text
 

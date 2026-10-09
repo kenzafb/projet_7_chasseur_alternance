@@ -23,11 +23,13 @@ from shared.config import LOGS_MAX_PAR_UTILISATEUR
 RECHERCHE = "recherche"
 SPONTANEES = "spontanees"
 
+# mode : mode de chasse du lancement (un seul pipeline de chaque type par
+# utilisateur, tous modes confondus : le front d'un autre mode le signale)
 ETATS_INITIAUX = {
-    RECHERCHE:  {"en_cours": False, "message": "Prêt", "pourcentage": 0},
+    RECHERCHE:  {"en_cours": False, "message": "Prêt", "pourcentage": 0, "mode": None},
     # mode_test : envoi en cours vers l'utilisateur lui-même (affiché par le front)
     SPONTANEES: {"en_cours": False, "etape": None, "message": "Prêt", "pourcentage": 0,
-                 "mode_test": False},
+                 "mode_test": False, "mode": None},
 }
 
 

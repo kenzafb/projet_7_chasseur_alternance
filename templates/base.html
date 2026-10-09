@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chasseur d'Alternance</title>
+  <title>{{ label_mode|default("Chasseur d'Alternance") }}</title>
 
   <!-- Polices -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -49,10 +49,13 @@
         <div class="brand__sub" data-brand-sub>alternance</div>
       </div>
     </div>
-    <div class="mode-switch" data-mode-switch>
-      <button class="mode-switch__btn" data-mode-btn="alternance">Alternance</button>
-      <button class="mode-switch__btn" data-mode-btn="job">Job</button>
-    </div>
+    <!-- Un mode par URL : chaque lien ouvre l'autre mode (même page), un
+         onglet par mode si on le souhaite -->
+    <nav class="mode-switch" data-mode-switch>
+      <a class="mode-switch__btn{% if mode == 'alternance' %} is-active{% endif %}" href="/alternance" data-mode-btn="alternance">Alternance</a>
+      <a class="mode-switch__btn{% if mode == 'job' %} is-active{% endif %}" href="/job" data-mode-btn="job">Job</a>
+      <a class="mode-switch__btn" href="/stage" data-mode-btn="stage" title="Bientôt disponible">Stage</a>
+    </nav>
 
     <nav class="nav">
       <p class="nav__label">Recherche</p>
@@ -159,30 +162,19 @@
   </div>
 </div>
 
-<!-- Bascule de mode (alternance / job) -->
+<!-- Liens de mode : la page courante (#offres, #profil...) est gardée -->
 <script>
   (function () {
     const htmlMode = document.documentElement.getAttribute("data-mode") || "alternance";
-    // Marquer le bon bouton actif
-    document.querySelectorAll("[data-mode-btn]").forEach(btn => {
-      btn.classList.toggle("is-active", btn.dataset.modeBtn === htmlMode);
-      btn.addEventListener("click", async () => {
-        const choisi = btn.dataset.modeBtn;
-        if (choisi === htmlMode) return;   // déjà dessus
-        try {
-          const r = await fetch("/api/mode", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ mode: choisi }),
-          });
-          if (r.status === 401) { location.href = "/login"; return; }   // session expirée
-          location.reload();   // recharge dans le nouveau mode
-        } catch (_) {}
+    document.querySelectorAll("a[data-mode-btn]").forEach(lien => {
+      if (lien.dataset.modeBtn === "stage") return;
+      lien.addEventListener("click", e => {
+        if (lien.dataset.modeBtn === htmlMode) { e.preventDefault(); return; }
+        lien.href = "/" + lien.dataset.modeBtn + location.hash;
       });
     });
-    // Ajuster le sous-titre du brand
     const sub = document.querySelector("[data-brand-sub]");
-    if (sub) sub.textContent = (htmlMode === "job") ? "job" : "alternance";
+    if (sub) sub.textContent = htmlMode;
   })();
 </script>
 

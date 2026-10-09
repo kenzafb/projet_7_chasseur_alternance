@@ -4,6 +4,17 @@
    que des fonctions, jamais des URL.
    ============================================================================ */
 
+/* Mode de chasse de la page : vient de l'URL (/alternance, /job), posé par
+   le serveur sur <html data-mode>. Chaque appel à l'API le transmet
+   (paramètre « mode ») : deux onglets dans deux modes ne se gênent pas. */
+export const MODE = document.documentElement.dataset.mode;
+
+export function avecMode(url) {
+  const u = new URL(url, location.origin);
+  if (u.pathname.startsWith("/api/") && !u.searchParams.has("mode")) u.searchParams.set("mode", MODE);
+  return u.pathname + u.search;
+}
+
 /* Session absente ou expirée : retour à la page de connexion */
 function verifierSession(r) {
   if (r.status === 401) window.location.href = "/login";
@@ -49,6 +60,7 @@ export function confirmerLancement(cle, demandee, reponse) {
 }
 
 async function get(url) {
+  url = avecMode(url);
   const r = await fetch(url);
   verifierSession(r);
   if (!r.ok) throw new Error(`GET ${url} → ${r.status}`);
@@ -56,6 +68,7 @@ async function get(url) {
 }
 
 async function post(url, body) {
+  url = avecMode(url);
   const r = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -72,6 +85,7 @@ async function post(url, body) {
 
 /* Envoi multipart (téléversement de fichier) */
 async function postForm(url, formData) {
+  url = avecMode(url);
   const r = await fetch(url, { method: "POST", body: formData });
   verifierSession(r);
   if (!r.ok) {
@@ -85,6 +99,7 @@ async function postForm(url, formData) {
 /* Télécharge un fichier servi par l'API (PDF...) : vrai téléchargement
    navigateur, sous le nom donné par le serveur ou `nom` à défaut. */
 async function telecharger(url, nom) {
+  url = avecMode(url);
   const r = await fetch(url);
   verifierSession(r);
   if (!r.ok) {

@@ -82,10 +82,3 @@ def utilisateur_requis(request: Request) -> User:
         raise NonConnecte()
     return user
 
-
-def mode_courant(request) -> str:
-    """Mode de chasse actuel ('alternance' ou 'job'), lu depuis la session.
-    Défaut : 'alternance' (rétrocompat — comportement historique)."""
-    from shared.modes import MODES, MODE_DEFAUT
-    m = request.session.get("mode", MODE_DEFAUT)
-    return m if m in MODES else MODE_DEFAUT

@@ -21,14 +21,14 @@ import unicodedata
 
 from shared import config
 from shared.config import STATIC_DIR, TEMPLATES_DIR, COOKIE_SECURE, chemin_lettre_pdf, chemin_piece_jointe, secret_key
-from fastapi import FastAPI, APIRouter, Depends, Request, Body, UploadFile, File, Form
+from fastapi import FastAPI, APIRouter, Depends, Request, Body, UploadFile, File, Form, Query
 from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.responses import JSONResponse, FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from auth.routes import router as auth_router
-from auth.securite import NonConnecte, utilisateur_requis, mode_courant
+from auth.securite import NonConnecte, utilisateur_requis
 from database.models import User
 from shared.erreurs import ErreurUtilisateur, exiger_profil
 from database.candidatures_db import (lire_candidatures, lire_candidature, modifier_candidature, ajouter_candidature,
@@ -45,6 +45,7 @@ from shared import compte_envoi
 from database import compte_envoi_db
 from shared.pipelines import Pipelines, RECHERCHE, SPONTANEES
 from shared.statique import importmap, url_statique
+from shared.modes import MODE_DEFAUT, MODES, MODES_A_VENIR, get_mode, modes_accueil, verifier_mode
 from database.dates import maintenant_utc
 
 # ─── Modules métier ───────────────────────────────────────────────
@@ -248,42 +249,64 @@ class MailTest(BaseModel):
     destinataire: str | None = Field(None, max_length=255)
 
 
-# ─── Page + logs ──────────────────────────────────────────────────────────────
+# ─── Mode de chasse : dans l'URL des pages, explicite pour l'API ──────────────
+def mode_requis(mode: str | None = Query(None, description="Mode de chasse : alternance ou job (obligatoire)")
+                ) -> str:
+    """Mode d'une requête de l'API, donné par le paramètre « mode » (le front
+    l'ajoute à chaque appel, d'après l'URL de la page). Absent, inconnu ou
+    pas encore ouvert : 400. Jamais lu dans la session : deux onglets dans
+    deux modes différents ne se gênent pas."""
+    return verifier_mode(mode)
+
+
+# ─── Pages + logs ─────────────────────────────────────────────────────────────
 
 @prive.get("/")
-def index(request: Request):
-    return templates.TemplateResponse(request, "base.html", {"mode": mode_courant(request),
+def accueil(request: Request, bienvenue: str | None = None):
+    """Choix du mode. Ancienne URL d'après l'inscription (/?bienvenue=1) :
+    redirigée vers le profil du mode alternance."""
+    if bienvenue:
+        return RedirectResponse(url=f"/{MODE_DEFAUT}?bienvenue=1", status_code=303)
+    # Mode de l'ancienne session, pour les anciens liens « /#page »
+    ancien = request.session.get("mode")
+    return templates.TemplateResponse(request, "accueil.html", {
+        "modes": modes_accueil(), "ancien_mode": ancien if ancien in MODES else MODE_DEFAUT})
+
+
+def _page_du_mode(request: Request, mode: str):
+    return templates.TemplateResponse(request, "base.html", {"mode": mode, "label_mode": get_mode(mode)["label"],
                                                              "limites": config.LIMITES_LANCEMENT,
                                                              "analyse_ia": config.analyse_ia_active()})
+
+@prive.get("/alternance")
+def page_alternance(request: Request):
+    return _page_du_mode(request, "alternance")
+
+@prive.get("/job")
+def page_job(request: Request):
+    return _page_du_mode(request, "job")
+
+@prive.get("/stage")
+def page_stage(request: Request):
+    """Mode stage annoncé (phase 6b) : page « bientôt disponible »."""
+    return templates.TemplateResponse(request, "bientot.html",
+                                      {"cle": "stage", "nom": MODES_A_VENIR["stage"]["label"]})
 
 @prive.get("/api/logs")
 def api_logs(user: User = Depends(utilisateur_requis)):
     return pipelines.logs(user.id)
 
 @prive.get("/api/candidatures")
-def api_candidatures(request: Request, user: User = Depends(utilisateur_requis)):
-    return lire_candidatures(user.id, mode=mode_courant(request))
+def api_candidatures(user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
+    return lire_candidatures(user.id, mode=mode)
 
 
 # ─── Profil utilisateur ───────────────────────────────────────────────────────
 @prive.get("/api/mode")
-def api_get_mode(request: Request):
-    """Mode actuel (alternance/job) + son label et sa couleur."""
-    from shared.modes import get_mode
-    cle = mode_courant(request)
-    m = get_mode(cle)
-    return {"mode": cle, "label": m["label"], "couleur": m["couleur"]}
-
-
-@prive.post("/api/mode")
-def api_set_mode(request: Request, body: dict = Body(...)):
-    """Bascule le mode de chasse dans la session."""
-    from shared.modes import MODES, MODE_DEFAUT
-    nouveau = body.get("mode", MODE_DEFAUT)
-    if nouveau not in MODES:
-        return JSONResponse({"erreur": "Mode inconnu"}, status_code=400)
-    request.session["mode"] = nouveau
-    return {"ok": True, "mode": nouveau}
+def api_get_mode(mode: str = Depends(mode_requis)):
+    """Label et couleur du mode demandé (alternance/job)."""
+    m = get_mode(mode)
+    return {"mode": mode, "label": m["label"], "couleur": m["couleur"]}
 
 
 @prive.get("/api/domaines")
@@ -301,13 +324,14 @@ def api_criteres_options():
 
 
 @prive.get("/api/profil")
-def api_get_profil(request: Request, user: User = Depends(utilisateur_requis)):
-    return lire_profil(user.id, mode=mode_courant(request))
+def api_get_profil(request: Request, user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
+    return lire_profil(user.id, mode=mode)
 
 
 @prive.post("/api/profil")
-def api_post_profil(request: Request, body: dict = Body(...), user: User = Depends(utilisateur_requis)):
-    ok = sauvegarder_profil(user.id, body, mode=mode_courant(request))
+def api_post_profil(request: Request, body: dict = Body(...), user: User = Depends(utilisateur_requis),
+                    mode: str = Depends(mode_requis)):
+    ok = sauvegarder_profil(user.id, body, mode=mode)
     return {"ok": ok}
 
 
@@ -361,7 +385,7 @@ def _supprimer_si_orpheline(user_id: int, fichiers: list[str]):
 async def api_profil_upload(request: Request,
                             nom: str = Form(""),
                             fichier: UploadFile = File(...),
-                            user: User = Depends(utilisateur_requis)):
+                            user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
     # Validation type PDF
     if not (fichier.filename or "").lower().endswith(".pdf"):
         return JSONResponse({"erreur": "Seuls les fichiers PDF sont acceptés"}, status_code=400)
@@ -374,20 +398,22 @@ async def api_profil_upload(request: Request,
         return JSONResponse({"erreur": "Fichier trop volumineux (max 5 Mo)"}, status_code=400)
     # Stockage dans le dossier de l'utilisateur ; en base, chemin relatif à UPLOADS_DIR
     relatif = _ecrire_piece_jointe(user.id, fichier.filename, contenu)
-    remplacees = ajouter_piece_jointe(user.id, nom, relatif, mode=mode_courant(request))
+    remplacees = ajouter_piece_jointe(user.id, nom, relatif, mode=mode)
     _supprimer_si_orpheline(user.id, remplacees)
     return {"ok": True, "nom": nom, "fichier": relatif.split("/", 1)[1]}
 
 @prive.post("/api/profil/piece/supprimer")
-def api_profil_piece_supprimer(request: Request, body: dict = Body(...), user: User = Depends(utilisateur_requis)):
-    retirees = supprimer_piece_jointe(user.id, body.get("nom", ""), mode=mode_courant(request))
+def api_profil_piece_supprimer(request: Request, body: dict = Body(...),
+                               user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
+    retirees = supprimer_piece_jointe(user.id, body.get("nom", ""), mode=mode)
     # Le fichier n'est effacé que si l'autre mode ne s'en sert plus
     _supprimer_si_orpheline(user.id, retirees)
     return {"ok": True}
 
 @prive.get("/api/profil/piece")
-def api_profil_piece_get(request: Request, nom: str, user: User = Depends(utilisateur_requis)):
-    prof = lire_profil(user.id, mode=mode_courant(request))
+def api_profil_piece_get(request: Request, nom: str, user: User = Depends(utilisateur_requis),
+                         mode: str = Depends(mode_requis)):
+    prof = lire_profil(user.id, mode=mode)
     for pj in prof.get("pieces_jointes", []):
         chemin = chemin_piece_jointe(pj.get("fichier", ""))
         if pj.get("nom") == nom and chemin and chemin.is_file():
@@ -443,21 +469,21 @@ def api_compte_envoi_mail_test(body: MailTest | None = None, user: User = Depend
 # ─── France Travail + La Bonne Alternance ────────────────────────────────────
 
 @prive.post("/api/recherche")
-def api_recherche(request: Request, body: Recherche | None = None, user: User = Depends(utilisateur_requis)):
+def api_recherche(request: Request, body: Recherche | None = None, user: User = Depends(utilisateur_requis),
+                  mode: str = Depends(mode_requis)):
     user_id = user.id   # capturé AVANT le thread (le thread n'a pas accès à request)
     ia = config.analyse_ia_active()   # ANALYSE_IA=false : offres insérées « non analysées »
     # Offres traitées au plus, France Travail et LBA confondues ; sans IA,
     # plafond propre (D20), même champ max_analyses
     max_analyses, note = _limite("analyses" if ia else "sans_ia", body.max_analyses if body else None)
-    mode = mode_courant(request)   # idem : capturé avant le thread
     traitees = "analysées" if ia else "ajoutées sans analyse"
-    from shared.modes import get_mode
     cfg_mode = get_mode(mode)
     profil = lire_profil(user_id, mode=mode)
     exiger_profil(profil)   # 400 tout de suite plutôt qu'une erreur dans le thread
 
-    if not pipelines.demarrer(RECHERCHE, user_id, message="Démarrage..."):
-        return JSONResponse({"erreur": "Recherche déjà en cours"}, status_code=400)
+    if not pipelines.demarrer(RECHERCHE, user_id, message="Démarrage...", mode=mode):
+        en_cours = pipelines.etat(RECHERCHE, user_id).get("mode")
+        return JSONResponse({"erreur": f"Recherche déjà en cours (mode {en_cours})"}, status_code=400)
 
     def etat(**champs):
         pipelines.maj(RECHERCHE, user_id, **champs)
@@ -563,30 +589,32 @@ def api_statut_pipelines(user: User = Depends(utilisateur_requis)):
             "spontanees": pipelines.etat(SPONTANEES, user.id)}
 
 @prive.post("/api/generer_lettre")
-def api_generer_lettre(body: OffreId, request: Request, user: User = Depends(utilisateur_requis)):
-    offre = lire_candidature(user.id, body.id, mode=mode_courant(request))
+def api_generer_lettre(body: OffreId, request: Request, user: User = Depends(utilisateur_requis),
+                       mode: str = Depends(mode_requis)):
+    offre = lire_candidature(user.id, body.id, mode=mode)
     if not offre:
         return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
     if not config.analyse_ia_active():
         return JSONResponse({"erreur": "Génération de lettre indisponible : l'IA est désactivée "
                                        "(ANALYSE_IA=false). Écris la lettre toi-même ou réactive l'IA."},
                             status_code=503)
-    profil = lire_profil(user.id, mode=mode_courant(request))
-    lettre = generer_lettre(offre, profil, mode=mode_courant(request))
-    modifier_candidature(user.id, body.id, {"lettre": lettre, "statut": "en_cours"}, mode=mode_courant(request))
+    profil = lire_profil(user.id, mode=mode)
+    lettre = generer_lettre(offre, profil, mode=mode)
+    modifier_candidature(user.id, body.id, {"lettre": lettre, "statut": "en_cours"}, mode=mode)
     return {"lettre": lettre}
 
 @prive.post("/api/analyser")
-def api_analyser(body: OffreId, request: Request, user: User = Depends(utilisateur_requis)):
-    offre = lire_candidature(user.id, body.id, mode=mode_courant(request))
+def api_analyser(body: OffreId, request: Request, user: User = Depends(utilisateur_requis),
+                 mode: str = Depends(mode_requis)):
+    offre = lire_candidature(user.id, body.id, mode=mode)
     if not offre:
         return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
     if not config.analyse_ia_active():
         return JSONResponse({"erreur": "Analyse indisponible : l'IA est désactivée (ANALYSE_IA=false)."},
                             status_code=503)
-    profil = lire_profil(user.id, mode=mode_courant(request))
+    profil = lire_profil(user.id, mode=mode)
     # ErreurIA : réponse 502/503 (gestionnaire plus haut), l'offre n'est pas touchée
-    analyse = analyser_offre(offre, profil, mode=mode_courant(request))
+    analyse = analyser_offre(offre, profil, mode=mode)
     modifs = {
         "score":          analyse["score"],
         "verdict":        analyse["verdict"],
@@ -597,48 +625,52 @@ def api_analyser(body: OffreId, request: Request, user: User = Depends(utilisate
     }
     if analyse.get("statut_auto") == "archive":
         modifs["statut"] = "archive"
-    modifier_candidature(user.id, body.id, modifs, mode=mode_courant(request))
+    modifier_candidature(user.id, body.id, modifs, mode=mode)
     return analyse
 
 @prive.post("/api/maj_statut")
-def api_maj_statut(body: MajStatut, request: Request, user: User = Depends(utilisateur_requis)):
+def api_maj_statut(body: MajStatut, request: Request, user: User = Depends(utilisateur_requis),
+                   mode: str = Depends(mode_requis)):
     modifs = {"statut": body.statut}
     if body.statut in ["envoye", "reponse", "entretien", "refus"]:
-        offre = lire_candidature(user.id, body.id, mode=mode_courant(request))
+        offre = lire_candidature(user.id, body.id, mode=mode)
         if offre and not offre.get("date_candidature"):
             modifs["date_candidature"] = maintenant_utc()
-    modifier_candidature(user.id, body.id, modifs, mode=mode_courant(request))
+    modifier_candidature(user.id, body.id, modifs, mode=mode)
     return {"ok": True}
 
 @prive.post("/api/archiver")
-def api_archiver(body: OffreId, request: Request, user: User = Depends(utilisateur_requis)):
-    modifier_candidature(user.id, body.id, {"statut": "archive"}, mode=mode_courant(request))
+def api_archiver(body: OffreId, request: Request, user: User = Depends(utilisateur_requis),
+                 mode: str = Depends(mode_requis)):
+    modifier_candidature(user.id, body.id, {"statut": "archive"}, mode=mode)
     return {"ok": True}
 
 @prive.post("/api/offre/archivage")
-def api_offre_archivage(body: Archivage, request: Request, user: User = Depends(utilisateur_requis)):
+def api_offre_archivage(body: Archivage, request: Request, user: User = Depends(utilisateur_requis),
+                        mode: str = Depends(mode_requis)):
     """Gère la raison d'archivage et le désarchivage d'une offre."""
     if body.desarchiver:
         modifs = {"statut": "nouveau", "raison_archivage": ""}
     else:
         # Archive avec la raison choisie (et s'assure qu'elle reste archivée)
         modifs = {"statut": "archive", "raison_archivage": body.raison}
-    modifier_candidature(user.id, body.id, modifs, mode=mode_courant(request))
+    modifier_candidature(user.id, body.id, modifs, mode=mode)
     return {"ok": True}
 
 @prive.post("/api/sauvegarder")
-def api_sauvegarder(body: Sauvegarde, request: Request, user: User = Depends(utilisateur_requis)):
+def api_sauvegarder(body: Sauvegarde, request: Request, user: User = Depends(utilisateur_requis),
+                    mode: str = Depends(mode_requis)):
     modifs = {}
     if body.lettre is not None:            modifs["lettre"] = body.lettre
     if body.email_candidature is not None: modifs["email_candidature"] = body.email_candidature
     if body.objet_email is not None:       modifs["objet_email"] = body.objet_email
-    modifier_candidature(user.id, body.id, modifs, mode=mode_courant(request))
+    modifier_candidature(user.id, body.id, modifs, mode=mode)
     return {"ok": True}
 
 @prive.post("/api/telecharger_pdf")
-def api_telecharger_pdf(body: TelechargerPdf, request: Request, user: User = Depends(utilisateur_requis)):
+def api_telecharger_pdf(body: TelechargerPdf, request: Request, user: User = Depends(utilisateur_requis),
+                        mode: str = Depends(mode_requis)):
     """Génère le PDF de la lettre et renvoie l'URL de téléchargement."""
-    mode = mode_courant(request)
     offre = lire_candidature(user.id, body.id, mode=mode)
     if not offre:
         return JSONResponse({"erreur": "Non trouvé"}, status_code=404)
@@ -655,13 +687,13 @@ def api_telecharger_pdf(body: TelechargerPdf, request: Request, user: User = Dep
             os.remove(chemin_ancien)
         except OSError:
             pass
-    return {"ok": True, "url": f"/api/lettre_pdf/{body.id}", "nom": nom_telechargement(offre, profil)}
+    return {"ok": True, "url": f"/api/lettre_pdf/{body.id}?mode={mode}", "nom": nom_telechargement(offre, profil)}
 
 @prive.get("/api/lettre_pdf/{ref_offre}")
-def api_lettre_pdf(ref_offre: str, request: Request, user: User = Depends(utilisateur_requis)):
+def api_lettre_pdf(ref_offre: str, request: Request, user: User = Depends(utilisateur_requis),
+                   mode: str = Depends(mode_requis)):
     """Renvoie le PDF d'une candidature de l'utilisateur connecté, en pièce
     jointe. Celui d'un autre utilisateur est introuvable (404)."""
-    mode = mode_courant(request)
     relatif = lire_lettre_pdf(user.id, ref_offre, mode=mode)
     chemin = chemin_lettre_pdf(relatif)
     # Défense en profondeur : le fichier doit être dans le dossier de l'utilisateur
@@ -674,22 +706,24 @@ def api_lettre_pdf(ref_offre: str, request: Request, user: User = Depends(utilis
 
 # ─── Spontanées — Suivi des candidatures ──────────────────────────────────────
 @prive.get("/api/spontanees/suivi")
-def api_spontanees_suivi(request: Request, user: User = Depends(utilisateur_requis)):
-    return lire_entreprises_envoyees(user.id, mode_courant(request))
+def api_spontanees_suivi(request: Request, user: User = Depends(utilisateur_requis),
+                         mode: str = Depends(mode_requis)):
+    return lire_entreprises_envoyees(user.id, mode)
 
 
 @prive.post("/api/spontanees/suivi/statut")
-def api_spontanees_statut(request: Request, body: dict = Body(...), user: User = Depends(utilisateur_requis)):
-    ok = modifier_statut_suivi(user.id, body.get("id"), body.get("statut", ""), mode_courant(request))
+def api_spontanees_statut(request: Request, body: dict = Body(...), user: User = Depends(utilisateur_requis),
+                          mode: str = Depends(mode_requis)):
+    ok = modifier_statut_suivi(user.id, body.get("id"), body.get("statut", ""), mode)
     return {"ok": ok}
 
 
 # ─── Spontanées — Stats ───────────────────────────────────────────────────────
 
 @prive.get("/api/spontanees/stats")
-def api_spontanees_stats(request: Request, user: User = Depends(utilisateur_requis)):
+def api_spontanees_stats(request: Request, user: User = Depends(utilisateur_requis),
+                         mode: str = Depends(mode_requis)):
     # Lecture des stats depuis la base
-    mode = mode_courant(request)
     stats = calculer_stats(user.id, mode)
     # Maximums utiles des lancements (le serveur les applique aussi)
     from database.entreprises_db import compter_a_scraper
@@ -700,7 +734,7 @@ def api_spontanees_stats(request: Request, user: User = Depends(utilisateur_requ
     stats["a_valider"] = compter_a_valider(user.id, mode)
     # On ajoute l'état du pipeline de l'utilisateur, géré en mémoire
     etat = pipelines.etat(SPONTANEES, user.id)
-    stats.update({cle: etat[cle] for cle in ("en_cours", "etape", "message", "pourcentage", "mode_test")})
+    stats.update({cle: etat[cle] for cle in ("en_cours", "etape", "message", "pourcentage", "mode_test", "mode")})
     return stats
 
 @prive.post("/api/spontanees/stop")
@@ -718,7 +752,8 @@ def _lancer_spontanees(user_id: int, etape: str, message: str, debut_log: str,
     travail(stop_event, log_fn, on_progress) fait le vrai travail.
     Retourne une réponse 400 si un pipeline spontané de l'utilisateur tourne déjà."""
     if not pipelines.demarrer(SPONTANEES, user_id, etape=etape, message=message, **etat):
-        return JSONResponse({"erreur": "Pipeline déjà en cours"}, status_code=400)
+        en_cours = pipelines.etat(SPONTANEES, user_id).get("mode")
+        return JSONResponse({"erreur": f"Pipeline déjà en cours (mode {en_cours})"}, status_code=400)
     arret = pipelines.evenement_arret(user_id)
 
     def log(msg):
@@ -756,14 +791,13 @@ def _avec_limite(reponse, **limite):
     return reponse
 
 @prive.post("/api/spontanees/fetch")
-def api_spontanees_fetch(request: Request, body: Fetch | None = None, user: User = Depends(utilisateur_requis)):
+def api_spontanees_fetch(request: Request, body: Fetch | None = None,
+                         user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
     user_id = user.id
-    mode = mode_courant(request)
     maximum, note = _limite("entreprises", body.max_entreprises if body else None)
     # Même profil que fetch_entreprises (celui du mode) : LBA si le mode l'utilise, et Sirene
     from shared.criteres import normaliser_recherche
     from shared.domaines import domaines_du_profil
-    from shared.modes import get_mode
     from shared.naf import avertissement_sirene
     profil = lire_profil(user_id, mode=mode)
     avertissement = " ".join(filter(None, [
@@ -779,13 +813,13 @@ def api_spontanees_fetch(request: Request, body: Fetch | None = None, user: User
     return _avec_limite(_lancer_spontanees(
         user_id, "fetch", "Récupération des entreprises en Île-de-France...",
         f"▶ Fetch entreprises démarré (au plus {maximum} nouvelles entreprises){note}", travail,
-        "Fetch terminé !", "✅ Fetch terminé", "fetch"), max_entreprises=maximum,
+        "Fetch terminé !", "✅ Fetch terminé", "fetch", mode=mode), max_entreprises=maximum,
         **({"avertissement": avertissement} if avertissement else {}))
 
 @prive.post("/api/spontanees/scraper")
-def api_spontanees_scraper(request: Request, body: Scraper | None = None, user: User = Depends(utilisateur_requis)):
+def api_spontanees_scraper(request: Request, body: Scraper | None = None,
+                           user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
     user_id = user.id
-    mode = mode_courant(request)
     from database.entreprises_db import compter_a_scraper
     disponibles = compter_a_scraper(user_id, mode)
     if not disponibles:
@@ -800,13 +834,14 @@ def api_spontanees_scraper(request: Request, body: Scraper | None = None, user: 
     return _avec_limite(_lancer_spontanees(
         user_id, "scraper", "Scraping des emails...",
         f"▶ Scraper emails démarré (au plus {maximum} entreprises){note}", travail,
-        "Scraping terminé !", "✅ Scraping terminé", "scraper"), max_scrapees=maximum)
+        "Scraping terminé !", "✅ Scraping terminé", "scraper", mode=mode), max_scrapees=maximum)
 
 # ─── Emails non validés par l'IA : jamais envoyés tels quels (D15) ────────────
 @prive.get("/api/spontanees/a_valider")
-def api_spontanees_a_valider(request: Request, user: User = Depends(utilisateur_requis)):
+def api_spontanees_a_valider(request: Request, user: User = Depends(utilisateur_requis),
+                             mode: str = Depends(mode_requis)):
     from database.entreprises_db import lire_a_valider
-    return lire_a_valider(user.id, mode_courant(request))
+    return lire_a_valider(user.id, mode)
 
 @prive.post("/api/spontanees/valider")
 def api_spontanees_valider(body: ValiderEmails, user: User = Depends(utilisateur_requis)):
@@ -817,10 +852,10 @@ def api_spontanees_valider(body: ValiderEmails, user: User = Depends(utilisateur
     return {"ok": True}
 
 @prive.post("/api/spontanees/revalider")
-def api_spontanees_revalider(request: Request, body: Revalider | None = None, user: User = Depends(utilisateur_requis)):
+def api_spontanees_revalider(request: Request, body: Revalider | None = None,
+                             user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
     """Relance la validation par l'IA des entreprises du mode aux emails non validés."""
     user_id = user.id
-    mode = mode_courant(request)
     if not config.analyse_ia_active():
         raise ErreurUtilisateur("Validation par l'IA indisponible : l'IA est désactivée (ANALYSE_IA=false). "
                                 "Valide les emails à la main.")
@@ -837,12 +872,13 @@ def api_spontanees_revalider(request: Request, body: Revalider | None = None, us
     return _avec_limite(_lancer_spontanees(
         user_id, "revalider", "Validation IA des emails...",
         f"▶ Validation IA démarrée (au plus {maximum} entreprises){note}", travail,
-        "Validation terminée !", "✅ Validation terminée", "validation"), max_revalidations=maximum)
+        "Validation terminée !", "✅ Validation terminée", "validation", mode=mode),
+        max_revalidations=maximum)
 
 @prive.post("/api/spontanees/envoyer")
-def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends(utilisateur_requis)):
+def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends(utilisateur_requis),
+                           mode: str = Depends(mode_requis)):
     user_id = user.id
-    mode = mode_courant(request)   # capturé avant le thread
     # Plafond de sécurité par lancement (réputation du compte d'envoi)
     # Refus clair AVANT tout lancement : pas de clé (503), pas de compte ou
     # compte jamais vérifié (400), plafond du jour déjà atteint (400), rien à envoyer (400)
@@ -871,7 +907,7 @@ def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends
 
     reponse = _lancer_spontanees(user_id, "envoyer", message, debut, travail,
                                  "Envoi de test terminé !" if test else "Envoi terminé !",
-                                 "✅ Envoi terminé", "envoi", mode_test=test)
+                                 "✅ Envoi terminé", "envoi", mode_test=test, mode=mode)
     return _avec_limite(reponse, limite=limite, mode_test=test)
 
 @prive.get("/api/spontanees/statut")

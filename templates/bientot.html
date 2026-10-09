@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ nom }} : bientôt disponible</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: "Inter", sans-serif; background: #15191E; color: #15191E;
+           display: grid; place-items: center; min-height: 100vh; padding: 20px 16px; }
+    .box { background: #fff; border-radius: 14px; padding: 32px 28px; width: 100%; max-width: 420px;
+           box-shadow: 0 20px 60px rgba(0,0,0,.35); text-align: center; }
+    h1 { font-family: "Space Grotesk", sans-serif; font-size: 21px; margin-bottom: 8px; }
+    p { color: #6B7682; font-size: 13.5px; line-height: 1.5; }
+    a { display: inline-block; margin-top: 22px; color: #2F5BEA; font-weight: 600; font-size: 13.5px; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="box" data-bientot="{{ cle }}">
+    <h1>{{ nom }} : bientôt disponible</h1>
+    <p>La recherche de stages arrive dans une prochaine version. En attendant, les modes alternance et job restent ouverts.</p>
+    <a href="/">Choisir un autre mode</a>
+  </div>
+</body>
+</html>

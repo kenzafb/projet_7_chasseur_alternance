@@ -321,6 +321,7 @@ html[data-mode="job"] {
 }
 .mode-switch__btn {
   flex: 1; padding: 6px 8px; border: none; background: transparent;
+  text-align: center; text-decoration: none;
   font-size: 12px; font-weight: 600; color: var(--txt-muted);
   border-radius: 6px; cursor: pointer; transition: all .15s; font-family: inherit;
 }

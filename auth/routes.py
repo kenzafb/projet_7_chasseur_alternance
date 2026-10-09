@@ -100,6 +100,6 @@ def traiter_register(request: Request,
         db.commit()
         # Connecte directement
         request.session["user_id"] = user.id
-        return RedirectResponse(url="/?bienvenue=1", status_code=303)
+        return RedirectResponse(url="/alternance?bienvenue=1", status_code=303)
     finally:
         db.close()
