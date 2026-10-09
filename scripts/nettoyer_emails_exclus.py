@@ -2,10 +2,15 @@
 scripts/nettoyer_emails_exclus.py
 =================================
 Applique les règles de shared/referentiels/emails_exclus.txt (décision
-D47) aux entreprises déjà en base, tous utilisateurs : les adresses
-techniques ou factices sont retirées de emails_trouves (et de
-extra.emails_lba), et notées dans extra.emails_exclus_retires. À lancer
-par l'humain, sur la base de DATABASE_URL :
+D47) aux données déjà en base, tous utilisateurs :
+  - entreprises : les adresses techniques ou factices sont retirées de
+    emails_trouves (et de extra.emails_lba), et notées dans
+    extra.emails_exclus_retires ;
+  - adresses contactées (table emails_contactes, tous modes, dont
+    l'historique importé, phase 6b) : les lignes de ces adresses sont
+    supprimées (…@sentry.wixpress.com, par exemple : jamais de vrais
+    contacts). La liste affichée garde la trace de ce qui est retiré.
+À lancer par l'humain, sur la base de DATABASE_URL :
 
     venv/bin/python scripts/nettoyer_emails_exclus.py              # liste seulement
     venv/bin/python scripts/nettoyer_emails_exclus.py --appliquer  # écrit en base
@@ -22,7 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from database.connexion import SessionLocal  # noqa: E402
-from database.models import Entreprise  # noqa: E402
+from database.models import EmailContacte, Entreprise  # noqa: E402
 from shared.emails_exclus import email_exclu  # noqa: E402
 
 
@@ -61,7 +66,39 @@ def nettoyer(appliquer: bool = False, afficher=print) -> list[dict]:
     return concernees
 
 
+def nettoyer_contactes(appliquer: bool = False, afficher=print) -> list[dict]:
+    """Adresses contactées exclues par les règles : [{user_id, mode, email}],
+    supprimées de emails_contactes avec appliquer."""
+    concernees = []
+    db = SessionLocal()
+    try:
+        for c in db.query(EmailContacte).order_by(EmailContacte.user_id, EmailContacte.mode, EmailContacte.email):
+            if not email_exclu(c.email):
+                continue
+            concernees.append({"user_id": c.user_id, "mode": c.mode, "email": c.email})
+            if appliquer:
+                db.delete(c)
+        if appliquer:
+            db.commit()
+    finally:
+        db.close()
+    for c in concernees:
+        afficher(f"  utilisateur {c['user_id']}, mode {c['mode']} : {c['email']}")
+    afficher(f"{len(concernees)} adresse(s) contactée(s) exclue(s) : "
+             + ("supprimées de la base." if appliquer else "rien écrit (ajouter --appliquer pour supprimer)."))
+    return concernees
+
+
+def main(appliquer: bool = False, afficher=print):
+    afficher("── Entreprises : adresses trouvées ──")
+    entreprises = nettoyer(appliquer, afficher)
+    afficher("── Adresses contactées (dont l'historique importé) ──")
+    contactes = nettoyer_contactes(appliquer, afficher)
+    return entreprises, contactes
+
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Retire des entreprises en base les adresses techniques ou factices.")
+    parser = argparse.ArgumentParser(description="Retire de la base les adresses techniques ou factices "
+                                                 "(entreprises et adresses contactées).")
     parser.add_argument("--appliquer", action="store_true", help="écrire en base (sinon : liste seulement)")
-    nettoyer(parser.parse_args().appliquer)
+    main(parser.parse_args().appliquer)

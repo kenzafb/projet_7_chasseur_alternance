@@ -13,6 +13,9 @@ en lecture seule) :
      destinataires du mail) : une candidature, date connue ;
   b. présente dans une entreprise de l'ancienne base, non marquée envoyée ;
   c. absente de l'ancienne base (mail personnel ou autre, probablement).
+Les adresses techniques ou factices (règles de
+shared/referentiels/emails_exclus.txt, D47) sont écartées avant le
+classement et jamais importées (phase 6b).
 
 Import (groupes choisis, a seulement par défaut), dans la base de
 DATABASE_URL :
@@ -53,6 +56,7 @@ from database.dedup_db import normaliser_email  # noqa: E402
 from database.insertion import inserer_ou_ignorer  # noqa: E402
 from database.models import EmailContacte, Entreprise, EntrepriseMode, User  # noqa: E402
 from scripts.importer_ancienne_base import fichier_sqlite, meme_fichier  # noqa: E402
+from shared.emails_exclus import email_exclu  # noqa: E402
 
 MODE = "alternance"
 GROUPES = {
@@ -241,14 +245,20 @@ def lancer(fichier, source, user_id=None, groupes="a", dry_run=False, sortie=pri
     if not source.is_file():
         raise Refus(f"ancienne base introuvable : {source}")
     verifier_cible(source)
-    classement = classer(lire_historique(fichier), lire_ancienne_base(source))
+    adresses = lire_historique(fichier)
+    # Adresses techniques ou factices (D47) : jamais importées (phase 6b)
+    exclues = [a for a in adresses if email_exclu(a)]
+    classement = classer([a for a in adresses if not email_exclu(a)], lire_ancienne_base(source))
     titre = "ESSAI À BLANC (--dry-run) : rien n'est écrit" if dry_run else "IMPORT"
     sortie(f"── {titre} ──")
     sortie(f"Fichier : {fichier}")
     sortie(f"Ancienne base : {source} (lecture seule)")
     sortie(f"Base cible : {config.DATABASE_URL}\n")
+    if exclues:
+        sortie(f"{len(exclues)} adresses techniques ou factices écartées (shared/referentiels/emails_exclus.txt) : "
+               + ", ".join(exclues[:EXEMPLES]) + (" ..." if len(exclues) > EXEMPLES else "") + "\n")
     afficher_classement(classement, sortie)
-    resultat = {"classement": classement, "bilan": None}
+    resultat = {"classement": classement, "exclues": exclues, "bilan": None}
     if user_id is not None:
         resultat["bilan"] = importer(classement, user_id, choisis, appliquer=not dry_run)
         afficher_bilan(resultat["bilan"], user_id, choisis, not dry_run, sortie)

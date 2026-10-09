@@ -184,3 +184,16 @@ def test_etiquette_sur_une_entreprise_recuperee_apres_l_import(ancienne_base, hi
     assert calculer_stats(uid, mode)["prochaines"][0]["contacts_autres_modes"] == attendu
     assert envoyeur.compter_a_envoyer(uid, mode) == 2                           # jamais bloquant
     assert lire_entreprises(uid, "alternance") == []
+
+
+def test_adresses_exclues_jamais_importees(ancienne_base, tmp_path, utilisateur):
+    """Phase 6b : les règles de emails_exclus.txt (D47) s'appliquent aussi à l'import."""
+    fichier = tmp_path / "historique.json"
+    fichier.write_text(json.dumps(["rh@acme.fr", "460ff4620fa44cba8df530afde949785@sentry.wixpress.com"]),
+                       encoding="utf-8")
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    lignes, sortie = _sortie()
+    r = imp.lancer(fichier, ancienne_base, uid, groupes="a,b,c", sortie=sortie)
+    assert r["exclues"] == ["460ff4620fa44cba8df530afde949785@sentry.wixpress.com"]
+    assert "1 adresses techniques ou factices écartées" in "\n".join(lignes)
+    assert lire_emails_contactes(uid, "alternance") == {"rh@acme.fr"}
