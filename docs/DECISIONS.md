@@ -312,3 +312,27 @@ Décisions données par l'humain au lancement de la phase et mises en œuvre. Le
 
 ### D67. Une URL par mode, mode explicite pour l'API
 - **Décision.** `/alternance`, `/job` et `/stage`, et une page d'accueil où l'on choisit son mode. Le mode vient de l'URL et non plus de la session : deux onglets dans deux modes différents ne se gênent pas. L'API reçoit le mode explicitement (paramètre `mode`). Les anciennes URL redirigent. `/stage` affiche une page « bientôt disponible » (phase 6b). Isolation entre utilisateurs et protection de toutes les routes inchangées.
+- **Page `/stage` « bientôt disponible » remplacée** par D68 (phase 6b) : le mode stage est ouvert.
+
+## Phase 6b (mode stage), décisions du 9 octobre 2026
+
+Décisions données par l'humain au lancement de la phase et mises en œuvre. Les choix faits pendant la mise en œuvre restent à valider dans `docs/PHASE_6B_RAPPORT.md`.
+
+### D68. Mode stage ouvert sur /stage, avec son profil propre
+- **Décision.** `/stage` est un mode comme les autres (fin de la page « bientôt disponible » de D67). Profil du mode : dates de début et de fin du stage, durée en semaines calculée et affichée, établissement et formation (texte libre), missions visées (texte libre), lien vers un portfolio, pièces jointes, objet et trame du mail de candidature spontanée, domaines, secteurs, tailles et départements des spontanées comme en alternance. Rien sur la convention.
+- **Balises.** Au minimum `{date_debut}`, `{date_fin}`, `{duree_semaines}`, `{etablissement}`, `{formation}`, `{portfolio}` dans l'objet et la trame, en plus des balises existantes. Objet et trame par défaut génériques, valables pour n'importe quel utilisateur, qui annoncent un stage conventionné avec ses dates et sa durée.
+- **Conséquence.** Migration 0012 (colonnes du profil). Les balises et la règle de durée retenues sont dans le rapport.
+
+### D69. Sources du mode stage : Sirene seulement pour l'instant
+- **Décision.** Candidatures spontanées par Sirene comme en alternance (cœurs et transverses, tailles, départements). Pas de LBA (alternance uniquement). France Travail : essai `motsCles=stage` en Île-de-France ajouté à `scripts/verifier_france_travail.py` (nombre d'offres, types et natures de contrat, 20 intitulés) ; France Travail n'est pas branché dans le mode stage tant que l'humain n'a pas lu le résultat. La page Offres du mode stage dit que les offres ne sont pas encore disponibles.
+- **À reconsidérer** après lecture de `docs/referentiels/france_travail/verification_stage.json`.
+
+### D70. « Tous les secteurs » explicite, message avant lancement, tous les modes
+- **Constat.** En job, domaine « indifférent » : « Récupérer » ne cherchait rien sur Sirene sans le dire avant le lancement, alors que l'interface affichait « indifférent ».
+- **Décision.** Case explicite « tous les secteurs » dans la partie spontanées du profil, non cochée par défaut, avec la mention du volume. Quand ni domaine, ni secteur, ni cette case ne sont choisis, un message visible dans le profil et sur la page Spontanées avant tout lancement. Vaut pour tous les modes.
+
+### D71. Étiquette « déjà contactée en <mode> » aussi pour les entreprises récupérées plus tard
+- **Décision.** L'étiquette s'applique à toute entreprise dont une adresse figure dans les adresses contactées d'un autre mode (dont les contacts historiques importés), y compris une entreprise récupérée après l'import. Complète D65 et D66.
+
+### D72. Nettoyage des adresses contactées exclues : par l'humain
+- **Décision.** Les règles de `shared/referentiels/emails_exclus.txt` (D47) s'appliquent aussi aux adresses contactées importées (par exemple `…@sentry.wixpress.com`), par la commande de nettoyage existante (`scripts/nettoyer_emails_exclus.py`), lancée par l'humain. Complète D62.
