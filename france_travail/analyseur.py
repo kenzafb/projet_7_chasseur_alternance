@@ -379,7 +379,7 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
             offre["statut"] = "archive"
             offre["raison_archivage"] = "hors_domaine"
             _log(f"     -> Archivée automatiquement (hors domaine recherché)")
-        elif "stage" in titre_lower:
+        elif "stage" in titre_lower and mode != "stage":
             offre["statut"] = "archive"
             offre["raison_archivage"] = "stage"
             _log(f"     -> Archivée automatiquement (stage détecté)")
@@ -412,8 +412,10 @@ VERDICT_NON_ANALYSEE = "non_analysee"
 def marquer_non_analysee(offre, mode="alternance", verbeux=True):
     """Prépare une offre pour l'insertion sans IA et applique les seules
     règles d'archivage qui ne dépendent pas d'une analyse (mode alternance :
-    réservée à un public spécifique, école ou CFA, stage). Jamais d'archivage
-    pour note basse ni hors domaine. Modifie offre en place."""
+    réservée à un public spécifique, école ou CFA, stage ; mode stage :
+    réservée à un public spécifique seulement, une école peut accueillir un
+    stagiaire et le mot « stage » est attendu). Jamais d'archivage pour note
+    basse ni hors domaine. Modifie offre en place."""
     _log = print if verbeux else (lambda *a, **k: None)
     offre.update({
         "score":          None,
@@ -432,6 +434,8 @@ def marquer_non_analysee(offre, mode="alternance", verbeux=True):
     if reserve_public_specifique(desc_lower) or reserve_public_specifique(titre_lower):
         offre["statut"], offre["raison_archivage"] = "archive", "public_specifique"
         _log("     -> Archivée automatiquement (réservé public spécifique / BOETH)")
+    elif mode == "stage":
+        pass
     elif est_ecole_cfa(offre):
         offre["statut"], offre["raison_archivage"] = "archive", "ecole_cfa"
         _log("     -> Archivée automatiquement (école/CFA détectée)")

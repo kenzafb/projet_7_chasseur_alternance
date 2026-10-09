@@ -92,6 +92,7 @@ def criteres_france_travail(profil: dict, mode: str) -> dict:
         "tailles": rech.get("tailles", []),
         "taille_inconnue": rech.get("taille_inconnue", True),
         "exclure_alternance": bool(cfg.get("ft_exclure_alternance")),
+        "intitules_stage": bool(cfg.get("ft_intitules_stage")),
     }
 
 

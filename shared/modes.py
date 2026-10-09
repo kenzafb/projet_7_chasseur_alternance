@@ -40,14 +40,15 @@ MODES = {
         "label": "Chasseur de Stage",
         "mot_poste": "stage",
         "couleur": "vert",
-        # Candidatures spontanées (Sirene) seulement. Pas de LBA (alternance
-        # uniquement) ; France Travail n'a ni type ni nature de contrat
-        # « stage » : un essai par mot-clé (scripts/verifier_france_travail.py)
-        # attend la lecture de l'humain avant d'être branché
-        "sources": [],
-        "ft_filtres": {},
-        "ft_options": [],
-        "offres": False,                  # page Offres : « pas encore disponibles »
+        # Pas de LBA (alternance uniquement). France Travail n'a ni type ni
+        # nature de contrat « stage » : mot-clé « stage » (essai du 9 octobre
+        # 2026 : 73 offres en IDF, 55 E1, 12 E2, 6 FS), alternance (E2, FS)
+        # écartée, intitulés filtrés par shared/referentiels/intitules_stage.txt
+        "sources": ["france_travail"],
+        "ft_filtres": {"motsCles": ["stage"]},
+        "ft_options": ["secteurs"],
+        "ft_exclure_alternance": True,    # natures E2 et FS : champ « alternance » de l'offre
+        "ft_intitules_stage": True,       # « stage » doit désigner le poste
     },
 }
 
@@ -61,18 +62,13 @@ MODES_A_VENIR: dict[str, dict] = {}
 TEXTES_ACCUEIL = {
     "alternance": ("Alternance", "Apprentissage ou professionnalisation : offres et candidatures spontanées."),
     "job":        ("Job", "CDD, intérim, saisonnier : missions courtes."),
-    "stage":      ("Stage", "Stage conventionné : candidatures spontanées ; offres bientôt."),
+    "stage":      ("Stage", "Stage conventionné : offres et candidatures spontanées."),
 }
 
 
 def get_mode(cle):
     """Retourne la config d'un mode, ou le mode par défaut si inconnu."""
     return MODES.get(cle or MODE_DEFAUT, MODES[MODE_DEFAUT])
-
-
-def offres_disponibles(cle) -> bool:
-    """Le mode a-t-il une recherche d'offres branchée ? (stage : pas encore)"""
-    return get_mode(cle).get("offres", True)
 
 
 def labels_modes():

@@ -29,6 +29,7 @@ from france_travail import parametres_api
 from shared.config import FT_REGION
 from shared.criteres import criteres_france_travail
 from shared.domaines import domaines_du_grand_domaine, est_grand_domaine
+from shared.intitules_stage import designe_un_stage
 from shared.offres import detecter_zone, generer_id
 from shared.tailles import garder_selon_taille, taille_depuis_tranche
 
@@ -383,7 +384,8 @@ def chercher_offres(user_id, criteres=None, mode="alternance", limite_lot=None, 
         o = _normaliser_une(brut)
         return (o is not None and o["titre"] != "Sans titre" and o["id"] not in offres_vues
                 and garder_selon_taille(o["_taille"], criteres["tailles"], criteres["taille_inconnue"])
-                and not (criteres.get("exclure_alternance") and o["_alternance"]))
+                and not (criteres.get("exclure_alternance") and o["_alternance"])
+                and (not criteres.get("intitules_stage") or designe_un_stage(o["titre"])))
 
     # Avec un lot : téléchargement arrêté dès limite_lot offres retenues
     candidates = _normaliser(recuperer_offres(criteres, log=log, retenir=retenue, objectif=limite_lot))
@@ -408,7 +410,15 @@ def chercher_offres(user_id, criteres=None, mode="alternance", limite_lot=None, 
         toutes_offres = [o for o in toutes_offres if not o.get("_alternance")]
         exclues = avant - len(toutes_offres)
         if exclues:
-            print(f"  {exclues} offres d'alternance écartées (mode job)")
+            log(f"  {exclues} offres d'alternance écartées (mode {mode})")
+
+    # Mode stage : « stage » doit désigner le poste, pas son objet (D74)
+    if criteres.get("intitules_stage"):
+        avant = len(toutes_offres)
+        toutes_offres = [o for o in toutes_offres if designe_un_stage(o["titre"])]
+        if avant - len(toutes_offres):
+            log(f"  {avant - len(toutes_offres)} offres écartées par l'intitulé (le stage n'y est pas le poste, "
+                "règles dans shared/referentiels/intitules_stage.txt)")
 
     # Le découpage mélange l'ordre de l'API : les plus récentes d'abord
     toutes_offres.sort(key=lambda o: o["date_trouvee"], reverse=True)

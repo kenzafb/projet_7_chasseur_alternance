@@ -1,0 +1,130 @@
+{
+  "verifie_le": "2026-10-09T11:35:29+00:00",
+  "recherche": {
+    "region": "11",
+    "motsCles": "stage"
+  },
+  "total": {
+    "params": {
+      "region": "11",
+      "motsCles": "stage"
+    },
+    "statut": 206,
+    "total": 73
+  },
+  "repartition": {
+    "typeContrat": {
+      "totaux": {
+        "CCE": 0,
+        "CDD": 34,
+        "CDI": 37,
+        "DDI": 0,
+        "DIN": 0,
+        "FRA": 0,
+        "LIB": 0,
+        "MIS": 2,
+        "REP": 0,
+        "SAI": 0,
+        "TTI": 0,
+        "DDT": 0
+      },
+      "somme": 73,
+      "libelles": {
+        "CCE": "Profession commerciale",
+        "CDD": "Contrat à durée déterminée",
+        "CDI": "Contrat à durée indéterminée",
+        "DDI": "Contrat durée déterminée insertion",
+        "DIN": "CDI Intérimaire",
+        "FRA": "Franchise",
+        "LIB": "Profession libérale",
+        "MIS": "Mission intérimaire",
+        "REP": "Reprise d'entreprise",
+        "SAI": "Contrat travail saisonnier",
+        "TTI": "Contrat travail temporaire insertion",
+        "DDT": "CDD Tremplin"
+      }
+    },
+    "natureContrat": {
+      "totaux": {
+        "CC": 0,
+        "CI": 0,
+        "CU": 0,
+        "E1": 55,
+        "E2": 12,
+        "EE": 0,
+        "ER": 0,
+        "FA": 0,
+        "FJ": 0,
+        "FS": 6,
+        "FX": 0,
+        "FY": 0,
+        "I1": 0,
+        "FT": 0,
+        "FU": 0,
+        "FV": 0,
+        "FW": 0,
+        "NS": 0,
+        "PS": 0
+      },
+      "somme": 73,
+      "libelles": {
+        "CC": "CDI de chantier ou d'opération",
+        "CI": "Contrat intermittent",
+        "CU": "Contrat d'usage",
+        "E1": "Contrat travail",
+        "E2": "Contrat apprentissage",
+        "EE": "Contrat d'Engagement Educatif",
+        "ER": "Engagement à servir dans la réserve",
+        "FA": "Act. Formation pré.recrut.",
+        "FJ": "Contrat pacte",
+        "FS": "Cont. professionnalisation",
+        "FX": "Emploi Avenir marchand",
+        "FY": "Emploi Avenir Professeur",
+        "I1": "Insertion par l'activ.éco.",
+        "FT": "CUI - CAE",
+        "FU": "CUI - CIE",
+        "FV": "Prépa.opérationnel.emploi",
+        "FW": "Emploi Avenir non marchand",
+        "NS": "Emploi non salarié",
+        "PS": "Portage salarial"
+      }
+    }
+  },
+  "echantillon": {
+    "offres_lues": 73,
+    "typeContrat": {
+      "CDI": 37,
+      "CDD": 34,
+      "MIS": 2
+    },
+    "natureContrat": {
+      "Contrat travail": 55,
+      "Contrat apprentissage": 12,
+      "Cont. professionnalisation": 6
+    },
+    "alternance": 18,
+    "intitule_avec_stage": 73,
+    "exemples": [
+      "STAGE - Assistant(e) Projet Retail H/F",
+      "Stage - Coordinateur(rice) référencement de marque H/F",
+      "Candidature spontanée ALTERNANCE/STAGE (H/F)",
+      "Stage en Cuisine F/H - Terlia",
+      "STAGE STANDARDISTE/ASSISTANT ANTENNE H/F/NB",
+      "STAGE - Assistant(e) Projet Retail H/F",
+      "Stage - Assistant(e) Développement RH (H/F)",
+      "Stage - Coordinateur(rice) référencement de marque H/F",
+      "Stage - Gestion et modernisation des Cartes SIM et eSIM F/H",
+      "COORDINATEUR (H/F) EN CHARGE DES ATELIERS, STAGES & RESTITUTION",
+      "Stage - Ingénieur(e) Données - R&D H/F",
+      "STAGE - Chargé(e) de missions RSE - Structuration de la Démarche et Bilan Carbone H/F",
+      "Stage - Ingénieur Développement Contrôle-Commande Simulateur F/H",
+      "Stage Développement international des territoires H/F",
+      "Coordinateur / Coordinatrice de stages de formation professionnel (H/F)",
+      "STAGE - ASSISTANT(E) CHEF DE PRODUITS (MARKETING & ÉVÉNEMENTIEL) - CATÉGORIE JARDIN - H/F",
+      "Stagiaire en assistanat relations entreprises - Stage de 6 mois (H/F)",
+      "Gestionnaire du service des stages F/H - ESCP Business School",
+      "Stage Développeur Logiciel (H/F)",
+      "Stage assistant ingénieur performance thermique/énergétique H/F"
+    ]
+  }
+}

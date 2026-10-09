@@ -45,7 +45,7 @@ from shared import compte_envoi
 from database import compte_envoi_db
 from shared.pipelines import Pipelines, RECHERCHE, SPONTANEES
 from shared.statique import importmap, url_statique
-from shared.modes import MODE_DEFAUT, MODES, get_mode, modes_accueil, offres_disponibles, verifier_mode
+from shared.modes import MODE_DEFAUT, MODES, get_mode, modes_accueil, verifier_mode
 from database.dates import maintenant_utc
 
 # ─── Modules métier ───────────────────────────────────────────────
@@ -276,7 +276,6 @@ def accueil(request: Request, bienvenue: str | None = None):
 def _page_du_mode(request: Request, mode: str):
     return templates.TemplateResponse(request, "base.html", {"mode": mode, "label_mode": get_mode(mode)["label"],
                                                              "sources": get_mode(mode)["sources"],
-                                                             "offres_disponibles": offres_disponibles(mode),
                                                              "limites": config.LIMITES_LANCEMENT,
                                                              "analyse_ia": config.analyse_ia_active()})
 
@@ -467,10 +466,6 @@ def api_compte_envoi_mail_test(body: MailTest | None = None, user: User = Depend
 
 
 # ─── France Travail + La Bonne Alternance ────────────────────────────────────
-# Mode stage : France Travail n'est pas branché tant que l'humain n'a pas lu
-# l'essai par mot-clé (scripts/verifier_france_travail.py) ; LBA : alternance
-MESSAGE_OFFRES_STAGE = ("Les offres de stage ne sont pas encore disponibles : utilise les candidatures "
-                        "spontanées en attendant.")
 
 @prive.post("/api/recherche")
 def api_recherche(request: Request, body: Recherche | None = None, user: User = Depends(utilisateur_requis),
@@ -482,8 +477,6 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
     max_analyses, note = _limite("analyses" if ia else "sans_ia", body.max_analyses if body else None)
     traitees = "analysées" if ia else "ajoutées sans analyse"
     cfg_mode = get_mode(mode)
-    if not offres_disponibles(mode):
-        raise ErreurUtilisateur(MESSAGE_OFFRES_STAGE)
     profil = lire_profil(user_id, mode=mode)
     exiger_profil(profil)   # 400 tout de suite plutôt qu'une erreur dans le thread
 

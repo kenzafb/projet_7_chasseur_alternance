@@ -68,23 +68,21 @@ def test_dates_en_lettres():
 
 
 # ─── Page, mode et offres ─────────────────────────────────────────────────────
-def test_page_stage_et_offres_indisponibles(stagiaire):
+def test_page_stage(stagiaire):
     client, _ = stagiaire
     page = client.get("/stage").text
     assert 'data-mode="stage"' in page and "<title>Chasseur de Stage" in page
-    assert "data-offres-indisponibles" in page and 'data-limite="analyses"' not in page
+    assert 'data-limite="analyses"' in page                              # offres disponibles (D74)
     assert 'data-mode-section="stage"' in page and 'type="date" data-profil="date_debut"' in page
     assert "{date_debut}" in page and "{duree_semaines}" in page       # aide des balises du stage
     assert "La Bonne Alternance (fort potentiel" not in page            # pas de LBA en stage
     assert client.get("/api/mode").json() == {"mode": "stage", "label": "Chasseur de Stage", "couleur": "vert"}
-    r = client.post("/api/recherche", json={"max_analyses": 5})
-    assert r.status_code == 400 and "pas encore disponibles" in r.json()["erreur"]
 
 
 def test_balises_du_stage_absentes_ailleurs(utilisateur):
     client, _ = utilisateur("a@test.fr", prenom="Alice")
     page = client.get("/alternance").text
-    assert "{prenom}" in page and "{duree_semaines}" not in page and "data-offres-indisponibles" not in page
+    assert "{prenom}" in page and "{duree_semaines}" not in page
 
 
 def test_mode_a_venir_refuse(monkeypatch):
@@ -250,3 +248,78 @@ def test_migration_0012(tmp_path):
     assert "date_debut" not in {r[1] for r in cx.execute("PRAGMA table_info(profils)")}
     assert cx.execute("SELECT prenom FROM profils").fetchall() == [("Alice",)]
     cx.close()
+
+
+# ─── Offres France Travail du mode stage (D74) ────────────────────────────────
+from tests.test_france_travail import api  # noqa: E402,F401  (fixture)
+
+
+def test_criteres_france_travail_du_stage():
+    from shared.criteres import criteres_france_travail
+    c = criteres_france_travail({"recherche": {"domaines": ["M18"], "secteurs": ["62"], "themes": ["13"]}}, "stage")
+    assert c["filtres"] == {"motsCles": ["stage"], "secteurActivite": ["62"]}     # pas de thème hors job
+    assert c["domaines"] == ["M18"] and c["exclure_alternance"] and c["intitules_stage"]
+
+
+def test_recherche_d_offres_de_stage(api, stagiaire):
+    from france_travail.main import lancer_recherche
+    from tests.faux_france_travail import offre
+    _, uid = stagiaire
+    api.offres = [offre(1, nature="E1", type_contrat="CDD", titre="Stage - Assistant(e) RH H/F"),
+                  offre(2, nature="E2", type_contrat="CDD", titre="Stage - Apprenti logistique"),   # alternance
+                  offre(3, nature="FS", type_contrat="CDD", titre="STAGE comptable"),               # alternance
+                  offre(4, nature="E1", type_contrat="CDI", titre="Gestionnaire du service des stages"),
+                  offre(5, nature="E1", type_contrat="CDI", titre="Technicien support"),            # pas « stage »
+                  offre(6, nature="E1", type_contrat="CDI", titre="Stagiaire juriste", domaine="K19")]
+    api.offres[4]["description"] = "Stage de fin d'études possible."
+    profil = {"recherche": {"domaines": ["M18"]}}
+    ecrites, logs = [], []
+    lancer_recherche(uid, profil, analyser=False, max_analyse=10, on_offre=ecrites.append, mode="stage",
+                     log_fn=logs.append)
+    assert all(r.get("motsCles") == "stage" and r.get("domaine") == "M18" for r in api.recherches)
+    assert [o["titre"] for o in ecrites] == ["Stage - Assistant(e) RH H/F"]
+    o, = ecrites
+    assert (o["verdict"], o["score"], o["statut"], o["raison_archivage"]) == ("non_analysee", None, "nouveau", "")
+    texte = "\n".join(logs)
+    assert "2 offres d'alternance écartées (mode stage)" in texte
+    assert "2 offres écartées par l'intitulé" in texte
+
+
+def test_recherche_par_la_route_en_stage(stagiaire, monkeypatch, pipelines_neufs):
+    """La page Offres du mode stage se remplit comme les autres : offres « non analysées »."""
+    import main
+    from database.candidatures_db import lire_candidatures
+    monkeypatch.setenv("ANALYSE_IA", "false")
+    client, uid = stagiaire
+    client.post("/api/profil", json=PROFIL_STAGE)
+
+    def recherche(user_id, profil, analyser, max_analyse, on_offre, mode, log_fn):
+        o = {"id": "s1", "titre": "Stage - Assistant RH", "entreprise": "ACME", "lieu": "75 - Paris",
+             "zone": "Paris", "lien": "", "source": "France Travail", "description": "", "statut": "nouveau"}
+        from france_travail.analyseur import marquer_non_analysee
+        marquer_non_analysee(o, mode=mode)
+        on_offre(o)
+        return [o]
+    monkeypatch.setattr(main, "lancer_recherche", recherche)
+    r = client.post("/api/recherche", json={"max_analyses": 5})
+    assert r.status_code == 200 and "avertissement" not in r.json()
+    import time
+    for _ in range(200):
+        if not pipelines_neufs.etat("recherche", uid)["en_cours"]:
+            break
+        time.sleep(0.01)
+    c, = lire_candidatures(uid, mode="stage")
+    assert (c["titre"], c["statut"], c["verdict"]) == ("Stage - Assistant RH", "nouveau", "non_analysee")
+    assert "LBA ignorée" in client.get("/api/logs").text
+    assert lire_candidatures(uid, mode="alternance") == []
+
+
+def test_archivage_par_mots_cles_en_stage():
+    from france_travail.analyseur import marquer_non_analysee
+    def offre(**k):
+        return {"titre": "Stage - Assistant", "description": "", "entreprise": "ACME", **k}
+    assert marquer_non_analysee(offre(), mode="stage").get("statut") != "archive"
+    assert marquer_non_analysee(offre(entreprise="ESCP Business School"), mode="stage").get("statut") != "archive"
+    assert marquer_non_analysee(offre(), mode="alternance")["raison_archivage"] == "stage"
+    reserve = offre(description="Poste réservé aux bénéficiaires de l'obligation d'emploi")
+    assert marquer_non_analysee(reserve, mode="stage")["raison_archivage"] == "public_specifique"

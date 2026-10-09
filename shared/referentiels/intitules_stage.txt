@@ -1,0 +1,33 @@
+# Intitulés d'offres France Travail du mode stage (phase 6b, décision D74).
+# La recherche se fait par le mot-clé « stage », qui ramène aussi des postes
+# dont le stage est l'objet (« Coordinateur de stages de formation »,
+# « Gestionnaire du service des stages »). Une offre est gardée si au moins
+# une règle « + » trouve son intitulé et qu'aucune règle « - » ne le trouve.
+#
+# Format : une règle par ligne, « + » ou « - », un espace, une expression
+# régulière Python. L'intitulé est comparé en minuscules et sans accents
+# (« Stagiaire Comptabilité » devient « stagiaire comptabilite »).
+# Lignes vides et commentaires (#) ignorés. À compléter sans toucher au code ;
+# tests dans tests/test_intitules_stage.py (les 20 intitulés de l'essai du
+# 9 octobre 2026).
+
+# ── « stage » ou « stagiaire » désigne le poste ──
+# En début d'intitulé : « Stage - Assistant(e) RH », « Stagiaire juriste »
++ ^\W*(stage|stagiaire)\b
+# Suivi ou précédé d'un tiret ou de deux-points : « Assistant RH - Stage »
++ \b(stage|stagiaire)\s*[-–—:]
++ [-–—:]\s*(stage|stagiaire)\b
+# Après une barre oblique : « Candidature spontanée ALTERNANCE/STAGE »
++ /\s*(stage|stagiaire)\b
+# Entre parenthèses ou « en stage » : « Assistant marketing (stage) »
++ \((stage|stagiaire)\)
++ \ben stage\b
+
+# ── le stage est l'objet du poste ──
+# « Coordinateur de stages », « Gestionnaire du service des stages »,
+# « Responsable des stages », « Chargé(e) des stages »
+- \b(service|bureau|pole|cellule|gestion|gestionnaire|coordinat\w*|responsable|charge\w*|referent\w*)\s+(\(\w+\)\s+)?(de |des |du )?stages\b
+# « Stages de formation », « stages d'apprentissage »
+- \bstages? (de formation|d'apprentissage|de conduite|sportifs?)\b
+# « Ateliers, stages & restitution »
+- \bstages?\s*&
