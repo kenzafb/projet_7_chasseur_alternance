@@ -1,127 +1,125 @@
 # Chasseur d'Alternance
 
-Application web (FastAPI) qui automatise une recherche d'alternance, de job court ou de stage en Île-de-France : collecte des offres France Travail et La Bonne Alternance, analyse de chaque offre par Mistral AI, génération de lettres de motivation, et pipeline de candidatures spontanées (entreprises INSEE Sirene, recherche des emails de contact, envoi SMTP). Comptes utilisateurs multiples, un profil par utilisateur et par mode (`alternance`, `job`, `stage`), données en SQLite.
+Application web multi-utilisateurs qui automatise la recherche d'une alternance, d'un stage ou d'un job en Île-de-France. Elle rassemble les offres publiées (France Travail, La Bonne Alternance), constitue une liste d'entreprises ciblées pour des candidatures spontanées (base Sirene de l'INSEE, La Bonne Alternance), trouve leurs adresses de contact, envoie les candidatures depuis le compte mail de chaque utilisateur et suit les réponses. Chaque utilisateur a un profil par mode et ne voit que ses propres données.
 
-Projet en cours de refonte. L'état des lieux détaillé est dans `docs/ARCHITECTURE_ACTUELLE.md`, les rapports de phase dans `docs/PHASE_*_RAPPORT.md`.
+> [!IMPORTANT]
+> **L'analyse par IA est désactivée pour l'instant** (`ANALYSE_IA=false`) : notation des offres, génération des lettres de motivation et validation des emails trouvés.
+> Elle reviendra avec un modèle open source hébergé localement, pour ne plus dépendre d'un fournisseur extérieur.
+> En attendant, les offres arrivent « non analysées » (sans note ni verdict) et les emails trouvés par le scraper sont à valider à la main avant tout envoi.
 
-## Structure
+## Fonctionnalités
+
+Trois modes, chacun à son URL (`/alternance`, `/job`, `/stage`) avec son profil, ses offres, ses candidatures spontanées et son suivi. Deux onglets ouverts dans deux modes ne se gênent pas.
+
+### Offres
+
+| Mode | France Travail | La Bonne Alternance |
+|---|---|---|
+| Alternance | contrats d'apprentissage et de professionnalisation | offres hors relais France Travail, filtrées par niveau de diplôme visé |
+| Job | CDD, intérim, saisonnier ; thèmes « jobs d'été » et « sans diplôme ni expérience » en option | non |
+| Stage | mot-clé « stage », offres en alternance écartées, intitulés filtrés par des règles (le stage doit être le poste, pas son objet) | non |
+
+- Domaines du profil en codes de la nomenclature France Travail (14 grands domaines, 110 domaines), secteur de l'employeur et taille d'entreprise en option. Toutes les listes viennent des référentiels officiels, versionnés dans `docs/referentiels/`.
+- Rien n'est tronqué en silence : au-delà du plafond de l'API France Travail (3150 offres par requête), la recherche est redécoupée par date de création ; La Bonne Alternance est interrogée autour de 19 centres d'Île-de-France, chaque cercle saturé étant redécoupé. Les logs donnent ce qui a été annoncé, récupéré et écarté.
+- Offres dédoublonnées par utilisateur et par mode, archivage automatique par mots-clés (offres réservées à un public, écoles et CFA en alternance).
+
+### Candidatures spontanées
+
+- **Entreprises.** Sirene dans les trois modes : secteurs NAF déduits des domaines (secteurs « cœurs » toutes tailles, secteurs « transverses » pour les entreprises de 250 salariés et plus), ou secteurs choisis, ou case « tous les secteurs » ; filtres par taille (tranches INSEE) et par département. En alternance, s'y ajoutent les entreprises à fort potentiel d'embauche d'alternants repérées par La Bonne Alternance. Dédoublonnage par SIRET puis SIREN, source de chaque entreprise gardée et affichée. Bascule automatique vers la nomenclature NAF 2025 au 1er janvier 2027.
+- **Emails.** Un scraper cherche le site de chaque entreprise et lit ses pages (adresses obfusquées comprises). Les adresses techniques ou factices sont écartées par des règles (`shared/referentiels/emails_exclus.txt`).
+- **Envoi.** Chaque utilisateur envoie depuis son propre compte (Gmail avec un mot de passe d'application, ou tout serveur SMTP sur le port 465 ou 587), vérifié par un test de connexion. Objet et message personnalisables avec des balises (`{prenom}`, `{date}`, et en stage `{date_debut}`, `{duree_semaines}`...), pièces jointes, plafond de 50 mails par jour et par utilisateur, arrêt immédiat sur erreur de compte.
+- **Mode test**, activé par défaut sur tout nouveau compte d'envoi : chaque candidature part vers l'adresse de l'utilisateur, le vrai destinataire indiqué dans l'objet, et rien n'est marqué comme envoyé. Un bandeau le signale.
+- Une adresse déjà contactée dans un mode n'est jamais réécrite dans ce mode ; une entreprise contactée dans un autre mode porte l'étiquette « déjà contactée en alternance le JJ/MM/AAAA », sans bloquer l'envoi.
+
+### Suivi
+
+Statut par entreprise et par mode (envoyée, réponse, entretien, refus), statistiques par source (entreprises, emails trouvés, envois, réponses, entretiens), suivi des offres candidatées. Limites réglables à chaque lancement (offres, nouvelles entreprises, sites scrapés, mails envoyés), bornées par le serveur, et logs des traitements en direct dans l'interface.
+
+## Architecture technique
+
+- **Backend** : Python 3.13, FastAPI, traitements longs dans des threads par utilisateur (une recherche et une étape de spontanées à la fois, arrêt possible).
+- **Données** : SQLAlchemy 2, SQLite, schéma unique dans `database/models.py`, migrations Alembic (12 à ce jour).
+- **Authentification** : inscription sur code d'invitation, mots de passe hachés (argon2), session par cookie signé (`httponly`, `samesite`, `secure` en production). Toutes les routes sauf connexion et inscription exigent une session.
+- **Isolation** : chaque table de données porte l'utilisateur (clé étrangère, suppression en cascade), chaque requête filtre sur l'utilisateur connecté, dédoublonnages, logs et traitements sont propres à chacun.
+- **Secrets** : mots de passe SMTP chiffrés en base (Fernet, clé dans `.env`), jamais renvoyés au navigateur.
+- **Sources externes** : API Offres d'emploi v2 de France Travail, API de La Bonne Alternance, API Sirene de l'INSEE. Tout ce qui dépend du comportement d'une API est réuni dans un fichier de paramètres par source, vérifié par un script lancé à la main (`scripts/verifier_*.py`).
+- **Interface** : templates Jinja2, JavaScript en modules ES sans framework, PDF générés par WeasyPrint.
+- **Tests** : 784 tests automatisés (pytest), APIs externes simulées, aucun appel réseau, base temporaire migrée par Alembic.
 
 ```
-main.py              App FastAPI : pages, routes /api, threads des pipelines
-auth/                Connexion, inscription, session
-database/            SQLAlchemy : models.py (schéma, seule source de vérité), accès aux données
-alembic/             Migrations du schéma (alembic upgrade head)
-scripts/             importer_ancienne_base.py (comptes et profils de l'ancienne base)
-france_travail/      Offres : scrapers FT et LBA, analyse Mistral, lettre, PDF
-spontanees/          Candidatures spontanées : Sirene, scraping des emails, envoi
-shared/              config.py (.env, chemins, géographie), ia.py (client Mistral),
-                     modes.py, domaines.py, criteres.py, tailles.py, offres.py,
-                     referentiels/ (lecture des référentiels versionnés)
-docs/referentiels/   Référentiels France Travail téléchargés, avec leur date
-templates/, static/  Interface (Jinja2, JS en modules ES)
-archive/             Code désactivé (bot Telegram)
-data/                Base SQLite, uploads, fichiers de dédup (gitignoré)
+main.py              application FastAPI : pages, routes /api, lancement des traitements
+auth/                connexion, inscription, session
+database/            modèles SQLAlchemy et accès aux données
+alembic/             migrations du schéma
+france_travail/      offres : France Travail, La Bonne Alternance, analyse, lettre, PDF
+spontanees/          candidatures spontanées : Sirene, scraper d'emails, envoi
+shared/              configuration, modes, domaines, NAF, référentiels et règles
+scripts/             vérification des API, imports et nettoyage, lancés à la main
+templates/, static/  interface
+tests/               suite pytest
+docs/                décisions, spécification des sources, rapports de phase
+archive/             code désactivé (bot Telegram)
 ```
 
-## Installation de zéro
+## Installation et lancement
 
-Python 3.13 (venv de référence). WeasyPrint demande les bibliothèques système Pango et Cairo.
+Prérequis : Python 3.13 et les bibliothèques système Pango et Cairo (requises par WeasyPrint). Clés d'API à demander : France Travail (francetravail.io), La Bonne Alternance, INSEE Sirene.
 
 ```bash
-python -m venv venv
+git clone <url-du-depot> chasseur_alternance
+cd chasseur_alternance
+python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env    # puis remplir les clés
+pip install -r requirements.txt        # requirements-dev.txt pour lancer les tests
+mkdir -p data                          # base SQLite et fichiers envoyés (hors dépôt)
+cp .env.example .env
 ```
 
-Dans `.env` :
-- `SECRET_KEY` est obligatoire (32 caractères minimum, l'application refuse de démarrer sinon) : `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
-- `DATABASE_URL` désigne la base. Pour un fichier SQLite, chemin absolu avec quatre barres obliques : `DATABASE_URL=sqlite:////home/moi/chasseur_alternance/data/chasseur_v2.db`. Vide ou absente : `data/chasseur.db`, l'ancienne base, que la nouvelle version ne sait pas lire.
-- `CODE_INVITATION` ouvre l'inscription : sans lui, `/register` est fermé. `COOKIE_SECURE=true` en production derrière HTTPS.
-- `CLE_CHIFFREMENT` chiffre les mots de passe SMTP des comptes d'envoi : `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Sans elle, l'application démarre mais l'envoi de mails est désactivé. La changer rend illisibles les mots de passe déjà enregistrés (chacun devra ressaisir le sien). `PLAFOND_ENVOIS_JOUR` (50 par défaut) borne les mails envoyés par utilisateur et par jour.
+Remplir `.env` en suivant les commentaires de `.env.example`. L'essentiel :
 
-Puis créer la base (ou la mettre à jour après un `git pull`) :
+- `SECRET_KEY` (obligatoire, 32 caractères minimum) : `python -c "import secrets; print(secrets.token_urlsafe(48))"`
+- `CLE_CHIFFREMENT` (sans elle, l'envoi de mails est désactivé) : `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+- `DATABASE_URL` : chemin absolu, quatre barres obliques, par exemple `sqlite:////chemin/absolu/vers/chasseur_alternance/data/chasseur_v2.db`
+- `CODE_INVITATION` : code à saisir sur `/register` (vide : inscriptions fermées)
+- `ANALYSE_IA=false` tant que l'IA est désactivée
+- `FT_CLIENT_ID`, `FT_CLIENT_SECRET`, `LBA_API_KEY`, `INSEE_API_KEY` : identifiants des sources
+
+Créer la base (et la mettre à jour après chaque `git pull`), puis lancer :
 
 ```bash
 alembic upgrade head
-```
-
-Le schéma est défini dans `database/models.py` ; après l'avoir modifié, générer une migration avec `alembic revision --autogenerate -m "..."`, la relire, puis `alembic upgrade head`. `alembic check` vérifie qu'aucune modification de `models.py` n'est oubliée. Alembic refuse de toucher une base qui a des tables sans avoir été créée par lui (l'ancienne base).
-
-## Reprendre les comptes de l'ancienne base
-
-L'ancienne `data/chasseur.db` (schéma d'avant Alembic) n'est pas migrée en place. Le script `scripts/importer_ancienne_base.py` copie dans une base neuve les comptes 1, 3 et 4 (même identifiant, même mot de passe) et tous leurs profils (alternance et job), sans candidatures, entreprises ni fichiers de dédoublonnage. La source est ouverte en lecture seule ; le script refuse si source et cible sont le même fichier ou si la cible contient déjà des comptes, et applique lui-même `alembic upgrade head` sur la cible.
-
-```bash
-# 1. Essai à blanc : affiche ce qui serait importé, n'écrit rien
-python scripts/importer_ancienne_base.py --source data/chasseur.db --cible data/chasseur_v2.db --dry-run
-# 2. Import réel
-python scripts/importer_ancienne_base.py --source data/chasseur.db --cible data/chasseur_v2.db
-# 3. Dans .env : DATABASE_URL=sqlite:////chemin/absolu/vers/data/chasseur_v2.db, puis relancer l'app
-```
-
-Les pièces jointes restent dans `data/uploads/` : seuls leurs chemins en base changent (relatifs à ce dossier). Le résumé final liste celles qui manquent ou n'ont pas d'extension.
-
-## Lancement
-
-Après `alembic upgrade head` :
-
-```bash
 uvicorn main:app --reload --port 5002
-# ou : python main.py
 ```
 
-Puis http://localhost:5002 (redirige vers `/login`, inscription sur `/register` avec le code d'invitation). Documentation de l'API, une fois connecté : http://localhost:5002/docs.
+Ouvrir http://localhost:5002, créer un compte sur `/register` avec le code d'invitation, choisir un mode, remplir le profil, puis configurer le compte d'envoi (Profil, section Compte d'envoi) et le vérifier avec « Tester la connexion ». La documentation de l'API est sur http://localhost:5002/docs une fois connecté. En production derrière HTTPS : `COOKIE_SECURE=true`.
 
-**Une URL par mode.** La page d'accueil (`/`) propose les modes ; chacun a son URL : `/alternance`, `/job` et `/stage`. Le mode vient de l'URL, plus de la session : deux onglets dans deux modes ne se gênent pas. Chaque route de l'API qui dépend du mode exige le paramètre `mode` (`/api/profil?mode=job`) ; le front l'ajoute à chaque appel ; absent ou inconnu : 400. Les anciennes URL redirigent (`/?bienvenue=1`, liens `/#page`).
-
-**Entreprises et modes.** Une entreprise est unique par utilisateur (SIRET, puis SIREN) ; site, emails et contacts sont communs à tous les modes et ne sont scrapés qu'une fois. La sélection pour un mode, l'envoi, sa date et le statut de suivi sont propres à chaque mode : la page Spontanées et le suivi n'affichent que le mode courant, avec l'étiquette « déjà contactée en <autre mode> le <date> » quand c'est le cas, sans jamais bloquer l'envoi. L'historique d'avant la refonte (`data/emails_deja_envoyes.json`) s'importe en mode alternance :
-
-```bash
-venv/bin/python scripts/importer_contacts_historiques.py --dry-run            # classement, n'écrit rien
-venv/bin/python scripts/importer_contacts_historiques.py --user 1              # groupe a (défaut)
-venv/bin/python scripts/importer_contacts_historiques.py --user 1 --groupes a,b
-```
-
-L'étiquette vaut aussi pour une entreprise récupérée plus tard, dès qu'une de ses adresses est parmi les adresses contactées d'un autre mode. Les adresses techniques ou factices de `shared/referentiels/emails_exclus.txt` ne sont jamais importées.
-
-**Mode stage.** Profil propre : dates de début et de fin (durée en semaines calculée : jours du premier au dernier compris, divisés par 7, arrondis), établissement, formation, missions visées, portfolio, et pour les candidatures spontanées domaines, secteurs, tailles et départements comme en alternance. Sources : Sirene pour les candidatures spontanées (pas de LBA) ; France Travail pour les offres, par le mot-clé « stage » (aucun contrat « stage » n'existe dans l'API), alternance (E2, FS) écartée, intitulés filtrés par `shared/referentiels/intitules_stage.txt` (« stage » doit désigner le poste, pas son objet : « service des stages » est écarté). `python scripts/verifier_france_travail.py --stage` mesure ce que donne le mot-clé. Objet et trame par défaut annoncent un stage conventionné avec ses dates et sa durée.
-
-**Balises du mail de candidature spontanée**, dans l'objet comme dans le message : `{prenom}`, `{nom}`, `{telephone}`, `{email}`, `{date}` (date du jour) dans tous les modes ; en stage, aussi `{date_debut}`, `{date_fin}`, `{duree_semaines}`, `{etablissement}`, `{formation}`, `{missions}`, `{portfolio}`. Une balise inconnue est refusée à l'enregistrement du profil ; une balise vide dans le profil bloque l'envoi avant le premier mail.
-
-Chaque utilisateur envoie ses candidatures spontanées depuis son propre compte, configuré dans Profil, section Compte d'envoi (Gmail avec un mot de passe d'application, ou un autre serveur SMTP sur le port 465 ou 587), puis vérifié par « Tester la connexion ». Sans compte vérifié, l'envoi est refusé. L'envoi existe aussi en ligne de commande, avec le compte de l'utilisateur désigné :
-
-```bash
-python -m spontanees.envoyeur --user 1 --limite 10 --test
-```
-
-`--user` (identifiant du compte) est obligatoire pour les trois scripts : `spontanees.fetch_entreprises`, `spontanees.scraper_emails` et `spontanees.envoyeur` ; `--mode` (défaut `alternance`) choisit les entreprises sélectionnées dans ce mode.
-
-**Mode test.** Une case du compte d'envoi redirige toutes les candidatures spontanées vers l'adresse d'expédition de l'utilisateur, le vrai destinataire dans l'objet (`[TEST → rh@entreprise.fr] ...`) ; rien n'est enregistré comme contacté ni marqué envoyé. Un bandeau le signale sur la page Spontanées, et les logs du pipeline le répètent à chaque mail. `--test` en ligne de commande a le même effet pour un lancement.
-
-**Limites par lancement**, réglées dans l'interface au moment de lancer, bornées par le serveur (`LIMITES_LANCEMENT` dans `shared/config.py`) : offres analysées par Mistral (30 par défaut, 200 au plus, France Travail et LBA ensemble), nouvelles entreprises récupérées (200, 5000), entreprises scrapées (20, 200), mails envoyés (10, 50).
-
-**Modèles Mistral.** Un par usage : `MODELE_MISTRAL_ANALYSE`, `MODELE_MISTRAL_LETTRE`, `MODELE_MISTRAL_EXTRACTION`, sinon `MODELE_MISTRAL` pour tous, sinon `mistral-medium-latest` (analyse, lettre) et `mistral-small-latest` (extraction). `python scripts/verifier_mistral.py` liste les modèles de la clé et teste ceux configurés (appels réels). Une erreur Mistral ne produit jamais de note ni de lettre inventée : clé refusée ou modèle non autorisé arrêtent le pipeline avec un message clair, une erreur passagère fait sauter l'offre, qui reviendra au lancement suivant.
-
-**Recherche France Travail.** Domaines du profil en codes France Travail (grand domaine « M » ou domaine « M18 », rien de coché : indifférent), lus dans les référentiels de `docs/referentiels/france_travail/`. Alternance : contrats d'apprentissage et de professionnalisation ; job : CDD, intérim, saisonnier, thèmes 13 et 17 en option. Secteur de l'employeur en option, taille d'entreprise filtrée après récupération. Au-delà de 3150 offres par requête (plafond de l'API), la recherche est redécoupée par date de création seulement (période coupée en deux, jusqu'à l'heure) ; les logs donnent le total annoncé, le nombre récupéré et l'écart. Ce qui dépend du comportement de l'API est réuni dans `france_travail/parametres_api.py` (valeurs vérifiées le 8 octobre 2026) ; `python scripts/verifier_france_travail.py` (appels réels, identifiants `FT_CLIENT_ID` et `FT_CLIENT_SECRET`) le revérifie et affiche les valeurs à y reporter. Une recherche limitée à N offres arrête de télécharger dès N nouvelles offres obtenues (tranche la plus récente d'abord).
-
-**Recherche La Bonne Alternance** (mode alternance). Codes métiers déduits des domaines du profil (`metiers.json`), par lots de 100 ; profil indifférent : recherche sans code. Niveau visé du profil (texte libre : « Bac+3 », « BTS »...) converti en niveau européen ; il n'est pas envoyé à l'API, les offres d'un autre niveau sont écartées après récupération et celles sans niveau gardées. Recherche autour de 19 centres de l'Île-de-France à rayon réduit (`LBA_CENTRES` dans `shared/config.py`) ; un cercle dont la réponse atteint le plafond (150 par source, 450 offres) est redécoupé en sept cercles de rayon moitié jusqu'à 1 km, et les cercles encore au plafond sont écrits dans les logs. Offres relayées de France Travail exclues. Les entreprises à fort potentiel d'embauche d'alternants entrent dans les candidatures spontanées par l'étape « Récupérer » seulement (la recherche d'offres n'en ajoute pas), dédoublonnées par SIRET avec Sirene, filtrées par la taille du profil (« 0-0 » lu comme « sans salarié »). Sirene et LBA y sont traitées et affichées ensemble, sans priorité : chaque entreprise garde la liste des sources qui l'ont trouvée, la page Spontanées a une pastille et un filtre par source et une répartition par source (entreprises, emails, envois, réponses, entretiens) ; dans « Récupérer », LBA a droit à la moitié de la limite, Sirene au reste. Les adresses techniques ou factices (suivi d'erreurs, exemples de formulaire) ne sont jamais enregistrées : règles dans `shared/referentiels/emails_exclus.txt`, à compléter. Ce qui dépend de l'API est réuni dans `france_travail/parametres_lba.py` (vérifié le 9 octobre 2026) ; `python scripts/verifier_lba.py` (clé `LBA_API_KEY`) le revérifie.
-
-**Recherche Sirene** (candidatures spontanées). Codes NAF tirés de `shared/referentiels/correspondance_naf.json` : secteurs cœurs des domaines (informatique M18, immobilier C15), toutes tailles, et secteurs transverses pour les entreprises de 250 salariés et plus ; profil indifférent ou domaine sans correspondance : secteurs choisis dans le profil ; case « tous les secteurs » (non cochée par défaut) pour chercher sans filtre d'activité ; supports juridiques toujours exclus. Sans domaine, secteur ni cette case, Sirene n'est pas interrogé : le profil et la page Spontanées le disent avant tout lancement, et « Récupérer » est refusé dans les modes sans LBA (job, stage). La limite se remplit dans l'ordre : cœurs, secteurs choisis, transverses pour compléter, tous les secteurs en dernier ; les logs donnent la répartition et le nombre d'établissements annoncés par recherche. Tailles des candidatures spontanées (réglage distinct de celui des offres) en tranches INSEE de l'unité légale ; « sans salarié » (tranche NN, unités non employeuses, et « 0-0 » de LBA) seulement si elle est cochée ; option effectifs inconnus (aucune tranche, cherchés par une requête à part) ; départements du profil (tous les modes), aussi pour les entreprises LBA (rien de coché : toute l'Île-de-France) ; dédoublonnage par SIRET et SIREN. `python scripts/nettoyer_emails_exclus.py` retire des entreprises et des adresses contactées déjà en base les adresses exclues (liste seulement, `--appliquer` pour écrire). Nomenclature NAF rév. 2 jusqu'au 31 décembre 2026, NAF 2025 ensuite (`NOMENCLATURE_NAF` dans `.env` pour forcer), codes NAF 2025 de la table officielle de l'INSEE (`docs/referentiels/insee/`). Ce qui dépend de l'API est réuni dans `spontanees/parametres_sirene.py` ; `python scripts/verifier_sirene.py` (clé `INSEE_API_KEY`) le vérifie ; `--tous-secteurs` mesure seulement le volume de la case « tous les secteurs ».
-
-**Interrupteur `ANALYSE_IA`** (`.env`, vrai par défaut). À `false`, aucun appel à Mistral : les offres sont ajoutées « non analysées » (sans score ni verdict, archivées seulement par mots-clés : public réservé, école ou CFA, stage), la génération de lettre, la réanalyse et la validation des emails par l'IA sont refusées, le scraper lit les pages directement (emails notés non validés, à valider à la main). Un bandeau le signale dans l'interface.
-
-Procédure de test réel de bout en bout : `docs/RECETTE.md`. Décisions prises hors du code : `docs/DECISIONS.md`.
-
-## Tests
+Tests, sous plafond mémoire (seul pytest est tué en cas d'emballement ; chaque test est en outre limité à 30 s) :
 
 ```bash
 pip install -r requirements-dev.txt
 systemd-run --user --scope -p MemoryMax=2G venv/bin/python -m pytest -q
 ```
 
-Base SQLite temporaire créée par `alembic upgrade head`, réseau, Mistral et SMTP neutralisés, vrai `.env` ignoré. Le plafond mémoire fait que seul pytest est tué en cas d'emballement ; chaque test est en outre limité à 30 s (`pytest-timeout`, réglé dans `pytest.ini`). Les tests à threads passent par `en_parallele` (`tests/conftest.py`) : barrière, `join` et attentes ont tous un délai.
+Sur une installation neuve, un test est sauté : il a besoin de l'ancienne base de la version mono-utilisateur, absente.
 
-## Licence
+Les pipelines existent aussi en ligne de commande, pour un utilisateur donné par son identifiant (`--user`, obligatoire) et un mode (`--mode`, `alternance` par défaut) : `python -m spontanees.fetch_entreprises`, `python -m spontanees.scraper_emails`, `python -m spontanees.envoyeur --limite 10 --test`. La reprise des données de l'ancienne version (`scripts/importer_ancienne_base.py`, `scripts/importer_contacts_historiques.py`) et la procédure de recette réelle (`docs/RECETTE.md`) sont documentées dans `docs/`.
 
-MIT.
+## Améliorations à venir
+
+- **Retour de l'IA** avec un modèle open source hébergé localement, et analyse en différé des offres restées « non analysées ».
+- **Validation des emails par règles**, sans IA, pour réduire la validation à la main.
+- **Mot de passe oublié** et page Paramètres du compte.
+- **Hébergement** pour un usage à plusieurs, en dehors d'une machine personnelle.
+- **Refonte du bot Telegram** (aujourd'hui archivé) pour le multi-utilisateur.
+- **Candidature directe via l'API de La Bonne Alternance**, qui transmet CV et lettre au recruteur sans passer par le scraper ni par le compte mail ; l'identifiant de candidature des entreprises est déjà conservé.
+
+## Documentation
+
+Le dossier [`docs/`](docs/) contient le détail du projet :
+
+- [`DECISIONS.md`](docs/DECISIONS.md) : toutes les décisions produit et techniques, leur raison et leur conséquence dans le code ;
+- [`SPEC_SOURCES.md`](docs/SPEC_SOURCES.md) : spécification des sources (France Travail, La Bonne Alternance, Sirene) ;
+- `PHASE_*_RAPPORT.md` : un rapport par phase de la refonte multi-utilisateurs (changements, tests, limites, points tranchés) ;
+- [`RECETTE.md`](docs/RECETTE.md) : procédure de test réel de bout en bout ;
+- [`ARCHITECTURE_ACTUELLE.md`](docs/ARCHITECTURE_ACTUELLE.md) : état des lieux de départ de la refonte ;
+- `referentiels/` : référentiels officiels téléchargés et résultats des vérifications d'API, datés.
