@@ -132,11 +132,12 @@ def _libelle(code: str) -> str:
     return f"{libelles.get(code, code)} ({code})"
 
 
-# Ordre de grandeur montré à côté de la case « tous les secteurs » (sièges
-# actifs d'Île-de-France sans filtre d'activité). Non mesuré : à remplacer
-# par les nombres de scripts/verifier_sirene.py --tous-secteurs.
-VOLUME_TOUS_SECTEURS = ("plus d'un million d'entreprises en Île-de-France toutes tailles confondues, "
-                        "encore plusieurs dizaines de milliers à partir de 10 salariés")
+# Volume montré à côté de la case « tous les secteurs » : sièges actifs
+# d'Île-de-France sans filtre d'activité, mesurés par
+# scripts/verifier_sirene.py --tous-secteurs le 9 octobre 2026
+# (docs/referentiels/insee/verification_tous_secteurs.json)
+VOLUME_TOUS_SECTEURS = ("382 663 entreprises en Île-de-France hors « sans salarié », dont 67 755 à partir "
+                        "de 10 salariés ; mesure Sirene du 9 octobre 2026")
 
 MESSAGE_RIEN_A_CHERCHER = ("Aucun domaine, aucun secteur et « tous les secteurs » non cochée : « Récupérer » "
                            "ne cherchera aucune entreprise sur Sirene. Choisis des domaines ou des secteurs "

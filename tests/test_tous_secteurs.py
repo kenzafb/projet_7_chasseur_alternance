@@ -53,7 +53,7 @@ def test_case_non_cochee_par_defaut_et_normalisee():
     assert normaliser_recherche({"tous_secteurs": True})["tous_secteurs"] is True
     assert "tous_secteurs" not in normaliser_recherche({})
     o = options_du_profil()
-    assert o["domaines_naf"] == ["C15", "M18"] and "million" in o["volume_tous_secteurs"]
+    assert o["domaines_naf"] == ["C15", "M18"] and "382 663" in o["volume_tous_secteurs"] and "67 755" in o["volume_tous_secteurs"]
     assert o["message_rien_a_chercher"] == naf.MESSAGE_RIEN_A_CHERCHER
 
 
@@ -126,3 +126,23 @@ def test_alternance_lance_quand_meme_pour_lba(utilisateur, pipelines_neufs, monk
     client.post("/api/profil", json={"recherche": {"domaines": []}})
     r = client.post("/api/spontanees/fetch", json={"max_entreprises": 5})
     assert r.status_code == 200 and naf.MESSAGE_RIEN_A_CHERCHER in r.json()["avertissement"]
+
+
+def test_departements_et_tailles_des_spontanees_en_job(utilisateur, sirene):
+    """D75 : le profil job a les départements et tailles des spontanées,
+    mêmes défauts que le stage (rien de coché : toute l'IDF, toutes tailles
+    sauf « sans salarié », effectifs inconnus gardés)."""
+    client, uid = utilisateur("a@test.fr", prenom="Alice")
+    client.mode = "job"
+    client.post("/api/profil", json={"recherche": {"domaines": ["M18"], "departements": ["92"],
+                                                   "tailles_spontanees": ["10_49"],
+                                                   "taille_inconnue_spontanees": False}})
+    rech = lire_profil(uid, "job")["recherche"]
+    assert (rech["departements"], rech["tailles_spontanees"], rech["taille_inconnue_spontanees"]) == (
+        ["92"], ["10_49"], False)
+    plan = fetch.plan_sirene(lire_profil(uid, "job"), Journal())
+    assert all("codePostalEtablissement:92*" in q and "trancheEffectifsUniteLegale:(11 OR 12)" in q for _, q in plan)
+    assert len(plan) == 1                                          # effectifs inconnus non cherchés
+    defauts = fetch.plan_sirene({"recherche": {"domaines": ["M18"]}}, Journal())
+    assert "(75* OR 77* OR 78* OR 91* OR 92* OR 93* OR 94* OR 95*)" in defauts[0][1]
+    assert [g for g, _ in defauts][:2] == ["cœurs", "cœurs"]       # tranches, puis effectifs inconnus

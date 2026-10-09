@@ -1,0 +1,27 @@
+{
+  "verifie_le": "2026-10-09T11:35:58+00:00",
+  "toutes_tranches": {
+    "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND codePostalEtablissement:(75* OR 77* OR 78* OR 91* OR 92* OR 93* OR 94* OR 95*)",
+    "statut": 200,
+    "total": 3182798,
+    "curseur_suivant": null
+  },
+  "hors_sans_salarie": {
+    "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND codePostalEtablissement:(75* OR 77* OR 78* OR 91* OR 92* OR 93* OR 94* OR 95*) AND trancheEffectifsUniteLegale:(00 OR 01 OR 02 OR 03 OR 11 OR 12 OR 21 OR 22 OR 31 OR 32 OR 41 OR 42 OR 51 OR 52 OR 53)",
+    "statut": 200,
+    "total": 382663,
+    "curseur_suivant": null
+  },
+  "10_salaries_et_plus": {
+    "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND codePostalEtablissement:(75* OR 77* OR 78* OR 91* OR 92* OR 93* OR 94* OR 95*) AND trancheEffectifsUniteLegale:(11 OR 12 OR 21 OR 22 OR 31 OR 32 OR 41 OR 42 OR 51 OR 52 OR 53)",
+    "statut": 200,
+    "total": 67755,
+    "curseur_suivant": null
+  },
+  "requete_reelle_hors_sans_salarie": {
+    "q": "etablissementSiege:true AND etatAdministratifUniteLegale:A AND -activitePrincipaleUniteLegale:(41.10D OR 66.19A OR 68.32B) AND codePostalEtablissement:(75* OR 77* OR 78* OR 91* OR 92* OR 93* OR 94* OR... (326 caractères)",
+    "statut": 200,
+    "total": 381283,
+    "curseur_suivant": null
+  }
+}

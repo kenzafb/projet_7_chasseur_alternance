@@ -263,21 +263,21 @@ function lireDomainesCoches(selecteur = "[data-domaines-choix]") {
 }
 
 /* ── Options de recherche : taille des offres (alternance, job), taille des
-   candidatures spontanées (alternance et stage, réglage distinct, D63),
-   thèmes (job), départements (alternance et stage), secteurs employeur.
+   candidatures spontanées (tous les modes, réglage distinct, D63), thèmes
+   (job), départements des spontanées (tous les modes), secteurs employeur.
    Rien de coché : aucun filtre (spontanées : tout sauf « sans salarié »).
-   Taille des offres filtrée après récupération. Mode stage : pas encore
-   d'offres, seulement les réglages des candidatures spontanées. */
+   Taille des offres filtrée après récupération. Mode stage : intitulés
+   filtrés, pas de taille des offres (peu d'offres, D74). */
 async function rendreOptions(rech, mode) {
   const c = document.querySelector(`[data-options-recherche="${mode}"]`);
   if (!c) return;
   let o;
   try { o = await api.criteresOptions(); } catch (_) { c.innerHTML = ""; return; }
   const avecOffres = mode !== "stage";
-  const spontanees = mode !== "job";       // tailles et départements des spontanées
   const sources = mode === "alternance" ? "de Sirene et de La Bonne Alternance" : "de Sirene";
   // Avertissements des petites tailles écrits pour l'alternance (D55)
-  const avert = t => mode === "stage" ? t.replace(/alternant/g, "stagiaire") : t;
+  const recrue = { stage: "stagiaire", job: "salarié en contrat court" }[mode];
+  const avert = t => recrue ? t.replace(/d'alternant/g, `de ${recrue}`).replace(/un alternant/g, `un ${recrue}`) : t;
   const tailles = new Set(rech.tailles || []), secteurs = new Set(rech.secteurs || []);
   const themes = new Set(rech.themes || []), departements = new Set(rech.departements || []);
   const taillesSp = new Set(rech.tailles_spontanees || []);
@@ -289,7 +289,7 @@ async function rendreOptions(rech, mode) {
   c.innerHTML = `
     ${avecOffres ? `
     <div class="options-bloc">
-      <span class="field__label">Taille de l'entreprise${mode === "alternance" ? " (offres)" : ""}</span>
+      <span class="field__label">Taille de l'entreprise (offres)</span>
       <p class="profil-card__sub" style="margin:4px 0 10px;">Rien de coché : toutes les tailles. France Travail indique en général l'effectif de l'établissement qui recrute.${mode === "alternance" ? " Une petite entreprise qui publie une offre veut recruter : mieux vaut ne rien cocher ici." : ""}</p>
       <div class="domaines-choix">${o.tailles.filter(t => t.cle !== "sans_salarie").map(t => caseOption("data-taille-case", t.cle, t.libelle, tailles.has(t.cle))).join("")}
       </div>
@@ -300,7 +300,6 @@ async function rendreOptions(rech, mode) {
         </label>
       </div>
     </div>` : ""}
-    ${spontanees ? `
     <div class="options-bloc">
       <span class="field__label">Taille de l'entreprise (candidatures spontanées)</span>
       <p class="profil-card__sub" style="margin:4px 0 10px;">Entreprises ${sources}, effectif de l'entreprise entière. Rien de coché : toutes les tailles sauf « sans salarié ».</p>
@@ -313,19 +312,18 @@ async function rendreOptions(rech, mode) {
           <span>Garder les entreprises dont l'effectif est inconnu</span>
         </label>
       </div>
-    </div>` : ""}
+    </div>
     ${mode === "job" ? `
     <div class="options-bloc">
       <span class="field__label">Thèmes <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
       <p class="profil-card__sub" style="margin:4px 0 10px;">Renseignés volontairement par l'employeur : cocher un thème écarte les offres qui ne l'ont pas.</p>
       <div class="domaines-choix">${o.themes.map(t => caseOption("data-theme-case", t.code, t.libelle, themes.has(t.code))).join("")}</div>
     </div>` : ""}
-    ${spontanees ? `
     <div class="options-bloc">
       <span class="field__label">Départements des candidatures spontanées</span>
       <p class="profil-card__sub" style="margin:4px 0 10px;">Entreprises cherchées sur Sirene. Rien de coché : toute l'Île-de-France.</p>
       <div class="domaines-choix">${o.departements.map(d => caseOption("data-departement-case", d.code, `${d.code} · ${d.libelle}`, departements.has(d.code))).join("")}</div>
-    </div>` : ""}
+    </div>
     <div class="options-bloc" data-bloc-tous-secteurs>
       <span class="field__label">Candidatures spontanées : tous les secteurs</span>
       <div class="domaines-choix" style="margin-top:8px;">
@@ -334,7 +332,7 @@ async function rendreOptions(rech, mode) {
           <span>Chercher dans tous les secteurs <small class="options-avert">(${esc(o.volume_tous_secteurs)})</small></span>
         </label>
       </div>
-      <p class="profil-card__sub" style="margin:8px 0 10px;">Sans filtre d'activité : Sirene renvoie les entreprises ${spontanees ? "des départements et tailles choisis" : "de toute l'Île-de-France, toutes tailles sauf « sans salarié »"}, sans lien avec tes domaines, après celles de tes domaines et secteurs. La limite de « Récupérer » s'applique toujours.</p>
+      <p class="profil-card__sub" style="margin:8px 0 10px;">Sans filtre d'activité : Sirene renvoie les entreprises des départements et tailles choisis, sans lien avec tes domaines, après celles de tes domaines et secteurs. La limite de « Récupérer » s'applique toujours.</p>
       <p class="domaines-vide" data-sp-rien hidden></p>
     </div>
     <details class="options-bloc" ${secteurs.size ? "open" : ""}>
@@ -365,7 +363,7 @@ function lireOptions(mode) {
     out.taille_inconnue = c.querySelector("[data-taille-inconnue]").checked;
   }
   if (mode === "job") out.themes = coches("data-theme-case");
-  if (c.querySelector("[data-taille-inconnue-sp]")) {
+  if (c.querySelector("[data-taille-inconnue-sp]")) {   // toujours là depuis D75
     out.departements = coches("data-departement-case");
     out.tailles_spontanees = coches("data-taille-sp-case");
     out.taille_inconnue_spontanees = c.querySelector("[data-taille-inconnue-sp]").checked;
