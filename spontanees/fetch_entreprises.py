@@ -12,10 +12,12 @@ Sirene (SPEC_SOURCES section 4, phase 5d) :
     pour les unités légales de 250 salariés et plus seulement (tranche, ou
     catégorie ETI ou GE) ;
   - tailles du profil converties en tranches INSEE de l'unité légale, avec
-    l'option « effectifs inconnus » (unités sans tranche) ; « sans
+    l'option « effectifs inconnus » (unités sans tranche, requête à part) ; « sans
     salarié » (NN, unités non employeuses) seulement si elle est cochée ;
     rien de coché : toutes les tailles sauf elle (D55) ;
   - départements du profil (rien de coché : toute l'Île-de-France) ;
+  - la limite se remplit dans l'ordre du plan : cœurs, secteurs choisis,
+    transverses seulement pour compléter ; répartition dans les logs ;
   - sièges actifs ; nomenclature NAF de shared.config.nomenclature_naf ;
   - pagination par curseur, sans plafond de résultats ;
   - une entreprise déjà en base (même SIRET, LBA comprise) n'est pas
@@ -65,15 +67,19 @@ def _paquets(valeurs: list, taille: int | None) -> list[list]:
     return [valeurs[i:i + taille] for i in range(0, len(valeurs), taille)]
 
 
-def filtre_tailles(tailles, inconnue: bool) -> str:
+def filtre_tailles(tailles) -> str:
     """Clause de taille des secteurs cœurs : tranches des tailles cochées,
-    ou toutes sauf « sans salarié » (NN) si rien n'est coché (D55) ; unités
-    sans tranche ajoutées si l'option effectifs inconnus est cochée (ou si
-    rien n'est coché)."""
-    clause = _ou(P.VARIABLE_TRANCHE, tranches_insee(tailles))
-    if (inconnue or not tailles) and P.ABSENTS_PAR:
-        clause = f"({clause} OR {P.ABSENTS_PAR})"
-    return clause
+    ou toutes sauf « sans salarié » (NN) si rien n'est coché (D55)."""
+    return _ou(P.VARIABLE_TRANCHE, tranches_insee(tailles))
+
+
+def filtre_inconnus(tailles, inconnue: bool) -> str | None:
+    """Clause des unités sans tranche (effectif inconnu), cherchées par une
+    requête à part si l'option est cochée (ou si rien n'est coché). Jamais
+    dans un OU avec les tranches : en Lucene, « (tranche:(11 OR 12) OR
+    -tranche:*) » exclut toute unité qui a une tranche, et la requête ne
+    rendait plus rien (essai réel de la phase 6a : 0 cœur)."""
+    return P.ABSENTS_PAR if (inconnue or not tailles) and P.ABSENTS_PAR else None
 
 
 def filtre_grandes(tailles) -> str | None:
@@ -112,8 +118,14 @@ def plan_sirene(profil: dict, log=print) -> list[tuple[str, str]]:
     tailles = rech.get("tailles_spontanees") or []
     inconnue = rech.get("taille_inconnue_spontanees", True)
     departements = rech.get("departements") or sorted(DEPTS_IDF)
-    groupes = [("cœurs", codes["coeurs"], filtre_tailles(tailles, inconnue)),
-               ("secteurs", codes["secteurs"], filtre_tailles(tailles, inconnue))]
+    # Ordre du plan = ordre de remplissage de la limite : cœurs d'abord,
+    # secteurs choisis, transverses seulement pour compléter
+    inconnus = filtre_inconnus(tailles, inconnue)
+    groupes = []
+    for nom in ("cœurs", "secteurs"):
+        groupes.append((nom, codes["coeurs" if nom == "cœurs" else "secteurs"], filtre_tailles(tailles)))
+        if inconnus:
+            groupes.append((nom, codes["coeurs" if nom == "cœurs" else "secteurs"], inconnus))
     if codes["transverses"]:
         grandes = filtre_grandes(tailles)
         if grandes:
@@ -144,6 +156,7 @@ class Collecte:
         self.erreurs = 0
         self.sirens_connus = sirens_connus   # entreprises déjà en base (D59)
         self.sirens_vus = set()
+        self.annonce = None                  # total annoncé par la dernière requête
 
     def _page(self, q: str, curseur: str) -> dict | None:
         """Corps d'une page, None si aucun résultat (404)."""
@@ -177,10 +190,13 @@ class Collecte:
         notés vus par Sirene (D44), de même qu'un SIREN déjà en base (D59).
         Retourne le nombre de nouvelles."""
         curseur, nouvelles = "*", 0
+        self.annonce = 0
         while True:
             corps = self._page(q, curseur)
             if corps is None:
                 return nouvelles
+            if curseur == "*":
+                self.annonce = (corps.get("header") or {}).get("total")
             for etab in corps.get("etablissements") or []:
                 if plafond is not None and len(entreprises) >= plafond:
                     return nouvelles
@@ -341,8 +357,10 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
     sirens = frozenset(e.get("siren") or ((e.get("_extra") or {}).get("siret") or "")[:9] for e in existantes) - {""}
     au_depart = len(entreprises)
     plafond = au_depart + max_entreprises if max_entreprises else None
-    collecte, debut, par_groupe = Collecte(cle, _log, sirens), time.monotonic(), {}
-    _log(f"🔍 Sirene : {len(plan)} recherches")
+    collecte, debut = Collecte(cle, _log, sirens), time.monotonic()
+    # Tous les groupes du plan, dans l'ordre, même ceux qui ne donnent rien
+    par_groupe = dict.fromkeys((g for g, _ in plan), 0)
+    _log(f"🔍 Sirene : {len(plan)} recherches, cœurs d'abord, transverses pour compléter")
     for i, (groupe, q) in enumerate(plan, 1):
         if stop_event and stop_event.is_set():
             _log("⏹️  Arrêt demandé : entreprises déjà reçues enregistrées")
@@ -351,7 +369,10 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
             _log(f"⏹️  Limite de {max_entreprises} nouvelles entreprises atteinte.")
             break
         try:
-            par_groupe[groupe] = par_groupe.get(groupe, 0) + collecte.recuperer(q, entreprises, plafond)
+            n = collecte.recuperer(q, entreprises, plafond)
+            par_groupe[groupe] += n
+            inconnus = " (effectif inconnu)" if P.ABSENTS_PAR and P.ABSENTS_PAR in q else ""
+            _log(f"  Sirene, {groupe}{inconnus} : {collecte.annonce or 0} établissements annoncés, {n} nouvelles")
         except ErreurSirene as e:
             collecte.erreurs += 1
             _log(f"  ⚠️  Sirene, recherche abandonnée ({groupe}) : {e}")

@@ -38,7 +38,10 @@ VARIABLE_CODE_POSTAL = "codePostalEtablissement"
 # 1000 à Paris en 62.01Z. Taille « sans salarié », pas un effectif inconnu
 # (D55). Effectif inconnu : unité sans tranche du tout, ajoutée par
 # ABSENTS_PAR ; syntaxe acceptée (404, aucun résultat : les 19717 unités de
-# la référence ont toutes une tranche, 2819 connues + 16898 NN).
+# la référence ont toutes une tranche, 2819 connues + 16898 NN). Clause
+# employée seule, en ET avec les autres (requête à part) : dans un OU avec
+# les tranches, Lucene la lit comme une exclusion et la requête ne rend
+# plus rien (phase 6a).
 TRANCHE_SANS_SALARIE = "NN"
 ABSENTS_PAR = "-trancheEffectifsUniteLegale:*"
 

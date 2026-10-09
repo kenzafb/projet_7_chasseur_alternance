@@ -1,7 +1,7 @@
 """API Sirene de l'INSEE (3.11) simulée, sans réseau : un jeu d'établissements
 filtré par une requête dans le sous-ensemble de la syntaxe Lucene qu'emploie
 le code (ET, OU, valeurs entre parenthèses, préfixe « 75* », existence
-« -variable:* »), pagination par curseur.
+« -variable:* », exclusive dans un OU comme en Lucene), pagination par curseur.
 
 Réglable : nom de la variable NAF 2025, nombre maximal de valeurs par OU
 (au-delà : 414), syntaxe d'absence acceptée ou non.
@@ -88,8 +88,15 @@ class FausseSirene:
     def _clause(self, texte):
         texte = texte.strip()
         if texte.startswith("(") and texte.endswith(")") and len(_decouper(texte[1:-1], " OR ")) > 1:
-            sous = [self._clause(p) for p in _decouper(texte[1:-1], " OR ")]
-            return lambda e: any(f(e) for f in sous)
+            # Sémantique Lucene : dans un OU, une clause « -x » est exclusive
+            # (MUST_NOT), pas une alternative. « (a OR -b) » garde ce qui
+            # vérifie a et pas b ; sans clause positive, tout ce qui n'est pas b.
+            parties = _decouper(texte[1:-1], " OR ")
+            positives = [self._clause(p) for p in parties if not p.startswith(("-", "NOT "))]
+            exclues = [self._clause(p.lstrip("-") if p.startswith("-") else p[4:])
+                       for p in parties if p.startswith(("-", "NOT "))]
+            return lambda e: ((not positives or any(f(e) for f in positives))
+                              and not any(f(e) for f in exclues))
         negation = texte.startswith("-") or texte.startswith("NOT ")
         if negation:
             texte = texte[1:] if texte.startswith("-") else texte[4:]

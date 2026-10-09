@@ -33,13 +33,14 @@ def test_tranches_et_clauses():
     assert tranches_insee(["10_49", "moins_10"]) == ["00", "01", "02", "03", "11", "12"]
     assert tranches_insee(["sans_salarie"]) == ["NN"]
     assert " OR ".join(tranches_insee([])) == TOUTES_SAUF_NN                # rien de coché : tout sauf NN
-    # Effectif inconnu : unités sans tranche (ABSENTS_PAR), plus « NN » (sans salarié, D55)
-    assert fetch.filtre_tailles(["10_49"], False) == "trancheEffectifsUniteLegale:(11 OR 12)"
-    assert fetch.filtre_tailles(["10_49"], True) == ("(trancheEffectifsUniteLegale:(11 OR 12) OR "
-                                                     "-trancheEffectifsUniteLegale:*)")
-    assert fetch.filtre_tailles([], False) == f"(trancheEffectifsUniteLegale:({TOUTES_SAUF_NN}) OR " \
-                                              "-trancheEffectifsUniteLegale:*)"
-    assert fetch.filtre_tailles(["sans_salarie"], False) == "trancheEffectifsUniteLegale:NN"
+    # Effectif inconnu : unités sans tranche (ABSENTS_PAR), requête à part,
+    # jamais en OU avec les tranches (phase 6a) ; « NN » est « sans salarié » (D55)
+    assert fetch.filtre_tailles(["10_49"]) == "trancheEffectifsUniteLegale:(11 OR 12)"
+    assert fetch.filtre_tailles([]) == f"trancheEffectifsUniteLegale:({TOUTES_SAUF_NN})"
+    assert fetch.filtre_inconnus(["10_49"], True) == "-trancheEffectifsUniteLegale:*"
+    assert fetch.filtre_inconnus(["10_49"], False) is None
+    assert fetch.filtre_inconnus([], False) == "-trancheEffectifsUniteLegale:*"   # rien de coché : inconnus compris
+    assert fetch.filtre_tailles(["sans_salarie"]) == "trancheEffectifsUniteLegale:NN"
     assert fetch.filtre_grandes(["10_49"]) is None
     assert fetch.filtre_grandes(["5000_plus"]) == ("(trancheEffectifsUniteLegale:(52 OR 53) OR "
                                                    "categorieEntreprise:GE)")
@@ -48,7 +49,8 @@ def test_tranches_et_clauses():
 
 def test_sans_syntaxe_d_absence(monkeypatch):
     monkeypatch.setattr(P, "ABSENTS_PAR", None)
-    assert fetch.filtre_tailles(["10_49"], True) == "trancheEffectifsUniteLegale:(11 OR 12)"
+    assert fetch.filtre_inconnus(["10_49"], True) is None
+    assert [g for g, _ in fetch.plan_sirene(profil(), Journal())] == ["cœurs", "transverses"]
 
 
 def test_departements_dans_le_profil():
@@ -59,20 +61,23 @@ def test_departements_dans_le_profil():
 def test_plan_des_recherches(monkeypatch):
     monkeypatch.setenv("NOMENCLATURE_NAF", "NAFRev2")
     log = Journal()
-    plan = fetch.plan_sirene(profil(tailles=["10_49"], departements=["75", "92"]), log)
+    plan = fetch.plan_sirene(profil(tailles=["10_49"], inconnue=False, departements=["75", "92"]), log)
     assert len(plan) == 1                                                 # 120 codes et 8 départements par requête
     assert "codePostalEtablissement:(75* OR 92*)" in plan[0][1] and "62.01Z OR 62.02A" in plan[0][1]
     assert "secteurs transverses non cherchés" in log.texte()
     plan = fetch.plan_sirene(profil(), Journal())
-    assert [g for g, _ in plan] == ["cœurs", "transverses"]
+    # Cœurs (tranches, puis effectif inconnu à part), transverses en dernier
+    assert [g for g, _ in plan] == ["cœurs", "cœurs", "transverses"]
     assert "codePostalEtablissement:(75* OR 77* OR 78* OR 91* OR 92* OR 93* OR 94* OR 95*)" in plan[0][1]
-    assert f"trancheEffectifsUniteLegale:({TOUTES_SAUF_NN})" in plan[0][1]    # aucune taille : toutes sauf NN
+    assert plan[0][1].endswith(f"AND trancheEffectifsUniteLegale:({TOUTES_SAUF_NN})")   # aucune taille : toutes sauf NN
+    assert plan[1][1].endswith("AND -trancheEffectifsUniteLegale:*")
+    assert all(" OR -" not in q for _, q in plan)
     assert plan == fetch.plan_sirene(profil(), Journal())
     assert fetch.plan_sirene(profil(domaines=()), Journal()) == []
     # Paquets plus petits si l'API en acceptait moins
     monkeypatch.setattr(P, "NAF_PAR_REQUETE", 1)
     monkeypatch.setattr(P, "DEPARTEMENTS_PAR_REQUETE", 1)
-    assert len(fetch.plan_sirene(profil(tailles=["10_49"], departements=["75", "92"]), Journal())) == 18 * 2
+    assert len(fetch.plan_sirene(profil(tailles=["10_49"], departements=["75", "92"]), Journal())) == 18 * 2 * 2
 
 
 def test_plan_en_naf_2025(monkeypatch):
@@ -134,7 +139,7 @@ def test_recuperer_selon_le_profil(utilisateur, sirene):
     sauvegarder_profil(uid3, profil(tailles=["sans_salarie", "10_49"], inconnue=False, departements=["75"]))
     fetch.main(uid3, log_fn=Journal())
     assert _sirets(uid3) == [1, 2]
-    assert "1 requêtes en 0 min" in logs.texte()
+    assert "2 requêtes en 0 min" in logs.texte()                       # tranches, puis effectif inconnu
     # Effectifs inconnus refusés
     sauvegarder_profil(uid, profil(tailles=["10_49"], inconnue=False, departements=["75"]))
     uid2 = utilisateur("b@test.fr", prenom="Bob")[1]
@@ -152,6 +157,39 @@ def test_toutes_tailles_et_transverses(utilisateur, sirene):
     # Toutes les tailles sauf « sans salarié » : 1, 3, 4 ; transverses : 9 (tranche), 10 (catégorie GE)
     assert _sirets(uid) == [1, 3, 4, 9, 10]
     assert "2 transverses" in logs.texte()
+
+
+def test_coeurs_d_abord_transverses_pour_completer(utilisateur, sirene):
+    """Essai réel de la phase 6a : M18, limite de 10, effectifs inconnus
+    cochés ; 5 entreprises, toutes transverses. La clause d'absence en OU
+    avec les tranches excluait toute unité qui a une tranche (Lucene)."""
+    coeurs = [etablissement(i, tranche="12") for i in range(1, 9)]
+    transverses = [etablissement(i, naf="64.19Z", tranche="42", categorie="ETI") for i in range(20, 30)]
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    sirene(FausseSirene(transverses + coeurs))                  # l'API rend les transverses en premier
+    sauvegarder_profil(uid, profil(tailles=["10_49", "250_4999"], inconnue=True, departements=["75"]))
+    logs = Journal()
+    fetch.main(uid, max_entreprises=10, log_fn=logs)
+    # Les 8 cœurs d'abord, 2 transverses pour compléter la limite
+    assert _sirets(uid) == list(range(1, 9)) + [20, 21]
+    assert "Sirene : 10 nouvelles entreprises (8 cœurs, 2 transverses)" in logs.texte()
+    assert "Sirene, cœurs : 8 établissements annoncés, 8 nouvelles" in logs.texte()
+    assert "Sirene, cœurs (effectif inconnu) : 0 établissements annoncés, 0 nouvelles" in logs.texte()
+    # Assez de cœurs pour la limite : aucun transverse
+    _, uid2 = utilisateur("b@test.fr", prenom="Bob")
+    sauvegarder_profil(uid2, profil(tailles=["10_49", "250_4999"], departements=["75"]))
+    logs = Journal()
+    fetch.main(uid2, max_entreprises=5, log_fn=logs)
+    assert _sirets(uid2) == [1, 2, 3, 4, 5]
+    assert "(5 cœurs, 0 transverses)" in logs.texte()
+
+
+def test_ancienne_clause_d_absence_ne_rendait_rien():
+    """La fausse API suit Lucene : « -x » dans un OU exclut, il n'ajoute pas."""
+    api = FausseSirene([etablissement(1, tranche="12"), etablissement(2, tranche=None)])
+    assert api.filtrer("(trancheEffectifsUniteLegale:(11 OR 12) OR -trancheEffectifsUniteLegale:*)") == []
+    assert [e["siret"] for e in api.filtrer("etablissementSiege:true AND -trancheEffectifsUniteLegale:*")] \
+        == [siret_sirene(2)]
 
 
 def test_pas_de_doublon_avec_lba_et_trace_des_deux_sources(utilisateur, sirene):
@@ -197,7 +235,7 @@ def test_pagination_par_curseur_et_limite(utilisateur, sirene, monkeypatch):
     sauvegarder_profil(uid, profil(departements=["75"]))
     fetch.main(uid, log_fn=Journal())
     assert _sirets(uid) == list(range(1, 8))
-    curseurs = [r["curseur"] for r in api.recherches if "62.01Z" in r["q"]]
+    curseurs = [r["curseur"] for r in api.recherches if "62.01Z" in r["q"] and "-tranche" not in r["q"]]
     assert curseurs == ["*", "c2", "c4", "c6"]
     _, uid2 = utilisateur("b@test.fr", prenom="Bob")
     sauvegarder_profil(uid2, profil(departements=["75"]))
@@ -234,7 +272,7 @@ def test_erreur_d_une_recherche_n_arrete_pas_les_autres(utilisateur, sirene, mon
     logs = Journal()
     fetch.main(uid, log_fn=logs)
     assert "recherche abandonnée (cœurs)" in logs.texte() and "1 en erreur" in logs.texte()
-    assert _sirets(uid) == [9, 10]
+    assert _sirets(uid) == [3, 9, 10]                           # effectif inconnu (requête à part) et transverses
 
 
 # ─── Migration 0010 : ancien réglage pré-coché (D60) ──────────────────────────
