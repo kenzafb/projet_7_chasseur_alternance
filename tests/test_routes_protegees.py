@@ -115,9 +115,8 @@ def test_route_du_mode_refusee_sans_mode(utilisateur, methode, chemin):
     client.mode = None
     r = client.request(methode, chemin, follow_redirects=False)
     assert r.status_code == 400 and r.json()["erreur"].startswith("Mode manquant")
-    for mode, message in (("stage", "pas encore disponible"), ("inconnu", "Mode inconnu")):
-        r = client.request(methode, chemin, params={"mode": mode}, follow_redirects=False)
-        assert r.status_code == 400 and message in r.json()["erreur"]
+    r = client.request(methode, chemin, params={"mode": "inconnu"}, follow_redirects=False)
+    assert r.status_code == 400 and "Mode inconnu" in r.json()["erreur"]
 
 
 def test_route_du_mode_fermee_sans_session_meme_avec_mode(client):

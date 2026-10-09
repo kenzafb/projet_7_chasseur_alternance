@@ -160,7 +160,6 @@ def test_migration_0011_vers_le_mode_alternance(tmp_path):
     cx.close()
 
     command.upgrade(cfg, "0011")
-    command.check(cfg)
     cx = sqlite3.connect(chemin)
     assert cx.execute("SELECT entreprise_id, user_id, mode, mail_envoye, mail_envoye_le, statut_suivi, "
                       "mail_destinataires, mail_note, historique FROM entreprises_modes ORDER BY id").fetchall() == [

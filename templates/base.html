@@ -54,7 +54,7 @@
     <nav class="mode-switch" data-mode-switch>
       <a class="mode-switch__btn{% if mode == 'alternance' %} is-active{% endif %}" href="/alternance" data-mode-btn="alternance">Alternance</a>
       <a class="mode-switch__btn{% if mode == 'job' %} is-active{% endif %}" href="/job" data-mode-btn="job">Job</a>
-      <a class="mode-switch__btn" href="/stage" data-mode-btn="stage" title="Bientôt disponible">Stage</a>
+      <a class="mode-switch__btn{% if mode == 'stage' %} is-active{% endif %}" href="/stage" data-mode-btn="stage">Stage</a>
     </nav>
 
     <nav class="nav">
@@ -167,7 +167,6 @@
   (function () {
     const htmlMode = document.documentElement.getAttribute("data-mode") || "alternance";
     document.querySelectorAll("a[data-mode-btn]").forEach(lien => {
-      if (lien.dataset.modeBtn === "stage") return;
       lien.addEventListener("click", e => {
         if (lien.dataset.modeBtn === htmlMode) { e.preventDefault(); return; }
         lien.href = "/" + lien.dataset.modeBtn + location.hash;

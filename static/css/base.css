@@ -313,7 +313,14 @@ html[data-mode="job"] {
   --signal-deep:  #C2560F;   /* orange foncé */
 }
 
-/* Sélecteur de mode (alternance / job) dans la sidebar */
+/* ═══ Thème MODE STAGE : le bleu (signal) devient vert ═══ */
+html[data-mode="stage"] {
+  --signal:       #0F9F6E;   /* vert */
+  --signal-soft:  #E3F6EE;   /* vert très clair */
+  --signal-deep:  #0B7A55;   /* vert foncé */
+}
+
+/* Sélecteur de mode (alternance / job / stage) dans la sidebar */
 .mode-switch {
   display: flex; gap: 4px; margin: 10px 14px 4px;
   background: var(--surface-2); border-radius: var(--r-sm, 8px);

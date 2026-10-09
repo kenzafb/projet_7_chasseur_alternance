@@ -248,6 +248,11 @@ function majAffichageDomaines(c) {
   if (bandeau) bandeau.hidden = !c.querySelector("[data-domaine-indifferent]")?.checked;
 }
 
+// Conteneur des domaines de chaque mode
+const DOMAINES_DU_MODE = {
+  alternance: "[data-domaines-choix]", job: "[data-domaines-choix-job]", stage: "[data-domaines-choix-stage]",
+};
+
 function lireDomainesCoches(selecteur = "[data-domaines-choix]") {
   const c = document.querySelector(selecteur);
   if (!c || c.querySelector("[data-domaine-indifferent]")?.checked) return [];
@@ -257,15 +262,22 @@ function lireDomainesCoches(selecteur = "[data-domaines-choix]") {
   return [...lettres, ...domaines];
 }
 
-/* ── Options de recherche : taille des offres, taille des candidatures
-   spontanées (alternance, réglage distinct, D63), thèmes (job), départements,
-   secteurs employeur. Rien de coché : aucun filtre (spontanées : tout sauf
-   « sans salarié »). Taille des offres filtrée après récupération. */
+/* ── Options de recherche : taille des offres (alternance, job), taille des
+   candidatures spontanées (alternance et stage, réglage distinct, D63),
+   thèmes (job), départements (alternance et stage), secteurs employeur.
+   Rien de coché : aucun filtre (spontanées : tout sauf « sans salarié »).
+   Taille des offres filtrée après récupération. Mode stage : pas encore
+   d'offres, seulement les réglages des candidatures spontanées. */
 async function rendreOptions(rech, mode) {
   const c = document.querySelector(`[data-options-recherche="${mode}"]`);
   if (!c) return;
   let o;
   try { o = await api.criteresOptions(); } catch (_) { c.innerHTML = ""; return; }
+  const avecOffres = mode !== "stage";
+  const spontanees = mode !== "job";       // tailles et départements des spontanées
+  const sources = mode === "alternance" ? "de Sirene et de La Bonne Alternance" : "de Sirene";
+  // Avertissements des petites tailles écrits pour l'alternance (D55)
+  const avert = t => mode === "stage" ? t.replace(/alternant/g, "stagiaire") : t;
   const tailles = new Set(rech.tailles || []), secteurs = new Set(rech.secteurs || []);
   const themes = new Set(rech.themes || []), departements = new Set(rech.departements || []);
   const taillesSp = new Set(rech.tailles_spontanees || []);
@@ -275,6 +287,7 @@ async function rendreOptions(rech, mode) {
       <span>${esc(libelle)}${extra}</span>
     </label>`;
   c.innerHTML = `
+    ${avecOffres ? `
     <div class="options-bloc">
       <span class="field__label">Taille de l'entreprise${mode === "alternance" ? " (offres)" : ""}</span>
       <p class="profil-card__sub" style="margin:4px 0 10px;">Rien de coché : toutes les tailles. France Travail indique en général l'effectif de l'établissement qui recrute.${mode === "alternance" ? " Une petite entreprise qui publie une offre veut recruter : mieux vaut ne rien cocher ici." : ""}</p>
@@ -286,13 +299,13 @@ async function rendreOptions(rech, mode) {
           <span>Garder les offres dont l'effectif est inconnu</span>
         </label>
       </div>
-    </div>
-    ${mode === "alternance" ? `
+    </div>` : ""}
+    ${spontanees ? `
     <div class="options-bloc">
       <span class="field__label">Taille de l'entreprise (candidatures spontanées)</span>
-      <p class="profil-card__sub" style="margin:4px 0 10px;">Entreprises de Sirene et de La Bonne Alternance, effectif de l'entreprise entière. Rien de coché : toutes les tailles sauf « sans salarié ».</p>
+      <p class="profil-card__sub" style="margin:4px 0 10px;">Entreprises ${sources}, effectif de l'entreprise entière. Rien de coché : toutes les tailles sauf « sans salarié ».</p>
       <div class="domaines-choix">${o.tailles.map(t => caseOption("data-taille-sp-case", t.cle, t.libelle, taillesSp.has(t.cle),
-        t.avertissement ? ` <small class="options-avert">(${esc(t.avertissement)})</small>` : "")).join("")}
+        t.avertissement ? ` <small class="options-avert">(${esc(avert(t.avertissement))})</small>` : "")).join("")}
       </div>
       <div class="domaines-choix" style="margin-top:8px;">
         <label class="domaine-case domaine-case--petit">
@@ -307,7 +320,7 @@ async function rendreOptions(rech, mode) {
       <p class="profil-card__sub" style="margin:4px 0 10px;">Renseignés volontairement par l'employeur : cocher un thème écarte les offres qui ne l'ont pas.</p>
       <div class="domaines-choix">${o.themes.map(t => caseOption("data-theme-case", t.code, t.libelle, themes.has(t.code))).join("")}</div>
     </div>` : ""}
-    ${mode === "alternance" ? `
+    ${spontanees ? `
     <div class="options-bloc">
       <span class="field__label">Départements des candidatures spontanées</span>
       <p class="profil-card__sub" style="margin:4px 0 10px;">Entreprises cherchées sur Sirene. Rien de coché : toute l'Île-de-France.</p>
@@ -315,9 +328,10 @@ async function rendreOptions(rech, mode) {
     </div>` : ""}
     <details class="options-bloc" ${secteurs.size ? "open" : ""}>
       <summary class="field__label options-resume">Secteur de l'employeur <span style="opacity:.6;font-weight:400;">(optionnel${secteurs.size ? `, ${secteurs.size} choisi${secteurs.size > 1 ? "s" : ""}` : ""})</span></summary>
-      <p class="profil-card__sub" style="margin:4px 0 10px;">Rien de coché : tous les secteurs. Le secteur est l'activité de l'entreprise, pas le métier.${mode === "alternance" ? " Candidatures spontanées : ces secteurs servent à chercher les entreprises sur Sirene quand aucun domaine n'est choisi, ou pour un domaine sans correspondance NAF (seuls l'informatique et l'immobilier en ont une)." : ""}</p>
+      <p class="profil-card__sub" style="margin:4px 0 10px;">Le secteur est l'activité de l'entreprise, pas le métier.${avecOffres ? " Offres : rien de coché, tous les secteurs." : ""} Candidatures spontanées : ces secteurs servent à chercher les entreprises sur Sirene quand aucun domaine n'est choisi, ou pour un domaine sans correspondance NAF (seuls l'informatique et l'immobilier en ont une).</p>
       <div class="secteurs-liste">${o.secteurs.map(s => caseOption("data-secteur-case", s.code, `${s.code} · ${s.libelle}`, secteurs.has(s.code))).join("")}</div>
     </details>`;
+  c.dataset.charge = "1";
   c.querySelectorAll(".domaine-case").forEach(l => l.classList.toggle("is-checked", l.querySelector("input").checked));
   if (c.dataset.branche) return;
   c.dataset.branche = "1";
@@ -329,15 +343,15 @@ async function rendreOptions(rech, mode) {
 
 function lireOptions(mode) {
   const c = document.querySelector(`[data-options-recherche="${mode}"]`);
-  if (!c || !c.querySelector("[data-taille-inconnue]")) return {};   // options non chargées : on n'écrase rien
+  if (!c || !c.dataset.charge) return {};   // options non chargées : on n'écrase rien
   const coches = attribut => [...c.querySelectorAll(`[${attribut}]:checked`)].map(i => i.value);
-  const out = {
-    tailles: coches("data-taille-case"),
-    taille_inconnue: c.querySelector("[data-taille-inconnue]").checked,
-    secteurs: coches("data-secteur-case"),
-  };
+  const out = { secteurs: coches("data-secteur-case") };
+  if (c.querySelector("[data-taille-inconnue]")) {
+    out.tailles = coches("data-taille-case");
+    out.taille_inconnue = c.querySelector("[data-taille-inconnue]").checked;
+  }
   if (mode === "job") out.themes = coches("data-theme-case");
-  if (mode === "alternance") {
+  if (c.querySelector("[data-taille-inconnue-sp]")) {
     out.departements = coches("data-departement-case");
     out.tailles_spontanees = coches("data-taille-sp-case");
     out.taille_inconnue_spontanees = c.querySelector("[data-taille-inconnue-sp]").checked;
@@ -345,7 +359,28 @@ function lireOptions(mode) {
   return out;
 }
 
-/* ── Affichage des sections selon le mode (alternance/job) ─────────────── */
+/* ── Durée du stage : même règle que le serveur (shared/stage.py), jours
+   du premier au dernier compris, divisés par 7, arrondis à la semaine la
+   plus proche, au moins 1 ── */
+function dureeSemaines(debut, fin) {
+  if (!debut || !fin) return null;
+  const jours = Math.round((Date.parse(fin) - Date.parse(debut)) / 86400000) + 1;
+  if (Number.isNaN(jours) || jours < 1) return null;
+  return Math.max(1, Math.floor((jours + 3) / 7));
+}
+
+function majDureeStage() {
+  const el = document.querySelector("[data-duree-stage]");
+  if (!el) return;
+  const debut = document.querySelector('[data-profil="date_debut"]')?.value;
+  const fin = document.querySelector('[data-profil="date_fin"]')?.value;
+  const n = dureeSemaines(debut, fin);
+  el.textContent = n ? `Durée : ${n} semaine${n > 1 ? "s" : ""} (balise {duree_semaines}).`
+    : debut && fin ? "La date de fin est antérieure à la date de début."
+    : "Durée : renseigne les deux dates.";
+}
+
+/* ── Affichage des sections selon le mode (alternance/job/stage) ────────── */
 async function appliquerModeProfil() {
   let mode = "alternance";
   try { mode = (await api.mode()).mode || "alternance"; } catch (_) {}
@@ -396,17 +431,15 @@ export const Profil = {
       }
     });
     const domainesSel = Array.isArray(rech.domaines) ? rech.domaines : [];
-    if (mode === "job") {
-      await rendreDomaines(domainesSel, "[data-domaines-choix-job]");
-    } else {
-      await rendreDomaines(domainesSel, "[data-domaines-choix]");
-    }
+    await rendreDomaines(domainesSel, DOMAINES_DU_MODE[mode] || DOMAINES_DU_MODE.alternance);
     await rendreOptions(rech, mode);
+    majDureeStage();
 
     rendrePiecesJointes(p.pieces_jointes || []);
     CompteEnvoi.charger();
 
     if (!this._charge) {
+      document.querySelectorAll("[data-stage-date]").forEach(el => el.addEventListener("input", majDureeStage));
       brancherTags("competences");
       brancherProjets();
       brancherPiecesJointes();
@@ -437,14 +470,16 @@ export const Profil = {
       if (!_champVisible(el)) return;        // ignore les doublons masqués (évite d'écraser)
       rech[el.dataset.rech] = el.value;
     });
-    rech.domaines = lireDomainesCoches(
-      _modeProfilCourant === "job" ? "[data-domaines-choix-job]" : "[data-domaines-choix]"
-    );
+    rech.domaines = lireDomainesCoches(DOMAINES_DU_MODE[_modeProfilCourant] || DOMAINES_DU_MODE.alternance);
     Object.assign(rech, lireOptions(_modeProfilCourant));
     data.recherche = rech;
 
     try {
       return (await api.sauverProfil(data)).ok === true;
-    } catch (_) { return false; }
+    } catch (e) {
+      // Refus du serveur (date illisible, balise inconnue...) : message lisible
+      if (e.message) alert(e.message);
+      return false;
+    }
   },
 };

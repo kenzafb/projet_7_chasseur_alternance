@@ -81,7 +81,7 @@ class Profil(Base):
 
     id      = Column(Integer, primary_key=True)
     user_id = _user_id()
-    mode    = Column(String(20), nullable=False, default="alternance", server_default="alternance")   # alternance | job
+    mode    = Column(String(20), nullable=False, default="alternance", server_default="alternance")   # alternance | job | stage
 
     # Champs simples
     prenom           = Column(String(100), default="")
@@ -109,6 +109,13 @@ class Profil(Base):
     types_jobs_ok     = Column(Text, default="")   # types de jobs acceptés
     types_jobs_eviter = Column(Text, default="")   # types de jobs refusés
     localisation_pref = Column(Text, default="")   # localisation préférée (job, optionnel)
+    # Champs spécifiques au mode STAGE (formation : colonne commune ci-dessus).
+    # Dates du calendrier, pas des instants : colonnes Date, sans fuseau
+    date_debut        = Column(Date, nullable=True)   # premier jour du stage
+    date_fin          = Column(Date, nullable=True)   # dernier jour du stage
+    etablissement     = Column(String(200), default="")   # école, université
+    missions          = Column(Text, default="")   # missions visées
+    portfolio         = Column(String(255), default="")   # lien vers un portfolio
 
     lettre_type      = Column(Text, default="")   # trame de lettre de motivation (l'IA ne fait que le paragraphe entreprise)
     email_objet      = Column(String(300), default="")   # objet du mail de candidature spontanée

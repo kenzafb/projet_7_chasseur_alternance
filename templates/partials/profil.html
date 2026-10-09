@@ -168,8 +168,17 @@
       <span class="field__label">Message</span>
       <textarea class="field__area" data-profil="email_type" rows="12"
         placeholder="Bonjour,&#10;&#10;Je me permets de vous contacter pour une candidature spontanée...&#10;&#10;Cordialement,&#10;Prénom Nom"></textarea>
-      <span class="field__hint">Texte simple, sans placeholder. Termine par tes coordonnées (nom, téléphone, liens).</span>
+      <span class="field__hint">Termine par tes coordonnées (nom, téléphone, liens).</span>
     </label>
+    <div class="profil-aide" data-balises-mail>
+      <strong>Balises</strong>, dans l'objet comme dans le message, remplacées à l'envoi par ton profil :
+      <code>{prenom}</code> <code>{nom}</code> <code>{telephone}</code> <code>{email}</code>
+      <code>{date}</code> (date du jour){% if mode == "stage" %}, et pour le stage <code>{date_debut}</code>
+      <code>{date_fin}</code> <code>{duree_semaines}</code> <code>{etablissement}</code> <code>{formation}</code>
+      <code>{missions}</code> <code>{portfolio}</code>. Le message par défaut annonce un stage conventionné
+      avec ses dates et sa durée : remplis les dates du stage avant d'envoyer{% endif %}.
+      N'utilise pas d'autres accolades. Une balise vide dans ton profil bloque l'envoi.
+    </div>
   </div>
 
   <!-- ─── Section 7 : Critères de recherche (alternance) ─── -->
@@ -426,6 +435,70 @@
     </div>
     <div class="options-recherche" data-options-recherche="job">
       <!-- taille, thèmes, secteurs : injectés par profil.js -->
+    </div>
+  </div>
+
+  <!-- ════════ SECTIONS MODE STAGE ════════ -->
+
+  <!-- ─── Stage A : le stage ─── -->
+  <div class="card profil-card" data-mode-section="stage">
+    <div class="profil-card__head">
+      <span class="profil-card__num">02</span>
+      <div>
+        <h3 class="profil-card__title">Ton stage</h3>
+        <p class="profil-card__sub">Dates, formation et ce que tu veux faire. Repris dans le mail de candidature spontanée par les balises.</p>
+      </div>
+    </div>
+    <div class="profil-grid">
+      <label class="field">
+        <span class="field__label">Date de début</span>
+        <input class="field__input" type="date" data-profil="date_debut" data-stage-date>
+      </label>
+      <label class="field">
+        <span class="field__label">Date de fin</span>
+        <input class="field__input" type="date" data-profil="date_fin" data-stage-date>
+      </label>
+      <div class="field field--full"><span class="field__hint" data-duree-stage>Durée : renseigne les deux dates.</span></div>
+      <label class="field">
+        <span class="field__label">Établissement</span>
+        <input class="field__input" type="text" data-profil="etablissement" maxlength="200"
+          placeholder="Ex. Université, école, IUT…">
+      </label>
+      <label class="field">
+        <span class="field__label">Formation</span>
+        <input class="field__input" type="text" data-profil="formation"
+          placeholder="Ex. Licence 3, BUT 2e année, Master 1…">
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Missions visées</span>
+        <textarea class="field__area" data-profil="missions" rows="3"
+          placeholder="Ce que tu aimerais faire pendant le stage"></textarea>
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Portfolio <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
+        <input class="field__input" type="url" data-profil="portfolio" maxlength="255" placeholder="https://…">
+      </label>
+    </div>
+  </div>
+
+  <!-- ─── Stage B : domaines et candidatures spontanées ─── -->
+  <div class="card profil-card" data-mode-section="stage">
+    <div class="profil-card__head">
+      <span class="profil-card__num">03</span>
+      <div>
+        <h3 class="profil-card__title">Domaines et candidatures spontanées</h3>
+        <p class="profil-card__sub">Les entreprises cherchées sur Sirene pour tes candidatures spontanées.</p>
+      </div>
+    </div>
+    <div style="margin-top:4px;">
+      <span class="field__label">Domaines</span>
+      <p class="profil-card__sub" style="margin:4px 0 10px;">Seuls l'informatique et l'immobilier ont une correspondance avec les secteurs d'entreprise de Sirene : pour un autre domaine, choisis aussi des secteurs ci-dessous.</p>
+      <div class="domaines-choix" data-domaines-choix-stage>
+        <!-- cases injectées par profil.js -->
+      </div>
+    </div>
+    <div class="options-recherche" data-options-recherche="stage">
+      <!-- tailles, départements, secteurs : injectés par profil.js -->
     </div>
   </div>
 

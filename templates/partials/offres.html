@@ -5,12 +5,21 @@
     <span class="guide__x" data-guide-close="offres">×</span>
   </div>
 
+  {% if not offres_disponibles|default(true) %}
+  <!-- Mode stage : France Travail pas encore branché (essai par mot-clé à lire par l'humain) -->
+  <div class="profil-aide" data-offres-indisponibles>
+    <strong>Les offres de stage ne sont pas encore disponibles.</strong>
+    France Travail ne classe pas les stages comme un type de contrat : une recherche par mot-clé est à l'étude
+    avant d'être branchée. En attendant, les candidatures spontanées (page Spontanées) fonctionnent.
+  </div>
+  {% else %}
   <label class="limite-lancement">
     {% set limite_offres = limites.analyses if analyse_ia|default(true) else limites.sans_ia %}
     <span>Offres {{ "analysées" if analyse_ia|default(true) else "ajoutées sans analyse" }} au plus par lancement (max {{ limite_offres.max }})</span>
     <input type="number" data-limite="analyses" value="{{ limite_offres.defaut }}"
            min="1" max="{{ limite_offres.max }}">
   </label>
+  {% endif %}
 
   <div class="kpis kpis--4">
     <div class="kpi">

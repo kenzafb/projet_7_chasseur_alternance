@@ -40,12 +40,14 @@ function aller(page) {
   if (page === "spontanees-suivi") Suivi.charger();
   const t = TOPBAR[page];
   let titre = t.title;
-  // Le titre de la page Offres s'adapte au mode (alternance / job)
-  if (page === "offres" && document.documentElement.getAttribute("data-mode") === "job") {
-    titre = "Offres de jobs";
-  }
+  // Le titre de la page Offres s'adapte au mode (alternance / job / stage)
+  if (page === "offres" && MODE === "job") titre = "Offres de jobs";
+  if (page === "offres" && MODE === "stage") titre = "Offres de stage";
   document.querySelector('[data-topbar="title"]').textContent = titre;
   document.querySelector('[data-topbar="action-label"]').textContent = t.action;
+  // Mode stage : pas encore de recherche d'offres, pas de bouton pour la lancer
+  const sansOffres = page === "offres" && !!document.querySelector("[data-offres-indisponibles]");
+  document.querySelector('[data-topbar="action"]').style.display = sansOffres ? "none" : "";
   majBadge();
 }
 

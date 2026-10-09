@@ -45,7 +45,7 @@ from shared import compte_envoi
 from database import compte_envoi_db
 from shared.pipelines import Pipelines, RECHERCHE, SPONTANEES
 from shared.statique import importmap, url_statique
-from shared.modes import MODE_DEFAUT, MODES, MODES_A_VENIR, get_mode, modes_accueil, verifier_mode
+from shared.modes import MODE_DEFAUT, MODES, get_mode, modes_accueil, offres_disponibles, verifier_mode
 from database.dates import maintenant_utc
 
 # ─── Modules métier ───────────────────────────────────────────────
@@ -250,7 +250,7 @@ class MailTest(BaseModel):
 
 
 # ─── Mode de chasse : dans l'URL des pages, explicite pour l'API ──────────────
-def mode_requis(mode: str | None = Query(None, description="Mode de chasse : alternance ou job (obligatoire)")
+def mode_requis(mode: str | None = Query(None, description="Mode de chasse : alternance, job ou stage (obligatoire)")
                 ) -> str:
     """Mode d'une requête de l'API, donné par le paramètre « mode » (le front
     l'ajoute à chaque appel, d'après l'URL de la page). Absent, inconnu ou
@@ -275,6 +275,8 @@ def accueil(request: Request, bienvenue: str | None = None):
 
 def _page_du_mode(request: Request, mode: str):
     return templates.TemplateResponse(request, "base.html", {"mode": mode, "label_mode": get_mode(mode)["label"],
+                                                             "sources": get_mode(mode)["sources"],
+                                                             "offres_disponibles": offres_disponibles(mode),
                                                              "limites": config.LIMITES_LANCEMENT,
                                                              "analyse_ia": config.analyse_ia_active()})
 
@@ -288,9 +290,7 @@ def page_job(request: Request):
 
 @prive.get("/stage")
 def page_stage(request: Request):
-    """Mode stage annoncé (phase 6b) : page « bientôt disponible »."""
-    return templates.TemplateResponse(request, "bientot.html",
-                                      {"cle": "stage", "nom": MODES_A_VENIR["stage"]["label"]})
+    return _page_du_mode(request, "stage")
 
 @prive.get("/api/logs")
 def api_logs(user: User = Depends(utilisateur_requis)):
@@ -304,7 +304,7 @@ def api_candidatures(user: User = Depends(utilisateur_requis), mode: str = Depen
 # ─── Profil utilisateur ───────────────────────────────────────────────────────
 @prive.get("/api/mode")
 def api_get_mode(mode: str = Depends(mode_requis)):
-    """Label et couleur du mode demandé (alternance/job)."""
+    """Label et couleur du mode demandé (alternance, job, stage)."""
     m = get_mode(mode)
     return {"mode": mode, "label": m["label"], "couleur": m["couleur"]}
 
@@ -467,6 +467,10 @@ def api_compte_envoi_mail_test(body: MailTest | None = None, user: User = Depend
 
 
 # ─── France Travail + La Bonne Alternance ────────────────────────────────────
+# Mode stage : France Travail n'est pas branché tant que l'humain n'a pas lu
+# l'essai par mot-clé (scripts/verifier_france_travail.py) ; LBA : alternance
+MESSAGE_OFFRES_STAGE = ("Les offres de stage ne sont pas encore disponibles : utilise les candidatures "
+                        "spontanées en attendant.")
 
 @prive.post("/api/recherche")
 def api_recherche(request: Request, body: Recherche | None = None, user: User = Depends(utilisateur_requis),
@@ -478,6 +482,8 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
     max_analyses, note = _limite("analyses" if ia else "sans_ia", body.max_analyses if body else None)
     traitees = "analysées" if ia else "ajoutées sans analyse"
     cfg_mode = get_mode(mode)
+    if not offres_disponibles(mode):
+        raise ErreurUtilisateur(MESSAGE_OFFRES_STAGE)
     profil = lire_profil(user_id, mode=mode)
     exiger_profil(profil)   # 400 tout de suite plutôt qu'une erreur dans le thread
 
@@ -886,7 +892,9 @@ def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends
     if compte_envoi_db.envois_du_jour(user_id) >= config.PLAFOND_ENVOIS_JOUR:
         raise ErreurUtilisateur(f"Plafond de {config.PLAFOND_ENVOIS_JOUR} mails par jour atteint : "
                                 "les envois reprendront demain.")
-    from spontanees.envoyeur import compter_a_envoyer
+    from spontanees.envoyeur import compter_a_envoyer, objet_et_corps
+    # Balise inconnue, ou vide dans le profil (dates du stage...) : 400 avant tout lancement
+    objet_et_corps(lire_profil(user_id, mode=mode), mode)
     disponibles = compter_a_envoyer(user_id, mode)
     if not disponibles:
         raise ErreurUtilisateur("Rien à envoyer : aucune entreprise avec un email non contacté dans ce mode.")

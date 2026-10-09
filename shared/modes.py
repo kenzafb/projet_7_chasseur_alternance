@@ -1,12 +1,13 @@
 """
 shared/modes.py
 ===============
-Définit les "modes" de chasse : alternance ou job (mission courte).
-Chaque mode décrit ce qui change dans la recherche, l'analyse et l'interface.
+Définit les "modes" de chasse : alternance, job (mission courte) et stage
+(stage conventionné, phase 6b). Chaque mode décrit ce qui change dans la
+recherche, l'analyse et l'interface.
 
-Le mode vient de l'URL (/alternance, /job ; /stage annoncé, phase 6b) et
-l'API le reçoit explicitement à chaque requête (paramètre « mode ») : deux
-onglets dans deux modes différents ne se gênent pas. Plus de mode en session.
+Le mode vient de l'URL (/alternance, /job, /stage) et l'API le reçoit
+explicitement à chaque requête (paramètre « mode ») : deux onglets dans
+deux modes différents ne se gênent pas. Plus de mode en session.
 """
 
 from shared.erreurs import ErreurUtilisateur
@@ -35,26 +36,43 @@ MODES = {
         "ft_exclure_alternance": True,    # les contrats d'alternance en CDD sont écartés
         "limite_lot": 100,                # analyse 100 offres par run (le reste aux runs suivants)
     },
+    "stage": {
+        "label": "Chasseur de Stage",
+        "mot_poste": "stage",
+        "couleur": "vert",
+        # Candidatures spontanées (Sirene) seulement. Pas de LBA (alternance
+        # uniquement) ; France Travail n'a ni type ni nature de contrat
+        # « stage » : un essai par mot-clé (scripts/verifier_france_travail.py)
+        # attend la lecture de l'humain avant d'être branché
+        "sources": [],
+        "ft_filtres": {},
+        "ft_options": [],
+        "offres": False,                  # page Offres : « pas encore disponibles »
+    },
 }
 
 MODE_DEFAUT = "alternance"
 
-# Modes annoncés, pas encore ouverts : page « bientôt disponible », refusés par l'API
-MODES_A_VENIR = {
-    "stage": {"label": "Chasseur de Stage"},
-}
+# Modes annoncés, pas encore ouverts : signalés « bientôt disponible » sur la
+# page d'accueil, refusés par l'API (aucun depuis l'ouverture du stage)
+MODES_A_VENIR: dict[str, dict] = {}
 
 # Page d'accueil : choix du mode
 TEXTES_ACCUEIL = {
     "alternance": ("Alternance", "Apprentissage ou professionnalisation : offres et candidatures spontanées."),
     "job":        ("Job", "CDD, intérim, saisonnier : missions courtes."),
-    "stage":      ("Stage", "Stages conventionnés."),
+    "stage":      ("Stage", "Stage conventionné : candidatures spontanées ; offres bientôt."),
 }
 
 
 def get_mode(cle):
     """Retourne la config d'un mode, ou le mode par défaut si inconnu."""
     return MODES.get(cle or MODE_DEFAUT, MODES[MODE_DEFAUT])
+
+
+def offres_disponibles(cle) -> bool:
+    """Le mode a-t-il une recherche d'offres branchée ? (stage : pas encore)"""
+    return get_mode(cle).get("offres", True)
 
 
 def labels_modes():
@@ -66,7 +84,7 @@ def verifier_mode(cle) -> str:
     """Mode reçu par l'API : un mode ouvert, sinon ErreurUtilisateur (400).
     Aucun défaut : le mode est toujours donné explicitement."""
     if not cle:
-        raise ErreurUtilisateur("Mode manquant : chaque requête indique son mode (paramètre mode=alternance ou job).")
+        raise ErreurUtilisateur("Mode manquant : chaque requête indique son mode (paramètre mode=alternance, job ou stage).")
     if cle in MODES_A_VENIR:
         raise ErreurUtilisateur(f"Le mode {cle} n'est pas encore disponible.")
     if cle not in MODES:

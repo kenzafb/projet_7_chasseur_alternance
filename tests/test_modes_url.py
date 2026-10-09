@@ -1,6 +1,6 @@
-"""Une URL par mode (phase 6a) : page d'accueil, /alternance, /job, /stage
-« bientôt disponible », anciennes URL redirigées ; le mode vient de l'URL,
-deux onglets dans deux modes ne se gênent pas."""
+"""Une URL par mode (phase 6a, stage ouvert en 6b) : page d'accueil,
+/alternance, /job, /stage, anciennes URL redirigées ; le mode vient de
+l'URL, deux onglets dans deux modes ne se gênent pas."""
 
 import main
 from database.profil_db import lire_profil
@@ -12,18 +12,17 @@ def test_accueil_propose_les_modes(utilisateur):
     page = client.get("/").text
     for cle in ("alternance", "job", "stage"):
         assert f'href="/{cle}"' in page
-    assert "bientôt disponible" in page
+    assert "bientôt disponible" not in page                       # plus aucun mode annoncé
     assert 'location.replace("/alternance#" + page)' in page      # anciens liens « /#page »
 
 
 def test_page_de_chaque_mode(utilisateur):
     client, _ = utilisateur("a@test.fr", prenom="Alice")
-    for mode, titre in (("alternance", "Chasseur d'Alternance"), ("job", "Chasseur de Job")):
+    for mode, titre in (("alternance", "Chasseur d'Alternance"), ("job", "Chasseur de Job"),
+                        ("stage", "Chasseur de Stage")):
         page = client.get(f"/{mode}").text
         assert f'data-mode="{mode}"' in page and f"<title>{titre}" in page.replace("&#39;", "'")
         assert f'class="mode-switch__btn is-active" href="/{mode}"' in page
-    page = client.get("/stage").text
-    assert "bientôt disponible" in page and 'data-bientot="stage"' in page and "data-mode=" not in page
 
 
 def test_anciennes_url_redirigees(client, code_invitation):

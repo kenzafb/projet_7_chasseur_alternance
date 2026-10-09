@@ -59,10 +59,13 @@ PAUSE_ENTRE_MAILS = (30, 90)
 SAUVEGARDE_TOUS   = 10
 
 # Objet et trame par défaut de chaque mode, quand le profil du mode n'en a
-# pas : génériques, sans date, sans diplôme, sans accord de genre.
+# pas : génériques, sans diplôme, sans accord de genre. Celles du stage
+# emploient les balises des dates et de la durée (shared.balises_mail) :
+# l'envoi est refusé tant que les dates ne sont pas dans le profil.
 OBJETS_PAR_DEFAUT = {
     "alternance": "Candidature spontanée en alternance",
     "job":        "Candidature spontanée",
+    "stage":      "Candidature spontanée : stage du {date_debut} au {date_fin}",
 }
 
 TRAMES_PAR_DEFAUT = {
@@ -88,6 +91,17 @@ Vous trouverez mon CV en pièce jointe, avec mes disponibilités. Je reste à vo
 
 Cordialement,
 """,
+    "stage": """\
+Bonjour,
+
+Je me permets de vous adresser ma candidature spontanée pour un stage conventionné de {duree_semaines} semaines, du {date_debut} au {date_fin}, au sein de votre entreprise.
+
+Actuellement en formation, je recherche une structure où mettre en pratique mes compétences et contribuer concrètement aux projets de votre équipe.
+
+Vous trouverez mon CV en pièce jointe. Je reste à votre disposition pour tout échange.
+
+Cordialement,
+""",
 }
 
 
@@ -98,7 +112,10 @@ def objet_test(objet: str, vrais_destinataires: list[str]) -> str:
 
 def objet_et_corps(profil: dict, mode: str) -> tuple[str, str]:
     """Objet et corps du mail : ceux du profil du mode, sinon ceux par défaut
-    du mode, signés avec l'identité du profil."""
+    du mode, signés avec l'identité du profil ; balises remplacées par les
+    valeurs du profil. ErreurUtilisateur si une balise est inconnue ou vide
+    dans le profil : rien ne doit partir avec un trou dans le texte."""
+    from shared.balises_mail import remplir
     from shared.modes import MODE_DEFAUT
     cle = mode if mode in OBJETS_PAR_DEFAUT else MODE_DEFAUT
     objet = (profil.get("email_objet") or "").strip() or OBJETS_PAR_DEFAUT[cle]
@@ -107,8 +124,9 @@ def objet_et_corps(profil: dict, mode: str) -> tuple[str, str]:
         nom = f"{profil.get('prenom', '')} {profil.get('nom', '')}".strip()
         signature = [x for x in (nom, (profil.get("telephone") or "").strip(),
                                  (profil.get("email") or "").strip()) if x]
-        corps = TRAMES_PAR_DEFAUT[cle] + "\n".join(signature)
-    return objet, corps
+        # La signature n'est pas une trame : ses accolades éventuelles restent telles quelles
+        return remplir(objet, profil, mode), remplir(TRAMES_PAR_DEFAUT[cle], profil, mode) + "\n".join(signature)
+    return remplir(objet, profil, mode), remplir(corps, profil, mode)
 
 
 # ─── Chargement / sauvegarde des entreprises (base) ───────────────────────────
