@@ -326,12 +326,25 @@ async function rendreOptions(rech, mode) {
       <p class="profil-card__sub" style="margin:4px 0 10px;">Entreprises cherchées sur Sirene. Rien de coché : toute l'Île-de-France.</p>
       <div class="domaines-choix">${o.departements.map(d => caseOption("data-departement-case", d.code, `${d.code} · ${d.libelle}`, departements.has(d.code))).join("")}</div>
     </div>` : ""}
+    <div class="options-bloc" data-bloc-tous-secteurs>
+      <span class="field__label">Candidatures spontanées : tous les secteurs</span>
+      <div class="domaines-choix" style="margin-top:8px;">
+        <label class="domaine-case domaine-case--petit">
+          <input type="checkbox" data-tous-secteurs ${rech.tous_secteurs === true ? "checked" : ""}>
+          <span>Chercher dans tous les secteurs <small class="options-avert">(${esc(o.volume_tous_secteurs)})</small></span>
+        </label>
+      </div>
+      <p class="profil-card__sub" style="margin:8px 0 10px;">Sans filtre d'activité : Sirene renvoie les entreprises ${spontanees ? "des départements et tailles choisis" : "de toute l'Île-de-France, toutes tailles sauf « sans salarié »"}, sans lien avec tes domaines, après celles de tes domaines et secteurs. La limite de « Récupérer » s'applique toujours.</p>
+      <p class="domaines-vide" data-sp-rien hidden></p>
+    </div>
     <details class="options-bloc" ${secteurs.size ? "open" : ""}>
       <summary class="field__label options-resume">Secteur de l'employeur <span style="opacity:.6;font-weight:400;">(optionnel${secteurs.size ? `, ${secteurs.size} choisi${secteurs.size > 1 ? "s" : ""}` : ""})</span></summary>
       <p class="profil-card__sub" style="margin:4px 0 10px;">Le secteur est l'activité de l'entreprise, pas le métier.${avecOffres ? " Offres : rien de coché, tous les secteurs." : ""} Candidatures spontanées : ces secteurs servent à chercher les entreprises sur Sirene quand aucun domaine n'est choisi, ou pour un domaine sans correspondance NAF (seuls l'informatique et l'immobilier en ont une).</p>
       <div class="secteurs-liste">${o.secteurs.map(s => caseOption("data-secteur-case", s.code, `${s.code} · ${s.libelle}`, secteurs.has(s.code))).join("")}</div>
     </details>`;
   c.dataset.charge = "1";
+  _options = o;
+  majMessageSpontanees(mode);
   c.querySelectorAll(".domaine-case").forEach(l => l.classList.toggle("is-checked", l.querySelector("input").checked));
   if (c.dataset.branche) return;
   c.dataset.branche = "1";
@@ -345,7 +358,8 @@ function lireOptions(mode) {
   const c = document.querySelector(`[data-options-recherche="${mode}"]`);
   if (!c || !c.dataset.charge) return {};   // options non chargées : on n'écrase rien
   const coches = attribut => [...c.querySelectorAll(`[${attribut}]:checked`)].map(i => i.value);
-  const out = { secteurs: coches("data-secteur-case") };
+  const out = { secteurs: coches("data-secteur-case"),
+                tous_secteurs: !!c.querySelector("[data-tous-secteurs]")?.checked };
   if (c.querySelector("[data-taille-inconnue]")) {
     out.tailles = coches("data-taille-case");
     out.taille_inconnue = c.querySelector("[data-taille-inconnue]").checked;
@@ -357,6 +371,35 @@ function lireOptions(mode) {
     out.taille_inconnue_spontanees = c.querySelector("[data-taille-inconnue-sp]").checked;
   }
   return out;
+}
+
+/* ── Candidatures spontanées : ce que « Récupérer » cherchera sur Sirene.
+   Même règle que le serveur (shared/naf.py, avertissement_sirene) : rien
+   sans domaine, secteur ni « tous les secteurs » ; un domaine sans
+   correspondance NAF demande des secteurs ou « tous les secteurs ». ── */
+let _options = null;
+
+function majMessageSpontanees(mode) {
+  const c = document.querySelector(`[data-options-recherche="${mode}"]`);
+  const el = c?.querySelector("[data-sp-rien]");
+  if (!el || !_options) return;
+  const tous = !!c.querySelector("[data-tous-secteurs]")?.checked;
+  const secteurs = c.querySelectorAll(".secteurs-liste input:checked").length;
+  const conteneur = document.querySelector(DOMAINES_DU_MODE[mode] || DOMAINES_DU_MODE.alternance);
+  const domaines = lireDomainesCoches(DOMAINES_DU_MODE[mode] || DOMAINES_DU_MODE.alternance);
+  const couverts = new Set(_options.domaines_naf || []);
+  const sousDomaines = lettre => [...(conteneur?.querySelectorAll(`.gd[data-gd="${lettre}"] [data-domaine-case]`) || [])]
+    .map(i => i.value);
+  const manquants = domaines.filter(code => code.length === 1
+    ? sousDomaines(code).some(d => !couverts.has(d)) : !couverts.has(code));
+  let texte = "";
+  if (!tous && !domaines.length && !secteurs) texte = _options.message_rien_a_chercher;
+  else if (!tous && manquants.length && !secteurs) {
+    texte = `Domaines sans correspondance avec les secteurs de Sirene (${manquants.join(", ")}) : ils ne seront `
+      + "pas cherchés pour les candidatures spontanées. Choisis des secteurs d'entreprise, ou coche « tous les secteurs ».";
+  }
+  el.textContent = texte;
+  el.hidden = !texte;
 }
 
 /* ── Durée du stage : même règle que le serveur (shared/stage.py), jours
@@ -440,6 +483,9 @@ export const Profil = {
 
     if (!this._charge) {
       document.querySelectorAll("[data-stage-date]").forEach(el => el.addEventListener("input", majDureeStage));
+      // Domaines, secteurs, « tous les secteurs » : message des spontanées à jour
+      document.querySelector('[data-page-content="profil"]')?.addEventListener("change", () =>
+        majMessageSpontanees(_modeProfilCourant));
       brancherTags("competences");
       brancherProjets();
       brancherPiecesJointes();

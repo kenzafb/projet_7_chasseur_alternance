@@ -86,3 +86,21 @@ def test_sans_cle_ou_cle_refusee(monkeypatch, tmp_path):
     api.get = lambda *a, **k: Reponse(403, {"header": {"message": CLE}})
     code, sortie, res, _ = lancer(api, tmp_path)
     assert code == 1 and "clé INSEE refusée (403)" in sortie and CLE not in sortie
+
+
+def test_volume_tous_secteurs(cle, tmp_path):
+    """--tous-secteurs (phase 6b) : quatre comptages en Île-de-France, la
+    requête réelle (activités exclues en ET) acceptée."""
+    api = jeu()
+    api.etablissements.append(etablissement(500, naf="68.32B", cp="75011", tranche="12"))   # exclu
+    sorties = []
+    assert vs.main(session=api, sortie=tmp_path, pause=0, afficher=sorties.append,
+                   seulement_tous_secteurs=True) == 0
+    assert not (tmp_path / "verification_api.json").exists()
+    texte = (tmp_path / "verification_tous_secteurs.json").read_text(encoding="utf-8")
+    res = json.loads(texte)
+    totaux = {k: v["total"] for k, v in res.items() if isinstance(v, dict)}
+    assert totaux == {"toutes_tranches": 33, "hors_sans_salarie": 25, "10_salaries_et_plus": 17,
+                      "requete_reelle_hors_sans_salarie": 24}
+    assert len(api.recherches) == 4 and CLE not in texte
+    assert "VOLUME_TOUS_SECTEURS" in "\n".join(sorties)

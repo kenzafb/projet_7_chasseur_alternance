@@ -13,7 +13,9 @@ Critères de recherche du profil (profils.recherche, colonne JSON) :
   - themes : thèmes France Travail du mode job (13 saisonniers, 17 sans
     diplôme ni expérience), décochés par défaut ;
   - departements : départements d'Île-de-France des candidatures
-    spontanées (Sirene), [] pour tous.
+    spontanées (Sirene), [] pour tous ;
+  - tous_secteurs : candidatures spontanées sans filtre de secteur (Sirene,
+    toutes activités), faux par défaut : choix explicite (phase 6b).
 
 normaliser_recherche les remet en forme à l'enregistrement (valeurs
 inconnues retirées, types fixés) ; les autres clés (disponibilité, champs
@@ -67,6 +69,8 @@ def normaliser_recherche(recherche) -> dict:
         out["themes"] = _liste(out["themes"], set(THEMES_PROPOSES))
     if "departements" in out:
         out["departements"] = sorted(_liste(out["departements"], DEPTS_IDF))
+    if "tous_secteurs" in out:
+        out["tous_secteurs"] = out["tous_secteurs"] is True
     return out
 
 
@@ -92,9 +96,15 @@ def criteres_france_travail(profil: dict, mode: str) -> dict:
 
 
 def options_du_profil() -> dict:
-    """Listes proposées dans le profil : secteurs, tailles, thèmes, départements."""
+    """Listes proposées dans le profil : secteurs, tailles, thèmes,
+    départements ; domaines qui ont une correspondance NAF pour Sirene et
+    volume de « tous les secteurs » (message des candidatures spontanées)."""
+    from shared.naf import MESSAGE_RIEN_A_CHERCHER, VOLUME_TOUS_SECTEURS, domaines_couverts
     themes = referentiels.libelles(referentiels.france_travail("themes"))
     return {
+        "domaines_naf": sorted(domaines_couverts()),
+        "volume_tous_secteurs": VOLUME_TOUS_SECTEURS,
+        "message_rien_a_chercher": MESSAGE_RIEN_A_CHERCHER,
         "departements": [dict(e) for e in referentiels.france_travail("departements") if e["code"] in DEPTS_IDF],
         "secteurs": [dict(e) for e in referentiels.france_travail("secteurs_activites")],
         "tailles": [{k: t[k] for k in ("cle", "libelle")} | ({"avertissement": t["avertissement"]}

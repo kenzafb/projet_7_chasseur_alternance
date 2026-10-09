@@ -128,6 +128,15 @@ function rendreModeTest() {
   if (adr) adr.textContent = compte ? compte.adresse : "ton adresse d'expédition";
 }
 
+/* Ce que « Récupérer » ne cherchera pas, dit avant tout lancement */
+function rendreAvertissement() {
+  const bandeau = document.querySelector("[data-sp-avertissement]");
+  if (!bandeau) return;
+  const texte = stats?.avertissement_recuperer || "";
+  bandeau.hidden = !texte;
+  bandeau.textContent = texte ? "⚠️ " + texte : "";
+}
+
 /* Maximum d'un lancement : le plafond, borné par ce qui reste à traiter
    (entreprises à scraper, entreprises à contacter dans ce mode) */
 function rendreMaximums() {
@@ -199,6 +208,7 @@ export const Spontanees = {
       this._brancheValider = true;
     }
     rendreModeTest();
+    rendreAvertissement();
     rendreMaximums();
     rendreKpis();
     rendreTable();

@@ -13,6 +13,11 @@ Codes NAF cherchés sur Sirene pour un profil (SPEC_SOURCES section 4.1).
   sous-classes, mêmes tailles que les cœurs.
 - Exclusions systématiques (supports juridiques 68.32B, 41.10D, 66.19A,
   sans salarié), quelle que soit l'origine du code.
+- « Tous les secteurs » (case du profil, non cochée par défaut, phase 6b) :
+  toutes les activités, exclusions comprises, cherchées après les autres
+  groupes ; sans domaine ni secteur ni cette case, Sirene n'est pas
+  interrogé et le profil comme la page Spontanées le disent avant tout
+  lancement.
 
 Chaque code existe en NAF rév. 2 et en NAF 2025 (table officielle de
 l'INSEE, docs/referentiels/insee/correspondance_naf_rev2_naf2025.csv) ; la
@@ -127,17 +132,45 @@ def _libelle(code: str) -> str:
     return f"{libelles.get(code, code)} ({code})"
 
 
-def avertissement_sirene(domaines, secteurs=()) -> str:
-    """Message pour l'interface au lancement de « Récupérer », vide si rien à dire."""
+# Ordre de grandeur montré à côté de la case « tous les secteurs » (sièges
+# actifs d'Île-de-France sans filtre d'activité). Non mesuré : à remplacer
+# par les nombres de scripts/verifier_sirene.py --tous-secteurs.
+VOLUME_TOUS_SECTEURS = ("plus d'un million d'entreprises en Île-de-France toutes tailles confondues, "
+                        "encore plusieurs dizaines de milliers à partir de 10 salariés")
+
+MESSAGE_RIEN_A_CHERCHER = ("Aucun domaine, aucun secteur et « tous les secteurs » non cochée : « Récupérer » "
+                           "ne cherchera aucune entreprise sur Sirene. Choisis des domaines ou des secteurs "
+                           "d'entreprise dans le profil, ou coche « tous les secteurs ».")
+
+
+def avertissement_sirene(domaines, secteurs=(), tous_secteurs=False) -> str:
+    """Message pour l'interface (profil, page Spontanées, lancement de
+    « Récupérer »), vide si rien à dire."""
     domaines = normaliser_domaines(domaines)
     manquants = domaines_sans_correspondance(domaines)
+    if tous_secteurs:
+        return ""
     if not domaines and not secteurs:
-        return ("Aucun domaine ni secteur choisi : Sirene n'est pas interrogé. Choisis des domaines, "
-                "ou des secteurs d'entreprise, dans le profil.")
+        return MESSAGE_RIEN_A_CHERCHER
     if manquants and not secteurs:
         return (f"Domaines sans correspondance NAF pour Sirene : {', '.join(map(_libelle, manquants))} ; "
-                "choisis des secteurs d'entreprise dans le profil pour les y chercher.")
+                "choisis des secteurs d'entreprise dans le profil, ou coche « tous les secteurs », "
+                "pour les y chercher.")
     if manquants:
         return (f"Domaines sans correspondance NAF pour Sirene : {', '.join(map(_libelle, manquants))} ; "
                 "cherchés par les secteurs d'entreprise choisis.")
     return ""
+
+
+def sirene_pour_profil(profil: dict) -> dict:
+    """Ce que « Récupérer » cherchera sur Sirene pour ce profil, sans appel
+    réseau : {avertissement, rien_a_chercher, tous_secteurs}."""
+    from shared.criteres import normaliser_recherche
+    from shared.domaines import domaines_du_profil
+    rech = normaliser_recherche((profil or {}).get("recherche") or {})
+    domaines, secteurs = domaines_du_profil(profil or {}), rech.get("secteurs") or []
+    tous = bool(rech.get("tous_secteurs"))
+    codes = secteurs_sirene(domaines, secteurs)
+    rien = not (tous or codes["coeurs"] or codes["secteurs"] or codes["transverses"])
+    return {"avertissement": avertissement_sirene(domaines, secteurs, tous), "rien_a_chercher": rien,
+            "tous_secteurs": tous}

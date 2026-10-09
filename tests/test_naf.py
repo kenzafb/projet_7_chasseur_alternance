@@ -76,7 +76,7 @@ def test_secteurs_choisis_pour_indifferent_et_domaine_sans_correspondance():
 
 def test_avertissements():
     assert naf.avertissement_sirene(["M18"]) == ""
-    assert "Aucun domaine ni secteur choisi" in naf.avertissement_sirene([])
+    assert "« tous les secteurs » non cochée" in naf.avertissement_sirene([])
     assert naf.avertissement_sirene([], ["62"]) == ""
     m = naf.avertissement_sirene(["J11"])
     assert "(J11)" in m and "choisis des secteurs" in m

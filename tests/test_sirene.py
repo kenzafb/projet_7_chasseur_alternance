@@ -249,7 +249,7 @@ def test_rien_a_chercher_ou_cle_absente(utilisateur, sirene, monkeypatch):
     sauvegarder_profil(uid, profil(domaines=()))
     logs = Journal()
     fetch.main(uid, log_fn=logs)
-    assert api.recherches == [] and "Aucun domaine ni secteur choisi" in logs.texte()
+    assert api.recherches == [] and "« tous les secteurs » non cochée" in logs.texte()
     monkeypatch.delenv("INSEE_API_KEY")
     sauvegarder_profil(uid, profil())
     logs = Journal()

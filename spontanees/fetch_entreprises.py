@@ -16,8 +16,12 @@ Sirene (SPEC_SOURCES section 4, phase 5d) :
     salarié » (NN, unités non employeuses) seulement si elle est cochée ;
     rien de coché : toutes les tailles sauf elle (D55) ;
   - départements du profil (rien de coché : toute l'Île-de-France) ;
+  - « tous les secteurs » (case du profil, phase 6b) : toutes les
+    activités sauf les exclusions, mêmes tailles que les cœurs, après les
+    autres groupes ;
   - la limite se remplit dans l'ordre du plan : cœurs, secteurs choisis,
-    transverses seulement pour compléter ; répartition dans les logs ;
+    transverses seulement pour compléter, puis tous les secteurs ;
+    répartition dans les logs ;
   - sièges actifs ; nomenclature NAF de shared.config.nomenclature_naf ;
   - pagination par curseur, sans plafond de résultats ;
   - une entreprise déjà en base (même SIRET, LBA comprise) n'est pas
@@ -37,7 +41,7 @@ from shared.config import DEPTS_IDF
 from shared.criteres import normaliser_recherche
 from shared.domaines import domaines_du_profil
 from shared.modes import MODE_DEFAUT
-from shared.naf import avertissement_sirene, secteurs_sirene
+from shared.naf import avertissement_sirene, exclusions, secteurs_sirene
 from shared.tailles import TAILLES_250_PLUS, tranches_insee
 from spontanees import parametres_sirene as P
 
@@ -94,19 +98,25 @@ def filtre_grandes(tailles) -> str | None:
             f"{_ou(P.VARIABLE_CATEGORIE, [CATEGORIES_PAR_TAILLE[t] for t in grandes])})")
 
 
-def construire_query(codes, departements, variable_naf: str, filtre: str | None = None) -> str:
-    clauses = ["etablissementSiege:true", "etatAdministratifUniteLegale:A", _ou(variable_naf, codes),
+def construire_query(codes, departements, variable_naf: str, filtre: str | None = None,
+                     exclus=()) -> str:
+    """Requête d'un paquet de codes NAF ; codes None : toutes les activités
+    (« tous les secteurs »), sauf exclus, exclusion en ET (jamais dans un OU)."""
+    activite = _ou(variable_naf, codes) if codes is not None else (
+        f"-{_ou(variable_naf, sorted(exclus))}" if exclus else None)
+    clauses = ["etablissementSiege:true", "etatAdministratifUniteLegale:A", activite,
                _ou(P.VARIABLE_CODE_POSTAL, [f"{d}*" for d in departements])]
-    return " AND ".join(clauses + ([filtre] if filtre else []))
+    return " AND ".join([c for c in clauses if c] + ([filtre] if filtre else []))
 
 
 def plan_sirene(profil: dict, log=print) -> list[tuple[str, str]]:
     """(groupe, requête) à faire pour un profil : groupes « cœurs »,
-    « secteurs », « transverses ». Vide si rien n'est à chercher (raison
-    écrite dans les logs)."""
+    « secteurs », « transverses », « tous secteurs ». Vide si rien n'est à
+    chercher (raison écrite dans les logs)."""
     rech = normaliser_recherche((profil or {}).get("recherche") or {})
     domaines, secteurs = domaines_du_profil(profil or {}), rech.get("secteurs") or []
-    if avertissement := avertissement_sirene(domaines, secteurs):
+    tous = bool(rech.get("tous_secteurs"))
+    if avertissement := avertissement_sirene(domaines, secteurs, tous):
         log(f"ℹ️  {avertissement}")
     codes = secteurs_sirene(domaines, secteurs)
     variable = P.VARIABLE_NAF.get(codes["nomenclature"])
@@ -137,9 +147,16 @@ def plan_sirene(profil: dict, log=print) -> list[tuple[str, str]]:
             for nom, liste, filtre in groupes if liste
             for paquet in _paquets(liste, P.NAF_PAR_REQUETE)
             for depts in _paquets(departements, P.DEPARTEMENTS_PAR_REQUETE)]
+    if tous:
+        # Toutes les activités sauf les exclusions, mêmes tailles que les cœurs
+        exclus = exclusions(codes["nomenclature"])
+        plan += [("tous secteurs", construire_query(None, depts, variable, filtre, exclus))
+                 for filtre in [filtre_tailles(tailles)] + ([inconnus] if inconnus else [])
+                 for depts in _paquets(departements, P.DEPARTEMENTS_PAR_REQUETE)]
     log(f"  Sirene ({codes['nomenclature']}) : "
         f"{len(codes['coeurs'])} codes cœurs, {len(codes['secteurs'])} codes de secteurs choisis, "
-        f"{len(codes['transverses'])} codes transverses ; départements {', '.join(departements)} ; "
+        f"{len(codes['transverses'])} codes transverses{', tous les secteurs' if tous else ''} ; "
+        f"départements {', '.join(departements)} ; "
         f"tailles {', '.join(tailles) or 'toutes sauf sans salarié'}{' et inconnues' if tailles and inconnue else ''} ; "
         f"{len(plan)} recherches")
     return plan
@@ -369,7 +386,8 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
     collecte, debut = Collecte(cle, _log, sirens), time.monotonic()
     # Tous les groupes du plan, dans l'ordre, même ceux qui ne donnent rien
     par_groupe = dict.fromkeys((g for g, _ in plan), 0)
-    _log(f"🔍 Sirene : {len(plan)} recherches, cœurs d'abord, transverses pour compléter")
+    _log(f"🔍 Sirene : {len(plan)} recherches, cœurs d'abord, transverses pour compléter"
+         + (", tous les secteurs en dernier" if "tous secteurs" in par_groupe else ""))
     for i, (groupe, q) in enumerate(plan, 1):
         if stop_event and stop_event.is_set():
             _log("⏹️  Arrêt demandé : entreprises déjà reçues enregistrées")

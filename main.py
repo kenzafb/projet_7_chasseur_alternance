@@ -738,6 +738,9 @@ def api_spontanees_stats(request: Request, user: User = Depends(utilisateur_requ
     stats["a_envoyer"] = compter_a_envoyer(user.id, mode)
     from database.entreprises_db import compter_a_valider
     stats["a_valider"] = compter_a_valider(user.id, mode)
+    # Ce que « Récupérer » ne cherchera pas, dit avant tout lancement
+    from shared.naf import sirene_pour_profil
+    stats["avertissement_recuperer"] = sirene_pour_profil(lire_profil(user.id, mode=mode))["avertissement"]
     # On ajoute l'état du pipeline de l'utilisateur, géré en mémoire
     etat = pipelines.etat(SPONTANEES, user.id)
     stats.update({cle: etat[cle] for cle in ("en_cours", "etape", "message", "pourcentage", "mode_test", "mode")})
@@ -802,14 +805,15 @@ def api_spontanees_fetch(request: Request, body: Fetch | None = None,
     user_id = user.id
     maximum, note = _limite("entreprises", body.max_entreprises if body else None)
     # Même profil que fetch_entreprises (celui du mode) : LBA si le mode l'utilise, et Sirene
-    from shared.criteres import normaliser_recherche
-    from shared.domaines import domaines_du_profil
-    from shared.naf import avertissement_sirene
+    from shared.naf import sirene_pour_profil
     profil = lire_profil(user_id, mode=mode)
-    avertissement = " ".join(filter(None, [
-        lba_ignoree_pour_profil(profil) if "lba" in get_mode(mode)["sources"] else "",
-        avertissement_sirene(domaines_du_profil(profil),
-                             normaliser_recherche(profil.get("recherche") or {}).get("secteurs") or [])]))
+    sirene = sirene_pour_profil(profil)
+    avec_lba = "lba" in get_mode(mode)["sources"]
+    if sirene["rien_a_chercher"] and not avec_lba:
+        # Sirene seule source du mode (job, stage) : rien ne serait cherché
+        raise ErreurUtilisateur(sirene["avertissement"])
+    avertissement = " ".join(filter(None, [lba_ignoree_pour_profil(profil) if avec_lba else "",
+                                           sirene["avertissement"]]))
 
     def travail(arret, log, on_progress):
         from spontanees.fetch_entreprises import main as fetch_main

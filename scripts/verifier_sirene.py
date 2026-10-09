@@ -25,6 +25,14 @@ Requête de référence : sièges actifs à Paris (codes postaux 75), NAF 62.01Z
 6. Pagination : nombre=1000 et 1001, début 1000 et 20000, trois pages par
    curseur.
 
+--tous-secteurs (phase 6b) : seulement le volume de la case « tous les
+secteurs » des candidatures spontanées, sièges actifs des 8 départements
+d'Île-de-France sans filtre d'activité : toutes tranches, hors « sans
+salarié » (le défaut), 10 salariés et plus, et la requête réelle (activités
+exclues en ET) pour confirmer que l'API l'accepte. Quatre requêtes, écrites
+dans verification_tous_secteurs.json ; les nombres sont à reporter dans
+VOLUME_TOUS_SECTEURS (shared/naf.py), affiché dans le profil.
+
 Résultat détaillé dans docs/referentiels/insee/verification_api.json
 (--sortie pour un autre dossier), sans clé. À la fin, les valeurs à
 reporter dans spontanees/parametres_sirene.py, seul endroit du code qui
@@ -344,11 +352,48 @@ def resume(res: dict, afficher=print):
         afficher("⚠️  La liste de tranches par OU ne donne pas la somme des tranches seules.")
 
 
-def main(session=None, sortie=DOSSIER_SORTIE, pause=PAUSE_S, afficher=print) -> int:
+def tous_secteurs(v: Verificateur) -> dict:
+    """Volume de « tous les secteurs » en Île-de-France (sièges actifs)."""
+    from shared.config import DEPTS_IDF
+    from shared.naf import exclusions
+    idf = ou(P.VARIABLE_CODE_POSTAL, [f"{d}*" for d in sorted(DEPTS_IDF)])
+    tranche = P.VARIABLE_TRANCHE
+    exclus = f"-{ou('activitePrincipaleUniteLegale', sorted(exclusions('NAFRev2')))}"
+    essais = {
+        "toutes_tranches": v.compter(idf),
+        "hors_sans_salarie": v.compter(idf, ou(tranche, TRANCHES)),
+        "10_salaries_et_plus": v.compter(idf, ou(tranche, TRANCHES[4:])),
+        "requete_reelle_hors_sans_salarie": v.compter(exclus, idf, ou(tranche, TRANCHES)),
+    }
+    for nom, e in essais.items():
+        v.afficher(f"  {nom.replace('_', ' ')} : {v._court(e)}")
+    return {nom: v.sans_corps(e) for nom, e in essais.items()}
+
+
+def ecrire(v: Verificateur, sortie, nom: str, res: dict) -> Path:
+    sortie = Path(sortie)
+    sortie.mkdir(parents=True, exist_ok=True)
+    chemin = sortie / f"{nom}.json"
+    chemin.write_text(v._purger(json.dumps(res, ensure_ascii=False, indent=2, default=str)) + "\n",
+                      encoding="utf-8")
+    return chemin
+
+
+def main(session=None, sortie=DOSSIER_SORTIE, pause=PAUSE_S, afficher=print, seulement_tous_secteurs=False) -> int:
     v = Verificateur(session=session, pause=pause, afficher=afficher)
     if not v.cle:
         afficher("❌ INSEE_API_KEY absente du .env")
         return 1
+    if seulement_tous_secteurs:
+        try:
+            afficher("Tous les secteurs, Île-de-France :")
+            res = {"verifie_le": datetime.now(timezone.utc).isoformat(timespec="seconds"), **tous_secteurs(v)}
+        except ErreurCle as e:
+            afficher(f"❌ {e}")
+            return 1
+        chemin = ecrire(v, sortie, "verification_tous_secteurs", res)
+        afficher(f"Détail écrit dans {chemin} : nombres à reporter dans VOLUME_TOUS_SECTEURS (shared/naf.py)")
+        return 0
     try:
         afficher("Référence :")
         reference = v.reference()
@@ -372,11 +417,7 @@ def main(session=None, sortie=DOSSIER_SORTIE, pause=PAUSE_S, afficher=print) -> 
            "naf_multiples": naf_multiples, "departements": departements, "naf2025": naf2025,
            "pagination": pagination}
     res["propositions"] = propositions(res)
-    sortie = Path(sortie)
-    sortie.mkdir(parents=True, exist_ok=True)
-    chemin = sortie / "verification_api.json"
-    chemin.write_text(v._purger(json.dumps(res, ensure_ascii=False, indent=2, default=str)) + "\n",
-                      encoding="utf-8")
+    chemin = ecrire(v, sortie, "verification_api", res)
     afficher(f"Détail écrit dans {chemin} ({v.requetes} requêtes)")
     resume(res, afficher)
     return 0
@@ -385,4 +426,7 @@ def main(session=None, sortie=DOSSIER_SORTIE, pause=PAUSE_S, afficher=print) -> 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Vérification des points ouverts de l'API Sirene.")
     parser.add_argument("--sortie", type=Path, default=DOSSIER_SORTIE, help="dossier du fichier produit")
-    sys.exit(main(sortie=parser.parse_args().sortie))
+    parser.add_argument("--tous-secteurs", action="store_true",
+                        help="seulement le volume de « tous les secteurs » en Île-de-France")
+    args = parser.parse_args()
+    sys.exit(main(sortie=args.sortie, seulement_tous_secteurs=args.tous_secteurs))
