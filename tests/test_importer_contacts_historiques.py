@@ -145,3 +145,42 @@ def test_ancienne_base_ouverte_en_lecture_seule(ancienne_base, historique, utili
     _, uid = utilisateur("a@test.fr", prenom="Alice")
     imp.lancer(historique, ancienne_base, uid, groupes="a,b,c", sortie=lambda m: None)
     assert ancienne_base.read_bytes() == avant
+
+
+@pytest.mark.parametrize("mode", ["job", "stage"])
+def test_etiquette_sur_une_entreprise_recuperee_apres_l_import(ancienne_base, historique, utilisateur, mode,
+                                                               monkeypatch):
+    """Phase 6b, point 4 : une entreprise absente au moment de l'import,
+    récupérée plus tard par Sirene dans un autre mode, porte l'étiquette
+    « déjà contactée en alternance » dès qu'une de ses adresses scrapées
+    est dans l'historique importé. L'envoi n'est pas bloqué."""
+    import spontanees.fetch_entreprises as fetch
+    from database.entreprises_db import calculer_stats
+    from database.profil_db import sauvegarder_profil
+    from tests.faux_sirene import FausseSirene, etablissement, siret_sirene
+    client, uid = utilisateur("a@test.fr", prenom="Alice")
+    imp.lancer(historique, ancienne_base, uid, sortie=lambda m: None)           # groupe a, base vide
+    assert lire_entreprises(uid, mode) == []
+
+    monkeypatch.setenv("INSEE_API_KEY", "cle-insee")
+    monkeypatch.setenv("NOMENCLATURE_NAF", "NAFRev2")
+    monkeypatch.setattr(fetch.P, "PAUSE_S", 0)
+    monkeypatch.setattr(fetch.requests, "get", FausseSirene([etablissement(7), etablissement(8)]).get)
+    sauvegarder_profil(uid, {"recherche": {"domaines": ["M18"], "departements": ["75"]}}, mode=mode)
+    fetch.main(uid, log_fn=lambda m: None, mode=mode)
+    liste = lire_entreprises(uid, mode)
+    assert [e["_extra"]["siret"] for e in liste] == [siret_sirene(7), siret_sirene(8)]
+    assert all(e["contacts_autres_modes"] == [] for e in liste)                 # pas encore d'adresse
+    # Le scraper trouve une adresse de l'historique (autre casse) pour la première
+    liste[0]["emails_trouves"], liste[1]["emails_trouves"] = ["Jobs@ACME.fr"], ["contact@autre.fr"]
+    sauvegarder_enrichissement(uid, liste)
+
+    attendu = [{"mode": "alternance", "date": "2026-05-29", "historique": False}]
+    premiere, seconde = lire_entreprises(uid, mode)
+    assert premiere["contacts_autres_modes"] == attendu and seconde["contacts_autres_modes"] == []
+    client.mode = mode
+    prochaines = client.get("/api/spontanees/stats").json()["prochaines"]
+    assert [p["contacts_autres_modes"] for p in prochaines] == [attendu, []]
+    assert calculer_stats(uid, mode)["prochaines"][0]["contacts_autres_modes"] == attendu
+    assert envoyeur.compter_a_envoyer(uid, mode) == 2                           # jamais bloquant
+    assert lire_entreprises(uid, "alternance") == []
