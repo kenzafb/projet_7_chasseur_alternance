@@ -13,12 +13,14 @@ Format : identifiant, date, phase, décision, raison, conséquence dans le code,
 - **Raison.** Le fichier n'est rattaché à aucun utilisateur ni à aucun mode ; l'importer pour le user 1 en mode alternance serait une supposition.
 - **Conséquence.** Le user 1 peut réécrire à une entreprise déjà contactée avant la refonte. Le fichier reste dans `data/`, ni lu ni écrit. Si l'import est décidé : `ajouter_emails_contactes(1, "alternance", adresses)`.
 - **À reconsidérer** au moment du mode stage.
+- **Remplacée** par D66 (phase 6a) : import par un script lancé par l'humain, groupe a par défaut.
 
 ### D2. Statut « contactée » porté par l'entreprise : dédoublonnage par mode incomplet, accepté
 - **Décision.** `entreprises.mail_envoye` reste une propriété de l'entreprise, tous modes confondus. Le dédoublonnage par mode (`emails_contactes` unique sur utilisateur, mode, adresse) n'agit donc que sur les adresses partagées : une entreprise contactée en alternance n'est jamais reproposée en job.
 - **Raison.** Rendre les entreprises vraiment par mode touche le fetch, le scraper, les statistiques, le suivi et l'envoyeur : chantier à part.
 - **Conséquence.** Comportement inchangé en phase 4.
 - **À refondre** pendant le mode stage : statut d'envoi par entreprise et par mode.
+- **Remplacée** par D65 (phase 6a).
 
 ### D3. Plafond quotidien de 50 mails par utilisateur conservé
 - **Décision.** `PLAFOND_ENVOIS_JOUR` vaut 50 par défaut (réglable dans `.env`), par utilisateur et par jour calendaire de Paris, tous lancements et mails de test confondus.
@@ -289,3 +291,24 @@ Décisions de `docs/SPEC_SOURCES.md` (sections 0, 4 et 7), validées par l'humai
 - **Constat.** Un seul réglage de taille filtrait à la fois les offres et les entreprises des spontanées ; or une petite entreprise qui publie une offre d'alternance veut recruter, l'écarter serait une perte.
 - **Décision.** Deux réglages dans le profil d'alternance : tailles des offres (`tailles`, `taille_inconnue` ; France Travail, toutes par défaut, aucune pré-coche par migration) et tailles des candidatures spontanées (`tailles_spontanees`, `taille_inconnue_spontanees` ; Sirene et entreprises LBA, « sans salarié » proposée ici seulement, pré-cochées à 10 salariés et plus pour les profils existants par la migration 0010). Lecture de D55 validée : rien de coché dans les spontanées veut dire toutes les tailles sauf « sans salarié ».
 
+
+## Phase 6a (préparation du mode stage), décisions du 9 octobre 2026
+
+Décisions données par l'humain au lancement de la phase et mises en œuvre. Les choix faits pendant la mise en œuvre restent à valider dans `docs/PHASE_6A_RAPPORT.md`.
+
+### D64. Sirene : les cœurs remplissent la limite, les transverses complètent
+- **Constat.** Essai réel M18, limite de 10 : 5 entreprises, toutes transverses, 0 cœur. Cause : la clause des effectifs inconnus était mise en OU avec les tranches, `(tranche:(...) OR -tranche:*)` ; en Lucene, une clause `-x` dans un OU exclut au lieu d'ajouter, donc toute unité qui a une tranche était écartée. Les transverses, sans cette clause, remplissaient seuls la limite. L'API simulée des tests lisait ce OU comme une union, d'où des tests verts.
+- **Décision.** La limite se remplit dans l'ordre du plan : cœurs, secteurs choisis, transverses seulement pour compléter. Les unités sans tranche sont cherchées par une requête à part (`-trancheEffectifsUniteLegale:*` en ET), jamais dans un OU. L'API simulée suit la sémantique Lucene.
+- **Logs.** Pour chaque recherche : groupe, établissements annoncés par Sirene, nouvelles ; à la fin, répartition de tous les groupes du plan, zéros compris.
+
+### D65. État d'envoi par entreprise et par mode (remplace D2)
+- **Décision.** Une entreprise reste unique par utilisateur (SIRET, puis SIREN) ; ses données publiques (site, emails, téléphones, contact, validation des emails) sont communes à tous les modes et ne sont scrapées qu'une fois. La sélection pour un mode, l'envoi, sa date, les destinataires et le statut de suivi sont propres à chaque mode (table `entreprises_modes`, migration 0011). Les données existantes passent en mode alternance.
+- **Interface.** La page Spontanées et le suivi n'affichent que les entreprises du mode courant, avec l'étiquette « déjà contactée en <autre mode> le <date> » quand c'est le cas ; l'envoi n'est jamais bloqué par un contact dans un autre mode.
+
+### D66. Historique des adresses contactées importé par un script (remplace D1)
+- **Décision.** `scripts/importer_contacts_historiques.py`, lancé par l'humain, classe les 1085 adresses de `data/emails_deja_envoyes.json` d'après l'ancienne base `data/chasseur.db` (lecture seule) : (a) dans une entreprise marquée envoyée, (b) dans une entreprise non marquée envoyée, (c) absente (probablement des mails personnels ou autres, le fichier venant du dossier Envoyés de Gmail). `--dry-run` d'abord ; import réel avec `--user` et le choix des groupes, a seulement par défaut, comme contactées en mode alternance ; les entreprises correspondantes de la nouvelle base sont marquées « déjà contactées en alternance ».
+- **Conséquence.** En alternance, ces adresses ne sont plus visées. En job ou en stage, rien n'est bloqué : seulement l'étiquette de D65.
+- **Essai à blanc du 9 octobre 2026** (sans `--user`) : 798 adresses en a, 11 en b, 276 en c.
+
+### D67. Une URL par mode, mode explicite pour l'API
+- **Décision.** `/alternance`, `/job` et `/stage`, et une page d'accueil où l'on choisit son mode. Le mode vient de l'URL et non plus de la session : deux onglets dans deux modes différents ne se gênent pas. L'API reçoit le mode explicitement (paramètre `mode`). Les anciennes URL redirigent. `/stage` affiche une page « bientôt disponible » (phase 6b). Isolation entre utilisateurs et protection de toutes les routes inchangées.
