@@ -3,6 +3,7 @@
    ============================================================================ */
 
 import { api } from "./api.js";
+import { etiquettesAutresModes } from "./spontanees.js";
 
 const STATUTS = [
   ["envoye", "Envoyé"],
@@ -21,7 +22,8 @@ function ligne(e) {
   const options = STATUTS.map(([v, label]) =>
     `<option value="${v}"${v === st ? " selected" : ""}>${label}</option>`).join("");
   return `<div class="suivi-row" data-id="${e._id}">
-    <span class="suivi-row__nom">${e.nom_commercial || e.nom || "—"}</span>
+    <span class="suivi-row__nom">${e.nom_commercial || e.nom || "—"}${e.historique
+      ? ' <span class="chip chip--gris" title="Contactée avant la refonte (import de l\'historique)">historique</span>' : ""}${etiquettesAutresModes(e)}</span>
     <span>${e.ville || "—"}</span>
     <span>${e.contact_rh || (e.emails_trouves && e.emails_trouves[0]) || "—"}</span>
     <span>${(e.telephones && e.telephones[0]) || e.telephone || "—"}</span>

@@ -74,7 +74,7 @@ def test_email_lba_pas_ajoute_a_une_entreprise_deja_contactee(utilisateur):
     from database.models import Entreprise
     with SessionLocal() as db:
         e = db.query(Entreprise).one()
-        e.mail_envoye, e.emails_trouves = True, ["ancien@soc.fr"]
+        e.modes[0].mail_envoye, e.emails_trouves = True, ["ancien@soc.fr"]
         db.commit()
     ajouter_entreprises_lba(uid, [_norm(1, email="nouveau@soc.fr")])
     e = lire_entreprises(uid)[0]
@@ -90,10 +90,12 @@ def test_stats_par_source_et_affichage(utilisateur):
     from database.models import Entreprise
     with SessionLocal() as db:
         lignes = db.query(Entreprise).order_by(Entreprise.id).all()
-        lignes[0].emails_trouves, lignes[0].mail_envoye, lignes[0].statut_suivi = ["a@s0.fr"], True, "entretien"
-        lignes[1].emails_trouves, lignes[1].mail_envoye, lignes[1].statut_suivi = ["a@s1.fr"], True, "refus"
-        lignes[3].emails_trouves, lignes[3].mail_envoye, lignes[3].statut_suivi = ["a@d.fr"], True, "reponse"
-        lignes[4].mail_envoye = True                                    # Société 1 (LBA), sans réponse
+        for i, (email, statut) in {0: ("a@s0.fr", "entretien"), 1: ("a@s1.fr", "refus"),
+                                   3: ("a@d.fr", "reponse"), 4: (None, "envoye")}.items():
+            if email:
+                lignes[i].emails_trouves = [email]
+            lignes[i].modes[0].mail_envoye, lignes[i].modes[0].statut_suivi = True, statut
+        # lignes[4] : Société 1 (LBA), sans réponse
         db.commit()
     stats = calculer_stats(uid)
     assert stats["raw"] == 5

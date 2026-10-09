@@ -124,6 +124,7 @@ def test_lancement_par_la_route_avec_le_mode_courant(a_et_b, smtp_simule, pipeli
     client_a, id_a, _, _ = a_et_b
     compte_verifie(smtp_simule, id_a, "alice@gmail.com")
     entreprises(id_a, 2)
+    ajouter_entreprises(id_a, [{"siret": f"S{i}"} for i in range(2)], mode="job")   # sélectionnées en job
     client_a.post("/api/mode", json={"mode": "job"})
     client_a.post("/api/profil", json={"email_type": "Corps du mode job."})
     assert client_a.post("/api/spontanees/envoyer", json={"limite": 2}).status_code == 200

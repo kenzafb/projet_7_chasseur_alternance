@@ -675,12 +675,12 @@ def api_lettre_pdf(ref_offre: str, request: Request, user: User = Depends(utilis
 # ─── Spontanées — Suivi des candidatures ──────────────────────────────────────
 @prive.get("/api/spontanees/suivi")
 def api_spontanees_suivi(request: Request, user: User = Depends(utilisateur_requis)):
-    return lire_entreprises_envoyees(user.id)
+    return lire_entreprises_envoyees(user.id, mode_courant(request))
 
 
 @prive.post("/api/spontanees/suivi/statut")
 def api_spontanees_statut(request: Request, body: dict = Body(...), user: User = Depends(utilisateur_requis)):
-    ok = modifier_statut_suivi(user.id, body.get("id"), body.get("statut", ""))
+    ok = modifier_statut_suivi(user.id, body.get("id"), body.get("statut", ""), mode_courant(request))
     return {"ok": ok}
 
 
@@ -689,14 +689,15 @@ def api_spontanees_statut(request: Request, body: dict = Body(...), user: User =
 @prive.get("/api/spontanees/stats")
 def api_spontanees_stats(request: Request, user: User = Depends(utilisateur_requis)):
     # Lecture des stats depuis la base
-    stats = calculer_stats(user.id)
+    mode = mode_courant(request)
+    stats = calculer_stats(user.id, mode)
     # Maximums utiles des lancements (le serveur les applique aussi)
     from database.entreprises_db import compter_a_scraper
     from spontanees.envoyeur import compter_a_envoyer
-    stats["a_scraper"] = compter_a_scraper(user.id)
-    stats["a_envoyer"] = compter_a_envoyer(user.id, mode_courant(request))
+    stats["a_scraper"] = compter_a_scraper(user.id, mode)
+    stats["a_envoyer"] = compter_a_envoyer(user.id, mode)
     from database.entreprises_db import compter_a_valider
-    stats["a_valider"] = compter_a_valider(user.id)
+    stats["a_valider"] = compter_a_valider(user.id, mode)
     # On ajoute l'état du pipeline de l'utilisateur, géré en mémoire
     etat = pipelines.etat(SPONTANEES, user.id)
     stats.update({cle: etat[cle] for cle in ("en_cours", "etape", "message", "pourcentage", "mode_test")})
@@ -755,23 +756,25 @@ def _avec_limite(reponse, **limite):
     return reponse
 
 @prive.post("/api/spontanees/fetch")
-def api_spontanees_fetch(body: Fetch | None = None, user: User = Depends(utilisateur_requis)):
+def api_spontanees_fetch(request: Request, body: Fetch | None = None, user: User = Depends(utilisateur_requis)):
     user_id = user.id
+    mode = mode_courant(request)
     maximum, note = _limite("entreprises", body.max_entreprises if body else None)
-    # Même profil que fetch_entreprises (mode alternance) : LBA d'abord, puis Sirene
+    # Même profil que fetch_entreprises (celui du mode) : LBA si le mode l'utilise, et Sirene
     from shared.criteres import normaliser_recherche
     from shared.domaines import domaines_du_profil
+    from shared.modes import get_mode
     from shared.naf import avertissement_sirene
-    profil = lire_profil(user_id)
+    profil = lire_profil(user_id, mode=mode)
     avertissement = " ".join(filter(None, [
-        lba_ignoree_pour_profil(profil),
+        lba_ignoree_pour_profil(profil) if "lba" in get_mode(mode)["sources"] else "",
         avertissement_sirene(domaines_du_profil(profil),
                              normaliser_recherche(profil.get("recherche") or {}).get("secteurs") or [])]))
 
     def travail(arret, log, on_progress):
         from spontanees.fetch_entreprises import main as fetch_main
         fetch_main(stop_event=arret, on_progress=on_progress, user_id=user_id,
-                   max_entreprises=maximum, log_fn=log)
+                   max_entreprises=maximum, log_fn=log, mode=mode)
 
     return _avec_limite(_lancer_spontanees(
         user_id, "fetch", "Récupération des entreprises en Île-de-France...",
@@ -780,10 +783,11 @@ def api_spontanees_fetch(body: Fetch | None = None, user: User = Depends(utilisa
         **({"avertissement": avertissement} if avertissement else {}))
 
 @prive.post("/api/spontanees/scraper")
-def api_spontanees_scraper(body: Scraper | None = None, user: User = Depends(utilisateur_requis)):
+def api_spontanees_scraper(request: Request, body: Scraper | None = None, user: User = Depends(utilisateur_requis)):
     user_id = user.id
+    mode = mode_courant(request)
     from database.entreprises_db import compter_a_scraper
-    disponibles = compter_a_scraper(user_id)
+    disponibles = compter_a_scraper(user_id, mode)
     if not disponibles:
         raise ErreurUtilisateur("Aucune entreprise à scraper : lance d'abord « Récupérer ».")
     maximum, note = _limite("scrapees", body.max_scrapees if body else None, disponibles)
@@ -791,7 +795,7 @@ def api_spontanees_scraper(body: Scraper | None = None, user: User = Depends(uti
     def travail(arret, log, on_progress):
         from spontanees.scraper_emails import main as scraper_main
         scraper_main(stop_event=arret, log_fn=log, user_id=user_id, on_progress=on_progress,
-                     max_scrapees=maximum)
+                     max_scrapees=maximum, mode=mode)
 
     return _avec_limite(_lancer_spontanees(
         user_id, "scraper", "Scraping des emails...",
@@ -800,9 +804,9 @@ def api_spontanees_scraper(body: Scraper | None = None, user: User = Depends(uti
 
 # ─── Emails non validés par l'IA : jamais envoyés tels quels (D15) ────────────
 @prive.get("/api/spontanees/a_valider")
-def api_spontanees_a_valider(user: User = Depends(utilisateur_requis)):
+def api_spontanees_a_valider(request: Request, user: User = Depends(utilisateur_requis)):
     from database.entreprises_db import lire_a_valider
-    return lire_a_valider(user.id)
+    return lire_a_valider(user.id, mode_courant(request))
 
 @prive.post("/api/spontanees/valider")
 def api_spontanees_valider(body: ValiderEmails, user: User = Depends(utilisateur_requis)):
@@ -813,21 +817,22 @@ def api_spontanees_valider(body: ValiderEmails, user: User = Depends(utilisateur
     return {"ok": True}
 
 @prive.post("/api/spontanees/revalider")
-def api_spontanees_revalider(body: Revalider | None = None, user: User = Depends(utilisateur_requis)):
-    """Relance la validation par l'IA des entreprises aux emails non validés."""
+def api_spontanees_revalider(request: Request, body: Revalider | None = None, user: User = Depends(utilisateur_requis)):
+    """Relance la validation par l'IA des entreprises du mode aux emails non validés."""
     user_id = user.id
+    mode = mode_courant(request)
     if not config.analyse_ia_active():
         raise ErreurUtilisateur("Validation par l'IA indisponible : l'IA est désactivée (ANALYSE_IA=false). "
                                 "Valide les emails à la main.")
     from database.entreprises_db import compter_a_valider
-    disponibles = compter_a_valider(user_id)
+    disponibles = compter_a_valider(user_id, mode)
     if not disponibles:
         raise ErreurUtilisateur("Aucun email en attente de validation.")
     maximum, note = _limite("revalidations", body.max_revalidations if body else None, disponibles)
 
     def travail(arret, log, on_progress):
         from spontanees.scraper_emails import revalider
-        revalider(user_id, stop_event=arret, log_fn=log, on_progress=on_progress, max_n=maximum)
+        revalider(user_id, stop_event=arret, log_fn=log, on_progress=on_progress, max_n=maximum, mode=mode)
 
     return _avec_limite(_lancer_spontanees(
         user_id, "revalider", "Validation IA des emails...",

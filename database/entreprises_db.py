@@ -3,16 +3,27 @@ database/entreprises_db.py
 ==========================
 Couche d'accès aux entreprises EN BASE, par utilisateur : stats, listing,
 et écritures des pipelines spontanées (fetch, scraper, envoyeur, suivi).
+
+Une entreprise est unique par utilisateur (SIRET, puis SIREN, D59) ; ses
+données publiques (site, emails, téléphones, contact) sont communes à tous
+les modes et ne sont scrapées qu'une fois. La sélection pour un mode,
+l'envoi, sa date, les destinataires et le statut de suivi sont propres à
+chaque mode (table entreprises_modes, phase 6a). Les fonctions de lecture
+et d'envoi ne voient que les entreprises sélectionnées dans le mode
+demandé ; un contact dans un autre mode est signalé, jamais bloquant.
 """
 
 import json
 from datetime import datetime, timedelta, timezone
 
 from database.connexion import SessionLocal
-from database.dates import JOUR_HEURE, depuis_base, en_texte, maintenant_utc, vers_utc
+from database.dates import JOUR, JOUR_HEURE, depuis_base, en_texte, maintenant_utc, vers_utc
 
 _TRES_ANCIEN = datetime.min.replace(tzinfo=timezone.utc)
-from database.models import Entreprise
+from sqlalchemy.orm import selectinload
+
+from database.models import EmailContacte, Entreprise, EntrepriseMode
+from shared.modes import MODE_DEFAUT
 from shared.emails_exclus import email_exclu, filtrer as filtrer_emails_exclus
 
 
@@ -73,71 +84,141 @@ def normaliser_contact_rh(valeur) -> str:
     return " ".join(resultat.split())[:LONGUEUR_CONTACT_RH]
 
 
-def _date_envoi(e):
+def _date_envoi(m):
     """Instant d'envoi pour trier, les entreprises sans date en dernier."""
-    return depuis_base(e.mail_envoye_le) or _TRES_ANCIEN
+    return depuis_base(m.mail_envoye_le) or _TRES_ANCIEN
 
 
-def repartition_par_source(entreprises) -> dict:
+def _du_mode(db, user_id: int, mode: str):
+    """[(Entreprise, EntrepriseMode)] des entreprises sélectionnées dans ce
+    mode, dans l'ordre de sélection."""
+    return (db.query(Entreprise, EntrepriseMode)
+              .join(EntrepriseMode, EntrepriseMode.entreprise_id == Entreprise.id)
+              .filter(Entreprise.user_id == user_id, EntrepriseMode.user_id == user_id,
+                      EntrepriseMode.mode == mode)
+              .order_by(EntrepriseMode.id).all())
+
+
+def _selectionner(db, e: Entreprise, mode: str) -> EntrepriseMode:
+    """Ligne de l'entreprise dans ce mode, créée si elle n'existe pas."""
+    m = next((x for x in e.modes if x.mode == mode), None)
+    if m is None:
+        m = EntrepriseMode(user_id=e.user_id, mode=mode, mail_envoye=False, statut_suivi="envoye",
+                           mail_destinataires=[], mail_note="", historique=False)
+        e.modes.append(m)
+    return m
+
+
+def contacts_autres_modes(db, user_id: int, mode: str, entreprises) -> dict[int, list[dict]]:
+    """Pour chaque entreprise (id), ses contacts dans les AUTRES modes :
+    [{"mode", "date" (AAAA-MM-JJ, vide si inconnue), "historique"}], un par
+    mode, triés par mode. Un contact, c'est un envoi enregistré pour
+    l'entreprise dans ce mode, ou l'une de ses adresses déjà contactée
+    dans ce mode (emails_contactes, import historique compris). Sert
+    d'étiquette dans la page Spontanées ; ne bloque jamais l'envoi."""
+    entreprises = list(entreprises)
+    ids = [e.id for e in entreprises]
+    if not ids:
+        return {}
+    trouves: dict[int, dict[str, dict]] = {}
+
+    def noter(eid, autre, date, historique=False):
+        actuel = trouves.setdefault(eid, {}).get(autre)
+        date = depuis_base(date)
+        if actuel is None:
+            trouves[eid][autre] = {"date": date, "historique": historique}
+        else:
+            if date and (actuel["date"] is None or date < actuel["date"]):
+                actuel["date"] = date
+            actuel["historique"] = actuel["historique"] or historique
+
+    for m in (db.query(EntrepriseMode)
+                .filter(EntrepriseMode.user_id == user_id, EntrepriseMode.mode != mode,
+                        EntrepriseMode.mail_envoye.is_(True), EntrepriseMode.entreprise_id.in_(ids))):
+        noter(m.entreprise_id, m.mode, m.mail_envoye_le, bool(m.historique))
+    par_email = {}
+    for c in (db.query(EmailContacte)
+                .filter(EmailContacte.user_id == user_id, EmailContacte.mode != mode)):
+        par_email.setdefault(c.email, []).append(c)
+    if par_email:
+        for e in entreprises:
+            for adresse in {(a or "").strip().lower() for a in (e.emails_trouves or [])}:
+                for c in par_email.get(adresse, []):
+                    noter(e.id, c.mode, c.contacte_le)
+    return {eid: [{"mode": autre, "date": en_texte(v["date"], JOUR) if v["date"] else "",
+                   "historique": v["historique"]} for autre, v in sorted(modes.items())]
+            for eid, modes in trouves.items()}
+
+
+def repartition_par_source(paires) -> dict:
     """Pour chaque source : entreprises, emails trouvés, mails envoyés,
-    réponses (réponse, entretien, refus) et entretiens. Une entreprise
-    trouvée par les deux sources compte dans chacune ; « les_deux » les
-    compte à part."""
+    réponses (réponse, entretien, refus) et entretiens, dans un mode
+    (paires (Entreprise, EntrepriseMode)). Une entreprise trouvée par les
+    deux sources compte dans chacune ; « les_deux » les compte à part."""
     def compter(liste):
         return {
             "entreprises": len(liste),
-            "avec_email":  sum(1 for e in liste if e.emails_trouves),
-            "envoyes":     sum(1 for e in liste if e.mail_envoye),
-            "reponses":    sum(1 for e in liste if e.mail_envoye and e.statut_suivi in STATUTS_REPONSE),
-            "entretiens":  sum(1 for e in liste if e.mail_envoye and e.statut_suivi == "entretien"),
+            "avec_email":  sum(1 for e, _ in liste if e.emails_trouves),
+            "envoyes":     sum(1 for _, m in liste if m.mail_envoye and not m.historique),
+            "reponses":    sum(1 for _, m in liste if m.mail_envoye and m.statut_suivi in STATUTS_REPONSE),
+            "entretiens":  sum(1 for _, m in liste if m.mail_envoye and m.statut_suivi == "entretien"),
         }
-    out = {src: compter([e for e in entreprises if src in (e.sources or [])]) for src in SOURCES}
-    out["les_deux"] = compter([e for e in entreprises if set(SOURCES) <= set(e.sources or [])])
+    out = {src: compter([(e, m) for e, m in paires if src in (e.sources or [])]) for src in SOURCES}
+    out["les_deux"] = compter([(e, m) for e, m in paires if set(SOURCES) <= set(e.sources or [])])
     return out
 
 
-def calculer_stats(user_id: int) -> dict:
-    """Statistiques globales des entreprises d'un utilisateur."""
+def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
+    """Statistiques des entreprises sélectionnées dans un mode."""
     db = SessionLocal()
     try:
-        q = db.query(Entreprise).filter_by(user_id=user_id)
-        toutes = q.all()
-        raw         = len(toutes)
-        avec_email  = sum(1 for e in toutes if e.emails_trouves)
-        mail_envoye = sum(1 for e in toutes if e.mail_envoye)
+        paires = _du_mode(db, user_id, mode)
+        raw         = len(paires)
+        avec_email  = sum(1 for e, _ in paires if e.emails_trouves)
+        mail_envoye = sum(1 for _, m in paires if m.mail_envoye and not m.historique)
+        historiques = sum(1 for _, m in paires if m.historique)
+        prochaines_paires = [(e, m) for e, m in paires if not m.mail_envoye][:PROCHAINES_AFFICHEES]
+        recentes = sorted(((e, m) for e, m in paires if m.mail_envoye),
+                          key=lambda p: (_date_envoi(p[1]), p[1].id), reverse=True)[:5]
+        ailleurs = contacts_autres_modes(db, user_id, mode, [e for e, _ in prochaines_paires + recentes])
 
         # 5 dernières entreprises contactées : les plus récentes par date d'envoi
-        # (à date égale, la dernière insérée d'abord)
-        recentes = sorted((e for e in toutes if e.mail_envoye),
-                          key=lambda e: (_date_envoi(e), e.id), reverse=True)[:5]
+        # (à date égale, la dernière sélectionnée d'abord)
         dernieres = [
             {
+                "id":     e.id,
                 "nom":    (e.nom_commercial or "?")[:40],
                 "ville":  e.ville or "",
                 "email":  (e.emails_trouves or [""])[0] if e.emails_trouves else "",
-                "envoye": bool(e.mail_envoye),
-                "date":   en_texte(e.mail_envoye_le, JOUR_HEURE),
+                "envoye": True,
+                "historique": bool(m.historique),
+                "date":   en_texte(m.mail_envoye_le, JOUR_HEURE),
                 "sources": list(e.sources or []),
+                "contacts_autres_modes": ailleurs.get(e.id, []),
             }
-            for e in recentes
+            for e, m in recentes
         ]
         # Prochaines entreprises traitées, dans l'ordre du scraper et de l'envoyeur
         prochaines = [
             {
+                "id":        e.id,
                 "nom":       (e.nom_commercial or (e.extra or {}).get("nom", "") or "?")[:40],
                 "ville":     e.ville or "",
                 "email":     (e.emails_trouves or [""])[0] if e.emails_trouves else "",
                 "envoye":    False,
                 "sources":   list(e.sources or []),
                 "email_lba": bool(set(e.emails_trouves or []) & set((e.extra or {}).get("emails_lba") or [])),
+                "contacts_autres_modes": ailleurs.get(e.id, []),
             }
-            for e in sorted((e for e in toutes if not e.mail_envoye), key=lambda e: e.id)[:PROCHAINES_AFFICHEES]
+            for e, m in prochaines_paires
         ]
         return {
+            "mode": mode,
             "raw": raw,
             "avec_email": avec_email,
             "mail_envoye": mail_envoye,
-            "par_source": repartition_par_source(toutes),
+            "historiques": historiques,
+            "par_source": repartition_par_source(paires),
             "dernieres": dernieres,
             "prochaines": prochaines,
         }
@@ -148,18 +229,19 @@ def calculer_stats(user_id: int) -> dict:
 
 # Champs rangés dans la colonne "extra", que l'envoyeur et le scraper
 # attendent au niveau racine du dict.
-_CHAMPS_EXTRA_REMONTES = ["nom", "mail_destinataires", "mail_note", "url_scrapee", "source_recherche"]
+_CHAMPS_EXTRA_REMONTES = ["nom", "url_scrapee", "source_recherche"]
 # Champs du scraper gardés dans extra (bug 5 : ils étaient perdus)
 # emails_non_valides : emails lus dans la page sans validation par Mistral
 _CHAMPS_EXTRA_SCRAPER = ("telephone", "url_scrapee", "source_recherche", "tentatives_site",
                          "emails_non_valides")
 
 
-def _entreprise_vers_dict(e) -> dict:
-    """Une ligne Entreprise → dict au format attendu par l'envoyeur (comme l'ancien JSON)."""
+def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
+    """Une entreprise et son état dans un mode → dict au format attendu par
+    l'envoyeur et le scraper (comme l'ancien JSON)."""
     extra = e.extra or {}
     d = {
-        "mode":           e.mode,
+        "mode":           m.mode,
         "nom_commercial": e.nom_commercial,
         "ville":          e.ville,
         "code_postal":    e.code_postal,
@@ -170,10 +252,15 @@ def _entreprise_vers_dict(e) -> dict:
         "telephones":     e.telephones or [],
         "contact_rh":     normaliser_contact_rh(e.contact_rh),
         "traite":         bool(e.traite),
-        "mail_envoye":    bool(e.mail_envoye),
-        "mail_envoye_le": en_texte(e.mail_envoye_le, JOUR_HEURE),
+        "mail_envoye":    bool(m.mail_envoye),
+        "mail_envoye_le": en_texte(m.mail_envoye_le, JOUR_HEURE),
+        "mail_destinataires": list(m.mail_destinataires or []),
+        "mail_note":      m.mail_note or "",
+        "historique":     bool(m.historique),
+        "statut_suivi":   m.statut_suivi or "envoye",
         "sources":        list(e.sources or []),
         "emails_lba":     list(extra.get("emails_lba") or []),
+        "contacts_autres_modes": list(ailleurs),
     }
     # On remonte les champs utiles depuis extra
     for champ in _CHAMPS_EXTRA_REMONTES:
@@ -187,48 +274,52 @@ def _entreprise_vers_dict(e) -> dict:
 
 
 def a_scraper(e: dict) -> bool:
-    """Entreprise que le scraper doit encore traiter."""
+    """Entreprise que le scraper doit encore traiter (données communes à
+    tous les modes : une entreprise déjà scrapée ne l'est plus)."""
     return not (e.get("traite") or e.get("emails_trouves") or e.get("mail_envoye"))
 
 
-def compter_a_scraper(user_id: int) -> int:
-    """Nombre d'entreprises à scraper : le maximum utile d'un lancement."""
+def compter_a_scraper(user_id: int, mode: str = MODE_DEFAUT) -> int:
+    """Nombre d'entreprises du mode à scraper : le maximum utile d'un lancement."""
     db = SessionLocal()
     try:
-        return sum(1 for e in db.query(Entreprise).filter_by(user_id=user_id)
-                   if not (e.traite or e.emails_trouves or e.mail_envoye))
+        return sum(1 for e, m in _du_mode(db, user_id, mode)
+                   if not (e.traite or e.emails_trouves or m.mail_envoye))
     finally:
         db.close()
 
 
-def _en_attente_de_validation(e: Entreprise) -> bool:
-    """Emails lus dans la page sans validation par l'IA, pas encore envoyés (D15)."""
-    return bool((e.extra or {}).get("emails_non_valides")) and bool(e.emails_trouves) and not e.mail_envoye
+def _en_attente_de_validation(e: Entreprise, m: EntrepriseMode) -> bool:
+    """Emails lus dans la page sans validation par l'IA, pas encore envoyés
+    dans ce mode (D15)."""
+    return bool((e.extra or {}).get("emails_non_valides")) and bool(e.emails_trouves) and not m.mail_envoye
 
 
-def lire_a_valider(user_id: int) -> list[dict]:
-    """Entreprises dont les emails attendent une validation (manuelle ou par l'IA)."""
+def lire_a_valider(user_id: int, mode: str = MODE_DEFAUT) -> list[dict]:
+    """Entreprises du mode dont les emails attendent une validation
+    (manuelle ou par l'IA ; la validation vaut pour tous les modes)."""
     db = SessionLocal()
     try:
         return [{"id": e.id, "nom": e.nom_commercial or (e.extra or {}).get("nom", "") or "?",
                  "ville": e.ville or "", "site": e.site_web or "", "emails": list(e.emails_trouves or [])}
-                for e in db.query(Entreprise).filter_by(user_id=user_id).order_by(Entreprise.id)
-                if _en_attente_de_validation(e)]
+                for e, m in _du_mode(db, user_id, mode)
+                if _en_attente_de_validation(e, m)]
     finally:
         db.close()
 
 
-def compter_a_valider(user_id: int) -> int:
-    return len(lire_a_valider(user_id))
+def compter_a_valider(user_id: int, mode: str = MODE_DEFAUT) -> int:
+    return len(lire_a_valider(user_id, mode))
 
 
 def valider_emails(user_id: int, entreprise_id: int) -> bool:
-    """Validation manuelle des emails d'une entreprise de l'utilisateur.
-    False si l'entreprise n'existe pas (ou n'est pas à lui) ou n'attend rien."""
+    """Validation manuelle des emails d'une entreprise de l'utilisateur
+    (donnée commune à tous les modes). False si l'entreprise n'existe pas
+    (ou n'est pas à lui) ou n'attend rien."""
     db = SessionLocal()
     try:
         e = db.query(Entreprise).filter_by(user_id=user_id, id=entreprise_id).first()
-        if not e or not _en_attente_de_validation(e):
+        if not e or not ((e.extra or {}).get("emails_non_valides") and e.emails_trouves):
             return False
         e.extra = {**(e.extra or {}), "emails_non_valides": False}
         db.commit()
@@ -237,43 +328,42 @@ def valider_emails(user_id: int, entreprise_id: int) -> bool:
         db.close()
 
 
-def lire_entreprises(user_id: int) -> list[dict]:
-    """Toutes les entreprises d'un utilisateur, format dict (comme l'ancien
-    JSON), dans l'ordre d'insertion, toutes sources confondues (D44)."""
+def lire_entreprises(user_id: int, mode: str = MODE_DEFAUT) -> list[dict]:
+    """Entreprises sélectionnées dans un mode, format dict (comme l'ancien
+    JSON), dans l'ordre de sélection, toutes sources confondues (D44), avec
+    leurs contacts dans les autres modes."""
     db = SessionLocal()
     try:
-        lignes = db.query(Entreprise).filter_by(user_id=user_id).order_by(Entreprise.id).all()
-        return [_entreprise_vers_dict(e) for e in lignes]
+        paires = _du_mode(db, user_id, mode)
+        ailleurs = contacts_autres_modes(db, user_id, mode, [e for e, _ in paires])
+        return [_entreprise_vers_dict(e, m, ailleurs.get(e.id, [])) for e, m in paires]
     finally:
         db.close()
 
 
-def sauvegarder_entreprises(user_id: int, liste: list[dict]):
+def sauvegarder_entreprises(user_id: int, liste: list[dict], mode: str = MODE_DEFAUT):
     """
-    Réécrit en base les modifications faites par l'envoyeur.
-    On met à jour les champs que l'envoyeur touche : mail_envoye,
-    mail_envoye_le, et mail_destinataires/mail_note (dans extra).
-    On retrouve chaque ligne par son _id technique.
+    Réécrit en base les modifications faites par l'envoyeur, dans ce mode :
+    mail_envoye, mail_envoye_le, mail_destinataires et mail_note. On
+    retrouve chaque ligne par l'id technique de l'entreprise (_id).
     """
     db = SessionLocal()
     try:
         for d in liste:
-            e = db.query(Entreprise).filter_by(id=d.get("_id"), user_id=user_id).first()
-            if not e:
+            m = (db.query(EntrepriseMode)
+                   .filter_by(entreprise_id=d.get("_id"), user_id=user_id, mode=mode).first())
+            if not m:
                 continue
-            e.mail_envoye    = bool(d.get("mail_envoye", False))
+            m.mail_envoye    = bool(d.get("mail_envoye", False))
             # Une date relue (texte en heure d'affichage) et non modifiée n'est
             # pas réécrite : seule une nouvelle valeur (datetime) l'est.
             date = d.get("mail_envoye_le")
-            if not (isinstance(date, str) and date and date == en_texte(e.mail_envoye_le, JOUR_HEURE)):
-                e.mail_envoye_le = vers_utc(date)
-            # Champs qui vivent dans extra
-            extra = dict(e.extra or {})
+            if not (isinstance(date, str) and date and date == en_texte(m.mail_envoye_le, JOUR_HEURE)):
+                m.mail_envoye_le = vers_utc(date)
             if "mail_destinataires" in d:
-                extra["mail_destinataires"] = d["mail_destinataires"]
+                m.mail_destinataires = list(d["mail_destinataires"] or [])
             if "mail_note" in d:
-                extra["mail_note"] = d["mail_note"]
-            e.extra = extra
+                m.mail_note = str(d["mail_note"] or "")[:200]
         db.commit()
     finally:
         db.close()
@@ -315,27 +405,49 @@ def sauvegarder_enrichissement(user_id: int, liste: list[dict]):
         db.close()
 
 
-def ajouter_entreprises(user_id: int, liste: list[dict]) -> int:
+def _index_entreprises(db, user_id: int):
+    """Entreprises de l'utilisateur par SIRET, par SIREN et par identifiant LBA."""
+    par_siret, par_siren, par_identifiant = {}, {}, {}
+    for e in (db.query(Entreprise).filter_by(user_id=user_id)
+                .options(selectinload(Entreprise.modes)).order_by(Entreprise.id)):
+        extra = e.extra or {}
+        if extra.get("siret"):
+            par_siret[extra["siret"]] = e
+        if _siren(e):
+            par_siren.setdefault(_siren(e), e)
+        if (extra.get("lba") or {}).get("identifiant"):
+            par_identifiant[extra["lba"]["identifiant"]] = e
+    return par_siret, par_siren, par_identifiant
+
+
+def _dans_le_mode(e: Entreprise, mode: str) -> bool:
+    return any(m.mode == mode for m in e.modes)
+
+
+def ajouter_entreprises(user_id: int, liste: list[dict], mode: str = MODE_DEFAUT) -> int:
     """
-    Insère en base les NOUVELLES entreprises trouvées par le fetch.
-    Dédup par SIRET (stocké dans extra), puis par SIREN : un autre
-    établissement d'une entreprise déjà en base n'est pas ajouté (D59).
-    Ne touche pas aux existantes.
-    Retourne le nombre de nouvelles entreprises ajoutées.
+    Sélectionne dans le mode les NOUVELLES entreprises trouvées par Sirene.
+    Une entreprise déjà en base dans un autre mode (même SIRET, puis même
+    SIREN, D59) n'est pas dupliquée : elle est sélectionnée dans ce mode,
+    avec ses données déjà scrapées, et la source « sirene » y est notée.
+    Celles déjà dans le mode ne sont pas touchées.
+    Retourne le nombre d'entreprises ajoutées au mode.
     """
     db = SessionLocal()
     ajoutees = 0
     try:
-        # Sirets déjà présents pour cet utilisateur (dédup)
-        existantes = db.query(Entreprise).filter_by(user_id=user_id).all()
-        sirets_connus = {(e.extra or {}).get("siret") for e in existantes} - {None, ""}
-        sirens_connus = {_siren(e) for e in existantes} - {""}
-
+        par_siret, par_siren, _ = _index_entreprises(db, user_id)
         for d in liste:
             siret = d.get("siret", "")
             siren = d.get("siren") or siret[:9]
-            if (siret and siret in sirets_connus) or (siren and siren in sirens_connus):
-                continue  # déjà en base (la source est notée par noter_source)
+            e = (par_siret.get(siret) if siret else None) or (par_siren.get(siren) if siren else None)
+            if e is not None:
+                if _dans_le_mode(e, mode):
+                    continue  # déjà dans le mode (la source est notée par noter_source)
+                _avec_source(e, SOURCE_SIRENE)
+                _selectionner(db, e, mode)
+                ajoutees += 1
+                continue
             # Champs connus → colonnes ; le reste → extra
             extra = {
                 "siret":       siret,
@@ -359,8 +471,11 @@ def ajouter_entreprises(user_id: int, liste: list[dict]) -> int:
                 extra          = extra,
             )
             db.add(e)
-            sirets_connus.add(siret)
-            sirens_connus.add(siren)
+            _selectionner(db, e, mode)
+            if siret:
+                par_siret[siret] = e
+            if siren:
+                par_siren.setdefault(siren, e)
             ajoutees += 1
         db.commit()
     finally:
@@ -368,12 +483,13 @@ def ajouter_entreprises(user_id: int, liste: list[dict]) -> int:
     return ajoutees
 
 
-def cles_connues(user_id: int) -> frozenset:
-    """SIRET, SIREN et identifiants LBA des entreprises déjà en base pour l'utilisateur."""
+def cles_connues(user_id: int, mode: str = MODE_DEFAUT) -> frozenset:
+    """SIRET, SIREN et identifiants LBA des entreprises déjà sélectionnées
+    dans le mode (une entreprise d'un autre mode reste à sélectionner)."""
     db = SessionLocal()
     try:
         cles = set()
-        for e in db.query(Entreprise).filter_by(user_id=user_id):
+        for e, _ in _du_mode(db, user_id, mode):
             extra = e.extra or {}
             cles.update(c for c in (extra.get("siret"), _siren(e), (extra.get("lba") or {}).get("identifiant")) if c)
         return frozenset(cles)
@@ -398,31 +514,26 @@ def noter_source(user_id: int, sirets, source: str, sirens=()) -> int:
         db.close()
 
 
-def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None = None) -> dict:
+def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None = None,
+                            mode: str = MODE_DEFAUT) -> dict:
     """Entreprises à fort potentiel de La Bonne Alternance (normalisées par
     france_travail.scraper_lba) dans les candidatures spontanées du mode
-    alternance, source « lba ». Dédoublonnage par SIRET avec toutes les
-    entreprises de l'utilisateur (Sirene comprises), puis par SIREN (un
-    autre établissement de la même entreprise, D59), à défaut par
+    (alternance), source « lba ». Dédoublonnage par SIRET avec toutes les
+    entreprises de l'utilisateur (Sirene comprises, tous modes), puis par
+    SIREN (un autre établissement de la même entreprise, D59), à défaut par
     identifiant LBA. Une entreprise déjà connue garde ses données et ajoute
-    « lba » à ses sources (D44) ; un email fourni par
-    LBA est ajouté à ses emails s'il n'y est pas et qu'elle n'a pas encore
-    été contactée. Les emails fournis par LBA sont notés dans
-    extra["emails_lba"]. maximum : nouvelles entreprises au plus (None :
-    toutes). Retourne {"ajoutees", "deja_connues", "deux_sources" (déjà
-    connues d'une autre source), "avec_email", "non_ajoutees"}."""
+    « lba » à ses sources (D44) ; connue seulement dans un autre mode, elle
+    est sélectionnée dans celui-ci (comptée parmi les ajoutées, dans la
+    limite). Un email fourni par LBA est ajouté à ses emails s'il n'y est
+    pas et qu'elle n'a encore été contactée dans aucun mode. Les emails
+    fournis par LBA sont notés dans extra["emails_lba"]. maximum :
+    nouvelles entreprises du mode au plus (None : toutes). Retourne
+    {"ajoutees", "deja_connues", "deux_sources" (déjà connues d'une autre
+    source), "avec_email", "non_ajoutees"}."""
     bilan = {"ajoutees": 0, "deja_connues": 0, "deux_sources": 0, "avec_email": 0, "non_ajoutees": 0}
     db = SessionLocal()
     try:
-        par_siret, par_siren, par_identifiant = {}, {}, {}
-        for e in db.query(Entreprise).filter_by(user_id=user_id):
-            extra = e.extra or {}
-            if extra.get("siret"):
-                par_siret[extra["siret"]] = e
-            if _siren(e):
-                par_siren.setdefault(_siren(e), e)
-            if (extra.get("lba") or {}).get("identifiant"):
-                par_identifiant[extra["lba"]["identifiant"]] = e
+        par_siret, par_siren, par_identifiant = _index_entreprises(db, user_id)
         for d in liste:
             infos_lba = {k: d.get(k, "") for k in ("identifiant", "candidature_id", "candidature_url", "libelle_naf")}
             email = d.get("email") or ""
@@ -431,12 +542,20 @@ def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None
                  or (par_siren.get(d["siren"]) if d.get("siren") else None)
                  or (par_identifiant.get(infos_lba["identifiant"]) if infos_lba["identifiant"] else None))
             if e is not None:
-                bilan["deja_connues"] += 1
+                if not _dans_le_mode(e, mode):
+                    if maximum is not None and bilan["ajoutees"] >= maximum:
+                        bilan["non_ajoutees"] += 1
+                        continue
+                    _selectionner(db, e, mode)
+                    bilan["ajoutees"] += 1
+                else:
+                    bilan["deja_connues"] += 1
                 extra = dict(e.extra or {})
                 extra["lba"] = infos_lba
                 if _avec_source(e, SOURCE_LBA):
                     bilan["deux_sources"] += 1
-                if email and not e.mail_envoye and email not in (e.emails_trouves or []):
+                envoyee = any(m.mail_envoye for m in e.modes)
+                if email and not envoyee and email not in (e.emails_trouves or []):
                     e.emails_trouves = list(e.emails_trouves or []) + [email]
                 if email:
                     extra["emails_lba"] = sorted(set(extra.get("emails_lba") or []) | {email})
@@ -459,7 +578,6 @@ def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None
                 bilan["avec_email"] += 1
             e = Entreprise(
                 user_id        = user_id,
-                mode           = "alternance",
                 sources        = [SOURCE_LBA],
                 nom_commercial = d.get("nom_commercial") or d.get("nom", ""),
                 ville          = d.get("ville", ""),
@@ -472,6 +590,7 @@ def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None
                 extra          = extra,
             )
             db.add(e)
+            _selectionner(db, e, mode)
             if d.get("siret"):
                 par_siret[d["siret"]] = e
             if d.get("siren"):
@@ -485,28 +604,28 @@ def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None
     return bilan
 
 
-def lire_entreprises_envoyees(user_id: int) -> list[dict]:
+def lire_entreprises_envoyees(user_id: int, mode: str = MODE_DEFAUT) -> list[dict]:
     """
-    Entreprises où un mail a été envoyé, pour le tableau de suivi.
+    Entreprises où un mail a été envoyé dans ce mode, pour le tableau de
+    suivi (contactées avant la refonte comprises, notées « historique »).
     Calcule automatiquement le statut 'a_relancer' si envoyé depuis +7 jours
-    et toujours au statut 'envoye'.
+    par l'application et toujours au statut 'envoye'.
     """
     db = SessionLocal()
     try:
-        envoyees = (db.query(Entreprise)
-                      .filter_by(user_id=user_id, mail_envoye=True)
-                      .all())
+        envoyees = [(e, m) for e, m in _du_mode(db, user_id, mode) if m.mail_envoye]
+        ailleurs = contacts_autres_modes(db, user_id, mode, [e for e, _ in envoyees])
         maintenant = maintenant_utc()
         resultat = []
-        for e in envoyees:
-            statut = e.statut_suivi or "envoye"
+        for e, m in envoyees:
+            statut = m.statut_suivi or "envoye"
             # Calcul auto "à relancer" : seulement si encore au statut brut "envoye"
-            if statut == "envoye" and e.mail_envoye_le:
-                if maintenant - depuis_base(e.mail_envoye_le) >= timedelta(days=7):
+            if statut == "envoye" and m.mail_envoye_le and not m.historique:
+                if maintenant - depuis_base(m.mail_envoye_le) >= timedelta(days=7):
                     statut = "a_relancer"
-            d = _entreprise_vers_dict(e)
+            d = _entreprise_vers_dict(e, m, ailleurs.get(e.id, []))
             d["statut_suivi"] = statut
-            resultat.append((depuis_base(e.mail_envoye_le) or _TRES_ANCIEN, d))
+            resultat.append((depuis_base(m.mail_envoye_le) or _TRES_ANCIEN, d))
         # Tri sur l'instant UTC (pas sur le texte affiché) : les plus récentes en premier
         resultat.sort(key=lambda paire: paire[0], reverse=True)
         return [d for _, d in resultat]
@@ -514,17 +633,18 @@ def lire_entreprises_envoyees(user_id: int) -> list[dict]:
         db.close()
 
 
-def modifier_statut_suivi(user_id: int, entreprise_id: int, statut: str) -> bool:
-    """Change le statut de suivi d'une entreprise (envoye/reponse/entretien/refus/bounce)."""
+def modifier_statut_suivi(user_id: int, entreprise_id: int, statut: str, mode: str = MODE_DEFAUT) -> bool:
+    """Change le statut de suivi d'une entreprise dans ce mode (envoye/reponse/entretien/refus/bounce)."""
     valides = {"envoye", "a_relancer", "reponse", "entretien", "refus", "bounce"}
     if statut not in valides:
         return False
     db = SessionLocal()
     try:
-        e = db.query(Entreprise).filter_by(user_id=user_id, id=entreprise_id).first()
-        if not e:
+        m = (db.query(EntrepriseMode)
+               .filter_by(user_id=user_id, entreprise_id=entreprise_id, mode=mode).first())
+        if not m:
             return False
-        e.statut_suivi = statut
+        m.statut_suivi = statut
         db.commit()
         return True
     finally:

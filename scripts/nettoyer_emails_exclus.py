@@ -40,7 +40,7 @@ def nettoyer(appliquer: bool = False, afficher=print) -> list[dict]:
             restantes = [a for a in emails if not email_exclu(a)]
             concernees.append({"id": e.id, "user_id": e.user_id, "nom": e.nom_commercial or extra.get("nom", "?"),
                                "retirees": sorted(set(retirees)), "restantes": restantes,
-                               "envoyee": bool(e.mail_envoye)})
+                               "envoyee": any(m.mail_envoye for m in e.modes)})
             if appliquer:
                 e.emails_trouves = restantes
                 if "emails_lba" in extra:

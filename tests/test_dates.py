@@ -64,11 +64,11 @@ def test_resultat_independant_du_fuseau_du_processus(fuseau_processus, tz):
     liste = entreprises_db.lire_entreprises(uid)
     liste[0].update(mail_envoye=True, mail_envoye_le="2026-01-15 09:30")
     entreprises_db.sauvegarder_entreprises(uid, liste)
-    assert _brut("SELECT mail_envoye_le FROM entreprises") == "2026-01-15 08:30:00.000000"
+    assert _brut("SELECT mail_envoye_le FROM entreprises_modes") == "2026-01-15 08:30:00.000000"
     relue = entreprises_db.lire_entreprises(uid)
     assert relue[0]["mail_envoye_le"] == "2026-01-15 09:30"
     entreprises_db.sauvegarder_entreprises(uid, relue)   # relecture/réécriture : inchangé
-    assert _brut("SELECT mail_envoye_le FROM entreprises") == "2026-01-15 08:30:00.000000"
+    assert _brut("SELECT mail_envoye_le FROM entreprises_modes") == "2026-01-15 08:30:00.000000"
 
     # Heure affichée : Paris, pas l'heure locale du processus
     assert maintenant_affichage().utcoffset() in (timedelta(hours=1), timedelta(hours=2))

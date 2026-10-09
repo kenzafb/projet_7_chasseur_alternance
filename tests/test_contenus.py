@@ -129,8 +129,8 @@ def test_objet_du_profil_dans_le_mail_envoye(utilisateur, smtp_simule, monkeypat
     client.post("/api/mode", json={"mode": "job"})
     client.post("/api/profil", json={"email_objet": "Objet job\r\nBcc: espion@x.fr", "email_type": "Corps job"})
     assert client.get("/api/profil").json()["email_objet"].startswith("Objet job")
-    ajouter_entreprises(user_id, [{"siret": "S1", "nom": "ACME"}])
-    liste = lire_entreprises(user_id)
+    ajouter_entreprises(user_id, [{"siret": "S1", "nom": "ACME"}], mode="job")
+    liste = lire_entreprises(user_id, "job")
     liste[0]["emails_trouves"] = ["rh@acme.fr"]
     sauvegarder_enrichissement(user_id, liste)
 

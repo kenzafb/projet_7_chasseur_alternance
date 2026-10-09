@@ -777,10 +777,13 @@ def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
 # ─── Chargement / sauvegarde ──────────────────────────────────────────────────
 
 from database.entreprises_db import a_scraper, lire_entreprises, sauvegarder_enrichissement
+from shared.modes import MODE_DEFAUT
 
-def charger_entreprises(user_id):
-    """Lit les entreprises de l'utilisateur depuis la BASE."""
-    data = lire_entreprises(user_id)
+def charger_entreprises(user_id, mode=MODE_DEFAUT):
+    """Lit les entreprises sélectionnées dans le mode depuis la BASE. Leurs
+    données (site, emails, contact) sont communes à tous les modes : une
+    entreprise déjà scrapée pour un autre mode ne l'est pas deux fois."""
+    data = lire_entreprises(user_id, mode)
     print(f"[Chargement] base → {len(data)} entreprises")
     return data
 
@@ -792,7 +795,7 @@ def sauvegarder(user_id, entreprises):
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
-def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=None):
+def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=None, mode=MODE_DEFAUT):
     """Cherche site, emails et contact des entreprises pas encore traitées,
     au plus max_scrapees par lancement (None : toutes)."""
     _log = log_fn or print
@@ -802,7 +805,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
     if DEBUG:
         _log("  [Mode DEBUG activé — logs DDG détaillés]")
 
-    entreprises  = charger_entreprises(user_id)
+    entreprises  = charger_entreprises(user_id, mode)
     total        = len(entreprises)
     deja_envoyes = sum(1 for e in entreprises if e.get("mail_envoye"))
     deja_emails  = sum(1 for e in entreprises if e.get("emails_trouves"))
@@ -941,7 +944,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
     _log(f"   DDG : {_compteur_ddg} requêtes")
 
 
-def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=None):
+def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=None, mode=MODE_DEFAUT):
     """Relance la validation par Mistral des emails gardés sans elle (D15) :
     pages relues, puis emails, téléphones et contact remplacés par ceux que
     l'IA retient. Échec passager : l'entreprise reste à valider. Erreur
@@ -950,7 +953,7 @@ def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=Non
     if not analyse_ia_active():
         _log(f"❌ {MESSAGE_IA_DESACTIVEE} Validation non lancée.")
         return
-    entreprises = charger_entreprises(user_id)
+    entreprises = charger_entreprises(user_id, mode)
     cibles = [e for e in entreprises
               if e.get("emails_non_valides") and e.get("emails_trouves") and not e.get("mail_envoye")]
     if max_n:
@@ -994,5 +997,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--user", type=int, required=True,
                         help="ID de l'utilisateur pour lequel scraper")
+    parser.add_argument("--mode", default=MODE_DEFAUT, help="entreprises sélectionnées dans ce mode")
     args = parser.parse_args()
-    main(user_id=args.user)
+    main(user_id=args.user, mode=args.mode)

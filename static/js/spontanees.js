@@ -8,10 +8,26 @@ let compte = null;    // compte d'envoi (mode test affiché en bandeau)
 let aValider = [];    // entreprises aux emails non validés par l'IA
 let filtre = "all";
 
+/* Contacts de l'entreprise dans les autres modes : simple étiquette,
+   l'envoi dans le mode courant n'est jamais bloqué */
+const NOMS_MODES = { alternance: "alternance", job: "job", stage: "stage" };
+function dateFr(jour) {
+  const [a, m, j] = (jour || "").split("-");
+  return a && m && j ? `${j}/${m}/${a}` : "";
+}
+export function etiquettesAutresModes(e) {
+  return (e.contacts_autres_modes || []).map(c => {
+    const date = dateFr(c.date);
+    const texte = `déjà contactée en ${NOMS_MODES[c.mode] || c.mode}${date ? ` le ${date}` : ""}`;
+    const titre = c.historique ? "Contact antérieur à la refonte (import de l'historique)" : texte;
+    return ` <span class="chip chip--ambre" title="${esc(titre)}">${esc(texte)}</span>`;
+  }).join("");
+}
+
 function ligne(e) {
   const aEmail = !!e.email;
   const statut = e.envoye
-    ? `<span class="chip chip--vert">envoyé</span>`
+    ? `<span class="chip chip--vert">${e.historique ? "contactée avant la refonte" : "envoyé"}</span>`
     : aEmail
       ? `<span class="chip chip--ft">à envoyer</span>`
       : `<span class="chip chip--gris">ignoré</span>`;
@@ -23,7 +39,7 @@ function ligne(e) {
   return `
     <div class="trow">
       <div>
-        <div class="trow__name">${esc(e.nom || "—")}${pastilles}</div>
+        <div class="trow__name">${esc(e.nom || "—")}${pastilles}${etiquettesAutresModes(e)}</div>
         <div class="trow__sub">${esc(e.ville || "")}</div>
       </div>
       <div class="trow__mail ${aEmail ? "" : "trow__mail--none"}">${aEmail ? esc(e.email) : "non trouvé"}${origine}</div>

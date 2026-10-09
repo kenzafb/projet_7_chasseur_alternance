@@ -152,10 +152,12 @@ def test_adresses_contactees_par_mode(a_et_b):
 
 
 def test_envoi_alternance_puis_job_puis_alternance(a_et_b, envoi_simule, monkeypatch):
-    """Adresse contactée en alternance : acceptée en job, refusée une seconde fois en alternance."""
+    """Adresse contactée en alternance : acceptée en job, refusée une seconde fois en alternance.
+    Les entreprises sont sélectionnées dans les deux modes (phase 6a)."""
     id_a, _ = a_et_b
     monkeypatch.setattr(envoyeur, "PAUSE_ENTRE_MAILS", (0, 0))
     ajouter_entreprises(id_a, [{"siret": f"S{i}", "nom": f"Ent {i}"} for i in range(3)])
+    assert ajouter_entreprises(id_a, [{"siret": f"S{i}", "nom": f"Ent {i}"} for i in range(3)], mode="job") == 3
     liste = lire_entreprises(id_a)
     for e in liste:
         e["emails_trouves"] = ["rh@acme.fr"]

@@ -25,6 +25,11 @@ Garde-fous :
   - identifiants refusés ou serveur injoignable : arrêt immédiat
     (EnvoiInterrompu), sans essayer les entreprises suivantes.
 
+État d'envoi par mode (phase 6a) : seules les entreprises sélectionnées
+dans le mode sont visées, et leur état d'envoi (envoyée, date,
+destinataires) est celui du mode. Une entreprise contactée dans un autre
+mode reste envoyable : la page Spontanées l'indique seulement.
+
 Système de déduplication (par utilisateur et par mode, en base) :
   - Au démarrage : charge les adresses déjà contactées par CET utilisateur
     dans CE mode (table emails_contactes) + les destinataires enregistrés
@@ -112,19 +117,22 @@ from database.entreprises_db import lire_entreprises, sauvegarder_entreprises
 
 # Utilisateur pour lequel l'envoyeur travaille : passé par l'appelant
 # (user_id de la session côté web, --user obligatoire en CLI).
-def charger_json(user_id):
-    """Lit les entreprises de l'utilisateur depuis la BASE."""
-    return lire_entreprises(user_id)
+def charger_json(user_id, mode="alternance"):
+    """Lit depuis la BASE les entreprises sélectionnées dans le mode, avec
+    leur état d'envoi dans ce mode."""
+    return lire_entreprises(user_id, mode)
 
 
-def sauvegarder_json(user_id, data):
-    """Réécrit les modifications (mail_envoye, etc.) en BASE pour l'utilisateur."""
-    sauvegarder_entreprises(user_id, data)
+def sauvegarder_json(user_id, data, mode="alternance"):
+    """Réécrit l'état d'envoi (mail_envoye, etc.) dans ce mode, en BASE."""
+    sauvegarder_entreprises(user_id, data, mode)
 
 
 def adresses_deja_contactees(user_id, mode, entreprises) -> set:
     """Adresses à ne plus viser dans ce mode : celles de emails_contactes, et
-    les destinataires enregistrés sur les entreprises du mode (au cas où)."""
+    les destinataires enregistrés sur les entreprises du mode (au cas où).
+    Un contact dans un autre mode ne compte pas : il est seulement signalé
+    dans la page Spontanées."""
     deja = lire_emails_contactes(user_id, mode)
     for e in entreprises:
         if e.get("mode") == mode and e.get("mail_envoye") and e.get("mail_destinataires"):
@@ -149,7 +157,7 @@ def envoyable(e) -> bool:
 def compter_a_envoyer(user_id, mode) -> int:
     """Entreprises avec email, pas encore envoyées, dont au moins une adresse
     n'a pas été contactée dans ce mode : le maximum utile d'un envoi."""
-    entreprises = charger_json(user_id)
+    entreprises = charger_json(user_id, mode)
     deja = adresses_deja_contactees(user_id, mode, entreprises)
     return sum(1 for e in entreprises
                if envoyable(e) and adresses_nouvelles(e, deja))
@@ -211,7 +219,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
 
     bilan = {"envoyes": 0, "echecs": 0, "arret": None}
 
-    entreprises = charger_json(user_id)
+    entreprises = charger_json(user_id, mode)
 
     # ── Déduplication : adresses contactées + champ mail_destinataires ───────
     nb_contactes = len(lire_emails_contactes(user_id, mode))
@@ -246,7 +254,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
     for e in entreprises:
         if stop_event and stop_event.is_set():
             _log("⏹️  Arrêt — sauvegarde en cours...")
-            sauvegarder_json(user_id, entreprises)
+            sauvegarder_json(user_id, entreprises, mode)
             return bilan_final("stop")
 
         if envoyes >= limite:
@@ -309,7 +317,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
                 # Problème de compte ou de serveur : inutile d'essayer les suivantes
                 if erreur.categorie == smtp.AUTH:
                     marquer_verification(user_id, False)
-                sauvegarder_json(user_id, entreprises)
+                sauvegarder_json(user_id, entreprises, mode)
                 bilan_final("erreur")
                 conseil = (" Vérifie le compte d'envoi dans ton profil, puis relance "
                            "« Tester la connexion »." if erreur.categorie == smtp.AUTH else "")
@@ -343,7 +351,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
         traites += 1
 
         if traites % SAUVEGARDE_TOUS == 0:
-            sauvegarder_json(user_id, entreprises)
+            sauvegarder_json(user_id, entreprises, mode)
             avec = sum(1 for x in entreprises if x.get("emails_trouves"))
             _log(f"  💾 Sauvegarde — {envoyes} envoyés, {echecs} échecs")
 
@@ -353,7 +361,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
                 _log(f"  ⏸️  Pause {pause:.0f}s...")
                 time.sleep(pause)
 
-    sauvegarder_json(user_id, entreprises)
+    sauvegarder_json(user_id, entreprises, mode)
     _log(f"✅ Envoi terminé — {envoyes} envoyés, {echecs} échecs")
     if test:
         _log("🧪 Mode test : tous les mails sont partis vers l'adresse d'expédition, rien n'est enregistré.")

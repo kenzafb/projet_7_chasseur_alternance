@@ -66,6 +66,7 @@ class User(Base):
     profils          = _relation_depuis_user("Profil")
     candidatures     = _relation_depuis_user("Candidature")
     entreprises      = _relation_depuis_user("Entreprise")
+    entreprises_modes = _relation_depuis_user("EntrepriseMode")
     offres_vues      = _relation_depuis_user("OffreVue")
     emails_contactes = _relation_depuis_user("EmailContacte")
     compte_envoi     = relationship("CompteEnvoi", back_populates="user", uselist=False,
@@ -172,12 +173,15 @@ class Candidature(Base):
 
 
 # ─── Entreprise (candidatures spontanées) ─────────────────────────────────────
+# Une entreprise est unique par utilisateur (SIRET, puis SIREN) : ses données
+# publiques (site, emails, contacts) sont communes à tous les modes et ne
+# sont scrapées qu'une fois. Ce qui dépend du mode (sélection, envoi, date,
+# suivi) est dans EntrepriseMode, une ligne par mode où elle est sélectionnée.
 class Entreprise(Base):
     __tablename__ = "entreprises"
 
     id      = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    mode    = Column(String(20), nullable=False, default="alternance", server_default="alternance")   # alternance | job
 
     nom_commercial = Column(String(300), default="")
     ville          = Column(String(150), default="")
@@ -195,12 +199,38 @@ class Entreprise(Base):
     contact_rh     = Column(String(200), default="")
 
     traite         = Column(Boolean, default=False)
-    mail_envoye    = Column(Boolean, default=False)
-    mail_envoye_le = Column(DateTime(timezone=True))
-    statut_suivi   = Column(String(30), default="envoye")   # envoye, reponse, entretien, refus, bounce ("à relancer" calculé via mail_envoye_le)
-    extra          = Column(JSON, default=dict)   # champs FT/scraper non mappés (siret, dirigeant, mail_destinataires...)
+    extra          = Column(JSON, default=dict)   # champs FT/scraper non mappés (siret, dirigeant...)
 
-    user = _relation_vers_user("entreprises")
+    user  = _relation_vers_user("entreprises")
+    modes = relationship("EntrepriseMode", back_populates="entreprise",
+                         cascade="all, delete-orphan", passive_deletes=True)
+
+
+# ─── État d'une entreprise dans un mode (sélection, envoi, suivi) ─────────────
+class EntrepriseMode(Base):
+    __tablename__ = "entreprises_modes"
+    __table_args__ = (
+        UniqueConstraint("entreprise_id", "mode"),
+        Index("ix_entreprises_modes_user_id_mode", "user_id", "mode"),
+    )
+
+    id            = Column(Integer, primary_key=True)
+    entreprise_id = Column(Integer, ForeignKey("entreprises.id", ondelete="CASCADE"), nullable=False)
+    user_id       = _user_id()
+    mode          = Column(String(20), nullable=False)   # alternance | job | stage
+
+    selectionnee_le    = Column(DateTime(timezone=True), default=maintenant_utc)
+    mail_envoye        = Column(Boolean, nullable=False, default=False, server_default=false())
+    mail_envoye_le     = Column(DateTime(timezone=True))
+    statut_suivi       = Column(String(30), default="envoye")   # envoye, reponse, entretien, refus, bounce ("à relancer" calculé via mail_envoye_le)
+    mail_destinataires = Column(JSON, default=list)
+    mail_note          = Column(String(200), default="")
+    # Contactée avant la refonte (scripts/importer_contacts_historiques.py) :
+    # jamais envoyée par l'application, date connue ou non
+    historique         = Column(Boolean, nullable=False, default=False, server_default=false())
+
+    entreprise = relationship("Entreprise", back_populates="modes")
+    user       = _relation_vers_user("entreprises_modes")
 
 
 # ─── Offres déjà vues (dédup des recherches, par utilisateur et par mode) ─────

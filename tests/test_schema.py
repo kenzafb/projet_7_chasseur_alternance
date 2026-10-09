@@ -69,7 +69,7 @@ def test_suppression_user_en_cascade_cote_base():
     # DELETE SQL direct, sans l'ORM : seul ON DELETE CASCADE peut nettoyer
     with engine.begin() as cx:
         cx.execute(text("DELETE FROM users WHERE id = :id"), {"id": uid})
-        for table in ("profils", "candidatures", "entreprises"):
+        for table in ("profils", "candidatures", "entreprises", "entreprises_modes"):
             assert cx.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar_one() == 0
 
 
@@ -88,7 +88,7 @@ def test_entreprise_mode_par_defaut():
         db.close()
     entreprises_db.ajouter_entreprises(uid, [{"siret": "1"}])
     with engine.connect() as cx:
-        assert cx.execute(text("SELECT mode FROM entreprises")).scalar_one() == "alternance"
+        assert cx.execute(text("SELECT mode FROM entreprises_modes")).scalar_one() == "alternance"
 
 
 def test_dates_stockees_en_datetime_et_rendues_en_texte():

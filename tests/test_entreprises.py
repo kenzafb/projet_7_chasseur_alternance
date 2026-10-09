@@ -163,7 +163,7 @@ def test_ancien_json_relu_comme_texte(user_id):
     try:
         e = db.query(Entreprise).filter_by(user_id=user_id).one()
         e.contact_rh = json.dumps({"prenom": "Jean", "nom": "Dupont", "poste": "RH"}, ensure_ascii=False)
-        e.mail_envoye = True
+        e.modes[0].mail_envoye = True
         db.commit()
     finally:
         db.close()

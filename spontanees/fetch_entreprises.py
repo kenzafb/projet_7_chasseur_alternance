@@ -36,6 +36,7 @@ from database.entreprises_db import ajouter_entreprises, noter_source
 from shared.config import DEPTS_IDF
 from shared.criteres import normaliser_recherche
 from shared.domaines import domaines_du_profil
+from shared.modes import MODE_DEFAUT
 from shared.naf import avertissement_sirene, secteurs_sirene
 from shared.tailles import TAILLES_250_PLUS, tranches_insee
 from spontanees import parametres_sirene as P
@@ -282,16 +283,18 @@ def extraire_infos(etab):
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
-def enregistrer(user_id, entreprises: dict, sirens_vus=()) -> int:
-    """Nouvelles entreprises en base, et source « sirene » notée sur les
-    entreprises déjà connues (LBA) que Sirene a retrouvées, par SIRET ou
-    par SIREN."""
+def enregistrer(user_id, entreprises: dict, sirens_vus=(), mode=MODE_DEFAUT) -> int:
+    """Nouvelles entreprises du mode en base (une entreprise déjà connue
+    dans un autre mode y est sélectionnée, sans doublon), et source
+    « sirene » notée sur les entreprises du mode déjà connues (LBA) que
+    Sirene a retrouvées, par SIRET ou par SIREN."""
     noter_source(user_id, [s for s, e in entreprises.items() if e.get("_vue_par_sirene")], "sirene",
                  sirens=sirens_vus)
-    return ajouter_entreprises(user_id, [e for e in entreprises.values() if not e.get("_deja_en_base")])
+    return ajouter_entreprises(user_id, [e for e in entreprises.values() if not e.get("_deja_en_base")], mode)
 
 
-def entreprises_lba(user_id, profil, max_entreprises=None, stop_event=None, log_fn=print) -> int:
+def entreprises_lba(user_id, profil, max_entreprises=None, stop_event=None, log_fn=print,
+                    mode=MODE_DEFAUT) -> int:
     """Entreprises à fort potentiel de La Bonne Alternance (SPEC_SOURCES
     section 3). Retourne le nombre de nouvelles entreprises ajoutées (au
     plus max_entreprises)."""
@@ -304,7 +307,7 @@ def entreprises_lba(user_id, profil, max_entreprises=None, stop_event=None, log_
     # Cercles au plafond de 150 entreprises redécoupés (D36), jusqu'à
     # max_entreprises nouvelles
     lba = rechercher_pour_profil(profil, log=log_fn, stop_event=stop_event, redecouper_entreprises=True,
-                                 objectif_entreprises=max_entreprises, connus=cles_connues(user_id))
+                                 objectif_entreprises=max_entreprises, connus=cles_connues(user_id, mode))
     if lba is not None:
         log_fn(f"⏱️  La Bonne Alternance terminée : {lba['requetes']} requêtes en "
                f"{int(lba['duree_s']) // 60} min {int(lba['duree_s']) % 60:02d} s")
@@ -312,7 +315,7 @@ def entreprises_lba(user_id, profil, max_entreprises=None, stop_event=None, log_
         if lba is not None:
             log_fn("ℹ️  Aucune entreprise à fort potentiel trouvée sur LBA")
         return 0
-    b = ajouter_entreprises_lba(user_id, lba["entreprises"], maximum=max_entreprises)
+    b = ajouter_entreprises_lba(user_id, lba["entreprises"], maximum=max_entreprises, mode=mode)
     log_fn(f"🏢 LBA : {b['ajoutees']} nouvelles entreprises à fort potentiel"
            + (f" (dont {b['avec_email']} avec un email fourni par LBA)" if b["avec_email"] else "")
            + (f", {b['deja_connues']} déjà connues" if b["deja_connues"] else "")
@@ -321,17 +324,22 @@ def entreprises_lba(user_id, profil, max_entreprises=None, stop_event=None, log_
     return b["ajoutees"]
 
 
-def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_fn=None):
-    """Ajoute en base au plus max_entreprises NOUVELLES entreprises (None :
-    toutes), de La Bonne Alternance et de Sirene, sans priorité de l'une
-    sur l'autre (D44) : LBA a droit à la moitié de la limite, Sirene au
-    reste (plus ce que LBA n'a pas utilisé)."""
+def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_fn=None, mode=MODE_DEFAUT):
+    """Sélectionne dans le mode au plus max_entreprises NOUVELLES entreprises
+    (None : toutes), de La Bonne Alternance (modes qui l'utilisent) et de
+    Sirene, sans priorité de l'une sur l'autre (D44) : LBA a droit à la
+    moitié de la limite, Sirene au reste (plus ce que LBA n'a pas utilisé).
+    Une entreprise déjà connue dans un autre mode compte comme nouvelle
+    pour ce mode ; ses données déjà scrapées sont reprises."""
     _log = log_fn if log_fn is not None else print
     from database.profil_db import lire_profil
-    profil = lire_profil(user_id)
+    from shared.modes import get_mode
+    profil = lire_profil(user_id, mode=mode)
 
-    part_lba = None if max_entreprises is None else (max_entreprises + 1) // 2
-    ajoutees_lba = entreprises_lba(user_id, profil, part_lba, stop_event, _log)
+    ajoutees_lba = 0
+    if "lba" in get_mode(mode)["sources"]:
+        part_lba = None if max_entreprises is None else (max_entreprises + 1) // 2
+        ajoutees_lba = entreprises_lba(user_id, profil, part_lba, stop_event, _log, mode)
     if max_entreprises is not None:
         max_entreprises -= ajoutees_lba
         if max_entreprises <= 0:
@@ -349,9 +357,10 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
         _log("ℹ️  Sirene : rien à chercher pour ce profil.")
         return
 
-    # SIRET déjà en base (Sirene ou LBA) : pas de doublon, seulement la source notée
+    # SIRET déjà dans le mode (Sirene ou LBA) : pas de doublon, seulement la source
+    # notée ; une entreprise connue dans un autre mode sera sélectionnée dans celui-ci
     from database.entreprises_db import lire_entreprises
-    existantes = lire_entreprises(user_id)
+    existantes = lire_entreprises(user_id, mode)
     entreprises = {(e.get("_extra") or {}).get("siret"): {"_deja_en_base": True}
                    for e in existantes if (e.get("_extra") or {}).get("siret")}
     sirens = frozenset(e.get("siren") or ((e.get("_extra") or {}).get("siret") or "")[:9] for e in existantes) - {""}
@@ -381,7 +390,7 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
         if on_progress:
             on_progress(round(i / len(plan) * 100), f"{i}/{len(plan)} recherches · {len(entreprises) - au_depart} nouvelles")
 
-    nb_ajoutees = enregistrer(user_id, entreprises, collecte.sirens_vus)
+    nb_ajoutees = enregistrer(user_id, entreprises, collecte.sirens_vus, mode)
     deja = sum(1 for e in entreprises.values() if e.get("_vue_par_sirene")) + len(collecte.sirens_vus)
     duree = time.monotonic() - debut
     _log(f"🏢 Sirene : {nb_ajoutees} nouvelles entreprises ("
@@ -396,5 +405,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--user", type=int, required=True,
                         help="ID de l'utilisateur pour lequel récupérer les entreprises")
+    parser.add_argument("--mode", default=MODE_DEFAUT, help="mode où sélectionner les entreprises")
     args = parser.parse_args()
-    main(user_id=args.user)
+    main(user_id=args.user, mode=args.mode)

@@ -304,7 +304,10 @@ def test_envoi_borne_par_les_entreprises_a_contacter(utilisateur, smtp_simule, m
     from database.entreprises_db import sauvegarder_entreprises
     sauvegarder_entreprises(user_id, liste)
     assert client.get("/api/spontanees/stats").json()["a_envoyer"] == 2
-    assert envoyeur.compter_a_envoyer(user_id, "job") == 3         # rh0 jamais contactée en job
+    assert envoyeur.compter_a_envoyer(user_id, "job") == 0         # aucune sélectionnée en job
+    ajouter_entreprises(user_id, [{"siret": f"S{i}"} for i in range(4)], mode="job")
+    # En job : rh0 jamais contactée, l'envoi d'alternance ne compte pas (état par mode)
+    assert envoyeur.compter_a_envoyer(user_id, "job") == 4
 
     recues = []
     monkeypatch.setattr(envoyeur, "main", lambda **kw: recues.append(kw["limite"]))
