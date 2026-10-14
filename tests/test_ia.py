@@ -84,7 +84,7 @@ def test_requete_native(ia, monkeypatch):
     appeler_structure(MESSAGE, AnalyseOffre, temperature=0.1, max_tokens=50)
     corps = ia.appels[0]
     assert corps["think"] is False and corps["stream"] is False      # premier niveau, pas dans options
-    assert corps["format"]["required"] == ["score", "eligible", "points_forts", "points_faibles", "domaine", "resume",
+    assert corps["format"]["required"] == ["score", "points_forts", "points_faibles", "domaine", "resume",
                                            "niveau_requis", "duree_mois", "date_debut_offre", "alternance_seulement",
                                            "niveau_exigence"]
     assert corps["format"]["properties"]["niveau_requis"]["enum"] == ["bac", "bac+2", "bac+3", "bac+4", "bac+5",
@@ -397,7 +397,7 @@ def test_lettre_en_echec_rien_d_enregistre(utilisateur, ia, monkeypatch):
 
 
 # ─── Contrôles en Python ─────────────────────────────────────────────────────
-@pytest.mark.parametrize("score, attendu, verdict", [(15, 10, "excellent"), (-3, 0, "ineligible"), (0, 0, "ineligible")])
+@pytest.mark.parametrize("score, attendu, verdict", [(15, 10, "excellent"), (-3, 0, "faible"), (0, 0, "faible")])
 def test_score_borne_en_python(ia, score, attendu, verdict):
     ia.reponse = ANALYSE.replace('"score": 8', f'"score": {score}')
     analyse = analyser_offre({"titre": "Dev", "description": "..."}, {"prenom": "A"})

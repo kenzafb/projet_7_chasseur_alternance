@@ -24,7 +24,8 @@ class AnalyseOffre(_Reponse):
     """Analyse d'une offre, dans tous les modes."""
     # Ni minimum ni maximum dans le schéma (Ollama les ignore) : bornes en Python
     score: int = Field(description="Note de 0 à 10")
-    eligible: bool = Field(description="Faux si une condition d'inéligibilité est remplie")
+    # Pas de champ d'éligibilité : le modèle ne décide jamais qu'une offre
+    # est inéligible (D99), seules les règles de shared/eligibilite.py le font
     points_forts: list[str] = Field(description="3 au plus")
     points_faibles: list[str] = Field(description="2 au plus")
     domaine: str = Field(description="Catégorie métier en 2 à 4 mots")

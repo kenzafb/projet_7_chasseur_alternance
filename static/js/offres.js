@@ -18,12 +18,11 @@ const LABEL_RAISON = {
 
 const RAISONS = ["manuel", "ineligible", "note_basse", "ecole_cfa", "hors_domaine", "public_specifique", "stage"];
 
-/* Motif d'inéligibilité : raisons établies en Python (en tête des points
-   faibles, « Inéligible : ... »), sinon le jugement de l'IA */
+/* Motif d'inéligibilité : raisons établies en Python, en tête des points
+   faibles (« Inéligible : ... ») ; l'IA n'en décide jamais (D99) */
 function motifIneligible(o) {
-  const motifs = (o.points_faibles || []).filter(p => p.startsWith("Inéligible : "))
-    .map(p => p.slice("Inéligible : ".length));
-  return motifs.length ? motifs.join(" ; ") : "jugée inéligible par l'IA";
+  return (o.points_faibles || []).filter(p => p.startsWith("Inéligible : "))
+    .map(p => p.slice("Inéligible : ".length)).join(" ; ");
 }
 
 const $list = () => document.querySelector('[data-list="offres"]');
@@ -75,7 +74,7 @@ function carte(o) {
         </div>
         <div class="offre__title">${esc(o.titre || "Sans titre")}</div>
         <div class="offre__org"><b>${esc(o.entreprise || "Entreprise inconnue")}</b> · ${esc(o.lieu || o.zone || "")}</div>
-        ${ineligible ? `<div class="offre__inelig">Inéligible : ${esc(motifIneligible(o))}</div>` : ""}
+        ${ineligible && motifIneligible(o) ? `<div class="offre__inelig">Inéligible : ${esc(motifIneligible(o))}</div>` : ""}
       </div>
       <div class="offre__score">${nonAnalysee ? '<span class="non-analysee">non analysée</span>' : viseur(score)}</div>
       <svg class="offre__chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>

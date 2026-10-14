@@ -15,7 +15,7 @@ LONGUEUR_CHAMP = 400   # caractères gardés d'un champ libre du profil
 
 FORMAT_REPONSE = (
     "Réponds uniquement avec cet objet JSON :\n"
-    '{"score": <entier de 0 à 10>, "eligible": <true ou false>, '
+    '{"score": <entier de 0 à 10>, '
     '"points_forts": [<3 phrases courtes au plus>], "points_faibles": [<2 phrases courtes au plus>], '
     '"domaine": "<catégorie métier en 2 à 4 mots>", "resume": "<12 mots au plus>", '
     '"niveau_requis": "<bac, bac+2, bac+3, bac+4, bac+5 ou non_precise>", '
@@ -131,7 +131,7 @@ REGLES = {
     "alternance": (
         "Tu évalues une offre d'alternance pour ce candidat.",
         contexte_alternance,
-        "INÉLIGIBLE (eligible false, score de 0 à 2) si l'une de ces conditions est vraie :\n"
+        "NOTE BASSE (0 à 2) si l'une de ces conditions est vraie :\n"
         "- le poste réel est hors des domaines recherchés ;\n"
         "- l'offre exige 3 ans d'expérience ou plus ;\n"
         "- le poste est senior (ingénieur confirmé, architecte, senior), sauf offre d'une école ou d'un CFA.\n\n"
@@ -140,7 +140,7 @@ REGLES = {
         "- 7-8 : bon accord avec une ou deux réserves (niveau non précisé, compétences manquantes, lieu éloigné) ;\n"
         "- 5-6 : accord moyen (niveau un peu au-dessus, compétences importantes manquantes) ;\n"
         "- 3-4 : faible accord (domaine éloigné, prérequis incompatibles) ;\n"
-        "- 0-2 : inéligible.\n"
+        "- 0-2 : conditions de note basse ci-dessus.\n"
         "Une compétence demandée que la formation va apporter n'est qu'un point faible mineur ; une compétence "
         "absente du profil et de la formation est un point faible important. Si le poste correspond à ce que "
         "le candidat préfère éviter, baisse la note. La date de début et la disponibilité ne comptent pas.\n\n"
@@ -151,7 +151,7 @@ REGLES = {
         "Tu évalues une offre de job court (mission, CDD, intérim, saisonnier) pour ce candidat : "
         "est-elle accessible et adaptée ?",
         contexte_job,
-        "INÉLIGIBLE (eligible false, score de 0 à 2) si l'une de ces conditions est vraie :\n"
+        "NOTE BASSE (0 à 2) si l'une de ces conditions est vraie :\n"
         "- l'offre exige plus d'expérience que la sienne (« souhaitée » ou « appréciée » n'élimine pas) ;\n"
         "- la durée minimale du contrat dépasse ce que le candidat peut faire (plus court : c'est bien) ;\n"
         "- le poste correspond clairement aux types de jobs à éviter.\n\n"
@@ -162,7 +162,7 @@ REGLES = {
         "- 7-8 : accessible (débutant accepté) et compatible sans correspondre exactement, ou dans un domaine préféré ;\n"
         "- 5-6 : accessible avec un vrai bémol (horaires peu compatibles, loin, hors de ses types de jobs) ;\n"
         "- 3-4 : proche de ce qu'il veut éviter, ou plusieurs défauts ;\n"
-        "- 0-2 : inéligible.\n"
+        "- 0-2 : conditions de note basse ci-dessus.\n"
         "Un job sans diplôme ni expérience exigés vaut environ 7 au départ. Une durée minimale nettement trop "
         "longue plafonne la note vers 4-5 ; des horaires incompatibles coûtent plusieurs points ; sans "
         "permis, préfère un lieu accessible en transports. Sans localisation préférée, la distance ne compte "
@@ -172,7 +172,7 @@ REGLES = {
     "stage": (
         "Tu évalues une offre de stage pour cet étudiant.",
         contexte_stage,
-        "INÉLIGIBLE (eligible false, score de 0 à 2) si l'une de ces conditions est vraie :\n"
+        "NOTE BASSE (0 à 2) si l'une de ces conditions est vraie :\n"
         "- ce n'est pas un stage pour un étudiant (emploi salarié, formation payante) ;\n"
         "- le poste réel est hors des domaines recherchés.\n\n"
         "NOTE de 0 à 10, d'après les missions réelles et non le seul titre :\n"
@@ -180,7 +180,7 @@ REGLES = {
         "- 7-8 : bon accord avec une ou deux réserves (missions un peu différentes) ;\n"
         "- 5-6 : accord moyen (missions assez éloignées) ;\n"
         "- 3-4 : faible accord ;\n"
-        "- 0-2 : inéligible.\n"
+        "- 0-2 : conditions de note basse ci-dessus.\n"
 
         "domaine : catégorie métier courte, ou exactement « Hors domaine » si le poste réel est hors des "
         "domaines recherchés.",
@@ -276,12 +276,13 @@ def appliquer_eligibilite(result: dict, offre: dict, profil: dict, mode: str) ->
 
 def _valider_analyse(analyse: AnalyseOffre) -> dict:
     """Analyse validée par son schéma (score entier ramené à 0..10 en Python,
-    tous les champs présents), mise au format de l'application : verdict déduit du score,
-    score ramené à 2 pour une offre inéligible, listes raccourcies. Rien
-    n'est complété par défaut, sauf un domaine vide (« Non classé »)."""
+    tous les champs présents), mise au format de l'application : verdict déduit du score
+    (excellent, bon, moyen, faible), listes raccourcies. Le modèle ne décide
+    jamais de l'éligibilité (D99) : éligible jusqu'à ce que les règles
+    Python (appliquer_eligibilite) en décident autrement. Rien n'est
+    complété par défaut, sauf un domaine vide (« Non classé »)."""
     result = analyse.model_dump()
-    if not result["eligible"]:
-        result["score"] = min(result["score"], 2)
+    result["eligible"] = True
     result["verdict"] = score_to_verdict(result["score"])
     result["points_forts"] = result["points_forts"][:3]
     result["points_faibles"] = result["points_faibles"][:2]
@@ -290,11 +291,12 @@ def _valider_analyse(analyse: AnalyseOffre) -> dict:
 
 
 def score_to_verdict(score):
+    """Verdict d'un score : « ineligible » n'en sort jamais, il ne vient que
+    des règles Python (shared/eligibilite.py, D99)."""
     if score >= 9: return "excellent"
     if score >= 7: return "bon"
     if score >= 5: return "moyen"
-    if score >= 3: return "faible"
-    return "ineligible"
+    return "faible"
 
 # ─── Offres réservées à un public spécifique (BOETH, RQTH) ────────────────────
 # La mention d'égalité des chances (« ce poste est ouvert aux personnes en
@@ -341,7 +343,7 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
 
     offre["raison_archivage"] = ""
     if mode == "job":
-        # Mode job : on archive seulement les inéligibles (raison « ineligible », D95)
+        # Mode job : on archive seulement les inéligibles, établis en Python (D95, D99)
         if not offre.get("eligible", True):
             offre["statut"] = "archive"
             offre["raison_archivage"] = "ineligible"

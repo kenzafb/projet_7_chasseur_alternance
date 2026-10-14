@@ -107,8 +107,6 @@ def test_refus_avant_lancement(alice, ia):
 # ─── Archivage complet après l'analyse ───────────────────────────────────────
 @pytest.mark.parametrize("mode, reponse, raison", [
     ("alternance", analyse(7, domaine="Hors domaine"), "hors_domaine"),
-    ("alternance", analyse(2, eligible=False), "ineligible"),
-    ("job", analyse(1, eligible=False), "ineligible"),
     ("stage", analyse(6, domaine="Hors domaine"), "hors_domaine"),
 ])
 def test_archivage_fonde_sur_l_analyse(alice, ia, mode, reponse, raison):
@@ -140,10 +138,13 @@ def test_offre_deplacee_par_l_utilisateur_pas_archivee(alice, ia):
     client, uid = alice
     en_attente(uid, "A", 1)
     main.modifier_candidature(uid, "A", {"statut": "en_cours"})
-    ia.reponse = analyse(1, eligible=False)
+    client.post("/api/profil", json={"prenom": "Alice", "niveau_etudes": "Bac"})
+    main.modifier_candidature(uid, "A", {"description": "Diplôme Bac+5 exigé."})
+    ia.reponse = analyse(8).replace('"niveau_requis": "non_precise"', '"niveau_requis": "bac+5"').replace(
+        '"niveau_exigence": "non_precise"', '"niveau_exigence": "exige"')
     lancer(client, uid)
     o = lire_candidature(uid, "A")
-    assert (o["statut"], o["score"], o["verdict"]) == ("en_cours", 1, "ineligible")
+    assert (o["statut"], o["score"], o["verdict"]) == ("en_cours", 3, "ineligible")
 
 
 # ─── Échecs : rien d'inventé ─────────────────────────────────────────────────
@@ -313,3 +314,17 @@ def test_mots_cles_avant_l_ia(alice, ia):
     b = lire_candidature(uid, "B")
     assert (b["statut"], b["raison_archivage"], b["verdict"]) == ("archive", "public_specifique", "non_analysee")
     assert "1 archivées par mots-clés sans IA" in etat["message"]
+
+
+@pytest.mark.parametrize("mode", ["alternance", "job", "stage"])
+def test_le_modele_ne_rend_jamais_ineligible(alice, ia, mode):
+    """D99 : ministral-3:3b déclarait inéligibles des offres sans règle vérifiable,
+    dont une qui correspond au profil. Seules les règles Python archivent."""
+    client, uid = alice
+    client.mode = mode
+    client.post("/api/profil", json={"prenom": "Alice"})
+    en_attente(uid, "A", 1, mode=mode)
+    ia.reponse = analyse(1, eligible=False)     # « eligible » du modèle : ignoré
+    lancer(client, uid)
+    o = lire_candidature(uid, "A", mode=mode)
+    assert (o["statut"], o["eligible"], o["verdict"], o["score"]) == ("nouveau", True, "faible", 1)

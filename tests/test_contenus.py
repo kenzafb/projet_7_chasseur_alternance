@@ -94,7 +94,8 @@ def test_prompt_court_avec_schema_explicite(ia, mode, monkeypatch):
     offre = {**OFFRE, "description": "mot " * 2000}
     analyseur.analyser_offre(offre, PROFIL_STAGE if mode == "stage" else PROFIL, mode=mode)
     texte = _prompts(ia)
-    assert '"score": <entier de 0 à 10>' in texte and '"eligible": <true ou false>' in texte
+    assert '"score": <entier de 0 à 10>' in texte and '"niveau_exigence"' in texte
+    assert '"eligible"' not in texte                          # le modèle ne décide plus de l'éligibilité (D99)
     assert len(texte) < 4500                                  # description tronquée à 300 caractères
     assert "Camille" not in texte and "06 00" not in texte    # identité inutile à la notation
 
