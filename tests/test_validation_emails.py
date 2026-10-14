@@ -82,7 +82,7 @@ def test_ia_seulement_pour_les_douteux(ia):
     assert len(ia.appels) == 2 and ia.appels[0]["model"] == "ministral-3:3b"
     texte = ia.textes(0)
     assert "Entreprise : ACME" in texte and "Adresse : gerant@gmail.com" in texte and "Le gérant" in texte
-    assert ia.appels[0]["response_format"]["json_schema"]["name"] == "ValidationEmail"
+    assert ia.appels[0]["format"]["title"] == "ValidationEmail"
 
 
 def test_ia_bloquante_coupee_pour_la_suite(ia):

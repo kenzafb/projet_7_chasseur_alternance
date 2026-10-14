@@ -121,13 +121,41 @@ def analyse_ia_active() -> bool:
 
 MESSAGE_IA_DESACTIVEE = "IA désactivée (ANALYSE_IA=false dans le .env) : aucun appel à l'IA."
 
-# Serveur d'IA au format compatible OpenAI (POST <IA_BASE_URL>/chat/completions) :
-# Ollama sur la machine par défaut. Tout est relu dans l'environnement à
-# chaque appel (un changement du .env vaut au lancement suivant).
-IA_BASE_URL_DEFAUT = "http://localhost:11434/v1"
+def _reel(variable: str, defaut: float, minimum: float) -> float:
+    try:
+        return max(minimum, float(os.getenv(variable, "").strip() or defaut))
+    except ValueError:
+        return defaut
+
+# Serveur d'IA. IA_API=ollama (défaut) : API native d'Ollama (POST /api/chat),
+# la seule qui coupe la réflexion (« think ») et impose un schéma JSON
+# (« format ») de façon documentée. IA_API=openai : format compatible OpenAI
+# (POST /v1/chat/completions), pour un autre serveur. Tout est relu dans
+# l'environnement à chaque appel (un changement du .env vaut au lancement suivant).
+APIS_IA = ("ollama", "openai")
+IA_BASE_URL_DEFAUT = {"ollama": "http://localhost:11434", "openai": "http://localhost:11434/v1"}
+
+def ia_api() -> str:
+    valeur = os.getenv("IA_API", "").strip().lower()
+    return valeur if valeur in APIS_IA else "ollama"
 
 def ia_base_url() -> str:
-    return (os.getenv("IA_BASE_URL", "").strip() or IA_BASE_URL_DEFAUT).rstrip("/")
+    """Racine du serveur ; pour l'API native, un « /v1 » final est retiré."""
+    api = ia_api()
+    url = (os.getenv("IA_BASE_URL", "").strip() or IA_BASE_URL_DEFAUT[api]).rstrip("/")
+    if api == "ollama" and url.endswith("/v1"):
+        url = url[:-3]
+    return url
+
+def ia_num_ctx() -> int:
+    """Taille du contexte demandée à Ollama (options.num_ctx, défaut 8192) :
+    le défaut d'Ollama peut tronquer en silence un prompt plus long."""
+    return int(_reel("IA_NUM_CTX", 8192, 1024))
+
+def ia_keep_alive() -> str:
+    """Durée pendant laquelle Ollama garde le modèle chargé après un appel
+    (keep_alive, défaut « 10m ») : évite de le recharger entre deux offres."""
+    return os.getenv("IA_KEEP_ALIVE", "").strip() or "10m"
 
 def ia_api_key() -> str:
     """Clé facultative (Ollama n'en demande pas), envoyée en « Bearer »."""
@@ -145,12 +173,6 @@ def modele_ia(usage: str) -> str:
     """Modèle d'un usage, relu dans l'environnement à chaque appel."""
     return os.getenv(f"IA_MODELE_{usage.upper()}", "").strip() or USAGES_IA[usage]
 
-def _reel(variable: str, defaut: float, minimum: float) -> float:
-    try:
-        return max(minimum, float(os.getenv(variable, "").strip() or defaut))
-    except ValueError:
-        return defaut
-
 def ia_delai_s() -> float:
     """Attente maximale d'une réponse (secondes, défaut 600). Sur processeur,
     une analyse prend une à deux minutes, plus le chargement du modèle."""
@@ -164,15 +186,6 @@ def ia_longueur_description() -> int:
     2000) : sur processeur, chaque millier de caractères coûte une dizaine
     de secondes de lecture."""
     return int(_reel("IA_LONGUEUR_DESCRIPTION", 2000, 200))
-
-# Format de sortie imposé au serveur : "schema" (schéma JSON du modèle
-# Pydantic, sortie contrainte par Ollama), "json" (objet JSON quelconque),
-# "aucun" (rien d'imposé, la réponse est seulement validée). Défaut : schema
-FORMATS_JSON = ("schema", "json", "aucun")
-
-def ia_format_json() -> str:
-    valeur = os.getenv("IA_FORMAT_JSON", "").strip().lower()
-    return valeur if valeur in FORMATS_JSON else "schema"
 
 def ia_reflexion() -> bool:
     """Mode de réflexion des modèles qui en ont un (Qwen 3...) : coupé par

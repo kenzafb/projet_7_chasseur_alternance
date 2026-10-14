@@ -30,7 +30,8 @@ os.environ["COOKIE_SECURE"] = "false"
 for _var in ("CODE_INVITATION", "FT_CLIENT_ID", "FT_CLIENT_SECRET", "LBA_API_KEY",
              "INSEE_API_KEY", "CLE_CHIFFREMENT", "PLAFOND_ENVOIS_JOUR", "ANALYSE_IA",
              "IA_BASE_URL", "IA_API_KEY", "IA_MODELE_ANALYSE", "IA_MODELE_LETTRE", "IA_MODELE_EXTRACTION",
-             "IA_DELAI_S", "IA_LONGUEUR_DESCRIPTION", "IA_FORMAT_JSON", "IA_REFLEXION"):
+             "IA_DELAI_S", "IA_LONGUEUR_DESCRIPTION", "IA_REFLEXION", "IA_API", "IA_NUM_CTX",
+             "IA_KEEP_ALIVE"):
     os.environ.pop(_var, None)
 
 import httpx  # noqa: E402
@@ -72,10 +73,15 @@ def pas_de_reseau(monkeypatch):
 REPONSE_LETTRE = '{"contact_entreprise": "ACME\\n75010 Paris", "paragraphe_entreprise": "ACME, votre contexte me parle."}'
 
 
-def reponse_chat(contenu: str) -> httpx.Response:
-    """Réponse du serveur d'IA (format chat/completions) portant `contenu`."""
-    return httpx.Response(200, json={"choices": [{"index": 0, "finish_reason": "stop",
-                                                  "message": {"role": "assistant", "content": contenu}}]})
+def reponse_chat(contenu: str, native: bool = True, reflexion: str = "") -> httpx.Response:
+    """Réponse du serveur d'IA portant `contenu` : API native d'Ollama
+    (/api/chat), ou format chat/completions (native=False)."""
+    message = {"role": "assistant", "content": contenu}
+    if reflexion:
+        message["thinking"] = reflexion
+    if native:
+        return httpx.Response(200, json={"model": "m", "message": message, "done": True, "done_reason": "stop"})
+    return httpx.Response(200, json={"choices": [{"index": 0, "finish_reason": "stop", "message": message}]})
 
 
 def erreur_http(statut: int, message: str = "erreur") -> httpx.Response:
@@ -106,10 +112,12 @@ class FausseIA:
             r = self.file.pop(0) if self.file else self.reponse
         if isinstance(r, BaseException):
             raise r
-        return r if isinstance(r, httpx.Response) else reponse_chat(r)
+        return r if isinstance(r, httpx.Response) else reponse_chat(r, native=url.endswith("/api/chat"))
 
     def obtenir(self, url, entetes, delai):
         self.urls.append(url)
+        if url.endswith("/api/tags"):
+            return httpx.Response(200, json={"models": [{"name": m, "model": m} for m in self.modeles]})
         return httpx.Response(200, json={"object": "list", "data": [{"id": m, "object": "model"}
                                                                    for m in self.modeles]})
 

@@ -129,7 +129,7 @@ def valider_par_ia(email: str, nom: str, domaine_site: str | None, extrait: str,
     from shared.ia import appeler_structure
     from shared.schemas_ia import ValidationEmail
     return appeler_structure(messages_validation(email, nom, domaine_site, extrait), ValidationEmail,
-                             usage="extraction", modele=modele, essais=essais, temperature=0).valide
+                             usage="extraction", modele=modele, essais=essais, temperature=0.1).valide
 
 
 def trier(emails, domaine_site: str | None, nom: str = "", texte: str = "", ia: bool = True,

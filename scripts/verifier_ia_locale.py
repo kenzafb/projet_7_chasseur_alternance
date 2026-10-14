@@ -137,7 +137,7 @@ def main(argv=None, sortie=print) -> int:
         sortie("ℹ️  ANALYSE_IA=false dans le .env : ignoré pour ce test (rien n'est écrit en base).")
         os.environ["ANALYSE_IA"] = "true"
 
-    sortie(f"Serveur d'IA : {config.ia_base_url()}")
+    sortie(f"Serveur d'IA : {config.ia_base_url()} (API {config.ia_api()})")
     for usage in config.USAGES_IA:
         sortie(f"  IA_MODELE_{usage.upper():<10} = {config.modele_ia(usage)}")
 

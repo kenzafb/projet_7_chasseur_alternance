@@ -63,15 +63,57 @@ def test_modele_par_usage(monkeypatch):
 
 def test_serveur_et_cle(ia, monkeypatch):
     appeler_ia(MESSAGE)
-    assert ia.urls[-1] == "http://localhost:11434/v1/chat/completions"
+    assert ia.urls[-1] == "http://localhost:11434/api/chat"          # API native par défaut
+    monkeypatch.setenv("IA_BASE_URL", "http://localhost:11434/v1")   # ancien réglage : /v1 retiré
+    appeler_ia(MESSAGE)
+    assert ia.urls[-1] == "http://localhost:11434/api/chat"
+    monkeypatch.setenv("IA_API", "openai")
     monkeypatch.setenv("IA_BASE_URL", "http://serveur:8080/v1/")
     monkeypatch.setenv("IA_API_KEY", "secret")
     entetes = {}
+    from tests.conftest import reponse_chat as rc
     monkeypatch.setattr(shared.ia, "_poster", lambda url, corps, e, delai: entetes.update(e, url=url, delai=delai)
-                        or reponse_chat("ok"))
+                        or rc("ok", native=False))
     assert appeler_ia(MESSAGE) == "ok"
     assert entetes["url"] == "http://serveur:8080/v1/chat/completions"
     assert entetes["Authorization"] == "Bearer secret"
+
+
+def test_requete_native(ia, monkeypatch):
+    ia.reponse = ANALYSE
+    appeler_structure(MESSAGE, AnalyseOffre, temperature=0.1, max_tokens=50)
+    corps = ia.appels[0]
+    assert corps["think"] is False and corps["stream"] is False      # premier niveau, pas dans options
+    assert corps["format"]["required"] == ["score", "eligible", "points_forts", "points_faibles", "domaine", "resume"]
+    assert corps["options"] == {"num_ctx": 8192, "temperature": 0.1, "num_predict": 50}
+    assert corps["keep_alive"] == "10m"
+    assert "tools" not in corps and "response_format" not in corps and "reasoning_effort" not in corps
+    monkeypatch.setenv("IA_NUM_CTX", "16384")
+    monkeypatch.setenv("IA_KEEP_ALIVE", "30m")
+    appeler_ia(MESSAGE)
+    assert ia.appels[-1]["options"] == {"num_ctx": 16384} and ia.appels[-1]["keep_alive"] == "30m"
+    assert "format" not in ia.appels[-1]
+
+
+def test_requete_openai(ia, monkeypatch):
+    monkeypatch.setenv("IA_API", "openai")
+    ia.reponse = ANALYSE
+    appeler_structure(MESSAGE, AnalyseOffre, temperature=0.6)
+    corps = ia.appels[0]
+    assert ia.urls[0] == "http://localhost:11434/v1/chat/completions"
+    assert corps["response_format"]["type"] == "json_schema" and corps["reasoning_effort"] == "none"
+    assert corps["temperature"] == 0.6 and "think" not in corps and "format" not in corps
+
+
+def test_jamais_tools_et_format_ensemble(ia):
+    with pytest.raises(ValueError, match="tools"):
+        appeler_structure(MESSAGE, AnalyseOffre, tools=[{"type": "function"}])
+    assert ia.appels == []
+
+
+def test_liste_des_modeles_native(ia):
+    assert shared.ia.lister_modeles() == ["ministral-3:3b", "ministral-3:8b"]
+    assert ia.urls[-1] == "http://localhost:11434/api/tags"
 
 
 def test_delai_configurable(monkeypatch):
@@ -182,26 +224,10 @@ def test_un_seul_appel_a_la_fois(ia, monkeypatch):
 
 
 # ─── Réponses structurées ────────────────────────────────────────────────────
-def test_schema_impose_et_reflexion_coupee(ia):
-    ia.reponse = ANALYSE
-    analyse = appeler_structure(MESSAGE, AnalyseOffre)
-    assert analyse.score == 8
-    corps = ia.appels[0]
-    assert corps["response_format"]["type"] == "json_schema"
-    assert corps["response_format"]["json_schema"]["schema"]["required"] == [
-        "score", "eligible", "points_forts", "points_faibles", "domaine", "resume"]
-    assert corps["reasoning_effort"] == "none" and corps["stream"] is False
-
-
-def test_reflexion_et_format_reglables(ia, monkeypatch):
-    ia.reponse = ANALYSE
+def test_reflexion_gardee_sur_demande(ia, monkeypatch):
     monkeypatch.setenv("IA_REFLEXION", "true")
-    monkeypatch.setenv("IA_FORMAT_JSON", "json")
-    appeler_structure(MESSAGE, AnalyseOffre)
-    assert "reasoning_effort" not in ia.appels[-1] and ia.appels[-1]["response_format"] == {"type": "json_object"}
-    monkeypatch.setenv("IA_FORMAT_JSON", "aucun")
-    appeler_structure(MESSAGE, AnalyseOffre)
-    assert "response_format" not in ia.appels[-1]
+    appeler_ia(MESSAGE)
+    assert "think" not in ia.appels[-1]
 
 
 @pytest.mark.parametrize("texte", ['```json\n{"valide": true}\n```', 'Voici : {"valide": true} !'])
@@ -228,21 +254,21 @@ def test_paragraphe_vide_invalide(ia):
 
 
 def test_parametre_refuse_retire_et_retenu(ia):
-    refus = erreur_http(400, 'json: unknown field "reasoning_effort"')
-    ia.panne = lambda corps: refus if "reasoning_effort" in corps else None
+    refus = erreur_http(400, '"ministral-3:8b" does not support thinking')
+    ia.panne = lambda corps: refus if "think" in corps else None
     ia.reponse = "ok"
     assert appeler_ia(MESSAGE, tentatives=1) == "ok"
-    assert len(ia.appels) == 2 and "reasoning_effort" not in ia.appels[1]
+    assert len(ia.appels) == 2 and "think" not in ia.appels[1]
     appeler_ia(MESSAGE, tentatives=1)
     assert len(ia.appels) == 3   # retenu : plus envoyé
 
 
 def test_schema_refuse_retire(ia):
-    refus = erreur_http(400, "invalid response_format: json_schema not supported")
-    ia.panne = lambda corps: refus if "response_format" in corps else None
+    refus = erreur_http(400, "invalid format: schema not supported")
+    ia.panne = lambda corps: refus if "format" in corps else None
     ia.reponse = ANALYSE
     assert appeler_structure(MESSAGE, AnalyseOffre).score == 8
-    assert "response_format" not in ia.appels[-1]
+    assert "format" not in ia.appels[-1]
 
 
 # ─── Analyse : aucun résultat par défaut ─────────────────────────────────────

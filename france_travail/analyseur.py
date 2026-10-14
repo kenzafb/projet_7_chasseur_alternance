@@ -180,7 +180,7 @@ def analyser_offre(offre, profil, mode="alternance", modele=None, essais=2):
     de CFA est marquée à archiver (statut_auto)."""
     exiger_profil(profil)   # plus de repli sur un utilisateur par défaut
     analyse = appeler_structure(construire_messages(offre, profil, mode), AnalyseOffre,
-                                usage="analyse", modele=modele, essais=essais, temperature=0.2)
+                                usage="analyse", modele=modele, essais=essais, temperature=0.1)
     result = _valider_analyse(analyse)
     # Mode stage : une école peut accueillir un stagiaire (D74), rien à archiver
     if mode == "alternance" and est_ecole_cfa(offre):

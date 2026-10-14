@@ -149,7 +149,7 @@ def test_lettre_generee_avec_la_trame_du_mode(ia, mode):
     assert ("stage" in lettre.lower()) == (mode == "stage")
     assert "ACME, votre contexte me parle." in lettre
     assert ia.appels[-1]["model"] == "ministral-3:8b"
-    assert ia.appels[-1]["response_format"]["json_schema"]["name"] == "LettreIA"
+    assert ia.appels[-1]["format"]["title"] == "LettreIA"
 
 
 def test_prompt_de_lettre_par_mode(ia):
