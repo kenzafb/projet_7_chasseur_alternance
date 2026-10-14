@@ -58,10 +58,12 @@ Format : identifiant, date, phase, décision, raison, conséquence dans le code,
 ### D10. Modèles Mistral configurables par usage
 - **Décision.** `MODELE_MISTRAL_ANALYSE`, `MODELE_MISTRAL_LETTRE`, `MODELE_MISTRAL_EXTRACTION`, sinon `MODELE_MISTRAL`, sinon les défauts : `mistral-medium-latest` pour l'analyse et la lettre, `mistral-small-latest` pour l'extraction d'emails.
 - **Raison.** Recette : `mistral-large-latest` refusé en 403 (code 1910, modèle hors de l'abonnement de la clé).
+- **Remplacée** par D77 (phase 7) : IA locale, `IA_MODELE_ANALYSE`, `IA_MODELE_LETTRE`, `IA_MODELE_EXTRACTION`.
 
 ### D11. Plus jamais de résultat inventé par l'IA
 - **Décision.** Aucun score, verdict ou lettre par défaut quand Mistral échoue. Erreur non récupérable (400, 401, 403, 404, 422) : arrêt immédiat du pipeline, message clair dans les logs et le bandeau. Erreur passagère épuisée (429, 5xx, réseau, réponse illisible) : l'offre est sautée. Dans les deux cas, l'offre n'est ni insérée, ni marquée vue, ni archivée : elle revient au lancement suivant.
 - **Conséquence.** Sur les routes directes (lettre, réanalyse), rien n'est enregistré : 503 pour une erreur de configuration, 502 sinon.
+- **Complétée** par D77 et D78 (phase 7) : IA injoignable bloquante ; réponse hors schéma redemandée une fois, puis offre sautée. Depuis D80, la recherche n'analyse plus : une offre sautée reste « non analysée » en base au lieu de ne pas être insérée.
 
 ### D12. Archivage « public spécifique » seulement pour les offres réservées
 - **Décision.** La mention d'égalité des chances (« ouvert aux personnes en situation de handicap », « à compétences égales ») n'archive plus. Seules les tournures de réservation ou d'exigence explicites (« réservé aux », « exclusivement », « RQTH obligatoire », « vous devez être bénéficiaire de l'obligation d'emploi »...) archivent l'offre.
@@ -69,6 +71,7 @@ Format : identifiant, date, phase, décision, raison, conséquence dans le code,
 
 ### D13. Emails lus dans la page gardés quand Mistral échoue
 - **Décision.** Si l'extraction par Mistral échoue, le scraper garde les emails trouvés par lecture directe de la page (regex, déobfuscation), notés non validés par l'IA (`emails_non_valides` dans `extra`). Une erreur non récupérable coupe l'IA pour le reste du lancement, avec un seul message.
+- **Remplacée** par D81 (phase 7) : règles d'abord, l'IA pour les seules adresses douteuses.
 
 ### D14. Limites bornées par ce qui existe
 - **Décision.** Le maximum du scraper est le nombre d'entreprises non traitées, celui de l'envoi le nombre d'entreprises avec email dont une adresse au moins n'a pas été contactée dans le mode courant. Le front l'affiche, le serveur l'applique (avec « demandé : X, ramené à Y », D6) et refuse en 400 un lancement sans rien à traiter.
@@ -78,6 +81,7 @@ Format : identifiant, date, phase, décision, raison, conséquence dans le code,
 ### D15. Emails non validés par l'IA : jamais envoyés automatiquement
 - **Décision.** Les emails gardés sans validation par Mistral (D13) ne partent jamais d'eux-mêmes, même en mode test, et ne comptent pas dans le maximum d'envoi. Ils restent visibles dans la page Spontanées avec la mention « non validé ». L'utilisateur les valide à la main, une entreprise à la fois (`POST /api/spontanees/valider`), ou relance plus tard la validation par l'IA sur les entreprises concernées (`POST /api/spontanees/revalider`, limite « revalidations », 20 par défaut, 200 au plus, bornée par le nombre en attente).
 - **Conséquence.** Une revalidation réussie remplace emails, téléphones et contact par ceux que l'IA retient ; un échec passager laisse l'entreprise en attente ; une erreur bloquante arrête la revalidation avec un seul message.
+- **Complétée** par D81 (phase 7) : la validation se fait adresse par adresse ; une adresse validée par les règles part sans IA ; la revalidation repasse les seules adresses douteuses, sans relire le site.
 
 ### D16. Code HTTP 400 de Mistral bloquant : validé
 - **Décision.** 400 rejoint 401, 403, 404 et 422 : arrêt immédiat du pipeline (D11).
@@ -95,16 +99,19 @@ Format : identifiant, date, phase, décision, raison, conséquence dans le code,
 - **Raison.** Le compte Mistral ne permet plus l'API ; un modèle local viendra plus tard. On étudie France Travail, LBA et Sirene sans IA.
 - **Conséquence.** La limite « analyses » borne aussi le nombre d'offres ajoutées sans analyse. Une offre non analysée pourra être analysée par le bouton « Analyser » quand l'IA reviendra. Les offres non analysées sont triées après les autres.
 - **À reconsidérer** à l'arrivée du modèle local (analyse en lot des offres `non_analysee`).
+- **Complétée** par D80 et D83 (phase 7) : la recherche n'appelle plus jamais l'IA, ANALYSE_IA reste l'interrupteur général ; sans IA, les règles de D81 valident encore les adresses de contact du domaine du site.
 
 ## Phase 5a, points tranchés après le rapport (8 octobre 2026)
 
 ### D20. Sans IA : archivage par mots-clés conservé, plafond d'offres propre
 - **Décision.** Quand `ANALYSE_IA=false`, l'archivage par mots-clés reste appliqué (public réservé D12, école ou CFA, stage) ; seuls note basse et hors domaine disparaissent (D19). La limite d'offres par lancement a son propre plafond : 100 par défaut, 500 au plus (`LIMITES_LANCEMENT["sans_ia"]`), affichés dans l'interface à la place de ceux de l'analyse (30, 200).
 - **Conséquence.** Même champ `max_analyses` pour la route ; valeur hors bornes ramenée et affichée (D6).
+- **Plafond remplacé** par D80 (phase 7) : 100 par défaut, 500 au plus pour toute recherche, IA active ou non (`LIMITES_LANCEMENT["offres"]`, champ `max_offres`).
 
 ### D21. Analyse en différé des offres « non analysées » : travail futur
 - **Décision.** Prévue pour l'arrivée du modèle local, non implémentée. En attendant, une offre `non_analysee` ne s'analyse qu'une à une, par le bouton « Analyser », IA active.
 - **À faire** avec le modèle local : analyse en lot des offres `verdict = "non_analysee"`, avec archivage complet une fois l'analyse obtenue.
+- **Réalisée** par D80 (phase 7).
 
 ## Phase 5b (domaines et France Travail), décisions du 8 octobre 2026
 
@@ -356,3 +363,32 @@ Décisions données par l'humain au lancement de la phase et mises en œuvre. Le
 
 ### D76. Volume de « tous les secteurs » mesuré
 - **Décision.** `VOLUME_TOUS_SECTEURS` (`shared/naf.py`) affiche la mesure : 382 663 sièges actifs en Île-de-France hors « sans salarié », dont 67 755 à partir de 10 salariés (3 182 798 toutes tranches). La requête réelle, avec les activités exclues en ET, est acceptée par l'API (381 283).
+
+## Phase 7 (IA locale avec Ollama), décisions du 14 octobre 2026
+
+Décisions données par l'humain au lancement de la phase et mises en œuvre. Contexte : plus aucune IA extérieure ; Ollama tourne sur la machine (`http://localhost:11434`), sur processeur, avec `ministral-3:8b` (lecture 27 tokens/s, écriture 7 tokens/s) et `ministral-3:3b` (57 et 13 tokens/s), 12 Go de RAM visibles, un seul modèle chargé à la fois. Les choix faits pendant la mise en œuvre restent à valider dans `docs/PHASE_7_RAPPORT.md`.
+
+### D77. IA interchangeable au format compatible OpenAI (remplace D10)
+- **Décision.** `shared/ia.py` parle `chat/completions`, configuré par le `.env` : `IA_BASE_URL` (défaut `http://localhost:11434/v1`), `IA_API_KEY` (facultative), `IA_MODELE_ANALYSE`, `IA_MODELE_LETTRE`, `IA_MODELE_EXTRACTION` (défauts `ministral-3:8b`, `ministral-3:8b`, `ministral-3:3b`). Plus de SDK `mistralai`. Un seul appel à la fois dans tout le processus, délai d'attente long et réglable (`IA_DELAI_S`, 600 s par défaut). Serveur injoignable : arrêt du pipeline, « IA locale injoignable : vérifie qu'Ollama tourne », comme les autres erreurs bloquantes. Jamais de résultat inventé (D11).
+
+### D78. Réponses structurées validées par Pydantic
+- **Décision.** Sortie JSON décrite par des modèles Pydantic (`shared/schemas_ia.py`), schéma imposé au serveur quand son API le permet (`response_format` de type `json_schema` ; un serveur qui le refuse est interrogé sans, la réponse restant validée). Une réponse invalide est redemandée une fois, puis l'offre est sautée et reste « non analysée ». Le mode de réflexion des modèles qui en ont un (Qwen notamment) est coupé dans la requête.
+
+### D79. Prompts pour un petit modèle, un par mode
+- **Décision.** Prompts plus courts, en français, schéma JSON écrit en toutes lettres, description de l'offre tronquée à une longueur réglable (`IA_LONGUEUR_DESCRIPTION`), seulement les champs utiles du profil. Un prompt d'analyse par mode, dont le mode stage (dates, missions visées, formation). Sens des prompts existants et règles d'archivage qui dépendent de l'analyse conservés.
+
+### D80. Analyse en différé des offres en attente (réalise D21)
+- **Décision.** La recherche insère toujours les offres « non analysées », sans attendre l'IA. Un pipeline « Analyser les offres en attente », par utilisateur et par mode, les traite des plus récentes aux plus anciennes, avec une limite par lancement, la progression dans le bandeau, un bouton d'arrêt et le temps restant estimé. Option du profil pour le lancer après chaque recherche.
+- **Conséquence.** Migration 0013 (`profils.analyse_auto`, faux pour les profils existants).
+
+### D81. Emails du scraper : règles d'abord, IA pour les cas douteux (remplace D13, complète D15)
+- **Décision.** Des règles sans IA valident ou écartent d'office : domaine de l'adresse identique au domaine du site de l'entreprise, préfixes de contact ou de recrutement courants, liste d'exclusion existante (D47). L'IA (modèle d'extraction) ne sert qu'aux cas douteux ; sans IA, ils restent « non validés ». Règles dans un fichier de données facile à compléter (`shared/referentiels/validation_emails.txt`).
+
+### D82. Lettre de motivation à la demande
+- **Décision.** Générée à la demande avec le modèle de lettre, avec un message d'attente dans l'interface.
+
+### D83. ANALYSE_IA reste l'interrupteur général (complète D19)
+- **Décision.** `ANALYSE_IA=false` : aucun appel à l'IA nulle part. `.env.example` et README décrivent l'installation d'Ollama, les modèles conseillés et `OLLAMA_MAX_LOADED_MODELS=1` pour les machines à peu de RAM.
+
+### D84. Vérification de l'IA locale par un script lancé par l'humain
+- **Décision.** `scripts/verifier_ia_locale.py` vérifie qu'Ollama répond, liste les modèles, analyse 3 vraies offres « non analysées » lues en lecture seule et valide un email douteux ; plusieurs modèles comparés sur les mêmes offres (`--modeles`), tableau du temps par offre, de la validité du JSON, du score et du verdict. Rien n'est écrit en base. Remplace `scripts/verifier_mistral.py`.

@@ -2,7 +2,7 @@
 
 Procédure à suivre par un humain, sur la vraie application, avec deux comptes : **A** (ton compte habituel) et **B** (un compte de test créé avec le code d'invitation). Elle vérifie les profils, le compte d'envoi en mode test, une petite recherche d'alternance limitée à 5 offres, une lettre et son PDF, un petit pipeline de candidatures spontanées envoyé en mode test vers toi, et l'isolation entre les deux comptes.
 
-Durée : environ 45 minutes, dont une bonne part d'attente (pauses entre appels Mistral, recherche des sites, pauses de 30 à 90 s entre deux mails). Aucun mail ne doit partir vers une entreprise : le mode test est activé avant tout envoi.
+Durée : environ 45 minutes, dont une bonne part d'attente (analyse des offres par l'IA locale, une à deux minutes par offre, recherche des sites, pauses de 30 à 90 s entre deux mails). Aucun mail ne doit partir vers une entreprise : le mode test est activé avant tout envoi.
 
 Pour chaque étape : **Faire**, **Observer** (ce qui doit se passer), **Échec si** (ce qui doit faire arrêter la recette et noter le problème). Noter l'heure, l'étape et le message exact de tout échec ; les lignes du terminal correspondantes sont les plus utiles.
 
@@ -17,8 +17,8 @@ Pour chaque étape : **Faire**, **Observer** (ce qui doit se passer), **Échec s
    alembic upgrade head
    alembic current          # attendu : 0006 (head)
    ```
-3. Vérifier dans `.env` la présence de : `SECRET_KEY`, `DATABASE_URL` (la base v2), `CODE_INVITATION`, `CLE_CHIFFREMENT`, `MISTRAL_API_KEY`, `FT_CLIENT_ID`, `FT_CLIENT_SECRET`, `LBA_API_KEY`, `INSEE_API_KEY`. Ne pas y laisser `GMAIL_SENDER` ni `GMAIL_APP_PASSWORD` (plus lus).
-4. Vérifier les modèles Mistral (appels réels, quelques tokens) : `venv/bin/python scripts/verifier_mistral.py`. Attendu : une ligne `OK` par usage (analyse, lettre, extraction) et « Tout est prêt. ». Sinon, choisir dans la liste affichée un modèle qui répond et le mettre dans `.env` (`MODELE_MISTRAL` ou `MODELE_MISTRAL_<USAGE>`).
+3. Vérifier dans `.env` la présence de : `SECRET_KEY`, `DATABASE_URL` (la base v2), `CODE_INVITATION`, `CLE_CHIFFREMENT`, `ANALYSE_IA=true`, `FT_CLIENT_ID`, `FT_CLIENT_SECRET`, `LBA_API_KEY`, `INSEE_API_KEY`. Ne pas y laisser `GMAIL_SENDER` ni `GMAIL_APP_PASSWORD` (plus lus).
+4. Vérifier l'IA locale, Ollama démarré (README, section « IA locale ») : `venv/bin/python scripts/verifier_ia_locale.py`. Attendu : « Le serveur répond », les modèles de `IA_MODELE_ANALYSE` et `IA_MODELE_EXTRACTION` dans la liste, « oui » dans la colonne « JSON valide » et « Rien n'a été écrit en base. ». Sinon : `ollama pull <modèle>` pour un modèle absent, « IA locale injoignable » si Ollama ne tourne pas.
 5. Lancer l'application **sans `--reload`** (le rechargement tue les pipelines en cours à chaque modification de fichier) et garder le terminal visible : c'est là que s'affichent les logs des pipelines, préfixés `[user N]`.
    ```bash
    uvicorn main:app --port 5002
@@ -81,25 +81,37 @@ Pour chaque étape : **Faire**, **Observer** (ce qui doit se passer), **Échec s
 
 ## 5. Recherche d'alternance limitée à 5 offres (A)
 
-**Faire (A)** : page Offres, champ « Offres analysées au plus par lancement » : **5**. Noter le nombre d'offres actives affiché. Cliquer « Lancer la recherche ».
+**Faire (A)** : page Offres, champ « Offres ajoutées au plus par recherche » : **5** (option « Analyser automatiquement » du profil décochée). Noter le nombre d'offres actives affiché. Cliquer « Lancer la recherche ».
 
 **Observer** :
 - le bandeau d'exécution apparaît avec sa jauge ; dans l'onglet Réseau, une requête `statut_pipelines` toutes les 5 s environ ;
 - dans le terminal :
-  - `[user A] 🔍 Recherche France Travail démarrée (au plus 5 offres analysées)`
-  - `✅ France Travail terminé : N offres analysées` avec N ≤ 5
-  - puis soit `LBA ignorée : limite de 5 offres analysées atteinte`, soit `Limite : M offres LBA analysées sur ...` avec N + M ≤ 5, soit `Aucune offre LBA récupérée`
+  - `[user A] 🔍 Recherche France Travail démarrée (au plus 5 offres)`
+  - `✅ France Travail terminé : N offres ajoutées` avec N ≤ 5
+  - puis soit `LBA ignorée : limite de 5 offres atteinte`, soit `Limite : M offres LBA sur ...` avec N + M ≤ 5, soit `Aucune offre LBA récupérée`
   - `✅ Recherche complète terminée`
-- à la fin : le bandeau disparaît, la liste se rafraîchit seule, **au plus 5** nouvelles offres (actives ou archivées automatiquement) ; les requêtes de statut s'arrêtent.
+- à la fin : le bandeau disparaît, la liste se rafraîchit seule, **au plus 5** nouvelles offres « non analysées » (actives ou archivées par mots-clés) ; le compteur « offre(s) en attente d'analyse » augmente d'autant ; les requêtes de statut s'arrêtent.
 - facultatif : relancer avec 5 ; les nouvelles offres sont différentes des premières (celles qui dépassaient la limite n'ont pas été perdues).
 
-**Échec si** : plus de 5 offres nouvelles, plus de 5 lignes « Score : » dans le terminal, la recherche ne finit pas (plus de 5 minutes), le bandeau reste affiché après « Recherche complète terminée », ou le polling continue après la fin.
+**Échec si** : plus de 5 offres nouvelles, une offre notée par la recherche (elle ne doit jamais appeler l'IA), la recherche ne finit pas (plus de 5 minutes), le bandeau reste affiché après « Recherche complète terminée », ou le polling continue après la fin.
 
 Les erreurs de France Travail ou de LBA (identifiants, quota) apparaissent dans le terminal et dans le message du bandeau : les noter, elles ne relèvent pas de cette phase.
 
+## 5 bis. Analyse des offres en attente (A)
+
+**Faire (A)** : page Offres, carte « offre(s) en attente d'analyse », champ « Au plus » : **2**, puis « Analyser les offres en attente ».
+
+**Observer** :
+- le bandeau affiche « Analyse 1/2, environ N min restantes » et sa jauge ; le terminal écrit `[1/2] « titre » : X/10, verdict` ;
+- chaque offre notée apparaît dans la liste sans attendre la fin ; les deux plus récentes sont notées, les autres restent « non analysées » ;
+- facultatif : relancer, puis « Arrêter » dans le bandeau : l'analyse s'arrête après l'offre en cours ;
+- facultatif : arrêter Ollama (`sudo systemctl stop ollama`) et relancer : message « IA locale injoignable : vérifie qu'Ollama tourne », aucune offre modifiée.
+
+**Échec si** : une note apparaît sur une offre dont la ligne du terminal dit « sautée », plus de 2 offres notées, ou le bandeau reste affiché après « Analyse terminée ».
+
 ## 6. Lettre de motivation et PDF (A)
 
-**Faire (A)** : ouvrir une des nouvelles offres, « Générer la lettre ». Modifier une phrase dans la fenêtre, « Enregistrer ». Rouvrir la lettre (« Voir la lettre »), puis « Télécharger en PDF ».
+**Faire (A)** : ouvrir une des nouvelles offres, « Générer la lettre » (la fenêtre affiche un message d'attente et les secondes écoulées, environ une minute). Modifier une phrase dans la fenêtre, « Enregistrer ». Rouvrir la lettre (« Voir la lettre »), puis « Télécharger en PDF ».
 
 **Observer** :
 - la lettre contient le nom de l'entreprise de l'offre et un paragraphe qui lui est propre, ton identité en signature, aucune information inventée ;
