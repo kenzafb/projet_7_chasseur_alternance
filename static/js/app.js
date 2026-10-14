@@ -68,7 +68,19 @@ const modal = {
     const offre = Offres.data().find(o => o.id === id);
     let lettre = offre?.lettre || "";
     if (!lettre) {
-      this.area().value = "Génération en cours…";
+      // IA locale sur processeur : la rédaction prend environ une minute,
+      // davantage si une analyse d'offres occupe déjà l'IA (une demande à la fois)
+      const debut = Date.now();
+      const attente = () => {
+        const s = Math.round((Date.now() - debut) / 1000);
+        this.area().value = "Rédaction de la lettre par l'IA locale… " + s + " s\n\n"
+          + "Compte environ une minute, davantage si une analyse d'offres est en cours : "
+          + "l'IA traite une demande à la fois. Tu peux laisser cette fenêtre ouverte.";
+      };
+      let minuteur = null;   // compteur de secondes, une mise à jour par seconde
+      const tic = () => { attente(); minuteur = setTimeout(tic, 1000); };
+      tic();
+      this.attendre(true);
       this.el().classList.add("is-open");
       try {
         lettre = (await api.genererLettre(id)).lettre;
@@ -77,10 +89,19 @@ const modal = {
         this.fermer();
         alert("Lettre non générée : " + e.message);
         return;
+      } finally {
+        clearTimeout(minuteur);
+        this.attendre(false);
       }
+      if (this.id !== id) { recharger(); return; }   // fenêtre fermée pendant la rédaction : la lettre est en base
     }
     this.area().value = lettre;
     this.el().classList.add("is-open");
+  },
+  /* Pendant la rédaction : zone en lecture seule, ni enregistrement ni PDF */
+  attendre(oui) {
+    this.area().readOnly = oui;
+    document.querySelectorAll("[data-modal-save], [data-modal-pdf]").forEach(b => { b.disabled = oui; });
   },
   fermer() { this.el().classList.remove("is-open"); this.id = null; },
   async enregistrer() {

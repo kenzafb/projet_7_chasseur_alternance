@@ -49,6 +49,25 @@ Un entretien serait l'occasion d'en parler plus en détail.
 
 Dans l'attente de votre retour, je vous prie d'agréer, Madame, Monsieur, mes salutations distinguées.
 """,
+    "stage": """\
+{contact_entreprise}
+
+Le {date}
+
+Objet : Candidature pour un stage
+
+Madame, Monsieur,
+
+Actuellement en formation, je recherche un stage conventionné et vous adresse ma candidature pour rejoindre votre équipe.
+
+{paragraphe_entreprise}
+
+Ce stage serait l'occasion de mettre en pratique ce que j'apprends et de contribuer concrètement à vos projets, avec sérieux et l'envie d'apprendre. Les dates et la durée du stage figurent dans mon CV.
+
+Un entretien serait l'occasion de vous présenter mon parcours plus en détail.
+
+Dans l'attente de votre retour, je vous prie d'agréer, Madame, Monsieur, mes salutations distinguées.
+""",
 }
 
 
@@ -110,9 +129,68 @@ def _nettoyer_contact(contact):
     return "\n".join(lignes_propres[:3]).strip()
 
 
-def generer_lettre(offre, profil, mode="alternance"):
+# ─── Prompt de la lettre, écrit pour un petit modèle local ────────────────────
+POSTE_PAR_MODE = {"alternance": "une alternance", "job": "un job", "stage": "un stage"}
+
+CONSIGNE_PAR_MODE = {
+    "alternance": "- relie les compétences RÉELLES de la personne (bagage ci-dessous) aux missions du poste ;\n",
+    "job": ("- mets en avant des qualités utiles pour un job court : fiabilité, sérieux, polyvalence, sens du "
+            "contact, capacité à apprendre vite et à s'intégrer dans une équipe ;\n"
+            "- pas de compétence technique pointue, sauf si le poste la demande explicitement ;\n"),
+    "stage": "- relie les missions visées par la personne et son bagage (ci-dessous) aux missions du poste ;\n",
+}
+
+
+def bagage_candidat(profil, mode="alternance") -> str:
+    """Ce que la lettre peut citer du profil, rien d'autre (aucune invention)."""
+    def court(texte, n=200):
+        return " ".join(str(texte or "").split())[:n]
+    lignes = []
+    if mode == "stage":
+        lignes.append(("Missions visées", court(profil.get("missions"), 300)))
+        lignes.append(("Formation", court(profil.get("formation"))))
+    lignes.append(("Compétences", ", ".join(profil.get("competences", []) or [])))
+    if mode != "stage":
+        lignes.append(("Formation", court(profil.get("formation"))))
+    lignes.append(("Expérience", court(profil.get("experience"))))
+    texte = "\n".join(f"- {libelle} : {valeur}" for libelle, valeur in lignes if valeur)
+    return texte or "- Rien de renseigné : reste sur l'intérêt pour l'entreprise, sans inventer de compétence."
+
+
+def construire_messages_lettre(offre, profil, mode="alternance") -> list[dict]:
+    """Messages envoyés à l'IA pour les deux éléments rédigés de la lettre."""
+    from shared.config import ia_longueur_description
+    description = " ".join((offre.get("description", "") or "").split())[:ia_longueur_description()]
+    prompt = (
+        f"Tu aides une personne candidate à personnaliser sa lettre de motivation pour "
+        f"{POSTE_PAR_MODE.get(mode, 'une alternance')}. Rédige deux éléments.\n\n"
+        "OFFRE\n"
+        f"Entreprise : {offre.get('entreprise', '') or 'non précisée'} ({offre.get('lieu', '') or 'lieu non précisé'})\n"
+        f"Poste : {offre.get('titre', '')}\n"
+        f"Description : {description}\n\n"
+        f"BAGAGE DE LA PERSONNE\n{bagage_candidat(profil, mode)}\n\n"
+        "1. contact_entreprise : bloc destinataire en 2 lignes, le nom de l'entreprise puis la ville "
+        "(ex. « ACME Solutions\\n75010 Paris »). Rien d'autre : ni date, ni objet, ni formule de politesse.\n"
+        "2. paragraphe_entreprise : un seul paragraphe de 2 à 3 phrases, 350 caractères au plus :\n"
+        "- ne commence pas par « Je » : commence par le nom de l'entreprise, « Votre » ou « C'est » ;\n"
+        "- montre un intérêt précis pour cette entreprise ou ce poste (activité, missions, contexte) ;\n"
+        f"{CONSIGNE_PAR_MODE.get(mode, CONSIGNE_PAR_MODE['alternance'])}"
+        "- N'invente AUCUNE compétence ni expérience absente du bagage ;\n"
+        "- écris de façon neutre : aucun adjectif ni participe accordé au genre de la personne candidate "
+        "(« j'ai le sens de la rigueur » plutôt qu'un adjectif comme « je suis rigoureux ») ;\n"
+        "- ton direct et sincère, sans superlatifs (« incroyable », « idéal », « parfait ») ;\n"
+        "- ne parle ni de la formation, ni de la disponibilité, ni des dates : la lettre le dit déjà.\n\n"
+        "Réponds uniquement avec cet objet JSON :\n"
+        '{"contact_entreprise": "<nom de l\'entreprise\\nville>", "paragraphe_entreprise": "<2 à 3 phrases>"}'
+    )
+    return [{"role": "system", "content": "Tu rédiges en français. Tu réponds uniquement par un objet JSON "
+                                          "valide, sans texte autour."},
+            {"role": "user", "content": prompt}]
+
+
+def generer_lettre(offre, profil, mode="alternance", modele=None):
     """
-    Demande à l'IA uniquement :
+    Demande à l'IA (modèle de l'usage « lettre », ou `modele`) uniquement :
     1. Le bloc contact de l'entreprise (coin haut gauche de la lettre)
     2. Le paragraphe de personnalisation (~3 phrases max)
 
@@ -122,102 +200,15 @@ def generer_lettre(offre, profil, mode="alternance"):
     """
     exiger_profil(profil, CHAMPS_IDENTITE)
     template = preparer_lettre_type(profil.get("lettre_type") or lettre_par_defaut(mode))
-
     nom_entreprise = offre.get("entreprise", "")
-    titre_poste    = offre.get("titre", "")
-    lieu           = offre.get("lieu", "")
-    description    = (offre.get("description", "") or "")[:800]
-
-    # Bagage réel de la personne (depuis son profil) : rien n'est codé en dur
-    _comps = profil.get("competences", []) or []
-    _comps_txt = ", ".join(_comps) if _comps else ""
-    _formation = (profil.get("formation", "") or "").strip()
-    _experience = (profil.get("experience", "") or "").strip()
-    _bagage = []
-    if _comps_txt:   _bagage.append(f"Compétences : {_comps_txt}")
-    if _formation:   _bagage.append(f"Formation : {_formation[:200]}")
-    if _experience:  _bagage.append(f"Expérience : {_experience[:200]}")
-    bagage_candidat = ("\n".join(_bagage) if _bagage else
-                       "Rien de renseigné : reste sur l'intérêt pour l'entreprise, sans inventer de compétence.")
-
-    # Règle commune : la lettre est écrite à la première personne par
-    # quelqu'un dont on ne connaît pas le genre
-    neutre = (
-        "- Écris de façon neutre : aucun adjectif ni participe accordé au genre de la personne "
-        "candidate (préfère 'j'ai le sens de la rigueur' à un adjectif comme 'je suis rigoureux').\n"
-    )
-
-    # L'élément 2 (paragraphe entreprise) dépend du mode
-    if mode == "job":
-        element2 = (
-            "=== ÉLÉMENT 2 — PARAGRAPHE_ENTREPRISE ===\n"
-            "Un seul paragraphe de 2 à 3 phrases MAX (350 caractères max).\n"
-            "Règles impératives :\n"
-            "- NE commence PAS par 'Je'. Commence par le nom de l'entreprise, 'Votre', 'C'est', etc.\n"
-            "- Montre un intérêt concret pour CETTE entreprise ou ce poste (secteur, mission, contexte).\n"
-            "- Mets en avant les QUALITÉS HUMAINES adaptées à un job court : fiabilité, sérieux, "
-            "polyvalence, sens du contact, rigueur, capacité à apprendre vite et à s'intégrer dans une équipe.\n"
-            "- Appuie-toi sur le bagage réel de la personne (ci-dessous) quand il éclaire le poste ; "
-            "n'invente rien.\n"
-            f"  Bagage de la personne :\n{bagage_candidat}\n"
-            "- N'utilise PAS de compétences techniques pointues SAUF si le poste les demande "
-            "EXPLICITEMENT (ex. saisie informatique, support). Pour un poste manuel, de vente, "
-            "d'accueil ou de manutention, ne parle PAS d'informatique.\n"
-            "- Ton simple, direct et sincère, sans superlatifs ('incroyable', 'idéal', 'parfait').\n"
-            f"{neutre}"
-            "- Ne mentionne PAS la formation ni la disponibilité (déjà dans le corps de la lettre).\n"
-            "Exemple de forme (manutention), à ne pas recopier : \"Votre entreprise recherche des "
-            "profils fiables et rapides ; le travail en équipe et la rigueur font partie de mes "
-            "habitudes, et je m'investis pleinement dans les missions confiées.\"\n\n"
-        )
-    else:
-        element2 = (
-            "=== ÉLÉMENT 2 — PARAGRAPHE_ENTREPRISE ===\n"
-            "Un seul paragraphe de 2 à 3 phrases MAX (350 caractères max).\n"
-            "Règles impératives :\n"
-            "- NE commence PAS par 'Je'. Commence par le nom de l'entreprise, 'Votre', 'C'est', etc.\n"
-            "- Montre un intérêt spécifique pour cette entreprise (secteur, missions, taille, contexte).\n"
-            "- Relie les compétences RÉELLES de la personne candidate (ci-dessous) au contexte du poste. "
-            "N'invente AUCUNE compétence ni expérience absente de ce bagage.\n"
-            f"  Bagage de la personne :\n{bagage_candidat}\n"
-            "- Ton direct et professionnel, sans superlatifs ('incroyable', 'idéal', 'parfait').\n"
-            f"{neutre}"
-            "- Ne mentionne PAS la formation, les projets personnels, ni la disponibilité "
-            "(déjà dans le corps de la lettre).\n"
-            "Structure attendue, à remplir avec l'offre et le bagage réels (ne pas recopier les "
-            "crochets) : \"[Entreprise], votre [activité ou projet précis tiré de l'offre] rejoint "
-            "[compétence réelle du bagage], [mise en pratique lors de telle expérience réelle du bagage].\"\n\n"
-        )
-
-    prompt = (
-        "Tu aides une personne candidate à personnaliser sa lettre de motivation.\n"
-        "Génère UNIQUEMENT ces 2 éléments en JSON valide, sans backticks ni texte autour.\n\n"
-
-        "=== OFFRE ===\n"
-        f"Entreprise : {nom_entreprise} — {lieu}\n"
-        f"Poste : {titre_poste}\n"
-        f"Description : {description}\n\n"
-
-        "=== ÉLÉMENT 1 — CONTACT_ENTREPRISE ===\n"
-        "Bloc destinataire pour le coin supérieur gauche de la lettre. 2-3 lignes MAX.\n"
-        "Format : nom de l'entreprise ligne 1, ville ou adresse ligne 2.\n"
-        "Exemple : \"ACME Solutions\\n75010 Paris\"\n"
-        "INTERDIT : date, 'Objet :', formule de politesse, 'Paris le', tout autre élément de lettre.\n"
-        "UNIQUEMENT le nom et la ville, rien d'autre.\n\n"
-
-        f"{element2}"
-
-        "Réponds UNIQUEMENT en JSON valide :\n"
-        "{\"contact_entreprise\": \"...\", \"paragraphe_entreprise\": \"...\"}"
-    )
-
 
     # Réponse hors schéma redemandée une fois. ErreurIABloquante et
     # ErreurIAPassagere remontent : pas de lettre sans paragraphe rédigé.
     reponse = appeler_structure(
-        [{"role": "user", "content": prompt}],
+        construire_messages_lettre(offre, profil, mode),
         LettreIA,
         usage="lettre",
+        modele=modele,
         temperature=0.6,
     )
     contact    = reponse.contact_entreprise or nom_entreprise

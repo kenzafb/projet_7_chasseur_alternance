@@ -142,11 +142,23 @@ def test_trames_par_defaut_generiques():
         assert "alternance" not in texte.lower()
 
 
-@pytest.mark.parametrize("mode", ["alternance", "job"])
+@pytest.mark.parametrize("mode", ["alternance", "job", "stage"])
 def test_lettre_generee_avec_la_trame_du_mode(ia, mode):
     lettre = generateur.generer_lettre(OFFRE, PROFIL, mode=mode)
     assert ("alternance" in lettre.lower()) == (mode == "alternance")
+    assert ("stage" in lettre.lower()) == (mode == "stage")
     assert "ACME, votre contexte me parle." in lettre
+    assert ia.appels[-1]["model"] == "ministral-3:8b"
+    assert ia.appels[-1]["response_format"]["json_schema"]["name"] == "LettreIA"
+
+
+def test_prompt_de_lettre_par_mode(ia):
+    generateur.generer_lettre(OFFRE, {**PROFIL, "missions": "MISSIONS-VISEES"}, mode="stage")
+    generateur.generer_lettre(OFFRE, PROFIL, mode="job")
+    stage, job = ia.textes(0), ia.textes(1)
+    assert "pour un stage" in stage and "MISSIONS-VISEES" in stage
+    assert "pour un job" in job and "fiabilité" in job and "MISSIONS-VISEES" not in job
+    assert '"paragraphe_entreprise": "<2 à 3 phrases>"' in stage
 
 
 def test_lettre_type_du_profil_prioritaire(ia):
