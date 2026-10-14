@@ -29,9 +29,19 @@ class AnalyseOffre(_Reponse):
     points_faibles: list[str] = Field(description="2 au plus")
     domaine: str = Field(description="Catégorie métier en 2 à 4 mots")
     resume: str = Field(description="12 mots au plus")
-    # Facultatif (hors de « required ») : niveau d'études que demande l'offre,
-    # tel que le modèle l'a compris ; affiché par scripts/verifier_ia_locale.py
-    niveau_demande: str | None = Field(None, description="Niveau d'études demandé par l'offre, ou null")
+    # Extraits de l'offre, sans jugement : l'éligibilité qui en dépend est
+    # décidée en Python (shared/eligibilite.py, D94)
+    niveau_requis: Literal["bac", "bac+2", "bac+3", "bac+4", "bac+5", "non_precise"] = Field(
+        description="Niveau d'études exigé ou demandé par l'offre")
+    duree_mois: float | None = Field(description="Durée du contrat ou du stage en mois, ou null")
+    date_debut_offre: str | None = Field(description="Début écrit dans l'offre, ou null")
+    alternance_seulement: bool = Field(description="Vrai si l'offre n'existe qu'en alternance ou apprentissage")
+
+    @field_validator("duree_mois")
+    @classmethod
+    def _duree(cls, duree):
+        """Durée nulle ou négative : non précisée."""
+        return duree if duree and duree > 0 else None
 
     @field_validator("score")
     @classmethod

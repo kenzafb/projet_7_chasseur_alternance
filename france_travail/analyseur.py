@@ -18,8 +18,25 @@ FORMAT_REPONSE = (
     '{"score": <entier de 0 à 10>, "eligible": <true ou false>, '
     '"points_forts": [<3 phrases courtes au plus>], "points_faibles": [<2 phrases courtes au plus>], '
     '"domaine": "<catégorie métier en 2 à 4 mots>", "resume": "<12 mots au plus>", '
-    '"niveau_demande": "<niveau d\'études demandé par l\'offre, ou null s\'il n\'est pas dit>"}'
+    '"niveau_requis": "<bac, bac+2, bac+3, bac+4, bac+5 ou non_precise>", '
+    '"duree_mois": <nombre ou null>, "date_debut_offre": "<texte ou null>", '
+    '"alternance_seulement": <true ou false>}'
 )
+
+# Ce que le modèle recopie de l'offre, sans juger : l'éligibilité qui en
+# dépend (niveau, durée, dates, alternance) est décidée en Python (D94)
+EXTRACTION = (
+    "RECOPIE AUSSI, sans juger, ce que dit l'offre :\n"
+    "- niveau_requis : niveau d'études exigé ou demandé (« ingénieur », « master » ou « Bac+5 » = bac+5 ; "
+    "« licence » = bac+3 ; « BTS », « DUT » = bac+2) ; non_precise s'il n'est pas dit ;\n"
+    "- duree_mois : durée du stage ou du contrat en mois (6 mois = 6, 10 semaines = 2.5), null si non dite ;\n"
+    "- date_debut_offre : date ou mois de début écrit dans l'offre, avec l'année (mois puis année), null sinon ;\n"
+    "- alternance_seulement : true si l'offre n'est proposée qu'en alternance ou apprentissage.\n\n"
+    "Le niveau, la durée et les dates sont vérifiés à part : ne les compte pas dans la note."
+)
+
+ETALEMENT = ("Étale les notes : réserve 8 à 10 aux offres qui correspondent vraiment au profil et aux missions "
+             "visées ; une offre correcte sans plus vaut 5 à 7 ; une offre éloignée, 3 à 4.")
 
 SYSTEME = ("Tu es un recruteur qui évalue des offres pour un candidat. Tu réponds uniquement par un "
            "objet JSON valide, en français, sans texte autour.")
@@ -100,7 +117,6 @@ REGLES = {
         contexte_alternance,
         "INÉLIGIBLE (eligible false, score de 0 à 2) si l'une de ces conditions est vraie :\n"
         "- le poste réel est hors des domaines recherchés ;\n"
-        "- l'offre exige un niveau d'études nettement supérieur au niveau visé (ex. Bac+5 pour un Bac+2) ;\n"
         "- l'offre exige 3 ans d'expérience ou plus ;\n"
         "- le poste est senior (ingénieur confirmé, architecte, senior), sauf offre d'une école ou d'un CFA.\n\n"
         "NOTE de 0 à 10, d'après les missions réelles et non le seul titre :\n"
@@ -120,7 +136,6 @@ REGLES = {
         "est-elle accessible et adaptée ?",
         contexte_job,
         "INÉLIGIBLE (eligible false, score de 0 à 2) si l'une de ces conditions est vraie :\n"
-        "- l'offre exige un diplôme que le candidat n'a pas ;\n"
         "- l'offre exige plus d'expérience que la sienne (« souhaitée » ou « appréciée » n'élimine pas) ;\n"
         "- la durée minimale du contrat dépasse ce que le candidat peut faire (plus court : c'est bien) ;\n"
         "- le poste correspond clairement aux types de jobs à éviter.\n\n"
@@ -143,17 +158,14 @@ REGLES = {
         contexte_stage,
         "INÉLIGIBLE (eligible false, score de 0 à 2) si l'une de ces conditions est vraie :\n"
         "- ce n'est pas un stage pour un étudiant (emploi salarié, formation payante) ;\n"
-        "- le poste réel est hors des domaines recherchés ;\n"
-        "- l'offre exige un niveau d'études nettement supérieur à la formation de l'étudiant ;\n"
-        "- les dates sont incompatibles : durée minimale exigée nettement plus longue que sa période, ou "
-        "début après la fin de sa période.\n\n"
+        "- le poste réel est hors des domaines recherchés.\n\n"
         "NOTE de 0 à 10, d'après les missions réelles et non le seul titre :\n"
-        "- 9-10 : missions proches des missions visées, domaine recherché, niveau et dates compatibles ;\n"
-        "- 7-8 : bon accord avec une ou deux réserves (missions un peu différentes, dates non précisées) ;\n"
-        "- 5-6 : accord moyen (missions assez éloignées, niveau un peu au-dessus) ;\n"
+        "- 9-10 : missions proches des missions visées, domaine recherché ;\n"
+        "- 7-8 : bon accord avec une ou deux réserves (missions un peu différentes) ;\n"
+        "- 5-6 : accord moyen (missions assez éloignées) ;\n"
         "- 3-4 : faible accord ;\n"
         "- 0-2 : inéligible.\n"
-        "Des dates absentes de l'offre ne sont pas une pénalité.\n\n"
+
         "domaine : catégorie métier courte, ou exactement « Hors domaine » si le poste réel est hors des "
         "domaines recherchés.",
     ),
@@ -172,7 +184,8 @@ def construire_messages(offre, profil, mode="alternance") -> list[dict]:
         f"Entreprise : {offre.get('entreprise', '') or 'non précisée'}\n"
         f"Lieu : {offre.get('lieu', '') or 'non précisé'}\n"
         f"Description : {description}\n\n"
-        f"{regles}\n\n"
+        f"{regles}\n{ETALEMENT}\n\n"
+        f"{EXTRACTION}\n\n"
         f"{FORMAT_REPONSE}"
     )
     return [{"role": "system", "content": SYSTEME}, {"role": "user", "content": prompt}]
@@ -187,6 +200,7 @@ def analyser_offre(offre, profil, mode="alternance", modele=None, essais=2):
     analyse = appeler_structure(construire_messages(offre, profil, mode), AnalyseOffre,
                                 usage="analyse", modele=modele, essais=essais, temperature=0.1)
     result = _valider_analyse(analyse)
+    appliquer_eligibilite(result, profil, mode)
     # Mode stage : une école peut accueillir un stagiaire (D74), rien à archiver
     if mode == "alternance" and est_ecole_cfa(offre):
         result["statut_auto"] = "archive"
@@ -214,6 +228,22 @@ def est_ecole_cfa(offre) -> bool:
         mot in description_lower or mot in entreprise_lower or mot in titre_lower
         for mot in ECOLES_MOTS_CLES
     )
+
+
+def appliquer_eligibilite(result: dict, profil: dict, mode: str) -> dict:
+    """Critères bloquants décidés en Python (shared/eligibilite.py) à partir
+    des champs extraits de l'offre : inéligible, score plafonné à 3, verdict
+    « ineligible », raison en tête des points faibles et dans
+    raison_ineligibilite. Une information non précisée ne bloque jamais."""
+    from shared.eligibilite import PLAFOND_SCORE_INELIGIBLE, raisons_ineligibilite
+    raisons = raisons_ineligibilite(result, profil, mode)
+    result["raison_ineligibilite"] = " ; ".join(raisons)
+    if raisons:
+        result["eligible"] = False
+        result["score"] = min(result["score"], PLAFOND_SCORE_INELIGIBLE)
+        result["verdict"] = "ineligible"
+        result["points_faibles"] = [f"Inéligible : {r}" for r in raisons] + result["points_faibles"][:2]
+    return result
 
 
 def _valider_analyse(analyse: AnalyseOffre) -> dict:
@@ -284,7 +314,7 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
     offre["raison_archivage"] = ""
     if mode == "job":
         # Mode job : on archive seulement les inéligibles (niveau/exp/durée non compatibles)
-        if not offre.get("eligible", True) and offre.get("score", 10) <= 2:
+        if not offre.get("eligible", True):
             offre["statut"] = "archive"
             offre["raison_archivage"] = "note_basse"
             _log(f"     -> Archivée automatiquement (inéligible score {offre['score']})")
@@ -305,7 +335,7 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
             offre["statut"] = "archive"
             offre["raison_archivage"] = "stage"
             _log(f"     -> Archivée automatiquement (stage détecté)")
-        elif not offre.get("eligible", True) and offre.get("score", 10) <= 2:
+        elif not offre.get("eligible", True):
             offre["statut"] = "archive"
             offre["raison_archivage"] = "note_basse"
             _log(f"     -> Archivée automatiquement (inéligible score {offre['score']})")

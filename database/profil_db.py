@@ -24,7 +24,15 @@ def lire_profil(user_id: int, mode: str = "alternance") -> dict:
 
 
 def profil_vers_dict(p: Profil) -> dict:
-    """Une ligne de profils -> dict (format de lire_profil)."""
+    """Une ligne de profils -> dict (format de lire_profil), avec le niveau
+    d'études retenu pour l'éligibilité (niveau_profil, shared/eligibilite.py)."""
+    from shared.eligibilite import niveau_du_profil
+    d = _profil_vers_dict(p)
+    d["niveau_profil"] = niveau_du_profil(d)
+    return d
+
+
+def _profil_vers_dict(p: Profil) -> dict:
     return {
         "prenom": p.prenom or "",
         "nom": p.nom or "",

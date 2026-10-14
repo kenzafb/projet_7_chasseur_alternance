@@ -20,7 +20,7 @@ from tests.conftest import compte_verifie
 from tests.test_envoyeur import attendre, entreprises
 
 ANALYSE = ('{"score": 8, "eligible": true, "points_forts": [], "points_faibles": [], '
-           '"domaine": "Informatique", "resume": "ok"}')
+           '"domaine": "Informatique", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false}')
 
 
 # ─── Règle commune ───────────────────────────────────────────────────────────

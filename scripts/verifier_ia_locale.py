@@ -20,8 +20,9 @@ par l'humain, Ollama démarré :
    Un seul essai par réponse : on mesure ce que le modèle répond du
    premier coup.
 4. Affiche un tableau comparatif sur les mêmes offres : temps, JSON valide
-   ou non, score, verdict et niveau d'études demandé par l'offre tel que le
-   modèle l'a compris (s'il l'a donné) ; puis l'avis sur l'email.
+   ou non, score, verdict, niveau requis et durée tels que le modèle les a
+   lus dans l'offre, et la raison d'inéligibilité décidée en Python (D94) ;
+   puis l'avis sur l'email.
 
 --lettre : à la place, pour une offre (--offre <id>, sinon la plus récente
 des offres non analysées), rédige le paragraphe de lettre avec chaque
@@ -306,13 +307,15 @@ def main(argv=None, sortie=print) -> int:
             debut = time.monotonic()
             try:
                 a = analyser_offre(o["offre"], o["profil"], mode=o["mode"], modele=modele, essais=1)
+                duree = a.get("duree_mois")
                 ligne = [modele, f"O{i}", _secondes(debut), "oui", f"{a['score']}/10", a["verdict"],
-                         (a.get("niveau_demande") or "-")[:24], a["domaine"][:24]]
+                         a.get("niveau_requis") or "-", f"{duree:g}" if duree else "-",
+                         (a.get("raison_ineligibilite") or "-")[:60], a["domaine"][:24]]
                 valides += 1
             except ReponseInvalide as e:
-                ligne = [modele, f"O{i}", _secondes(debut), "non", "-", "-", "-", str(e)[:40]]
+                ligne = [modele, f"O{i}", _secondes(debut), "non", "-", "-", "-", "-", "-", str(e)[:40]]
             except ErreurIAPassagere as e:
-                ligne = [modele, f"O{i}", _secondes(debut), "-", "-", "-", "-", f"échec : {str(e)[:40]}"]
+                ligne = [modele, f"O{i}", _secondes(debut), "-", "-", "-", "-", "-", "-", f"échec : {str(e)[:40]}"]
             except ErreurIABloquante as e:
                 sortie(f"  ❌ {e}")
                 break
@@ -338,8 +341,8 @@ def main(argv=None, sortie=print) -> int:
     # 4. Tableaux comparatifs
     if lignes_offres:
         sortie("\nAnalyse des offres (un seul essai par réponse) :")
-        for l in _tableau(["Modèle", "Offre", "Temps", "JSON valide", "Score", "Verdict", "Niveau demandé",
-                           "Domaine ou erreur"],
+        for l in _tableau(["Modèle", "Offre", "Temps", "JSON valide", "Score", "Verdict", "Niveau requis",
+                           "Durée (mois)", "Inéligible (Python)", "Domaine ou erreur"],
                           lignes_offres):
             sortie("  " + l)
     if lignes_email:

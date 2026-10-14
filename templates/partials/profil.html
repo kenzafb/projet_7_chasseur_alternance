@@ -69,6 +69,13 @@
           placeholder="- Diplôme en cours (niveau), établissement (années)&#10;- Diplôme préparé en alternance (niveau), établissement&#10;..."></textarea>
         <span class="field__hint">Une ligne par diplôme. Indique le niveau, l'intitulé, l'établissement et les dates.</span>
       </label>
+      <label class="field">
+        <span class="field__label">Niveau d'études actuel</span>
+        <input class="field__input" type="text" data-profil="niveau_etudes"
+          placeholder="Ex. Bac+2 obtenu, Bac+3 en cours">
+        <span class="field__hint">Sert à écarter, sans IA, les offres qui exigent un niveau bien supérieur (deux crans ou plus).</span>
+      </label>
+      <p class="domaines-vide" data-niveau-avert hidden></p>
       <label class="field field--full">
         <span class="field__label">Niveau d'études visé</span>
         <input class="field__input" type="text" data-profil="niveau_vise"
@@ -353,8 +360,9 @@
         <span class="field__label">Niveau d'études obtenu</span>
         <input class="field__input" type="text" data-profil="niveau_etudes"
           placeholder="Ex. Bac, Bac+2…">
-        <span class="field__hint">Ton niveau actuel. Les offres exigeant un diplôme que tu n'as pas seront écartées.</span>
+        <span class="field__hint">Ton niveau actuel. Les offres exigeant un niveau supérieur d'au moins deux crans sont écartées sans IA.</span>
       </label>
+      <p class="domaines-vide" data-niveau-avert hidden></p>
       <label class="field field--full">
         <span class="field__label">Expérience professionnelle</span>
         <textarea class="field__area" data-profil="experience" rows="4"
@@ -487,6 +495,13 @@
         <input class="field__input" type="text" data-profil="formation"
           placeholder="Ex. Licence 3, BUT 2e année, Master 1…">
       </label>
+      <label class="field">
+        <span class="field__label">Niveau d'études actuel</span>
+        <input class="field__input" type="text" data-profil="niveau_etudes"
+          placeholder="Ex. Bac+2 en cours (BUT2) ; vide : déduit de la formation">
+        <span class="field__hint">Sert à écarter, sans IA, les offres qui exigent un niveau bien supérieur (deux crans ou plus).</span>
+      </label>
+      <p class="domaines-vide" data-niveau-avert hidden></p>
       <label class="field field--full">
         <span class="field__label">Missions visées</span>
         <textarea class="field__area" data-profil="missions" rows="3"

@@ -51,7 +51,7 @@ def _prompts(ia):
 @pytest.mark.parametrize("mode", ["alternance", "job", "stage"])
 def test_prompts_sans_mention_d_un_utilisateur_reel(ia, mode):
     generateur.generer_lettre(OFFRE, PROFIL, mode=mode)
-    ia.reponse = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok"}'
+    ia.reponse = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false}'
     analyseur.analyser_offre(OFFRE, PROFIL, mode=mode)
     texte = _prompts(ia)
     assert len(ia.appels) == 2
@@ -68,7 +68,7 @@ def test_prompt_de_lettre_neutre_et_fonde_sur_le_profil(ia):
 
 
 def test_analyse_job_tire_les_preferences_du_profil(ia):
-    ia.reponse = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok"}'
+    ia.reponse = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false}'
     analyseur.analyser_offre(OFFRE, PROFIL, mode="job")
     texte = _prompts(ia)
     for valeur in ("TYPES-OK-DU-PROFIL", "TYPES-EVITER-DU-PROFIL", "HORAIRES-DU-PROFIL",
@@ -81,7 +81,7 @@ def test_analyse_job_tire_les_preferences_du_profil(ia):
     assert "N'applique AUCUNE préférence que le profil n'exprime pas" in texte
 
 
-REPONSE = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok"}'
+REPONSE = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false}'
 PROFIL_STAGE = {"prenom": "Camille", "formation": "Licence 3 informatique", "etablissement": "Université X",
                 "missions": "MISSIONS-DU-PROFIL", "date_debut": "2027-01-04", "date_fin": "2027-06-25",
                 "duree_semaines": 25, "recherche": {"domaines": ["M18"]}}
@@ -106,7 +106,9 @@ def test_prompt_stage(ia):
     assert "offre de stage" in texte and "MISSIONS-DU-PROFIL" in texte
     assert "du 4 janvier 2027 au 25 juin 2027 (25 semaines)" in texte
     assert "Licence 3 informatique" in texte and "Université X" in texte
-    assert "dates sont incompatibles" in texte and "Hors domaine" in texte
+    assert "Hors domaine" in texte and "duree_mois" in texte and "date_debut_offre" in texte
+    assert "nettement supérieur" not in texte and "dates sont incompatibles" not in texte   # vérifiés en Python
+    assert "réserve 8 à 10" in texte
     assert "Systèmes d'information" in texte
 
 

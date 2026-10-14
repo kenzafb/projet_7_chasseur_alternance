@@ -422,6 +422,15 @@ function majDureeStage() {
     : "Durée : renseigne les deux dates.";
 }
 
+/* Niveau d'études retenu pour écarter les offres trop exigeantes : rien de
+   lisible dans le niveau ni dans la formation, un avertissement le demande */
+function afficherNiveau(niveau) {
+  document.querySelectorAll("[data-niveau-avert]").forEach(el => {
+    el.textContent = niveau?.avertissement || "";
+    el.hidden = !niveau?.avertissement;
+  });
+}
+
 /* ── Affichage des sections selon le mode (alternance/job/stage) ────────── */
 async function appliquerModeProfil() {
   let mode = "alternance";
@@ -454,6 +463,7 @@ export const Profil = {
       el.value = p[el.dataset.profil] ?? "";
     });
     document.querySelectorAll("[data-profil-case]").forEach(el => { el.checked = p[el.dataset.profilCase] === true; });
+    afficherNiveau(p.niveau_profil);
 
     _tags["competences"] = Array.isArray(p.competences) ? [...p.competences] : [];
     rendreTags("competences");
@@ -522,7 +532,9 @@ export const Profil = {
     data.recherche = rech;
 
     try {
-      return (await api.sauverProfil(data)).ok === true;
+      const ok = (await api.sauverProfil(data)).ok === true;
+      if (ok) api.profil().then(p => afficherNiveau(p.niveau_profil), () => {});
+      return ok;
     } catch (e) {
       // Refus du serveur (date illisible, balise inconnue...) : message lisible
       if (e.message) alert(e.message);
