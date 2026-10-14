@@ -526,3 +526,7 @@
 
 /* Motif d'une offre inéligible (D94, D95) */
 .offre__inelig { margin-top: 4px; font-size: 13px; color: #C0353A; }
+
+/* J'ai postulé (D105) */
+.offre__postuler { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; font-size: 13px; }
+.offre__postuler input[type="date"] { font: inherit; padding: 4px 6px; }

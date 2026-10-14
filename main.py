@@ -184,6 +184,13 @@ class Archivage(BaseModel):
             raise ValueError("indiquer soit desarchiver: true, soit une raison d'archivage")
         return self
 
+class Postuler(BaseModel):
+    """J'ai postulé (date du jour par défaut, modifiable), ou retour en arrière."""
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(min_length=1, max_length=64)
+    date: str | None = Field(None, max_length=10)   # AAAA-MM-JJ
+    annuler: bool = False
+
 class Sauvegarde(BaseModel):
     id: str
     lettre: str | None = None
@@ -715,6 +722,35 @@ def api_maj_statut(body: MajStatut, request: Request, user: User = Depends(utili
             modifs["date_candidature"] = maintenant_utc()
     modifier_candidature(user.id, body.id, modifs, mode=mode)
     return {"ok": True}
+
+# Statuts d'une offre où la personne a postulé (D105) : « envoye » (affiché
+# « Postulée »), puis le suivi de la page Mes candidatures
+STATUTS_POSTULEE = ("envoye", "reponse", "entretien", "refus")
+
+
+@prive.post("/api/offre/postuler")
+def api_offre_postuler(body: Postuler, user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
+    """Marque l'offre « postulée » à la date donnée (jour de Paris, aujourd'hui
+    par défaut ; date future refusée), change la date d'une offre déjà
+    postulée, ou annule (retour aux offres à traiter, date effacée)."""
+    from datetime import datetime, time
+    from database.dates import fuseau_affichage, maintenant_affichage
+    from shared.stage import lire_date
+    offre = lire_candidature(user.id, body.id, mode=mode)
+    if not offre:
+        return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
+    if body.annuler:
+        modifier_candidature(user.id, body.id, {"statut": "nouveau", "date_candidature": None}, mode=mode)
+        return {"ok": True, "statut": "nouveau", "date_candidature": ""}
+    jour = lire_date(body.date, "Date de candidature") or maintenant_affichage().date()
+    if jour > maintenant_affichage().date():
+        raise ErreurUtilisateur("La date de candidature ne peut pas être dans le futur.")
+    # Midi, heure de Paris : le jour reste le même une fois converti en UTC
+    instant = datetime.combine(jour, time(12), tzinfo=fuseau_affichage())
+    statut = offre.get("statut") if offre.get("statut") in STATUTS_POSTULEE else "envoye"
+    modifier_candidature(user.id, body.id, {"statut": statut, "date_candidature": instant,
+                                            "raison_archivage": ""}, mode=mode)
+    return {"ok": True, "statut": statut, "date_candidature": jour.isoformat()}
 
 @prive.post("/api/archiver")
 def api_archiver(body: OffreId, request: Request, user: User = Depends(utilisateur_requis),

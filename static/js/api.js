@@ -129,6 +129,7 @@ export const api = {
   genererLettre:     (id)      => post("/api/generer_lettre", { id }),
   majStatut:         (id, s)   => post("/api/maj_statut", { id, statut: s }),
   archiver:          (id)      => post("/api/archiver", { id }),
+  postuler:          (id, corps) => post("/api/offre/postuler", { id, ...corps }),
   desarchiver:       (id)      => post("/api/offre/archivage", { id, desarchiver: true }),
   changerRaison:     (id, r)   => post("/api/offre/archivage", { id, raison: r }),
   sauvegarder:       (payload) => post("/api/sauvegarder", payload),

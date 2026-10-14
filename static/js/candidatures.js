@@ -7,7 +7,7 @@ import { api } from "./api.js";
 
 // Statuts de suivi d'une candidature alternance (après génération de lettre)
 const STATUTS = [
-  ["envoye",    "Envoyé"],
+  ["envoye",    "Postulée"],
   ["reponse",   "Réponse"],
   ["entretien", "Entretien"],
   ["refus",     "Refus"],
