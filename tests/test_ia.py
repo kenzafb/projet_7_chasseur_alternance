@@ -91,9 +91,9 @@ def test_chaque_usage_appelle_son_modele(ia, monkeypatch):
     analyser_offre({"titre": "Dev", "description": "..."}, profil)
     ia.reponse = '{"contact_entreprise": "ACME", "paragraphe_entreprise": "ACME me parle."}'
     generer_lettre({"titre": "Dev", "entreprise": "ACME"}, profil)
-    import spontanees.scraper_emails as se
-    ia.reponse = '{"emails": [], "telephones": [], "contact_rh": null, "fiable": true}'
-    se.ia_extraire_contact("page", "ACME", [])
+    from shared.validation_emails import valider_par_ia
+    ia.reponse = '{"valide": true}'
+    valider_par_ia("x@gmail.com", "ACME", "acme.fr", "")
     assert [a["model"] for a in ia.appels] == ["modele-analyse", "modele-lettre", "modele-extraction"]
 
 

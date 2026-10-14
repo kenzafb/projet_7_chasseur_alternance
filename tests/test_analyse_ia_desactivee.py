@@ -118,10 +118,12 @@ def test_interface_ia_active(utilisateur):
 
 
 # ─── Scraper et validation des emails ────────────────────────────────────────
-def test_scraper_lecture_directe(ia_coupee, sites, user_id, ia):
+def test_scraper_regles_seules(ia_coupee, sites, user_id, ia):
+    sites.douteux = {"acme2.fr", "acme3.fr"}
     entreprises, logs = _lancer(user_id)
     assert ia.appels == []
-    for nom in ("ACME 1", "ACME 2", "ACME 3"):
+    assert entreprises["ACME 1"]["emails_trouves"] and entreprises["ACME 1"]["emails_non_valides"] is False
+    for nom in ("ACME 2", "ACME 3"):
         assert entreprises[nom]["emails_trouves"] and entreprises[nom]["emails_non_valides"] is True
     assert logs.count("IA désactivée") == 1 and "IA indisponible" not in logs
 

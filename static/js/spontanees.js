@@ -168,7 +168,8 @@ function rendreAValider() {
   liste.innerHTML = aValider.map(e => `
     <div class="a-valider__ligne">
       <div><div class="trow__name">${esc(e.nom)}</div><div class="trow__sub">${esc(e.ville)}</div></div>
-      <div class="trow__mail">${e.emails.map(esc).join(", ")}</div>
+      <div class="trow__mail">${e.emails.map(esc).join(", ")}${(e.valides || []).length
+        ? `<div class="trow__sub">déjà validées : ${e.valides.map(esc).join(", ")}</div>` : ""}</div>
       <span class="chip chip--gris">non validé</span>
       <button class="btn btn--sm" data-valider="${e.id}">Valider</button>
     </div>`).join("");

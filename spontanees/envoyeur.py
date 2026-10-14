@@ -51,6 +51,7 @@ from shared.config import chemin_piece_jointe
 from shared.chiffrement import ChiffrementIndisponible
 from shared.compte_envoi import exiger_compte_verifie
 from shared.erreurs import ErreurUtilisateur
+from shared.validation_emails import emails_douteux, emails_valides
 from database.compte_envoi_db import liberer_envoi, marquer_verification, reserver_envoi
 from database.dedup_db import ajouter_emails_contactes, lire_emails_contactes, normaliser_email
 
@@ -159,17 +160,18 @@ def adresses_deja_contactees(user_id, mode, entreprises) -> set:
 
 
 def adresses_nouvelles(entreprise, deja) -> list[str]:
-    """Adresses de l'entreprise pas encore contactées, normalisées, sans doublon."""
-    uniques = dict.fromkeys(normaliser_email(a) for a in entreprise.get("emails_trouves") or []
+    """Adresses validées de l'entreprise pas encore contactées, normalisées,
+    sans doublon. Une adresse douteuse (non validée) n'est jamais visée."""
+    uniques = dict.fromkeys(normaliser_email(a) for a in emails_valides(entreprise)
                             if a and a.strip())
     return [a for a in uniques if a not in deja]
 
 
 def envoyable(e) -> bool:
-    """Entreprise que l'envoyeur peut viser : des emails, pas encore envoyée,
-    et des emails validés (par l'IA ou à la main). Les emails non validés ne
-    partent jamais automatiquement (décision D15)."""
-    return bool(e.get("emails_trouves")) and not e.get("mail_envoye") and not e.get("emails_non_valides")
+    """Entreprise que l'envoyeur peut viser : pas encore envoyée, et au moins
+    un email validé (par les règles, l'IA ou à la main). Les emails non
+    validés ne partent jamais automatiquement (décision D15)."""
+    return bool(emails_valides(e)) and not e.get("mail_envoye")
 
 
 def compter_a_envoyer(user_id, mode) -> int:
@@ -250,7 +252,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
     # ── Queue ─────────────────────────────────────────────────────────────────
     a_envoyer = [e for e in entreprises if envoyable(e)]
     non_valides = sum(1 for e in entreprises
-                      if e.get("emails_trouves") and not e.get("mail_envoye") and e.get("emails_non_valides"))
+                      if emails_douteux(e) and not emails_valides(e) and not e.get("mail_envoye"))
     if non_valides:
         _log(f"ℹ️  {non_valides} entreprise(s) aux emails non validés ignorée(s) : à valider dans la page Spontanées.")
 

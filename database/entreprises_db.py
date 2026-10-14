@@ -230,9 +230,13 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
 # attendent au niveau racine du dict.
 _CHAMPS_EXTRA_REMONTES = ["nom", "url_scrapee", "source_recherche"]
 # Champs du scraper gardés dans extra (bug 5 : ils étaient perdus)
-# emails_non_valides : emails lus dans la page sans validation (par l'IA ou à la main)
+# emails_non_valides : l'entreprise a des adresses douteuses pas encore validées ;
+# emails_douteux : lesquelles (absent : entreprise d'avant la phase 7, toutes
+# ses adresses le sont si emails_non_valides) ; contextes_emails : texte de la
+# page autour de chacune, pour la validation par l'IA plus tard
+# (shared/validation_emails.py)
 _CHAMPS_EXTRA_SCRAPER = ("telephone", "url_scrapee", "source_recherche", "tentatives_site",
-                         "emails_non_valides")
+                         "emails_non_valides", "emails_douteux", "contextes_emails")
 
 
 def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
@@ -266,6 +270,8 @@ def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
         d[champ] = extra.get(champ, "")
     d["tentatives_site"] = int(extra.get("tentatives_site") or 0)
     d["emails_non_valides"] = bool(extra.get("emails_non_valides"))
+    d["emails_douteux"] = extra.get("emails_douteux")   # None : avant la phase 7
+    d["contextes_emails"] = dict(extra.get("contextes_emails") or {})
     # On garde extra complet aussi, au cas où
     d["_extra"] = extra
     d["_id"] = e.id   # id technique en base, pour réécrire précisément
@@ -288,10 +294,18 @@ def compter_a_scraper(user_id: int, mode: str = MODE_DEFAUT) -> int:
         db.close()
 
 
+def _douteux(e: Entreprise) -> list[str]:
+    """Adresses douteuses de l'entreprise, pas encore validées (phase 7)."""
+    from shared.validation_emails import emails_douteux
+    extra = e.extra or {}
+    return emails_douteux({"emails_trouves": e.emails_trouves or [], "emails_douteux": extra.get("emails_douteux"),
+                           "emails_non_valides": extra.get("emails_non_valides")})
+
+
 def _en_attente_de_validation(e: Entreprise, m: EntrepriseMode) -> bool:
-    """Emails lus dans la page sans validation par l'IA, pas encore envoyés
+    """Adresses douteuses pas encore validées, entreprise pas encore envoyée
     dans ce mode (D15)."""
-    return bool((e.extra or {}).get("emails_non_valides")) and bool(e.emails_trouves) and not m.mail_envoye
+    return bool((e.extra or {}).get("emails_non_valides")) and bool(_douteux(e)) and not m.mail_envoye
 
 
 def lire_a_valider(user_id: int, mode: str = MODE_DEFAUT) -> list[dict]:
@@ -300,7 +314,8 @@ def lire_a_valider(user_id: int, mode: str = MODE_DEFAUT) -> list[dict]:
     db = SessionLocal()
     try:
         return [{"id": e.id, "nom": e.nom_commercial or (e.extra or {}).get("nom", "") or "?",
-                 "ville": e.ville or "", "site": e.site_web or "", "emails": list(e.emails_trouves or [])}
+                 "ville": e.ville or "", "site": e.site_web or "", "emails": _douteux(e),
+                 "valides": [a for a in e.emails_trouves or [] if a not in _douteux(e)]}
                 for e, m in _du_mode(db, user_id, mode)
                 if _en_attente_de_validation(e, m)]
     finally:
@@ -318,9 +333,9 @@ def valider_emails(user_id: int, entreprise_id: int) -> bool:
     db = SessionLocal()
     try:
         e = db.query(Entreprise).filter_by(user_id=user_id, id=entreprise_id).first()
-        if not e or not ((e.extra or {}).get("emails_non_valides") and e.emails_trouves):
+        if not e or not ((e.extra or {}).get("emails_non_valides") and _douteux(e)):
             return False
-        e.extra = {**(e.extra or {}), "emails_non_valides": False}
+        e.extra = {**(e.extra or {}), "emails_non_valides": False, "emails_douteux": [], "contextes_emails": {}}
         db.commit()
         return True
     finally:

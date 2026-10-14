@@ -19,6 +19,7 @@ import socket
 import tempfile
 import threading
 import time
+import types
 from pathlib import Path
 
 _TMP = Path(tempfile.mkdtemp(prefix="chasseur_tests_"))
@@ -123,6 +124,8 @@ def ia(monkeypatch):
     monkeypatch.setattr(shared.ia, "_poster", faux)
     monkeypatch.setattr(shared.ia, "_obtenir", faux.obtenir)
     monkeypatch.setattr(shared.ia, "_refuses", {})   # paramètres refusés : oubliés entre les tests
+    # Pauses entre deux essais instantanées
+    monkeypatch.setattr(shared.ia, "time", types.SimpleNamespace(sleep=lambda s: None, monotonic=time.monotonic))
     return faux
 
 

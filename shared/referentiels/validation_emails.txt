@@ -1,0 +1,134 @@
+# Validation des emails trouvés par le scraper (phase 7), sans IA.
+# Une valeur par ligne, casse ignorée ; tout ce qui suit un # est un commentaire.
+# Les adresses de shared/referentiels/emails_exclus.txt sont écartées avant
+# ces règles.
+#
+# Ordre d'application, pour chaque adresse trouvée sur le site d'une entreprise :
+#   1. liste d'exclusion (emails_exclus.txt) ou préfixe écarté : écartée d'office ;
+#   2. même domaine que le site de l'entreprise ET préfixe de contact : validée d'office ;
+#   3. tout le reste est douteux : l'IA (modèle d'extraction) tranche si elle
+#      est active, sinon l'adresse reste « non validée » (jamais envoyée
+#      automatiquement, à valider à la main).
+#
+# Un préfixe vaut pour la partie avant @ entière (« rh@ ») ou suivie d'un
+# point, d'un tiret, d'un souligné ou d'un chiffre (« rh.paris@ », « rh-idf@ »,
+# « contact2@ »).
+
+[prefixes_contact]
+# Recrutement et ressources humaines
+recrutement
+recrutements
+recrute
+rh
+drh
+ressources.humaines
+ressourceshumaines
+emploi
+emplois
+jobs
+job
+carriere
+carrieres
+career
+careers
+candidature
+candidatures
+cv
+alternance
+stage
+stages
+talent
+talents
+hr
+hiring
+# Contact général
+contact
+contacts
+info
+infos
+information
+informations
+accueil
+bonjour
+hello
+secretariat
+administration
+direction
+agence
+cabinet
+office
+
+[prefixes_ecartes]
+# Adresses qui ne servent pas à candidater (données personnelles, presse,
+# juridique, technique, commandes...)
+dpo
+gdpr
+rgpd
+privacy
+cnil
+donnees.personnelles
+media
+medias
+press
+presse
+legal
+juridique
+compliance
+webmaster
+postmaster
+hostmaster
+abuse
+noreply
+no-reply
+ne-pas-repondre
+nepasrepondre
+donotreply
+bounce
+mailer-daemon
+investor
+investors
+ir
+relations.investisseurs
+facturation
+factures
+comptabilite
+compta
+billing
+invoice
+sav
+support
+commande
+commandes
+newsletter
+unsubscribe
+desabonnement
+
+[domaines_messagerie]
+# Messageries grand public : une petite entreprise s'en sert souvent, mais
+# rien ne prouve que l'adresse est la sienne. Toujours douteuses (l'IA lit
+# alors le texte autour de l'adresse).
+gmail.com
+googlemail.com
+hotmail.com
+hotmail.fr
+outlook.com
+outlook.fr
+live.com
+live.fr
+msn.com
+yahoo.com
+yahoo.fr
+icloud.com
+me.com
+orange.fr
+wanadoo.fr
+free.fr
+sfr.fr
+neuf.fr
+laposte.net
+bbox.fr
+aol.com
+gmx.fr
+gmx.com
+protonmail.com
+proton.me

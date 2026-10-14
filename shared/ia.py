@@ -320,14 +320,3 @@ def lister_modeles() -> list[str]:
         return sorted({m["id"] for m in reponse.json().get("data") or [] if m.get("id")})
     except (ValueError, AttributeError, TypeError):
         raise ErreurIAPassagere("Liste des modèles illisible") from None
-
-
-def reponse_json(texte: str) -> dict:
-    """Objet JSON d'une réponse (blocs ```json tolérés) ; ErreurIAPassagere s'il est illisible."""
-    try:
-        donnees = json.loads(re.sub(r"```(?:json)?\s*", "", texte or "").strip())
-    except ValueError:
-        raise ErreurIAPassagere("Réponse de l'IA illisible (JSON attendu)") from None
-    if not isinstance(donnees, dict):
-        raise ErreurIAPassagere("Réponse de l'IA illisible (objet JSON attendu)")
-    return donnees

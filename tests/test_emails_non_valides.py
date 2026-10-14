@@ -1,6 +1,6 @@
-"""Emails non validés par l'IA (décision D15) : jamais envoyés
+"""Emails non validés (décision D15, phase 7) : jamais envoyés
 automatiquement, hors du maximum d'envoi, visibles avec leur mention,
-validables à la main un par un ou repassés à l'IA plus tard."""
+validables à la main un par un ou repassés aux règles et à l'IA plus tard."""
 
 import pytest
 
@@ -13,7 +13,6 @@ from shared import config
 from tests.conftest import compte_verifie
 from tests.test_envoyeur import attendre, entreprises
 from tests.test_ia import INTROUVABLE, echouer, erreur_http
-from tests.test_scraper_sans_ia import sites  # noqa: F401  (fixture)
 
 
 @pytest.fixture(autouse=True)
@@ -95,32 +94,63 @@ def _revalider(client, user_id, pipelines, **corps):
     return r
 
 
-def test_relance_ia_valide_et_remplace(alice, sites, ia, pipelines_neufs):  # noqa: F811
+def test_relance_ia_valide_ou_ecarte_sans_relire_le_site(alice, ia, pipelines_neufs, monkeypatch):
     client, user_id, _ = alice
-    ia.reponse = '{"emails": ["recrutement@acme1.fr"], "telephones": [], "contact_rh": null, "fiable": true}'
-    r = _revalider(client, user_id, pipelines_neufs, max_revalidations=1)
-    assert r.json()["max_revalidations"] == 1
+    monkeypatch.setattr(se, "get_page", lambda *a, **k: pytest.fail("le site ne doit pas être relu"))
+    ia.file = ['{"valide": true}', '{"valide": false}']
+    r = _revalider(client, user_id, pipelines_neufs)
+    assert r.json()["max_revalidations"] == 2
+    e1, e2 = lire_entreprises(user_id)[1:]
+    assert e1["emails_trouves"] == ["rh1@ent1.fr"] and e1["emails_non_valides"] is False
+    assert e2["emails_trouves"] == [] and e2["emails_non_valides"] is False   # écartée par l'IA
+    assert "acme1.fr" in ia.textes(0) and "rh1@ent1.fr" in ia.textes(0)
+    assert "Validation IA terminée : 2/2" in client.get("/api/logs").text
+
+
+def test_relance_regles_d_abord(alice, ia, pipelines_neufs):
+    """Une adresse validée d'office par les règles n'est pas soumise à l'IA."""
+    client, user_id, _ = alice
+    liste = lire_entreprises(user_id)
+    liste[1].update(emails_trouves=["recrutement@acme1.fr", "x@agence.fr"],
+                    emails_douteux=["recrutement@acme1.fr", "x@agence.fr"],
+                    contextes_emails={"x@agence.fr": "Site réalisé par l'agence"})
+    sauvegarder_enrichissement(user_id, liste)
+    ia.reponse = '{"valide": false}'
+    _revalider(client, user_id, pipelines_neufs, max_revalidations=1)
+    assert len(ia.appels) == 1 and "Site réalisé par l'agence" in ia.textes(0)
     e = lire_entreprises(user_id)[1]
     assert e["emails_trouves"] == ["recrutement@acme1.fr"] and e["emails_non_valides"] is False
-    assert lire_entreprises(user_id)[2]["emails_non_valides"] is True   # au-delà de la limite
-    assert "Validation IA terminée : 1/1" in client.get("/api/logs").text
 
 
-def test_relance_ia_en_echec_passager_reste_a_valider(alice, sites, ia, monkeypatch, pipelines_neufs):  # noqa: F811
+def test_relance_ia_en_echec_passager_reste_a_valider(alice, ia, pipelines_neufs):
     client, user_id, _ = alice
     echouer(ia, erreur_http(503))
     _revalider(client, user_id, pipelines_neufs)
     assert [e["emails_non_valides"] for e in lire_entreprises(user_id)] == [False, True, True]
     assert lire_entreprises(user_id)[1]["emails_trouves"] == ["rh1@ent1.fr"]
+    assert len(client.get("/api/spontanees/a_valider").json()) == 2
 
 
-def test_relance_ia_bloquante_un_message_et_arret(alice, sites, ia, monkeypatch, pipelines_neufs):  # noqa: F811
+def test_relance_ia_bloquante_un_message_et_arret(alice, ia, pipelines_neufs):
     client, user_id, _ = alice
     echouer(ia, erreur_http(404, INTROUVABLE))
     _revalider(client, user_id, pipelines_neufs)
     assert len(ia.appels) == 1
     assert client.get("/api/logs").text.count("IA indisponible") == 1
     assert len(client.get("/api/spontanees/a_valider").json()) == 2
+
+
+def test_seules_les_adresses_validees_partent(alice, smtp_simule):
+    """Une entreprise avec une adresse validée et une douteuse est envoyée,
+    à l'adresse validée seulement."""
+    _, user_id, _ = alice
+    liste = lire_entreprises(user_id)
+    liste[1].update(emails_trouves=["contact@ent1.fr", "douteux@gmail.com"], emails_douteux=["douteux@gmail.com"])
+    sauvegarder_enrichissement(user_id, liste)
+    assert envoyeur.compter_a_envoyer(user_id, "alternance") == 2
+    envoyeur.main(user_id, limite=10)
+    assert sorted(to[0] for _, _, to, _ in smtp_simule.messages) == ["contact@ent1.fr", "rh0@ent0.fr"]
+    assert "douteux@gmail.com" not in lire_emails_contactes(user_id, "alternance")
 
 
 def test_relance_bornee_et_refusee_sans_attente(alice, utilisateur, monkeypatch, pipelines_neufs):

@@ -31,7 +31,7 @@ from bs4 import BeautifulSoup
 from ddgs import DDGS
 from ddgs.exceptions import RatelimitException
 from shared.config import MESSAGE_IA_DESACTIVEE, analyse_ia_active, modele_ia
-from shared.ia import ErreurIABloquante, ErreurIAPassagere, appeler_ia, reponse_json
+from shared.validation_emails import emails_douteux, emails_valides, trier
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -346,57 +346,6 @@ def extraire_emails_html(html, domaine_entreprise=None):
     return valides
 
 
-# ─── IA ───────────────────────────────────────────────────────────────────────
-
-def ia_extraire_contact(texte_page, nom_entreprise, emails_bruts,
-                              html_contact=None):
-    emails_str   = ", ".join(emails_bruts) if emails_bruts else "aucun trouvé par regex"
-    html_section = f"\n\n=== HTML BRUT PAGE CONTACT ===\n{html_contact}\n" if html_contact else ""
-
-    prompt = (
-        f"Tu analyses le contenu d'une page web pour trouver les coordonnées de '{nom_entreprise}'.\n"
-        f"Emails déjà détectés par regex : {emails_str}\n\n"
-        "=== CONTENU DE LA PAGE ===\n"
-        f"{texte_page}\n"
-        f"{html_section}"
-        "=== INSTRUCTIONS ===\n"
-        "1. EMAILS : tous les emails professionnels utiles (contact, rh, recrutement, info, alternance).\n"
-        "   - Cherche aussi les obfuscations : 'contact [at] site.fr', 'info(at)site.fr'.\n"
-        "   - Cherche dans les liens mailto: si présents dans le HTML brut.\n"
-        "   - Rejette : noreply, postmaster, bounce, emails techniques.\n"
-        "   - Si aucun email trouvé dans le contenu → liste vide [] (NE PAS INVENTER).\n\n"
-        "2. TELEPHONES : numéros français uniquement (format 01 23 45 67 89 ou +33...).\n\n"
-        "3. CONTACT_RH : prénom + nom du contact RH si EXPLICITEMENT mentionné, sinon null.\n\n"
-        f"4. FIABLE : cette page appartient-elle bien à '{nom_entreprise}' ?\n"
-        "   Réponds false si :\n"
-        "   - C'est clairement un annuaire, site d'emploi tiers, ou secteur totalement différent.\n"
-        "   - Les emails trouvés ont un domaine qui ne correspond PAS du tout au nom de l'entreprise.\n"
-        "   - La page concerne une entreprise d'un autre pays sans lien avec la France.\n"
-        "   En cas de doute → true.\n\n"
-        "Réponds UNIQUEMENT en JSON valide, sans backticks :\n"
-        '{"emails": ["contact@example.fr"], "telephones": ["01 23 45 67 89"], '
-        '"contact_rh": null, "fiable": true}'
-    )
-
-    # Erreur passagère retentée une fois. ErreurIABloquante et ErreurIAPassagere
-    # remontent : l'appelant garde alors les emails lus dans la page, non validés.
-    texte = appeler_ia(
-        [
-            {"role": "system", "content": (
-                "Tu es un expert en extraction de données de contact. "
-                "Tu réponds UNIQUEMENT en JSON valide sans backticks ni markdown. "
-                "Tu ne génères JAMAIS d'emails si tu n'en trouves pas dans le contenu fourni."
-            )},
-            {"role": "user", "content": prompt},
-        ],
-        usage="extraction",
-        response_format={"type": "json_object"},
-    )
-    result = reponse_json(texte)
-    dbg(f"IA → {result}")
-    return result
-
-
 # ─── Analyse du nom / correspondance domaine ─────────────────────────────────
 
 def analyser_nom(nom):
@@ -629,11 +578,13 @@ def meilleurs_emails(emails):
 
 
 def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
-    """Emails, téléphones et contact d'une entreprise. Avec l'IA (ia=True),
-    l'IA valide et complète ce que la page donne ; s'il échoue, ou sans
-    IA, les emails lus directement dans les pages (regex, déobfuscation)
-    sont gardés avec valide_ia=False. Une erreur bloquante est signalée dans
-    "ia_bloquee" (message) au lieu d'être levée."""
+    """Emails d'une entreprise, lus directement dans ses pages (regex,
+    déobfuscation), puis triés (shared/validation_emails.py) : règles
+    d'abord, l'IA (ia=True) seulement pour les adresses douteuses. Retourne
+    "emails" (validées puis douteuses), "douteux", "contextes" (texte autour
+    des douteuses), "ecartes" ; une erreur de l'IA est signalée dans
+    "ia_bloquee" ou "erreur_ia" (message) au lieu d'être levée, les adresses
+    concernées restent douteuses."""
     url_site = url_site.strip().rstrip("/")
     if not url_site.startswith("http"):
         url_site = "https://" + url_site
@@ -644,7 +595,6 @@ def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
 
     tous_emails_bruts = []
     pages_texte       = []
-    html_contact_brut = ""
     mots_prio         = ["contact", "recrutement", "rh", "emploi", "carriere", "alternance"]
 
     if url_racine != url_site:
@@ -679,8 +629,8 @@ def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
         html, url_finale = get_page(alt)
 
     if not html and not pages_texte:
-        return {"emails": [], "telephones": [], "contact_rh": None, "url_finale": None, "fiable": True,
-                "valide_ia": True}
+        return {"emails": [], "douteux": [], "contextes": {}, "ecartes": [], "telephones": [],
+                "contact_rh": None, "url_finale": None, "fiable": True}
 
     vus = {url_racine, url_site, url_finale or url_site}
 
@@ -708,8 +658,6 @@ def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
             tous_emails_bruts.extend(e_page)
             if any(m in lien.lower() for m in mots_prio):
                 pages_texte.insert(0, html_vers_texte(html_page))
-                if not html_contact_brut:
-                    html_contact_brut = html_page
 
     for chemin_ml in ["/mentions-legales", "/mentions-legales/",
                        "/mentions-legales.html", "/legal", "/legal/"]:
@@ -730,37 +678,23 @@ def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
     emails_bruts_uniques = list(set(tous_emails_bruts))
     dbg(f"Emails bruts : {emails_bruts_uniques}")
 
-    # FIX 12 — troncature : prompt court pour un modèle sur processeur
-    texte_pour_ia = "\n\n---\n\n".join(pages_texte)
-    texte_pour_ia = texte_pour_ia[:2000]
-    html_contact_brut_tronque = html_contact_brut[:3000] if html_contact_brut else None
-
-    # Sans IA : ce que la page donne directement, non validé
-    sans_ia = {"emails": meilleurs_emails(emails_bruts_uniques), "telephones": [], "contact_rh": None,
-               "url_finale": url_finale or url_racine, "fiable": True, "valide_ia": False}
-    if not ia:
-        return sans_ia
-    try:
-        resultat = ia_extraire_contact(
-            texte_pour_ia,
-            nom_entreprise,
-            emails_bruts_uniques,
-            html_contact=html_contact_brut_tronque,
-        )
-    except ErreurIABloquante as e:
-        return {**sans_ia, "ia_bloquee": str(e)}
-    except ErreurIAPassagere as e:
-        return {**sans_ia, "erreur_ia": str(e)}
-
-    emails = resultat.get("emails")
-    return {
-        "emails":     meilleurs_emails(emails if isinstance(emails, list) else []),
-        "telephones": resultat.get("telephones") if isinstance(resultat.get("telephones"), list) else [],
-        "contact_rh": resultat.get("contact_rh"),
+    # Règles d'abord, IA pour les seules adresses douteuses
+    tri = trier(meilleurs_emails(emails_bruts_uniques), extraire_domaine(url_finale or url_site),
+                nom_entreprise, "\n\n".join(pages_texte), ia=ia, log=dbg)
+    resultat = {
+        "emails":     tri["valides"] + tri["douteux"],
+        "douteux":    tri["douteux"],
+        "contextes":  tri["contextes"],
+        "ecartes":    tri["ecartes"],
+        "telephones": [],
+        "contact_rh": None,
         "url_finale": url_finale or url_racine,
-        "fiable":     resultat.get("fiable", True) is not False,
-        "valide_ia":  True,
+        "fiable":     True,
     }
+    for cle in ("ia_bloquee", "erreur_ia"):
+        if cle in tri:
+            resultat[cle] = tri[cle]
+    return resultat
 
 
 # ─── Chargement / sauvegarde ──────────────────────────────────────────────────
@@ -790,7 +724,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
     _log = log_fn or print
     ia_configuree = analyse_ia_active()   # ANALYSE_IA=false : lecture directe seulement
     modele = modele_ia("extraction") if ia_configuree else "désactivée"
-    _log(f"Scraper Emails v15 | IA = {modele} | Moteur = DDG")
+    _log(f"Scraper Emails v15 | IA pour les emails douteux = {modele} | Moteur = DDG")
     if DEBUG:
         _log("  [Mode DEBUG activé — logs DDG détaillés]")
 
@@ -817,7 +751,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
     # Coupée pour tout le lancement sur une erreur bloquante de l'IA, ou d'emblée sans IA
     ia_active = ia_configuree
     if not ia_configuree:
-        _log(f"ℹ️  {MESSAGE_IA_DESACTIVEE} Emails lus directement dans les pages, notés non validés.")
+        _log(f"ℹ️  {MESSAGE_IA_DESACTIVEE} Emails validés par les règles seules, les douteux restent non validés.")
 
     def extraire(url, nom, dirigeant):
         nonlocal ia_active
@@ -825,9 +759,9 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
         if resultat.get("ia_bloquee") and ia_active:
             ia_active = False   # un seul message, pas un par entreprise
             _log(f"❌ IA indisponible : {resultat['ia_bloquee']} Suite du lancement sans IA : "
-                 "emails lus directement dans les pages, non validés.")
+                 "emails douteux gardés, non validés.")
         elif resultat.get("erreur_ia"):
-            _log(f"  ⚠️  IA : {resultat['erreur_ia']} Emails de la page gardés, non validés par l'IA.")
+            _log(f"  ⚠️  IA : {resultat['erreur_ia']} Emails douteux gardés, non validés.")
         return resultat
 
     try:
@@ -898,20 +832,27 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
                     e["traite"] = True; traites_ce_run += 1; continue
 
             emails     = resultat["emails"]
+            douteux    = resultat.get("douteux", [])
             telephones = resultat.get("telephones", [])
             contact    = resultat.get("contact_rh")
 
-            non_valides = bool(emails) and not resultat.get("valide_ia", True)
-            if emails:
-                _log(f"  ✅ {', '.join(emails)}" + (" (non validés par l'IA)" if non_valides else ""))
-            else:
+            valides = [a for a in emails if a not in douteux]
+            if valides:
+                _log(f"  ✅ {', '.join(valides)}")
+            if douteux:
+                _log(f"  ❔ {', '.join(douteux)} (non validés : à valider)")
+            if resultat.get("ecartes"):
+                _log("  🚫 Écartés : " + ", ".join(f"{a} ({r})" for a, r in resultat["ecartes"]))
+            if not emails:
                 _log(f"  ⚠️  Aucun email")
 
             e["emails_trouves"]   = emails
             e["telephones"]       = telephones
             e["telephone"]        = telephones[0] if telephones else None
             e["contact_rh"]       = contact
-            e["emails_non_valides"] = non_valides
+            e["emails_non_valides"] = bool(douteux)
+            e["emails_douteux"]   = douteux
+            e["contextes_emails"] = resultat.get("contextes", {})
             e["url_scrapee"]      = resultat.get("url_finale") or url
             e["source_recherche"] = source_site
             e["traite"]           = True
@@ -934,17 +875,17 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
 
 
 def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=None, mode=MODE_DEFAUT):
-    """Relance la validation par l'IA des emails gardés sans elle (D15) :
-    pages relues, puis emails, téléphones et contact remplacés par ceux que
-    l'IA retient. Échec passager : l'entreprise reste à valider. Erreur
-    bloquante : arrêt du lancement, un seul message."""
+    """Repasse aux règles puis à l'IA les adresses douteuses des entreprises
+    du mode (D15), sans relire les sites : le texte gardé autour de chaque
+    adresse sert à l'IA. Une adresse validée part avec les autres, une
+    adresse écartée est retirée ; un échec passager la laisse à valider.
+    Erreur bloquante : arrêt du lancement, un seul message."""
     _log = log_fn or print
     if not analyse_ia_active():
         _log(f"❌ {MESSAGE_IA_DESACTIVEE} Validation non lancée.")
         return
     entreprises = charger_entreprises(user_id, mode)
-    cibles = [e for e in entreprises
-              if e.get("emails_non_valides") and e.get("emails_trouves") and not e.get("mail_envoye")]
+    cibles = [e for e in entreprises if emails_douteux(e) and not e.get("mail_envoye")]
     if max_n:
         cibles = cibles[:max_n]
     _log(f"Validation IA | modèle = {modele_ia('extraction')} | {len(cibles)} entreprise(s)")
@@ -956,26 +897,28 @@ def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=Non
         nom = (e.get("nom_commercial") or e.get("nom", "?"))[:50]
         if on_progress:
             on_progress(round(i / len(cibles) * 100), f"{i}/{len(cibles)} entreprises revalidées")
-        url = e.get("site_web") or e.get("url_scrapee")
-        if not url:
-            _log(f"  ⏭️  {nom} : site inconnu, reste à valider à la main")
-            continue
-        resultat = scraper_et_extraire(url, nom, dirigeant=e.get("dirigeant", ""), ia=True)
-        if resultat.get("ia_bloquee"):
-            _log(f"❌ IA indisponible : {resultat['ia_bloquee']} Validation arrêtée, "
+        site = e.get("site_web") or e.get("url_scrapee") or ""
+        if site and "://" not in site:
+            site = "https://" + site
+        deja = emails_valides(e)
+        tri = trier(emails_douteux(e), extraire_domaine(site) if site else None, nom, ia=True,
+                    contextes=e.get("contextes_emails"))
+        e["emails_trouves"]     = deja + tri["valides"] + tri["douteux"]
+        e["emails_douteux"]     = tri["douteux"]
+        e["contextes_emails"]   = tri["contextes"]
+        e["emails_non_valides"] = bool(tri["douteux"])
+        if tri["ecartes"]:
+            _log(f"  🚫 {nom} : " + ", ".join(f"{a} ({r})" for a, r in tri["ecartes"]))
+        if tri.get("ia_bloquee"):
+            _log(f"❌ IA indisponible : {tri['ia_bloquee']} Validation arrêtée, "
                  "les entreprises restantes attendent toujours.")
             break
-        if not resultat.get("valide_ia"):
-            _log(f"  ⚠️  {nom} : {resultat.get('erreur_ia') or 'validation impossible'} Reste à valider.")
+        if tri["douteux"]:
+            _log(f"  ⚠️  {nom} : {tri.get('erreur_ia') or 'validation impossible'} "
+                 f"{', '.join(tri['douteux'])} reste(nt) à valider.")
             continue
-        e["emails_trouves"]     = resultat["emails"]
-        e["telephones"]         = resultat.get("telephones", [])
-        e["telephone"]          = e["telephones"][0] if e["telephones"] else None
-        e["contact_rh"]         = resultat.get("contact_rh")
-        e["url_scrapee"]        = resultat.get("url_finale") or url
-        e["emails_non_valides"] = False
         validees += 1
-        retenus = ", ".join(resultat["emails"]) or "aucun email retenu par l'IA"
+        retenus = ", ".join(e["emails_trouves"]) or "aucun email retenu"
         _log(f"  ✅ {nom} : {retenus}")
     sauvegarder(user_id, entreprises)
     _log(f"✅ Validation IA terminée : {validees}/{len(cibles)} entreprise(s) validée(s)")
