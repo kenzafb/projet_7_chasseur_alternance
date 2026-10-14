@@ -163,7 +163,8 @@ class OffreId(BaseModel):
 
 # Valeurs autorisées (cf. database/models.py)
 StatutCandidature = Literal["nouveau", "en_cours", "envoye", "reponse", "entretien", "refus", "archive"]
-RaisonArchivage = Literal["manuel", "note_basse", "ecole_cfa", "hors_domaine", "public_specifique", "stage"]
+RaisonArchivage = Literal["manuel", "note_basse", "ineligible", "ecole_cfa", "hors_domaine", "public_specifique",
+                          "stage"]
 
 class MajStatut(BaseModel):
     model_config = ConfigDict(extra="forbid")

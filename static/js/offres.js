@@ -12,9 +12,19 @@ let filtre = "all";
 let modeArchives = false;   // false = offres à postuler, true = archivées
 let fOffres = { source: "all", zone: "all", score: "all" };  // filtres combinables du mode normal
 const LABEL_RAISON = {
-  manuel: "Manuel", note_basse: "Note basse", ecole_cfa: "École / CFA",
+  manuel: "Manuel", ineligible: "Inéligible", note_basse: "Note basse", ecole_cfa: "École / CFA",
   hors_domaine: "Hors domaine", public_specifique: "Public spécifique", stage: "Stage",
 };
+
+const RAISONS = ["manuel", "ineligible", "note_basse", "ecole_cfa", "hors_domaine", "public_specifique", "stage"];
+
+/* Motif d'inéligibilité : raisons établies en Python (en tête des points
+   faibles, « Inéligible : ... »), sinon le jugement de l'IA */
+function motifIneligible(o) {
+  const motifs = (o.points_faibles || []).filter(p => p.startsWith("Inéligible : "))
+    .map(p => p.slice("Inéligible : ".length));
+  return motifs.length ? motifs.join(" ; ") : "jugée inéligible par l'IA";
+}
 
 const $list = () => document.querySelector('[data-list="offres"]');
 
@@ -50,6 +60,7 @@ function carte(o) {
   const faibles = (o.points_faibles || []).map(p => `<li>${esc(p)}</li>`).join("");
   const aLettre = !!o.lettre;
   const nonAnalysee = o.verdict === NON_ANALYSEE;
+  const ineligible = o.raison_archivage === "ineligible" || (o.eligible === false && !nonAnalysee);
   const lettreBloquee = !IA_ACTIVE && !aLettre;   // une lettre déjà écrite reste ouvrable
 
   return `
@@ -64,6 +75,7 @@ function carte(o) {
         </div>
         <div class="offre__title">${esc(o.titre || "Sans titre")}</div>
         <div class="offre__org"><b>${esc(o.entreprise || "Entreprise inconnue")}</b> · ${esc(o.lieu || o.zone || "")}</div>
+        ${ineligible ? `<div class="offre__inelig">Inéligible : ${esc(motifIneligible(o))}</div>` : ""}
       </div>
       <div class="offre__score">${nonAnalysee ? '<span class="non-analysee">non analysée</span>' : viseur(score)}</div>
       <svg class="offre__chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
@@ -82,7 +94,7 @@ function carte(o) {
         ${o.statut !== "archive" ? `
         <select class="archiver-select" data-archiver-select>
           <option value="">Archiver…</option>
-          ${["manuel","note_basse","ecole_cfa","hors_domaine","public_specifique","stage"]
+          ${RAISONS
             .map(r => `<option value="${r}">→ ${LABEL_RAISON[r]}</option>`).join("")}
         </select>` : ""}
       </div>
@@ -91,11 +103,12 @@ function carte(o) {
         <label class="archive-raison">
           <span>Raison :</span>
           <select data-raison-select>
-            ${["manuel","note_basse","ecole_cfa","hors_domaine","public_specifique","stage"]
+            ${RAISONS
               .map(r => `<option value="${r}"${(o.raison_archivage||"manuel")===r?" selected":""}>${LABEL_RAISON[r]}</option>`).join("")}
           </select>
         </label>
-        <button class="btn btn--ghost" data-act="desarchiver">Désarchiver</button>
+        <button class="btn btn--ghost" data-act="desarchiver">${o.raison_archivage === "ineligible"
+          ? "Remettre dans les offres actives" : "Désarchiver"}</button>
       </div>` : ""}
     </div>
   </article>`;

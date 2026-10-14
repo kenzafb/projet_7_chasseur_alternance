@@ -168,7 +168,7 @@ class Candidature(Base):
     email_candidature = Column(String(255), default="")
     objet_email       = Column(String(300), default="")
     statut            = Column(String(50), default="nouveau")
-    raison_archivage  = Column(String(40), default="")   # note_basse, ecole_cfa, hors_domaine, stage, public_specifique, manuel
+    raison_archivage  = Column(String(40), default="")   # ineligible, note_basse, ecole_cfa, hors_domaine, stage, public_specifique, manuel
 
     # Dernière lettre PDF générée : chemin relatif à LETTRES_PDF_DIR
     # ("user_<id>/lettre_<hex>.pdf"), servie par /api/lettre_pdf/<ref_offre>

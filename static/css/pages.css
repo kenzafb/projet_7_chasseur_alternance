@@ -523,3 +523,6 @@
 .analyse-attente__sous { font-size: 13px; opacity: .75; }
 .analyse-attente__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 .analyse-attente__actions .limite-lancement { margin: 0; }
+
+/* Motif d'une offre inéligible (D94, D95) */
+.offre__inelig { margin-top: 4px; font-size: 13px; color: #C0353A; }

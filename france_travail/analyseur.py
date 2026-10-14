@@ -313,11 +313,11 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
 
     offre["raison_archivage"] = ""
     if mode == "job":
-        # Mode job : on archive seulement les inéligibles (niveau/exp/durée non compatibles)
+        # Mode job : on archive seulement les inéligibles (raison « ineligible », D95)
         if not offre.get("eligible", True):
             offre["statut"] = "archive"
-            offre["raison_archivage"] = "note_basse"
-            _log(f"     -> Archivée automatiquement (inéligible score {offre['score']})")
+            offre["raison_archivage"] = "ineligible"
+            _log(f"     -> Archivée automatiquement (inéligible, score {offre['score']})")
     else:
         # Mode alternance : règles complètes
         if reserve_public_specifique(desc_lower) or reserve_public_specifique(titre_lower):
@@ -337,8 +337,8 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
             _log(f"     -> Archivée automatiquement (stage détecté)")
         elif not offre.get("eligible", True):
             offre["statut"] = "archive"
-            offre["raison_archivage"] = "note_basse"
-            _log(f"     -> Archivée automatiquement (inéligible score {offre['score']})")
+            offre["raison_archivage"] = "ineligible"
+            _log(f"     -> Archivée automatiquement (inéligible, score {offre['score']})")
 
 
 def appliquer_analyse(offre, analyse, mode="alternance", verbeux=True):

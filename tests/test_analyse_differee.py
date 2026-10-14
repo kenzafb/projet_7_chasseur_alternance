@@ -107,8 +107,8 @@ def test_refus_avant_lancement(alice, ia):
 # ─── Archivage complet après l'analyse ───────────────────────────────────────
 @pytest.mark.parametrize("mode, reponse, raison", [
     ("alternance", analyse(7, domaine="Hors domaine"), "hors_domaine"),
-    ("alternance", analyse(2, eligible=False), "note_basse"),
-    ("job", analyse(1, eligible=False), "note_basse"),
+    ("alternance", analyse(2, eligible=False), "ineligible"),
+    ("job", analyse(1, eligible=False), "ineligible"),
     ("stage", analyse(6, domaine="Hors domaine"), "hors_domaine"),
 ])
 def test_archivage_fonde_sur_l_analyse(alice, ia, mode, reponse, raison):

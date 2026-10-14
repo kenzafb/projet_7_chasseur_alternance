@@ -97,7 +97,7 @@ def test_analyse_plafonnee_avec_la_raison(ia):
     assert a["points_faibles"][0] == "Inéligible : Bac+5 exigé, profil Bac+2" and a["points_faibles"][-1] == "b"
     offre = {"titre": "Stage ingénieur", "description": "..."}
     appliquer_analyse(offre, a, mode="stage", verbeux=False)
-    assert (offre["statut"], offre["raison_archivage"]) == ("archive", "note_basse")
+    assert (offre["statut"], offre["raison_archivage"]) == ("archive", "ineligible")
 
 
 def test_information_non_precisee_jamais_bloquante(ia):
@@ -122,3 +122,27 @@ def test_avertissement_dans_le_profil(utilisateur):
         "crans": 2, "libelle": "Bac+2", "source": "niveau d'études", "avertissement": ""}
     page = client.get("/stage").text
     assert page.count('data-profil="niveau_etudes"') == 3 and page.count("data-niveau-avert") == 3
+
+
+def test_archive_ineligible_motif_filtre_et_retour(utilisateur, ia):
+    from database.candidatures_db import ajouter_candidature, lire_candidature
+    from france_travail.analyseur import marquer_non_analysee
+    from shared import config
+    client, uid = utilisateur("a@test.fr", prenom="Alice")
+    client.mode = "stage"
+    client.post("/api/profil", json={**{k: v for k, v in BUT2.items() if k != "duree_semaines"}})
+    ajouter_candidature(uid, marquer_non_analysee({"id": "O1", "titre": "Stage ingénieur", "description": "..."},
+                                                  mode="stage"), mode="stage")
+    ia.reponse = reponse(8, niveau_requis="bac+5")
+    assert client.post("/api/analyser", json={"id": "O1"}).status_code == 200
+    o = lire_candidature(uid, "O1", mode="stage")
+    assert (o["statut"], o["raison_archivage"], o["score"]) == ("archive", "ineligible", 3)
+    assert o["points_faibles"][0] == "Inéligible : Bac+5 exigé, profil Bac+2"
+    # Remise dans les offres actives
+    assert client.post("/api/offre/archivage", json={"id": "O1", "desarchiver": True}).json()["ok"]
+    assert lire_candidature(uid, "O1", mode="stage")["statut"] == "nouveau"
+    assert client.post("/api/offre/archivage", json={"id": "O1", "raison": "ineligible"}).status_code == 200
+    page = client.get("/stage").text
+    assert 'data-filter="ineligible">Inéligible<' in page
+    js = (config.STATIC_DIR / "js" / "offres.js").read_text(encoding="utf-8")
+    assert "Remettre dans les offres actives" in js and "motifIneligible" in js
