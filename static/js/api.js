@@ -32,8 +32,8 @@ export function limite(cle) {
 /* Confirmation d'un lancement avec la valeur réellement appliquée par le
    serveur ; le champ reprend cette valeur. */
 const LANCEMENTS = {
-  analyses:    { champ: "max_analyses",    texte: n => `Recherche lancée : ${n} offres ${
-    document.documentElement.dataset.analyseIa === "non" ? "ajoutées sans analyse" : "analysées"} au plus` },
+  offres:      { champ: "max_offres",      texte: n => `Recherche lancée : ${n} offres ajoutées au plus, sans analyse` },
+  analyses:    { champ: "max_analyses",    texte: n => `Analyse lancée : ${n} offres au plus, les plus récentes d'abord` },
   entreprises: { champ: "max_entreprises", texte: n => `Récupération lancée : ${n} nouvelles entreprises au plus` },
   scrapees:    { champ: "max_scrapees",    texte: n => `Scraping lancé : ${n} entreprises au plus` },
   mails:       { champ: "limite",          texte: n => `Envoi lancé : ${n} mails au plus` },
@@ -120,8 +120,10 @@ async function telecharger(url, nom) {
 export const api = {
   // Offres / candidatures
   candidatures:      ()        => get("/api/candidatures"),
-  recherche:         (max)     => post("/api/recherche", { max_analyses: max }),
+  recherche:         (max)     => post("/api/recherche", { max_offres: max }),
   statutPipelines:   ()        => get("/api/statut_pipelines"),
+  analyseAttente:    (max)     => post("/api/analyse", { max_analyses: max }),
+  analyseStop:       ()        => post("/api/analyse/stop"),
   analyser:          (id)      => post("/api/analyser", { id }),
   genererLettre:     (id)      => post("/api/generer_lettre", { id }),
   majStatut:         (id, s)   => post("/api/maj_statut", { id, statut: s }),

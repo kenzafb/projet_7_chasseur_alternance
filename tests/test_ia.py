@@ -288,63 +288,21 @@ def recherche(utilisateur, ia, monkeypatch, pipelines_neufs):
     return SimpleNamespace(client=client, user_id=user_id, sources=sources, lancer=lancer)
 
 
-def test_modele_non_autorise_arrete_tout(recherche, ia, monkeypatch):
+def test_la_recherche_n_appelle_jamais_l_ia(recherche, ia):
+    """D21 : offres toujours ajoutées « non analysées », même IA active ou en panne."""
     recherche.sources["lba"] = [_lba(0)]
-    echouer(ia, erreur_http(404, INTROUVABLE))
-    etat = recherche.lancer()
-    assert etat["message"].startswith("Erreur : Modèle « ministral-3:8b » introuvable")
-    assert len(ia.appels) == 1                                 # arrêt immédiat, LBA comprise
-    assert lire_candidatures(recherche.user_id) == []               # rien d'inséré ni d'archivé
-    assert lire_offres_vues(recherche.user_id, "alternance") == set()   # rien de marqué vu
-    logs = recherche.client.get("/api/logs").text
-    assert "Recherche arrêtée" in logs and "ollama pull" in logs
-    # Configuration corrigée : les mêmes offres reviennent
-    ia.panne = None   # IA rétablie
-    recherche.lancer()
-    assert len(lire_candidatures(recherche.user_id)) == 4
-
-
-def test_cle_refusee_arrete_tout(recherche, ia, monkeypatch):
-    echouer(ia, erreur_http(401))
-    assert "IA_API_KEY" in recherche.lancer()["message"]
-    assert lire_candidatures(recherche.user_id) == []
-
-
-def test_erreur_passagere_saute_l_offre_qui_revient(recherche, ia, monkeypatch):
-    echouer(ia, erreur_http(503), si=lambda kw: "Poste 1" in texte_envoye(kw))
-    etat = recherche.lancer()
-    assert etat["message"] == "Terminé !"
-    refs = {c["titre"] for c in lire_candidatures(recherche.user_id)}
-    assert refs == {"Poste 0", "Poste 2"}
-    assert len(lire_offres_vues(recherche.user_id, "alternance")) == 2
-    assert "Offre sautée" in recherche.client.get("/api/logs").text
-    # IA rétablie : l'offre sautée revient, les autres non
-    ia.panne = None   # IA rétablie
-    ia.appels.clear()
-    recherche.lancer()
-    assert {c["titre"] for c in lire_candidatures(recherche.user_id)} == {"Poste 0", "Poste 1", "Poste 2"}
-
-
-def test_echec_d_analyse_jamais_archive(recherche, ia, monkeypatch):
-    """Recette : des offres en échec d'analyse avaient été archivées « public spécifique »."""
-    recherche.sources["ft"] = [_brut_ft(0, "Ce poste est réservé aux bénéficiaires de l'obligation d'emploi.")]
-    echouer(ia, erreur_http(429))
-    recherche.lancer()
-    assert lire_candidatures(recherche.user_id) == []
-
-
-def test_lba_passagere_sautee(recherche, ia, monkeypatch):
-    recherche.sources["ft"] = []
-    recherche.sources["lba"] = [_lba(0), _lba(1)]
-    echouer(ia, erreur_http(500), si=lambda kw: "Alternance 0" in texte_envoye(kw))
-    recherche.lancer()
-    assert [c["id"] for c in lire_candidatures(recherche.user_id)] == ["LBA1"]
-    assert "Offre LBA sautée" in recherche.client.get("/api/logs").text
+    echouer(ia, connexion_refusee())
+    assert recherche.lancer()["message"] == "Terminé !"
+    assert ia.appels == []
+    offres = lire_candidatures(recherche.user_id)
+    assert len(offres) == 4 and {o["verdict"] for o in offres} == {"non_analysee"}
+    assert len(lire_offres_vues(recherche.user_id, "alternance")) == 3
 
 
 def test_bandeau_affiche_l_erreur_du_pipeline():
     app = (config.STATIC_DIR / "js" / "app.js").read_text(encoding="utf-8")
-    assert "function signalerErreur" in app and "signalerErreur(rech)" in app and "signalerErreur(sp)" in app
+    assert "function signalerErreur" in app
+    assert all(f"signalerErreur({p})" in app for p in ("rech", "an", "sp"))
 
 
 # ─── Routes directes : rien d'enregistré ─────────────────────────────────────

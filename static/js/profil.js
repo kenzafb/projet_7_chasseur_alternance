@@ -1,6 +1,7 @@
 /* ============================================================================
    profil.js — gestion du formulaire profil utilisateur
    - champs simples : [data-profil="..."]
+   - cases à cocher : [data-profil-case="..."] (booléens)
    - tags : [data-tags="..."] + [data-tags-input="..."]
    - projets : [data-projets] (liste de cartes nom/url/description)
    ============================================================================ */
@@ -452,6 +453,7 @@ export const Profil = {
       if (!_champVisible(el)) return;        // ignore les doublons masqués
       el.value = p[el.dataset.profil] ?? "";
     });
+    document.querySelectorAll("[data-profil-case]").forEach(el => { el.checked = p[el.dataset.profilCase] === true; });
 
     _tags["competences"] = Array.isArray(p.competences) ? [...p.competences] : [];
     rendreTags("competences");
@@ -497,6 +499,7 @@ export const Profil = {
       if (!_champVisible(el)) return;        // ignore les doublons masqués (évite d'écraser)
       data[el.dataset.profil] = el.value;
     });
+    document.querySelectorAll("[data-profil-case]").forEach(el => { data[el.dataset.profilCase] = el.checked; });
 
     // Validation de la lettre type : placeholders autorisés uniquement
     const lettre = data.lettre_type || "";

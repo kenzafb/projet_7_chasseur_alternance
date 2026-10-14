@@ -96,8 +96,8 @@ LIMITE_ENVOIS_PAR_LANCEMENT = 50
 # Choisies dans l'interface au moment de lancer. Valeur absente : défaut ;
 # inférieure à 1 : 1 ; au-delà du plafond : ramenée au plafond (côté serveur).
 LIMITES_LANCEMENT = {
-    "analyses":    {"defaut": 30,  "max": 200},    # offres analysées par l'IA (France Travail + LBA)
-    "sans_ia":     {"defaut": 100, "max": 500},    # offres ajoutées sans analyse, ANALYSE_IA=false (D20)
+    "offres":      {"defaut": 100, "max": 500},    # offres ajoutées par la recherche, sans analyse (D20)
+    "analyses":    {"defaut": 10,  "max": 200},    # offres en attente analysées par l'IA (D21, phase 7)
     "entreprises": {"defaut": 200, "max": 5000},   # nouvelles entreprises récupérées (Sirene)
     "scrapees":    {"defaut": 20,  "max": 200},    # entreprises dont on cherche le site et les emails
     "revalidations": {"defaut": 20, "max": 200},   # entreprises aux emails non validés repassées à l'IA

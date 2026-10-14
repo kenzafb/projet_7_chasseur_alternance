@@ -49,8 +49,6 @@ def test_recherche_sans_analyse(ia_coupee, recherche, ia):
         assert (o["score"], o["verdict"], o["statut"]) == (None, VERDICT_NON_ANALYSEE, "nouveau")
         assert o["points_forts"] == [] and o["resume_analyse"] == ""
     assert len(lire_offres_vues(recherche.user_id, "alternance")) == 3   # les offres FT
-    logs = recherche.client.get("/api/logs").text
-    assert "IA désactivée" in logs and "ajoutées sans analyse" in logs
     # Marquées vues : un second lancement ne les reprend pas
     recherche.lancer()
     assert len(lire_candidatures(recherche.user_id)) == 4
@@ -58,7 +56,7 @@ def test_recherche_sans_analyse(ia_coupee, recherche, ia):
 
 def test_recherche_sans_analyse_respecte_la_limite(ia_coupee, recherche):
     recherche.sources["lba"] = [_lba(0)]
-    recherche.lancer(max_analyses=2)
+    recherche.lancer(max_offres=2)
     assert {c["titre"] for c in lire_candidatures(recherche.user_id)} == {"Poste 0", "Poste 1"}
     assert len(lire_offres_vues(recherche.user_id, "alternance")) == 2
 
@@ -145,33 +143,43 @@ def test_route_revalider_refusee(ia_coupee, utilisateur):
     assert r.status_code == 400 and "IA est désactivée" in r.json()["erreur"]
 
 
-# ─── Plafond propre sans IA (D20) ────────────────────────────────────────────
-def test_limite_sans_ia_par_defaut_et_plafond(ia_coupee, recherche):
+# ─── Plafond de la recherche, avec ou sans IA (D20) ──────────────────────────
+@pytest.mark.parametrize("coupee", [True, False])
+def test_limite_de_la_recherche_identique_avec_ou_sans_ia(recherche, monkeypatch, coupee):
+    if coupee:
+        monkeypatch.setenv("ANALYSE_IA", "false")
     recherche.sources["ft"] = [_brut_ft(i) for i in range(150)]
     r = recherche.client.post("/api/recherche", json=None)
-    assert r.json()["max_analyses"] == 100
+    assert r.json()["max_offres"] == 100
     from tests.test_envoyeur import attendre
     attendre(lambda: not main.pipelines.etat("recherche", recherche.user_id)["en_cours"])
     assert len(lire_candidatures(recherche.user_id)) == 100
-    r = recherche.client.post("/api/recherche", json={"max_analyses": 10**6})
-    assert r.json()["max_analyses"] == 500
+    r = recherche.client.post("/api/recherche", json={"max_offres": 10**6})
+    assert r.json()["max_offres"] == 500
     attendre(lambda: not main.pipelines.etat("recherche", recherche.user_id)["en_cours"])
     assert "ramené à 500" in recherche.client.get("/api/logs").text
 
 
-def test_limite_avec_ia_inchangee(recherche):
-    r = recherche.client.post("/api/recherche", json={"max_analyses": 10**6})
-    assert r.json()["max_analyses"] == 200
-
-
-def test_interface_affiche_le_plafond_sans_ia(ia_coupee, utilisateur):
+def test_interface_plafond_de_la_recherche(ia_coupee, utilisateur):
     client, _ = utilisateur("a@test.fr", prenom="Alice")
     page = client.get("/alternance").text
-    assert "ajoutées sans analyse au plus par lancement (max 500)" in page
-    assert 'value="100"' in page and 'max="500"' in page
-    assert "ajoutées sans analyse" in (config.STATIC_DIR / "js" / "api.js").read_text(encoding="utf-8")
+    assert "Offres ajoutées au plus par recherche (max 500)" in page
+    assert 'data-limite="offres" value="100"' in page and 'max="500"' in page
 
 
-def test_interface_plafond_avec_ia(utilisateur):
-    page = utilisateur("a@test.fr", prenom="Alice")[0].get("/alternance").text
-    assert "Offres analysées au plus par lancement (max 200)" in page
+# ─── Analyse des offres en attente ───────────────────────────────────────────
+def test_analyse_en_attente_refusee(ia_coupee, utilisateur, ia):
+    client, uid = utilisateur("a@test.fr", prenom="Alice")
+    ajouter_candidature(uid, marquer_non_analysee({"id": "REF1", "titre": "Dev", "description": "..."}))
+    r = client.post("/api/analyse", json={})
+    assert r.status_code == 400 and "IA est désactivée" in r.json()["erreur"]
+    assert ia.appels == [] and lire_candidature(uid, "REF1")["verdict"] == VERDICT_NON_ANALYSEE
+    page = client.get("/alternance").text
+    assert "data-analyse-lancer" not in page and "les offres restent sans note" in page
+
+
+def test_analyse_automatique_pas_lancee_sans_ia(ia_coupee, recherche, ia):
+    recherche.client.post("/api/profil", json={"prenom": "Alice", "analyse_auto": True})
+    recherche.lancer()
+    assert ia.appels == [] and len(lire_candidatures(recherche.user_id)) == 3
+    assert "Analyse automatique non lancée" in recherche.client.get("/api/logs").text

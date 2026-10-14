@@ -152,6 +152,18 @@ function rendreKpis() {
   set("lettres", actives.filter(o => o.lettre).length);
   const c = document.querySelector('[data-count="offres"]');
   if (c) c.textContent = actives.length;
+  rendreAttente(actives);
+}
+
+/* Offres en attente d'analyse : nombre affiché, bouton et limite bornés */
+function rendreAttente(actives) {
+  const n = actives.filter(o => o.verdict === NON_ANALYSEE).length;
+  const nb = document.querySelector("[data-analyse-nombre]");
+  if (nb) nb.textContent = n;
+  const btn = document.querySelector("[data-analyse-lancer]");
+  if (btn) btn.disabled = n === 0;
+  const champ = document.querySelector('[data-limite="analyses"]');
+  if (champ && n) champ.max = Math.min(n, Number(champ.dataset.plafond ??= champ.max));
 }
 
 /* Échappement HTML basique */
@@ -215,7 +227,14 @@ export const Offres = {
     }
     const act = e.target.closest("[data-act]")?.dataset.act;
     if (act === "analyser") {
-      api.analyser(id).then(() => this.charger());
+      // Sur processeur, une analyse prend une à deux minutes : on le dit
+      const btn = e.target.closest("[data-act]");
+      btn.disabled = true;
+      btn.textContent = "Analyse en cours… (1 à 2 min)";
+      api.analyser(id).then(() => this.charger(), err => {
+        alert("Analyse impossible : " + err.message);
+        this.charger();
+      });
       return true;
     }
     if (act === "lettre") {

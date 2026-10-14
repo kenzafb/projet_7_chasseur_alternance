@@ -32,7 +32,7 @@ from auth.securite import NonConnecte, utilisateur_requis
 from database.models import User
 from shared.erreurs import ErreurUtilisateur, exiger_profil
 from database.candidatures_db import (lire_candidatures, lire_candidature, modifier_candidature, ajouter_candidature,
-                                     lire_lettre_pdf, enregistrer_lettre_pdf)
+                                     lire_lettre_pdf, enregistrer_lettre_pdf, compter_en_attente)
 from database.profil_db import (lire_profil, sauvegarder_profil, ajouter_piece_jointe, supprimer_piece_jointe,
                                 fichiers_references)
 from database.entreprises_db import calculer_stats, lire_entreprises_envoyees, modifier_statut_suivi
@@ -43,7 +43,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from shared.chiffrement import ChiffrementIndisponible, raison_indisponible
 from shared import compte_envoi
 from database import compte_envoi_db
-from shared.pipelines import Pipelines, RECHERCHE, SPONTANEES
+from shared.pipelines import ANALYSE, Pipelines, RECHERCHE, SPONTANEES
 from shared.statique import importmap, url_statique
 from shared.modes import MODE_DEFAUT, MODES, get_mode, modes_accueil, verifier_mode
 from database.dates import maintenant_utc
@@ -51,8 +51,9 @@ from database.dates import maintenant_utc
 # ─── Modules métier ───────────────────────────────────────────────
 from france_travail.main import lancer_recherche
 from france_travail.generateur import generer_lettre
-from france_travail.analyseur import analyser_offre, appliquer_analyse, marquer_non_analysee
-from shared.ia import ErreurIA, ErreurIABloquante, ErreurIAPassagere
+from france_travail.analyseur import analyser_offre, marquer_non_analysee
+from france_travail.analyse_differee import analyser_en_attente, duree_lisible, enregistrer_analyse
+from shared.ia import ErreurIA, ErreurIABloquante
 from france_travail.pdf_generator import generer_pdf_lettre, nom_telechargement
 from france_travail.scraper_lba import ignoree_pour_profil as lba_ignoree_pour_profil
 from france_travail.scraper_lba import rechercher_offres_pour_profil as rechercher_lba
@@ -132,7 +133,8 @@ if raison_indisponible():
 # ─── Journal d'accès : sans les requêtes de statut ───────────────────────────
 # Le front interroge l'état des pipelines toutes les quelques secondes tant
 # qu'ils tournent : ces lignes noieraient le journal d'accès d'uvicorn.
-ROUTES_DE_STATUT = frozenset({"/api/statut_pipelines", "/api/statut_recherche", "/api/spontanees/statut"})
+ROUTES_DE_STATUT = frozenset({"/api/statut_pipelines", "/api/statut_recherche", "/api/spontanees/statut",
+                              "/api/analyse/statut"})
 
 
 class SansRequetesDeStatut(logging.Filter):
@@ -204,6 +206,10 @@ def _limite(cle: str, demandee, disponibles: int | None = None) -> tuple[int, st
     return appliquee, f" (demandé : {demandee}, ramené à {appliquee})"
 
 class Recherche(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    max_offres: int | None = None
+
+class Analyse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     max_analyses: int | None = None
 
@@ -277,7 +283,8 @@ def _page_du_mode(request: Request, mode: str):
     return templates.TemplateResponse(request, "base.html", {"mode": mode, "label_mode": get_mode(mode)["label"],
                                                              "sources": get_mode(mode)["sources"],
                                                              "limites": config.LIMITES_LANCEMENT,
-                                                             "analyse_ia": config.analyse_ia_active()})
+                                                             "analyse_ia": config.analyse_ia_active(),
+                                                             "modele_analyse": config.modele_ia("analyse")})
 
 @prive.get("/alternance")
 def page_alternance(request: Request):
@@ -470,12 +477,12 @@ def api_compte_envoi_mail_test(body: MailTest | None = None, user: User = Depend
 @prive.post("/api/recherche")
 def api_recherche(request: Request, body: Recherche | None = None, user: User = Depends(utilisateur_requis),
                   mode: str = Depends(mode_requis)):
+    """Recherche France Travail et LBA. Les offres sont toujours ajoutées
+    « non analysées », sans attendre l'IA (D21) ; l'analyse vient après,
+    lancée à la main ou d'elle-même si l'option du profil est cochée."""
     user_id = user.id   # capturé AVANT le thread (le thread n'a pas accès à request)
-    ia = config.analyse_ia_active()   # ANALYSE_IA=false : offres insérées « non analysées »
-    # Offres traitées au plus, France Travail et LBA confondues ; sans IA,
-    # plafond propre (D20), même champ max_analyses
-    max_analyses, note = _limite("analyses" if ia else "sans_ia", body.max_analyses if body else None)
-    traitees = "analysées" if ia else "ajoutées sans analyse"
+    # Offres ajoutées au plus, France Travail et LBA confondues (D20)
+    max_offres, note = _limite("offres", body.max_offres if body else None)
     cfg_mode = get_mode(mode)
     profil = lire_profil(user_id, mode=mode)
     exiger_profil(profil)   # 400 tout de suite plutôt qu'une erreur dans le thread
@@ -491,19 +498,18 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
         pipelines.log(user_id, msg)
 
     def lancer():
+        termine = False
         try:
-            # Callback : chaque offre FT analysée est écrite en base au fur et à mesure
+            # Chaque offre est écrite en base au fur et à mesure
             def ecrire_en_base(offre):
                 ajouter_candidature(user_id, offre, mode=mode)
 
             etat(message="Recherche France Travail...")
-            if not ia:
-                log(f"ℹ️  {config.MESSAGE_IA_DESACTIVEE} Offres ajoutées « non analysées ».")
-            log(f"🔍 Recherche France Travail démarrée (au plus {max_analyses} offres {traitees}){note}")
-            analysees = lancer_recherche(user_id, profil, analyser=ia, max_analyse=max_analyses,
-                                         on_offre=ecrire_en_base, mode=mode, log_fn=log) or []
-            reste = max_analyses - len(analysees)
-            log(f"✅ France Travail terminé : {len(analysees)} offres {traitees}")
+            log(f"🔍 Recherche France Travail démarrée (au plus {max_offres} offres){note}")
+            ajoutees = lancer_recherche(user_id, profil, max_offres=max_offres,
+                                        on_offre=ecrire_en_base, mode=mode, log_fn=log) or []
+            reste = max_offres - len(ajoutees)
+            log(f"✅ France Travail terminé : {len(ajoutees)} offres ajoutées")
 
             # LBA (mode alternance) : offres seulement, les entreprises à fort
             # potentiel n'entrent que par l'étape « Récupérer » (D46). None :
@@ -512,9 +518,9 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
             if "lba" not in cfg_mode["sources"]:
                 log("ℹ️  LBA ignorée (mode sans alternance)")
             elif reste <= 0:
-                log(f"ℹ️  LBA ignorée : limite de {max_analyses} offres {traitees} atteinte")
+                log(f"ℹ️  LBA ignorée : limite de {max_offres} offres atteinte")
             else:
-                etat(message="Recherche La Bonne Alternance...")
+                etat(message="Recherche La Bonne Alternance...", pourcentage=50)
                 log("🔍 Recherche La Bonne Alternance démarrée")
                 lba = rechercher_lba(profil, log=log)
             offres_lba = lba["offres"] if lba else []
@@ -526,52 +532,30 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
                 log(f"  {len(nouvelles_lba)} nouvelles offres LBA (hors doublons FT)")
                 if len(nouvelles_lba) > reste:
                     # Les suivantes ne sont pas en base : proposées au prochain lancement
-                    log(f"  Limite : {reste} offres LBA {traitees} sur {len(nouvelles_lba)}")
+                    log(f"  Limite : {reste} offres LBA sur {len(nouvelles_lba)}")
                     nouvelles_lba = nouvelles_lba[:reste]
-
-                if nouvelles_lba and not ia:
-                    # Sans IA : écrites « non analysées », archivage par mots-clés seulement
-                    for offre in nouvelles_lba:
-                        marquer_non_analysee(offre, verbeux=False)
-                        ajouter_candidature(user_id, offre, mode=mode)
-                    log(f"✅ {len(nouvelles_lba)} offres LBA ajoutées sans analyse")
-                elif nouvelles_lba:
-                    etat(message=f"Analyse de {len(nouvelles_lba)} offres LBA...")
-                    log("🧠 Analyse des offres LBA...")
-                    ajoutees = 0
-                    for i, offre in enumerate(nouvelles_lba, 1):
-                        etat(message=f"Analyse LBA {i}/{len(nouvelles_lba)}...",
-                             pourcentage=40 + round(i / len(nouvelles_lba) * 60))
-                        try:
-                            # Un seul appel à l'IA à la fois : shared.ia s'en charge
-                            analyse = analyser_offre(offre, profil)
-                        except ErreurIAPassagere as e:
-                            # Ni écrite ni archivée : elle reviendra au prochain lancement
-                            log(f"  ⚠️  Offre LBA sautée, « {offre.get('titre', '?')[:50]} » : {e}. "
-                                "Elle reviendra au prochain lancement.")
-                            continue
-                        # Archivage auto avec raison (mêmes règles qu'analyser_offres, sans log)
-                        appliquer_analyse(offre, analyse, verbeux=False)
-                        ajouter_candidature(user_id, offre, mode=mode)   # écriture base au fur et à mesure
-                        ajoutees += 1
-                    log(f"✅ {ajoutees} offres LBA analysées et ajoutées sur {len(nouvelles_lba)}")
+                # Écrites « non analysées », archivage par mots-clés seulement
+                for offre in nouvelles_lba:
+                    marquer_non_analysee(offre, verbeux=False)
+                    ajouter_candidature(user_id, offre, mode=mode)
+                if nouvelles_lba:
+                    log(f"✅ {len(nouvelles_lba)} offres LBA ajoutées")
             elif lba is not None:
                 log("ℹ️  Aucune offre LBA récupérée")
 
             etat(pourcentage=100, message="Terminé !")
             log("✅ Recherche complète terminée")
-        except ErreurIABloquante as e:
-            # Clé refusée, modèle non autorisé... : arrêt immédiat, rien d'inventé
-            etat(message=f"Erreur : {e}")
-            log(f"❌ Recherche arrêtée : {e}")
+            termine = True
         except Exception as e:
             etat(message=f"Erreur : {e}")
             log(f"❌ Erreur recherche : {e}")
         finally:
             pipelines.terminer(RECHERCHE, user_id)
+        if termine and profil.get("analyse_auto"):
+            _analyse_automatique(user_id, mode)
 
     threading.Thread(target=lancer, daemon=True).start()
-    reponse = {"status": "démarré", "max_analyses": max_analyses}
+    reponse = {"status": "démarré", "max_offres": max_offres}
     if "lba" in cfg_mode["sources"]:
         if avertissement := lba_ignoree_pour_profil(profil):
             reponse["avertissement"] = avertissement
@@ -583,9 +567,94 @@ def api_statut_recherche(user: User = Depends(utilisateur_requis)):
 
 @prive.get("/api/statut_pipelines")
 def api_statut_pipelines(user: User = Depends(utilisateur_requis)):
-    """État des deux pipelines de l'utilisateur en une requête (polling du front)."""
+    """État des pipelines de l'utilisateur en une requête (polling du front)."""
     return {"recherche": pipelines.etat(RECHERCHE, user.id),
+            "analyse": pipelines.etat(ANALYSE, user.id),
             "spontanees": pipelines.etat(SPONTANEES, user.id)}
+
+
+# ─── Analyse des offres en attente (D21) ──────────────────────────────────────
+def _lancer_analyse(user_id: int, mode: str, maximum: int, note: str = "") -> bool:
+    """Lance l'analyse des offres en attente dans un thread. False si une
+    analyse de l'utilisateur tourne déjà (tous modes confondus)."""
+    profil = lire_profil(user_id, mode=mode)
+    if not pipelines.demarrer(ANALYSE, user_id, message="Analyse des offres en attente...", mode=mode):
+        return False
+    arret = pipelines.evenement_arret(user_id, ANALYSE)
+
+    def log(msg):
+        pipelines.log(user_id, msg)
+
+    def progression(faites, total, restant_s):
+        reste = duree_lisible(restant_s) if faites < total else ""
+        pipelines.maj(ANALYSE, user_id, faites=faites, total=total, restant_s=restant_s,
+                      pourcentage=round(faites / total * 100) if total else 100,
+                      message=f"Analyse {faites}/{total}" + (f", {reste} restantes" if reste else ""))
+
+    def lancer():
+        log(f"🧠 Analyse des offres en attente démarrée (au plus {maximum}){note}, "
+            f"modèle {config.modele_ia('analyse')}")
+        try:
+            bilan = analyser_en_attente(user_id, mode, profil, maximum, stop_event=arret, log=log,
+                                        on_progress=progression)
+            fin = (f"{bilan['analysees']} offres analysées, {bilan['archivees']} archivées, "
+                   f"{bilan['sautees']} sautées")
+            pipelines.maj(ANALYSE, user_id, message=("Arrêtée : " if bilan["arret"] else "Terminée : ") + fin)
+            log(f"✅ Analyse terminée : {fin}")
+        except ErreurIABloquante as e:
+            # IA injoignable, modèle absent... : arrêt immédiat, rien d'inventé
+            pipelines.maj(ANALYSE, user_id, message=f"Erreur : {e}")
+            log(f"❌ Analyse arrêtée : {e}")
+        except Exception as e:
+            pipelines.maj(ANALYSE, user_id, message=f"Erreur : {e}")
+            log(f"❌ Erreur analyse : {e}")
+        finally:
+            pipelines.terminer(ANALYSE, user_id)
+
+    threading.Thread(target=lancer, daemon=True).start()
+    return True
+
+
+def _analyse_automatique(user_id: int, mode: str):
+    """Après une recherche, si l'option du profil est cochée : analyse des
+    offres en attente avec la limite par défaut. Rien sans IA ni offre."""
+    if not config.analyse_ia_active():
+        pipelines.log(user_id, f"ℹ️  Analyse automatique non lancée : {config.MESSAGE_IA_DESACTIVEE}")
+        return
+    if not compter_en_attente(user_id, mode):
+        return
+    maximum = config.limite_lancement("analyses", None)
+    if not _lancer_analyse(user_id, mode, maximum, note=" (automatique après la recherche)"):
+        pipelines.log(user_id, "ℹ️  Analyse automatique non lancée : une analyse tourne déjà.")
+
+
+@prive.post("/api/analyse")
+def api_analyse(body: Analyse | None = None, user: User = Depends(utilisateur_requis),
+                mode: str = Depends(mode_requis)):
+    """Analyse les offres « non analysées » du mode, les plus récentes d'abord."""
+    if not config.analyse_ia_active():
+        raise ErreurUtilisateur("Analyse indisponible : l'IA est désactivée (ANALYSE_IA=false).")
+    exiger_profil(lire_profil(user.id, mode=mode))
+    disponibles = compter_en_attente(user.id, mode)
+    if not disponibles:
+        raise ErreurUtilisateur("Aucune offre en attente d'analyse dans ce mode.")
+    maximum, note = _limite("analyses", body.max_analyses if body else None, disponibles)
+    if not _lancer_analyse(user.id, mode, maximum, note):
+        en_cours = pipelines.etat(ANALYSE, user.id).get("mode")
+        return JSONResponse({"erreur": f"Analyse déjà en cours (mode {en_cours})"}, status_code=400)
+    return {"status": "démarré", "max_analyses": maximum, "en_attente": disponibles}
+
+@prive.post("/api/analyse/stop")
+def api_analyse_stop(user: User = Depends(utilisateur_requis)):
+    """Arrête l'analyse en cours de l'utilisateur, après l'offre en cours."""
+    en_cours = pipelines.demander_arret(user.id, ANALYSE)
+    if en_cours:
+        pipelines.log(user.id, "⏹️  Arrêt de l'analyse demandé (après l'offre en cours)")
+    return {"ok": True, "en_cours": en_cours}
+
+@prive.get("/api/analyse/statut")
+def api_analyse_statut(user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
+    return {**pipelines.etat(ANALYSE, user.id), "en_attente": compter_en_attente(user.id, mode)}
 
 @prive.post("/api/generer_lettre")
 def api_generer_lettre(body: OffreId, request: Request, user: User = Depends(utilisateur_requis),
@@ -605,6 +674,7 @@ def api_generer_lettre(body: OffreId, request: Request, user: User = Depends(uti
 @prive.post("/api/analyser")
 def api_analyser(body: OffreId, request: Request, user: User = Depends(utilisateur_requis),
                  mode: str = Depends(mode_requis)):
+    """Analyse (ou réanalyse) une offre tout de suite, archivage compris."""
     offre = lire_candidature(user.id, body.id, mode=mode)
     if not offre:
         return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
@@ -614,18 +684,9 @@ def api_analyser(body: OffreId, request: Request, user: User = Depends(utilisate
     profil = lire_profil(user.id, mode=mode)
     # ErreurIA : réponse 502/503 (gestionnaire plus haut), l'offre n'est pas touchée
     analyse = analyser_offre(offre, profil, mode=mode)
-    modifs = {
-        "score":          analyse["score"],
-        "verdict":        analyse["verdict"],
-        "eligible":       analyse["eligible"],
-        "points_forts":   analyse["points_forts"],
-        "points_faibles": analyse["points_faibles"],
-        "resume_analyse": analyse["resume"],
-    }
-    if analyse.get("statut_auto") == "archive":
-        modifs["statut"] = "archive"
-    modifier_candidature(user.id, body.id, modifs, mode=mode)
-    return analyse
+    modifs = enregistrer_analyse(user.id, mode, offre, analyse)
+    return {**analyse, "statut": modifs.get("statut", offre.get("statut")),
+            "raison_archivage": modifs.get("raison_archivage", offre.get("raison_archivage"))}
 
 @prive.post("/api/maj_statut")
 def api_maj_statut(body: MajStatut, request: Request, user: User = Depends(utilisateur_requis),

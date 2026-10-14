@@ -72,7 +72,7 @@ def test_page_stage(stagiaire):
     client, _ = stagiaire
     page = client.get("/stage").text
     assert 'data-mode="stage"' in page and "<title>Chasseur de Stage" in page
-    assert 'data-limite="analyses"' in page                              # offres disponibles (D74)
+    assert 'data-limite="offres"' in page                                # offres disponibles (D74)
     assert 'data-mode-section="stage"' in page and 'type="date" data-profil="date_debut"' in page
     assert "{date_debut}" in page and "{duree_semaines}" in page       # aide des balises du stage
     assert "La Bonne Alternance (fort potentiel" not in page            # pas de LBA en stage
@@ -274,7 +274,7 @@ def test_recherche_d_offres_de_stage(api, stagiaire):
     api.offres[4]["description"] = "Stage de fin d'études possible."
     profil = {"recherche": {"domaines": ["M18"]}}
     ecrites, logs = [], []
-    lancer_recherche(uid, profil, analyser=False, max_analyse=10, on_offre=ecrites.append, mode="stage",
+    lancer_recherche(uid, profil, max_offres=10, on_offre=ecrites.append, mode="stage",
                      log_fn=logs.append)
     assert all(r.get("motsCles") == "stage" and r.get("domaine") == "M18" for r in api.recherches)
     assert [o["titre"] for o in ecrites] == ["Stage - Assistant(e) RH H/F"]
@@ -293,7 +293,7 @@ def test_recherche_par_la_route_en_stage(stagiaire, monkeypatch, pipelines_neufs
     client, uid = stagiaire
     client.post("/api/profil", json=PROFIL_STAGE)
 
-    def recherche(user_id, profil, analyser, max_analyse, on_offre, mode, log_fn):
+    def recherche(user_id, profil, max_offres, on_offre, mode, log_fn):
         o = {"id": "s1", "titre": "Stage - Assistant RH", "entreprise": "ACME", "lieu": "75 - Paris",
              "zone": "Paris", "lien": "", "source": "France Travail", "description": "", "statut": "nouveau"}
         from france_travail.analyseur import marquer_non_analysee
@@ -301,7 +301,7 @@ def test_recherche_par_la_route_en_stage(stagiaire, monkeypatch, pipelines_neufs
         on_offre(o)
         return [o]
     monkeypatch.setattr(main, "lancer_recherche", recherche)
-    r = client.post("/api/recherche", json={"max_analyses": 5})
+    r = client.post("/api/recherche", json={"max_offres": 5})
     assert r.status_code == 200 and "avertissement" not in r.json()
     import time
     for _ in range(200):

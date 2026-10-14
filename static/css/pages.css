@@ -515,3 +515,11 @@
   display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 6px;
   max-height: 320px; overflow-y: auto; padding-right: 4px;
 }
+
+/* ── Offres en attente d'analyse (phase 7) ─────────────────────────────────── */
+.analyse-attente { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+                   gap: 12px; margin-bottom: 16px; }
+.analyse-attente__txt { display: flex; flex-direction: column; gap: 4px; }
+.analyse-attente__sous { font-size: 13px; opacity: .75; }
+.analyse-attente__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.analyse-attente__actions .limite-lancement { margin: 0; }

@@ -50,6 +50,7 @@ def lire_profil(user_id: int, mode: str = "alternance") -> dict:
             "etablissement": p.etablissement or "",
             "missions": p.missions or "",
             "portfolio": p.portfolio or "",
+            "analyse_auto": bool(p.analyse_auto),
             "competences": p.competences or [],
             "projets": p.projets or [],
             "recherche": p.recherche or {},
@@ -109,6 +110,8 @@ def sauvegarder_profil(user_id: int, donnees: dict, mode: str = "alternance") ->
                 setattr(p, champ, donnees[champ])
         for champ, valeur in dates.items():
             setattr(p, champ, valeur)
+        if "analyse_auto" in donnees:
+            p.analyse_auto = donnees["analyse_auto"] in (True, "true", "1", 1, "on")
         verifier_periode(p.date_debut, p.date_fin)   # avant l'écriture : rien n'est enregistré
         db.commit()
         return True

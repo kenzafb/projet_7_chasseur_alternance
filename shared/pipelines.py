@@ -1,8 +1,9 @@
 """
 shared/pipelines.py
 ===================
-État en mémoire des pipelines longs (recherche d'offres, candidatures
-spontanées), PAR UTILISATEUR : progression, événement d'arrêt et logs.
+État en mémoire des pipelines longs (recherche d'offres, analyse des
+offres en attente, candidatures spontanées), PAR UTILISATEUR : progression,
+événement d'arrêt et logs.
 
 Chaque utilisateur ne voit que ses propres états et logs, et ne peut
 arrêter que ses propres pipelines. Un seul pipeline de chaque type à la
@@ -21,12 +22,19 @@ from database.dates import maintenant_affichage
 from shared.config import LOGS_MAX_PAR_UTILISATEUR
 
 RECHERCHE = "recherche"
+ANALYSE = "analyse"
 SPONTANEES = "spontanees"
+# Pipelines qu'on peut arrêter en cours de route (événement d'arrêt)
+ARRETABLES = (ANALYSE, SPONTANEES)
 
 # mode : mode de chasse du lancement (un seul pipeline de chaque type par
 # utilisateur, tous modes confondus : le front d'un autre mode le signale)
 ETATS_INITIAUX = {
     RECHERCHE:  {"en_cours": False, "message": "Prêt", "pourcentage": 0, "mode": None},
+    # faites / total : offres traitées sur celles du lancement ; restant_s :
+    # temps restant estimé (moyenne des offres déjà traitées), None au début
+    ANALYSE:    {"en_cours": False, "message": "Prêt", "pourcentage": 0, "mode": None,
+                 "faites": 0, "total": 0, "restant_s": None},
     # mode_test : envoi en cours vers l'utilisateur lui-même (affiché par le front)
     SPONTANEES: {"en_cours": False, "etape": None, "message": "Prêt", "pourcentage": 0,
                  "mode_test": False, "mode": None},
@@ -38,7 +46,7 @@ class Pipelines:
         self._verrou = threading.Lock()
         self._logs_max = logs_max
         self._etats = {type_: {} for type_ in ETATS_INITIAUX}   # type -> user_id -> dict
-        self._arrets = {}                                         # user_id -> Event (spontanées)
+        self._arrets = {}                                         # (type, user_id) -> Event
         self._logs = {}                                           # user_id -> deque bornée
 
     # ─── États ────────────────────────────────────────────────────────────────
@@ -49,15 +57,15 @@ class Pipelines:
 
     def demarrer(self, type_: str, user_id: int, **champs) -> bool:
         """Marque le pipeline en cours, sauf s'il l'est déjà pour cet
-        utilisateur (vérification et marquage atomiques). Pour les
-        spontanées, réarme l'événement d'arrêt de l'utilisateur."""
+        utilisateur (vérification et marquage atomiques). Pour un pipeline
+        arrêtable, réarme l'événement d'arrêt de l'utilisateur."""
         with self._verrou:
             actuel = self._etats[type_].get(user_id)
             if actuel and actuel["en_cours"]:
                 return False
             self._etats[type_][user_id] = {**ETATS_INITIAUX[type_], **champs, "en_cours": True}
-            if type_ == SPONTANEES:
-                self._arrets[user_id] = threading.Event()
+            if type_ in ARRETABLES:
+                self._arrets[(type_, user_id)] = threading.Event()
             return True
 
     def maj(self, type_: str, user_id: int, **champs):
@@ -68,20 +76,20 @@ class Pipelines:
     def terminer(self, type_: str, user_id: int, **champs):
         self.maj(type_, user_id, **champs, en_cours=False)
 
-    # ─── Arrêt (candidatures spontanées) ──────────────────────────────────────
-    def evenement_arret(self, user_id: int) -> threading.Event:
-        """Événement d'arrêt du pipeline spontané de l'utilisateur."""
+    # ─── Arrêt (analyse, candidatures spontanées) ─────────────────────────────
+    def evenement_arret(self, user_id: int, type_: str = SPONTANEES) -> threading.Event:
+        """Événement d'arrêt du pipeline `type_` de l'utilisateur."""
         with self._verrou:
-            return self._arrets.setdefault(user_id, threading.Event())
+            return self._arrets.setdefault((type_, user_id), threading.Event())
 
-    def demander_arret(self, user_id: int) -> bool:
-        """Arrête le pipeline spontané de CET utilisateur s'il tourne.
+    def demander_arret(self, user_id: int, type_: str = SPONTANEES) -> bool:
+        """Arrête le pipeline `type_` de CET utilisateur s'il tourne.
         Retourne True si un pipeline était en cours."""
         with self._verrou:
-            etat = self._etats[SPONTANEES].get(user_id)
+            etat = self._etats[type_].get(user_id)
             if not (etat and etat["en_cours"]):
                 return False
-            self._arrets.setdefault(user_id, threading.Event()).set()
+            self._arrets.setdefault((type_, user_id), threading.Event()).set()
             etat["message"] = "Arrêt demandé — sauvegarde en cours..."
             return True
 

@@ -1,6 +1,5 @@
-import json
 import re
-from shared.ia import ErreurIABloquante, ErreurIAPassagere, appeler_structure
+from shared.ia import appeler_structure
 from shared.schemas_ia import AnalyseOffre
 from shared.config import ia_longueur_description
 from shared.erreurs import exiger_profil
@@ -322,13 +321,14 @@ def appliquer_analyse(offre, analyse, mode="alternance", verbeux=True):
     appliquer_archivage_auto(offre, analyse, mode=mode, verbeux=verbeux)
 
 
-# Offre insérée sans analyse (ANALYSE_IA=false) : verdict « non_analysee »,
-# ni score ni points ; elle pourra être réanalysée quand l'IA reviendra.
+# Offre insérée sans analyse (toute offre trouvée par la recherche) : verdict
+# « non_analysee », ni score ni points ; analysée ensuite en différé
+# (france_travail/analyse_differee.py) ou une à une par le bouton « Analyser ».
 VERDICT_NON_ANALYSEE = "non_analysee"
 
 
 def marquer_non_analysee(offre, mode="alternance", verbeux=True):
-    """Prépare une offre pour l'insertion sans IA et applique les seules
+    """Prépare une offre pour l'insertion sans analyse et applique les seules
     règles d'archivage qui ne dépendent pas d'une analyse (mode alternance :
     réservée à un public spécifique, école ou CFA, stage ; mode stage :
     réservée à un public spécifique seulement, une école peut accueillir un
@@ -361,27 +361,3 @@ def marquer_non_analysee(offre, mode="alternance", verbeux=True):
         offre["statut"], offre["raison_archivage"] = "archive", "stage"
         _log("     -> Archivée automatiquement (stage détecté)")
     return offre
-
-
-def analyser_offres(offres, profil, callback=None, mode="alternance", log_fn=None):
-    """Analyse les offres une à une ; callback(i, total, offre) pour chaque
-    offre analysée. Erreur passagère (quota, serveur, réponse illisible) :
-    l'offre est sautée, le callback n'est pas appelé (ni écrite ni marquée
-    vue : elle reviendra). ErreurIABloquante : remonte, le pipeline s'arrête."""
-    _log = log_fn or print
-    offres_analysees = []
-    for i, offre in enumerate(offres, 1):
-        print(f"  [{i}/{len(offres)}] {offre['titre'][:50]}...")
-        try:
-            analyse = analyser_offre(offre, profil, mode=mode)
-        except ErreurIAPassagere as e:
-            _log(f"  ⚠️  Offre sautée, « {offre['titre'][:50]} » : {e}. Elle reviendra au prochain lancement.")
-            continue
-        appliquer_analyse(offre, analyse, mode=mode)
-        eligible_str = "eligible" if offre["eligible"] else "INELIGIBLE"
-        print(f"     Score : {offre['score']}/10 — {offre['verdict']} — {eligible_str}")
-        offres_analysees.append(offre)
-        if callback:
-            callback(i, len(offres), offre)
-    offres_analysees.sort(key=lambda x: x["score"], reverse=True)
-    return offres_analysees

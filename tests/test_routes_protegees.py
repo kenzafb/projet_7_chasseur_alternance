@@ -98,13 +98,14 @@ def test_inventaire_des_routes_du_mode():
     chemins = {c for _, c in ROUTES_DU_MODE}
     assert {"/api/candidatures", "/api/profil", "/api/profil/upload", "/api/profil/piece",
             "/api/recherche", "/api/lettre_pdf/1", "/api/spontanees/stats", "/api/spontanees/suivi",
-            "/api/spontanees/fetch", "/api/spontanees/envoyer", "/api/mode"} <= chemins
+            "/api/spontanees/fetch", "/api/spontanees/envoyer", "/api/mode", "/api/analyse",
+            "/api/analyse/statut"} <= chemins
     assert all(c.startswith("/api/") for c in chemins)
     # Routes sans mode : compte, état des pipelines, logs, référentiels
     sans = {re.sub(r"\{[^}]+\}", "1", r.path) for r in ROUTES_APP
             if isinstance(r, APIRoute) and r.path.startswith("/api/")} - chemins
     assert sans == {"/api/logs", "/api/statut_recherche", "/api/statut_pipelines", "/api/spontanees/statut",
-                    "/api/spontanees/stop", "/api/spontanees/valider", "/api/domaines", "/api/criteres_options",
+                    "/api/spontanees/stop", "/api/spontanees/valider", "/api/analyse/stop", "/api/domaines", "/api/criteres_options",
                     "/api/compte_envoi", "/api/compte_envoi/supprimer", "/api/compte_envoi/tester",
                     "/api/compte_envoi/mode_test", "/api/compte_envoi/mail_test"}
 

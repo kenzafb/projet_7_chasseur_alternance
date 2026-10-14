@@ -1,33 +1,28 @@
 """
 france_travail/main.py
 ======================
-Pipeline "offres" : recherche France Travail, analyse IA, puis écriture
-de chaque offre via le callback on_offre (l'appelant écrit en base).
-Les offres déjà vues sont suivies en base par utilisateur et par mode
-(database/dedup_db.py).
+Pipeline "offres" : recherche France Travail, puis écriture de chaque
+offre « non analysée » via le callback on_offre (l'appelant écrit en base).
+L'analyse par l'IA vient après, en différé (france_travail/analyse_differee.py) :
+la recherche n'attend jamais l'IA. Les offres déjà vues sont suivies en
+base par utilisateur et par mode (database/dedup_db.py).
 """
 
 from france_travail.scraper import chercher_offres
-from france_travail.analyseur import analyser_offres, marquer_non_analysee
+from france_travail.analyseur import marquer_non_analysee
 from database.dedup_db import marquer_offres_vues
 
 
-def lancer_recherche(user_id, profil, analyser=True, max_analyse=999, on_offre=None, mode="alternance",
-                     log_fn=None):
-    """Recherche France Travail puis analyse d'au plus max_analyse offres.
-    Une offre n'est marquée vue qu'une fois analysée et écrite : celles
-    au-delà de la limite, ou dont l'analyse a échoué, reviendront au
-    lancement suivant. Retourne les offres retenues (analyse tentée).
-    ErreurIABloquante remonte telle quelle.
-
-    analyser=False (ANALYSE_IA=false) : aucune analyse ; chaque offre est
-    écrite « non analysée » (archivage par mots-clés seulement) puis
-    marquée vue."""
+def lancer_recherche(user_id, profil, max_offres=999, on_offre=None, mode="alternance", log_fn=None):
+    """Recherche France Travail, au plus max_offres nouvelles offres. Chaque
+    offre est écrite « non analysée » (archivage par mots-clés seulement)
+    puis marquée vue ; celles au-delà de la limite reviendront au lancement
+    suivant. Retourne les offres écrites."""
     print("\nRecherche des offres...")
     from shared.criteres import criteres_france_travail
     from shared.modes import get_mode
     cfg = get_mode(mode)
-    lot = min(cfg.get("limite_lot") or max_analyse, max_analyse)
+    lot = min(cfg.get("limite_lot") or max_offres, max_offres)
     nouvelles_offres = chercher_offres(
         user_id, criteres_france_travail(profil, mode), mode=mode, limite_lot=lot, marquer=False,
         log=log_fn or print)
@@ -36,18 +31,8 @@ def lancer_recherche(user_id, profil, analyser=True, max_analyse=999, on_offre=N
         print("Aucune nouvelle offre.")
         return []
 
-    if analyser:
-        # Callback : sauvegarde chaque offre dès qu'elle est analysée
-        def sauvegarder_au_fur(index, total, offre_analysee):
-            on_offre(offre_analysee)
-            marquer_offres_vues(user_id, mode, {offre_analysee["id"]})
-
-        analyser_offres(nouvelles_offres, profil=profil, callback=sauvegarder_au_fur, mode=mode,
-                        log_fn=log_fn)
-    else:
-        for offre in nouvelles_offres:
-            marquer_non_analysee(offre, mode=mode)
-            on_offre(offre)
-            marquer_offres_vues(user_id, mode, {offre["id"]})
-
+    for offre in nouvelles_offres:
+        marquer_non_analysee(offre, mode=mode)
+        on_offre(offre)
+        marquer_offres_vues(user_id, mode, {offre["id"]})
     return nouvelles_offres

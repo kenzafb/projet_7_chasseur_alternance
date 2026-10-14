@@ -1,16 +1,37 @@
 <!-- ════════════ PAGE OFFRES ════════════ -->
 <section class="page is-active" data-page-content="offres">
   <div class="guide" data-guide="offres">
-    <span class="guide__txt">Clique sur <strong>Lancer la recherche</strong> : le Chasseur récupère les offres d'alternance et les note selon ton profil. Les meilleures remontent en haut. Clique sur une offre pour l'analyser en détail et générer une lettre.</span>
+    <span class="guide__txt">Clique sur <strong>Lancer la recherche</strong> : le Chasseur récupère les offres, puis <strong>Analyser les offres en attente</strong> les fait noter par l'IA selon ton profil. Les meilleures remontent en haut. Clique sur une offre pour l'analyser en détail et générer une lettre.</span>
     <span class="guide__x" data-guide-close="offres">×</span>
   </div>
 
   <label class="limite-lancement">
-    {% set limite_offres = limites.analyses if analyse_ia|default(true) else limites.sans_ia %}
-    <span>Offres {{ "analysées" if analyse_ia|default(true) else "ajoutées sans analyse" }} au plus par lancement (max {{ limite_offres.max }})</span>
-    <input type="number" data-limite="analyses" value="{{ limite_offres.defaut }}"
-           min="1" max="{{ limite_offres.max }}">
+    <span>Offres ajoutées au plus par recherche (max {{ limites.offres.max }})</span>
+    <input type="number" data-limite="offres" value="{{ limites.offres.defaut }}"
+           min="1" max="{{ limites.offres.max }}">
   </label>
+
+  <!-- Analyse en différé : la recherche ajoute les offres « non analysées » -->
+  <div class="card analyse-attente" data-analyse-attente>
+    <div class="analyse-attente__txt">
+      <strong><span data-analyse-nombre>0</span> offre(s) en attente d'analyse</strong>
+      {% if analyse_ia|default(true) %}
+      <span class="analyse-attente__sous">Analysées par l'IA locale ({{ modele_analyse|default("") }}), les plus récentes d'abord. Compte une à deux minutes par offre sur processeur.</span>
+      {% else %}
+      <span class="analyse-attente__sous">IA désactivée : les offres restent sans note.</span>
+      {% endif %}
+    </div>
+    {% if analyse_ia|default(true) %}
+    <div class="analyse-attente__actions">
+      <label class="limite-lancement">
+        <span>Au plus (max {{ limites.analyses.max }})</span>
+        <input type="number" data-limite="analyses" value="{{ limites.analyses.defaut }}"
+               min="1" max="{{ limites.analyses.max }}">
+      </label>
+      <button class="btn btn--signal" data-analyse-lancer>Analyser les offres en attente</button>
+    </div>
+    {% endif %}
+  </div>
 
   <div class="kpis kpis--4">
     <div class="kpi">

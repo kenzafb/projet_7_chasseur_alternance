@@ -6,7 +6,6 @@ from types import SimpleNamespace
 
 import pytest
 
-import france_travail.analyseur
 import france_travail.scraper as scraper
 import main
 import spontanees.envoyeur as envoyeur
@@ -44,8 +43,6 @@ def test_interface_reprend_defauts_et_plafonds(utilisateur):
     client, _ = utilisateur("a@test.fr", prenom="Alice")
     page = client.get("/alternance").text
     for cle, regle in config.LIMITES_LANCEMENT.items():
-        if cle == "sans_ia":   # même champ que « analyses », affiché quand ANALYSE_IA=false
-            continue
         assert f'data-limite="{cle}" value="{regle["defaut"]}"' in page
         assert f'max="{regle["max"]}"' in page
 
@@ -82,8 +79,8 @@ def _rechercher(client, user_id, pipelines, **corps):
 def test_recherche_limite_france_travail_et_lba_ensemble(utilisateur, sources, ia, pipelines_neufs):
     client, user_id = utilisateur("a@test.fr", prenom="Alice")
     sources.update(ft=3, lba=10)
-    assert _rechercher(client, user_id, pipelines_neufs, max_analyses=5)["max_analyses"] == 5
-    assert len(ia.appels) == 5
+    assert _rechercher(client, user_id, pipelines_neufs, max_offres=5)["max_offres"] == 5
+    assert ia.appels == []                                    # la recherche n'attend jamais l'IA
     refs = {c["id"] for c in lire_candidatures(user_id)}
     assert len(refs) == 5 and sorted(r for r in refs if r.startswith("LBA")) == ["LBA0", "LBA1"]
     assert "limite" in client.get("/api/logs").text.lower()
@@ -92,11 +89,10 @@ def test_recherche_limite_france_travail_et_lba_ensemble(utilisateur, sources, i
 def test_offres_au_dela_de_la_limite_reproposees(utilisateur, sources, ia, pipelines_neufs):
     client, user_id = utilisateur("a@test.fr", prenom="Alice")
     sources.update(ft=10)
-    _rechercher(client, user_id, pipelines_neufs, max_analyses=4)
-    assert len(ia.appels) == 4
+    _rechercher(client, user_id, pipelines_neufs, max_offres=4)
     assert len(lire_offres_vues(user_id, "alternance")) == 4   # les 6 autres ne sont pas perdues
     assert len(lire_candidatures(user_id)) == 4
-    _rechercher(client, user_id, pipelines_neufs, max_analyses=100)
+    _rechercher(client, user_id, pipelines_neufs, max_offres=100)
     assert len(lire_candidatures(user_id)) == 10
 
 
@@ -104,16 +100,18 @@ def test_recherche_lba_ignoree_quand_france_travail_epuise_la_limite(utilisateur
                                                                      pipelines_neufs):
     client, user_id = utilisateur("a@test.fr", prenom="Alice")
     sources.update(ft=6, lba=4)
-    _rechercher(client, user_id, pipelines_neufs, max_analyses=6)
-    assert len(ia.appels) == 6
+    _rechercher(client, user_id, pipelines_neufs, max_offres=6)
+    assert len(lire_candidatures(user_id)) == 6
     assert "LBA ignorée" in client.get("/api/logs").text
 
 
 def test_recherche_defaut_et_plafond_serveur(utilisateur, sources, pipelines_neufs, monkeypatch):
     client, user_id = utilisateur("a@test.fr", prenom="Alice")
-    assert _rechercher(client, user_id, pipelines_neufs)["max_analyses"] == 30
-    assert _rechercher(client, user_id, pipelines_neufs, max_analyses=10**6)["max_analyses"] == 200
-    assert client.post("/api/recherche", json={"max_analyses": 5, "autre": 1}).status_code == 422
+    assert _rechercher(client, user_id, pipelines_neufs)["max_offres"] == 100
+    assert _rechercher(client, user_id, pipelines_neufs, max_offres=10**6)["max_offres"] == 500
+    assert "ramené à 500" in client.get("/api/logs").text
+    assert client.post("/api/recherche", json={"max_offres": 5, "autre": 1}).status_code == 422
+    assert client.post("/api/recherche", json={"max_analyses": 5}).status_code == 422   # ancien champ
 
 
 def test_limite_du_mode_job_reste_un_plafond(utilisateur, sources, ia, pipelines_neufs):
@@ -121,8 +119,8 @@ def test_limite_du_mode_job_reste_un_plafond(utilisateur, sources, ia, pipelines
     client.mode = "job"
     client.post("/api/profil", json={"prenom": "Alice"})
     sources.update(ft=8)
-    _rechercher(client, user_id, pipelines_neufs, max_analyses=3)
-    assert len(ia.appels) == 3
+    _rechercher(client, user_id, pipelines_neufs, max_offres=3)
+    assert len(lire_candidatures(user_id, mode="job")) == 3
 
 
 # ─── Fetch des entreprises ───────────────────────────────────────────────────

@@ -157,10 +157,10 @@ def test_recherche_d_offres_n_ajoute_aucune_entreprise(utilisateur, monkeypatch,
 def test_pas_de_aucune_offre_apres_lba_ignoree(utilisateur, monkeypatch, pipelines_neufs):
     """Point 8 : « Aucune offre LBA récupérée » seulement si LBA a tourné."""
     client, uid = utilisateur("a@test.fr", prenom="Alice")
-    monkeypatch.setattr(main, "lancer_recherche", lambda *a, max_analyse, **k: [{}] * max_analyse)
+    monkeypatch.setattr(main, "lancer_recherche", lambda *a, max_offres, **k: [{}] * max_offres)
     appels = []
     monkeypatch.setattr(main, "rechercher_lba", lambda profil, log=print: appels.append(1))
-    client.post("/api/recherche", json={"max_analyses": 3})
+    client.post("/api/recherche", json={"max_offres": 3})
     attendre(lambda: not main.pipelines.etat("recherche", uid)["en_cours"])
     logs = _logs(uid)
     assert "LBA ignorée : limite de 3 offres" in logs

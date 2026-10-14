@@ -54,6 +54,40 @@ def lire_candidatures(user_id: int, mode: str = "alternance") -> list[dict]:
         db.close()
 
 
+# Offre en attente d'analyse : insérée sans analyse (verdict non_analysee,
+# cf. france_travail.analyseur.VERDICT_NON_ANALYSEE) et pas archivée
+NON_ANALYSEE = "non_analysee"
+
+
+def _en_attente(db, user_id: int, mode: str):
+    return (db.query(Candidature)
+              .filter(Candidature.user_id == user_id, Candidature.mode == mode,
+                      Candidature.verdict == NON_ANALYSEE,
+                      Candidature.statut != "archive"))
+
+
+def lire_en_attente(user_id: int, mode: str, limite: int | None = None) -> list[dict]:
+    """Offres du mode à analyser, des plus récentes aux plus anciennes
+    (date de découverte, puis ordre d'insertion), au plus `limite`."""
+    db = SessionLocal()
+    try:
+        requete = (_en_attente(db, user_id, mode)
+                   .order_by(Candidature.date_trouvee.desc().nullslast(), Candidature.id.desc()))
+        if limite:
+            requete = requete.limit(limite)
+        return [_vers_dict(c) for c in requete.all()]
+    finally:
+        db.close()
+
+
+def compter_en_attente(user_id: int, mode: str) -> int:
+    db = SessionLocal()
+    try:
+        return _en_attente(db, user_id, mode).count()
+    finally:
+        db.close()
+
+
 def lire_candidature(user_id: int, ref_offre: str, mode: str = "alternance") -> dict | None:
     """Retourne une candidature précise (par son id/ref_offre), ou None."""
     db = SessionLocal()

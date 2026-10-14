@@ -116,6 +116,8 @@ class Profil(Base):
     etablissement     = Column(String(200), default="")   # école, université
     missions          = Column(Text, default="")   # missions visées
     portfolio         = Column(String(255), default="")   # lien vers un portfolio
+    # Analyse des offres en attente lancée d'elle-même après chaque recherche
+    analyse_auto      = Column(Boolean, nullable=False, default=False, server_default=false())
 
     lettre_type      = Column(Text, default="")   # trame de lettre de motivation (l'IA ne fait que le paragraphe entreprise)
     email_objet      = Column(String(300), default="")   # objet du mail de candidature spontanée

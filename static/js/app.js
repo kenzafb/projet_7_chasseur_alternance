@@ -13,8 +13,8 @@ import { Suivi }         from "./suivi.js";
 /* Contenu contextuel de la topbar selon la page */
 const TOPBAR = {
   offres:       { title: "Offres d'alternance",   action: "Lancer la recherche", run: async () => {
-    const demandee = limite("analyses");
-    confirmerLancement("analyses", demandee, await api.recherche(demandee));
+    const demandee = limite("offres");
+    confirmerLancement("offres", demandee, await api.recherche(demandee));
   } },
   candidatures: { title: "Mes candidatures",      action: "Actualiser",          run: () => recharger() },
   spontanees:   { title: "Candidatures spontanées", action: "Récupérer",         run: () => Spontanees.action("fetch") },
@@ -123,7 +123,7 @@ let minuteur = null;     // prochain poll programmé
 let enVol = false;       // une requête de statut est en cours
 let aRelancer = false;   // surveiller() appelé pendant cette requête
 
-/* Erreur d'un pipeline (clé Mistral refusée, modèle non autorisé...) :
+/* Erreur d'un pipeline (IA injoignable, modèle absent...) :
    affichée dans le bandeau de confirmation jusqu'à un clic, une seule fois */
 const erreursVues = new Set();
 function signalerErreur(etat) {
@@ -149,20 +149,23 @@ async function pollEtat() {
   enVol = true;
   let actif = !!pollEtat._etaitActif;   // erreur réseau : on garde le dernier état connu
   try {
-    const { recherche: rech, spontanees: sp } = await api.statutPipelines();
-    actif = rech.en_cours || sp.en_cours;
+    const { recherche: rech, analyse: an, spontanees: sp } = await api.statutPipelines();
+    actif = rech.en_cours || an.en_cours || sp.en_cours;
     signalerErreur(rech);
+    signalerErreur(an);
     signalerErreur(sp);
     const bar = document.querySelector("[data-runbar]");
     bar.classList.toggle("is-on", actif);
     // Un seul pipeline de chaque type par utilisateur, tous modes confondus :
     // celui d'un autre mode (autre onglet) est signalé
-    const autre = [rech, sp].find(e => e.en_cours && e.mode && e.mode !== MODE);
+    const autre = [rech, an, sp].find(e => e.en_cours && e.mode && e.mode !== MODE);
     const msg = document.querySelector("[data-runbar-msg]");
     if (msg) {
       msg.dataset.base ??= msg.textContent;
-      msg.textContent = autre ? `Traitement en cours en mode ${autre.mode} (autre onglet ou lancement précédent). `
-        + msg.dataset.base : msg.dataset.base;
+      // Analyse en cours : avancement et temps restant estimé avant le message fixe
+      const avancement = an.en_cours ? `${an.message}. ` : "";
+      msg.textContent = (autre ? `Traitement en cours en mode ${autre.mode} (autre onglet ou lancement précédent). ` : "")
+        + avancement + msg.dataset.base;
     }
     if (actif) {
       // La bannière garde son message fixe d'avertissement (défini dans le HTML).
@@ -170,13 +173,19 @@ async function pollEtat() {
       const barre = document.querySelector("[data-runbar-bar]");
       const lbl   = document.querySelector("[data-runbar-pct]");
       const progress = document.querySelector("[data-runbar-progress]");
-      if (rech.en_cours) {
-        const pct = rech.pourcentage ?? 0;
+      const jauge = rech.en_cours ? rech : an.en_cours ? an : null;
+      if (jauge) {
+        const pct = jauge.pourcentage ?? 0;
         if (progress) progress.style.display = "flex";
         if (barre) barre.style.width = pct + "%";
         if (lbl)   lbl.textContent = pct + "%";
       } else if (progress) {
         progress.style.display = "none";   // pas de jauge dans la bannière pour les spontanées
+      }
+      // Analyse : les offres notées apparaissent au fur et à mesure
+      if (an.en_cours && an.faites !== pollEtat._faites) {
+        pollEtat._faites = an.faites;
+        if (an.faites) Offres.charger();
       }
       // Met à jour les cartes du pipeline en temps réel (barre + message + pourcentage)
       if (sp.en_cours) Spontanees.majPipe(sp);
@@ -185,6 +194,7 @@ async function pollEtat() {
       if (pollEtat._etaitActif) recharger();
     }
     pollEtat._etaitActif = actif;
+    pollEtat._analyseEnCours = an.en_cours;
   } catch (_) {}
   enVol = false;
   if (aRelancer) { aRelancer = false; surveiller(); return; }
@@ -325,9 +335,19 @@ function brancher() {
     if (e.target.matches("[data-modal]")) modal.fermer();
   });
 
-  // bouton arrêter du runbar
+  // bouton arrêter du runbar : l'analyse en cours, sinon le pipeline spontané
   document.querySelector("[data-runbar-stop]").addEventListener("click", async () => {
-    try { await api.spStop(); } catch (_) {}
+    try {
+      if (pollEtat._analyseEnCours) await api.analyseStop(); else await api.spStop();
+    } catch (_) {}
+    surveiller();
+  });
+  // Analyse des offres en attente
+  const btnAnalyse = document.querySelector("[data-analyse-lancer]");
+  if (btnAnalyse) btnAnalyse.addEventListener("click", async () => {
+    const demandee = limite("analyses");
+    try { confirmerLancement("analyses", demandee, await api.analyseAttente(demandee)); }
+    catch (e) { alert(e.message); }
     surveiller();
   });
   // Boutons Arrêter sur les cartes du pipeline
