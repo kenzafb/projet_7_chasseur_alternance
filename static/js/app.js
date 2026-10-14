@@ -57,6 +57,21 @@ function majBadge() {
 }
 
 /* ── Modale lettre ───────────────────────────────────────────────────────── */
+/* Balises restées dans la lettre (entreprise inconnue, D108) : aperçu surligné */
+const A_COMPLETER = { "{entreprise}": "Nom de l'entreprise inconnu, à compléter",
+                      "{contact_entreprise}": "Nom de l'entreprise inconnu, à compléter" };
+function apercuLettre() {
+  const texte = document.querySelector("[data-modal-letter]").value;
+  const restes = Object.keys(A_COMPLETER).filter(b => texte.includes(b));
+  const alerte = document.querySelector("[data-modal-alerte]");
+  const apercu = document.querySelector("[data-modal-apercu]");
+  alerte.hidden = apercu.hidden = !restes.length;
+  if (!restes.length) return;
+  alerte.textContent = [...new Set(restes.map(b => A_COMPLETER[b]))].join(" ; ") + " : remplace la balise surlignée.";
+  const esc = t => t.replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+  apercu.innerHTML = restes.reduce((html, b) => html.split(esc(b)).join(`<mark>${esc(b)}</mark>`), esc(texte));
+}
+
 const modal = {
   el:    () => document.querySelector("[data-modal]"),
   area:  () => document.querySelector("[data-modal-letter]"),
@@ -69,6 +84,7 @@ const modal = {
     this.id = id;
     const offre = Offres.data().find(o => o.id === id);
     this.area().value = offre?.lettre || "";
+    apercuLettre();
     this.para().value = "";
     this.etat().textContent = "";
     this.el().classList.add("is-open");
@@ -105,6 +121,7 @@ const modal = {
     if (!this.id) return;
     try {
       this.area().value = (await api.assemblerLettre(this.id, this.para().value)).lettre;
+      apercuLettre();
       this.etat().textContent = "Paragraphe inséré : la lettre est enregistrée, modifiable ci-dessous.";
       Offres.charger();
     } catch (e) { alert(e.message); }
@@ -355,6 +372,7 @@ function brancher() {
   document.querySelector("[data-modal-save]").addEventListener("click", () => modal.enregistrer());
   document.querySelector("[data-modal-pdf]").addEventListener("click", () => modal.pdf());
   document.querySelector("[data-modal-regenerer]").addEventListener("click", () => modal.rediger());
+  document.querySelector("[data-modal-letter]").addEventListener("input", apercuLettre);
   document.querySelector("[data-modal-assembler]").addEventListener("click", () => modal.assembler());
   document.querySelector("[data-modal]").addEventListener("click", e => {
     if (e.target.matches("[data-modal]")) modal.fermer();

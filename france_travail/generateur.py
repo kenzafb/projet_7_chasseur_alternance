@@ -153,13 +153,26 @@ def _date_du_jour():
 NOMS_VIDES = {"", "inconnue", "inconnu", "non précisé", "non precise", "non renseigné", "non renseigne", "n/a", "na"}
 
 
+def entreprise_connue(offre) -> bool:
+    return (offre.get("entreprise") or "").strip().lower() not in NOMS_VIDES
+
+
 def contact_entreprise(offre) -> str:
-    """Bloc destinataire écrit en Python : nom de l'entreprise puis lieu, ou
-    une formule neutre si France Travail masque le nom."""
-    nom = (offre.get("entreprise") or "").strip()
-    lieu = (offre.get("lieu") or "").strip()
-    tete = "À l'attention du service recrutement" if nom.lower() in NOMS_VIDES else nom
-    return "\n".join(x for x in (tete, lieu) if x)
+    """Bloc destinataire écrit en Python : nom de l'entreprise puis lieu.
+    Nom inconnu : la balise reste telle quelle, à compléter (D108)."""
+    if not entreprise_connue(offre):
+        return "{contact_entreprise}"
+    return "\n".join(x for x in ((offre.get("entreprise") or "").strip(), (offre.get("lieu") or "").strip()) if x)
+
+
+# Balises laissées dans la lettre quand l'information manque (D108)
+A_COMPLETER = {"entreprise": "Nom de l'entreprise inconnu, à compléter",
+               "contact_entreprise": "Nom de l'entreprise inconnu, à compléter"}
+
+
+def marqueurs_a_completer(lettre: str) -> list[str]:
+    """Balises restées dans la lettre assemblée (entreprise inconnue)."""
+    return [b for b in A_COMPLETER if "{" + b + "}" in (lettre or "")]
 
 
 def sans_markdown(texte: str) -> str:
@@ -262,7 +275,9 @@ def assembler_lettre(offre, profil, paragraphe: str) -> str:
     if not paragraphe:
         raise ErreurUtilisateur("Le paragraphe personnalisé est vide : écris-le ou fais-le rédiger avant de "
                                 "l'insérer dans la lettre.")
-    return modele.format(entreprise=(offre.get("entreprise") or "").strip() or "votre entreprise",
+    # Nom inconnu (« Inconnue », vide) : {entreprise} et {contact_entreprise} restent visibles (D108)
+    return modele.format(entreprise=(offre.get("entreprise") or "").strip() if entreprise_connue(offre)
+                         else "{entreprise}",
                          poste=(offre.get("titre") or "").strip() or "le poste proposé",
                          date=_date_du_jour(), contact_entreprise=contact_entreprise(offre),
                          paragraphe=paragraphe, paragraphe_entreprise=paragraphe)

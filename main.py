@@ -50,7 +50,8 @@ from database.dates import maintenant_utc
 
 # ─── Modules métier ───────────────────────────────────────────────
 from france_travail.main import lancer_recherche
-from france_travail.generateur import assembler_lettre, lettre_par_defaut, rediger_paragraphe
+from france_travail.generateur import (A_COMPLETER, assembler_lettre, lettre_par_defaut, marqueurs_a_completer,
+                                      rediger_paragraphe)
 from france_travail.analyseur import analyser_offre, marquer_non_analysee
 from france_travail.analyse_differee import analyser_en_attente, duree_lisible, enregistrer_analyse, estimation_file
 from shared.ia import ErreurIA, ErreurIABloquante
@@ -719,7 +720,9 @@ def api_lettre_assembler(body: Assembler, user: User = Depends(utilisateur_requi
     if offre.get("statut") in (None, "", "nouveau"):
         modifs["statut"] = "en_cours"
     modifier_candidature(user.id, body.id, modifs, mode=mode)
-    return {"lettre": lettre}
+    a_completer = marqueurs_a_completer(lettre)
+    return {"lettre": lettre, "a_completer": a_completer,
+            "message": " ; ".join(dict.fromkeys(A_COMPLETER[b] for b in a_completer))}
 
 @prive.post("/api/analyser")
 def api_analyser(body: OffreId, request: Request, user: User = Depends(utilisateur_requis),

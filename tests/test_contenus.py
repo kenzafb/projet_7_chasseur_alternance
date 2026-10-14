@@ -283,3 +283,25 @@ def test_points_forts_tires_du_profil_seulement(mode):
     assert "points_forts : seulement des compétences, projets ou expériences écrits dans le PROFIL" in texte
     assert "jamais une compétence de l'offre absente du profil" in texte
     assert "Aucune compétence du profil ne correspond à l'offre" in texte
+
+
+# ─── D108 : entreprise inconnue, balises laissées à compléter ────────────────
+@pytest.mark.parametrize("nom", ["Inconnue", "", "  ", "non renseigné"])
+def test_entreprise_inconnue_balises_laissees(nom):
+    profil = {**PROFIL, "lettre_type": LETTRE_TYPE}
+    lettre = generateur.assembler_lettre({**OFFRE, "entreprise": nom, "lieu": "Lyon"}, profil, "P.")
+    assert lettre.startswith("{contact_entreprise}\nObjet : Vendeur") and "J'aime {entreprise}." in lettre
+    assert generateur.marqueurs_a_completer(lettre) == ["entreprise", "contact_entreprise"]
+    assert generateur.marqueurs_a_completer(generateur.assembler_lettre(OFFRE, profil, "P.")) == []
+
+
+def test_route_signale_les_balises_a_completer(utilisateur, ia):
+    from database.candidatures_db import ajouter_candidature
+    client, uid = utilisateur("a@test.fr", prenom="Alice")
+    client.post("/api/profil", json={**PROFIL, "lettre_type": LETTRE_TYPE})
+    ajouter_candidature(uid, {"id": "R1", "titre": "Dev", "entreprise": "Inconnue", "lieu": "Paris"})
+    r = client.post("/api/lettre/assembler", json={"id": "R1", "paragraphe": "P."}).json()
+    assert r["a_completer"] == ["entreprise", "contact_entreprise"]
+    assert r["message"] == "Nom de l'entreprise inconnu, à compléter"
+    js = (config.STATIC_DIR / "js" / "app.js").read_text(encoding="utf-8")
+    assert "<mark>" in js and "Nom de l'entreprise inconnu, à compléter" in js
