@@ -17,6 +17,14 @@ from tests.test_envoyeur import attendre
 from tests.test_ia import INTROUVABLE, echouer, recherche, sans_attente, texte_envoye  # noqa: F401  (fixtures)
 
 
+@pytest.fixture(autouse=True)
+def durees_neuves(monkeypatch):
+    """Durées d'analyse mesurées : vides à chaque test."""
+    import collections
+    from france_travail import analyse_differee
+    monkeypatch.setattr(analyse_differee, "_durees", collections.deque(maxlen=50))
+
+
 def analyse(score=8, eligible=True, domaine="Développement"):
     return ('{"score": %d, "eligible": %s, "points_forts": ["a"], "points_faibles": [], '
             '"domaine": "%s", "resume": "ok"}' % (score, "true" if eligible else "false", domaine))
@@ -62,7 +70,9 @@ def test_analyse_par_la_route(alice, ia):
         en_attente(uid, ref, jour)
     ia.reponse = analyse(8)
     reponse, etat = lancer(client, uid, max_analyses=2)
-    assert reponse == {"status": "démarré", "max_analyses": 2, "en_attente": 3}
+    assert {k: reponse[k] for k in ("status", "max_analyses", "en_attente")} == \
+        {"status": "démarré", "max_analyses": 2, "en_attente": 3}
+    assert reponse["estimation"] == {"secondes": 180, "texte": "environ 3 min", "mesure": False}
     assert [texte_envoye(a).count("Poste C") for a in ia.appels] == [1, 0]   # C, puis B
     for ref, attendu in (("C", "bon"), ("B", "bon"), ("A", "non_analysee")):
         assert lire_candidature(uid, ref)["verdict"] == attendu
@@ -212,11 +222,15 @@ def test_temps_restant_estime(alice, ia):
     for i in range(1, 4):
         en_attente(uid, f"R{i}", i)
     ia.reponse = analyse()
-    temps = iter([0, 90, 200, 300])   # début, puis fin de chaque offre (secondes)
+    # début ; puis pour chaque offre : départ, fin (durée notée), progression
+    temps = iter([0, 0, 90, 90, 90, 200, 200, 200, 300, 300])
     suivi = []
     analyser_en_attente(uid, "alternance", {"prenom": "Alice"}, 3, horloge=lambda: next(temps),
                         on_progress=lambda f, t, r: suivi.append((f, t, r)), log=lambda m: None)
     assert suivi == [(0, 3, None), (1, 3, 180.0), (2, 3, 100.0), (3, 3, 0.0)]
+    from france_travail import analyse_differee
+    assert analyse_differee.duree_moyenne_s() == 100
+    assert analyse_differee.estimation_file(36) == {"secondes": 3600, "texte": "environ 1 h 00", "mesure": True}
     assert duree_lisible(None) == "" and duree_lisible(20) == "moins d'une minute"
     assert duree_lisible(180) == "environ 3 min" and duree_lisible(4000) == "environ 1 h 07"
 
@@ -266,10 +280,36 @@ def test_option_propre_au_mode(alice):
 def test_interface(alice):
     client, _ = alice
     page = client.get("/alternance").text
-    assert "data-analyse-lancer" in page and 'data-limite="analyses" value="10"' in page
+    assert "data-analyse-lancer" in page and 'data-limite="analyses" value="30"' in page
+    assert "data-analyse-toute-file" in page and "data-analyse-estimation" in page
     assert "ministral-3:8b" in page and 'data-profil-case="analyse_auto"' in page
     from shared import config
     app = (config.STATIC_DIR / "js" / "app.js").read_text(encoding="utf-8")
     assert "api.analyseStop()" in app and "api.analyseAttente(" in app
     offres = (config.STATIC_DIR / "js" / "offres.js").read_text(encoding="utf-8")
     assert "Analyse en cours… (1 à 2 min)" in offres
+
+
+def test_toute_la_file(alice, ia):
+    client, uid = alice
+    for i in range(1, 6):
+        en_attente(uid, f"R{i}", i)
+    ia.reponse = analyse()
+    reponse, etat = lancer(client, uid, toute_la_file=True)
+    assert reponse["max_analyses"] == 5 and compter_en_attente(uid, "alternance") == 0
+    assert "(toute la file : 5 offres, environ 8 min)" in client.get("/api/logs").text
+
+
+def test_mots_cles_avant_l_ia(alice, ia):
+    """Une offre en attente que les mots-clés archivent n'est pas envoyée à l'IA."""
+    client, uid = alice
+    en_attente(uid, "A", 1)
+    en_attente(uid, "B", 2)
+    # Mise en attente sans archivage (règles plus anciennes), puis texte réservé
+    main.modifier_candidature(uid, "B", {"description": "Poste réservé aux bénéficiaires de l'obligation d'emploi."})
+    ia.reponse = analyse()
+    _, etat = lancer(client, uid)
+    assert len(ia.appels) == 1 and "Poste A" in texte_envoye(ia.appels[0])
+    b = lire_candidature(uid, "B")
+    assert (b["statut"], b["raison_archivage"], b["verdict"]) == ("archive", "public_specifique", "non_analysee")
+    assert "1 archivées par mots-clés sans IA" in etat["message"]

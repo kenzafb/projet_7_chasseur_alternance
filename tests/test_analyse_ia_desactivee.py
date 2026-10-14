@@ -147,15 +147,16 @@ def test_route_revalider_refusee(ia_coupee, utilisateur):
 
 # ─── Plafond de la recherche, avec ou sans IA (D20) ──────────────────────────
 @pytest.mark.parametrize("coupee", [True, False])
-def test_limite_de_la_recherche_identique_avec_ou_sans_ia(recherche, monkeypatch, coupee):
+def test_limite_de_la_recherche_avec_ou_sans_ia(recherche, monkeypatch, coupee):
     if coupee:
         monkeypatch.setenv("ANALYSE_IA", "false")
     recherche.sources["ft"] = [_brut_ft(i) for i in range(150)]
+    defaut = 100 if coupee else 30          # avec l'IA : 30, à analyser ensuite
     r = recherche.client.post("/api/recherche", json=None)
-    assert r.json()["max_offres"] == 100
+    assert r.json()["max_offres"] == defaut
     from tests.test_envoyeur import attendre
     attendre(lambda: not main.pipelines.etat("recherche", recherche.user_id)["en_cours"])
-    assert len(lire_candidatures(recherche.user_id)) == 100
+    assert len(lire_candidatures(recherche.user_id)) == defaut
     r = recherche.client.post("/api/recherche", json={"max_offres": 10**6})
     assert r.json()["max_offres"] == 500
     attendre(lambda: not main.pipelines.etat("recherche", recherche.user_id)["en_cours"])

@@ -331,14 +331,35 @@ def appliquer_analyse(offre, analyse, mode="alternance", verbeux=True):
 VERDICT_NON_ANALYSEE = "non_analysee"
 
 
+def archivage_mots_cles(offre, mode="alternance") -> str | None:
+    """Raison d'archivage établie sans IA, ou None. Mode alternance :
+    réservée à un public spécifique, école ou CFA, stage ; mode stage :
+    réservée seulement (une école peut accueillir un stagiaire, le mot
+    « stage » est attendu) ; mode job : aucune."""
+    if mode == "job":
+        return None
+    titre_lower = (offre.get("titre") or "").lower()
+    desc_lower = (offre.get("description") or "").lower()
+    if reserve_public_specifique(desc_lower) or reserve_public_specifique(titre_lower):
+        return "public_specifique"
+    if mode == "stage":
+        return None
+    if est_ecole_cfa(offre):
+        return "ecole_cfa"
+    if "stage" in titre_lower:
+        return "stage"
+    return None
+
+
+MESSAGES_ARCHIVAGE = {"public_specifique": "réservé public spécifique / BOETH", "ecole_cfa": "école/CFA détectée",
+                      "stage": "stage détecté"}
+
+
 def marquer_non_analysee(offre, mode="alternance", verbeux=True):
     """Prépare une offre pour l'insertion sans analyse et applique les seules
-    règles d'archivage qui ne dépendent pas d'une analyse (mode alternance :
-    réservée à un public spécifique, école ou CFA, stage ; mode stage :
-    réservée à un public spécifique seulement, une école peut accueillir un
-    stagiaire et le mot « stage » est attendu). Jamais d'archivage pour note
-    basse ni hors domaine. Modifie offre en place."""
-    _log = print if verbeux else (lambda *a, **k: None)
+    règles d'archivage qui ne dépendent pas d'une analyse
+    (archivage_mots_cles). Jamais d'archivage pour note basse ni hors
+    domaine. Modifie offre en place."""
     offre.update({
         "score":          None,
         "verdict":        VERDICT_NON_ANALYSEE,
@@ -349,19 +370,9 @@ def marquer_non_analysee(offre, mode="alternance", verbeux=True):
         "resume_analyse": "",
         "raison_archivage": "",
     })
-    if mode == "job":
-        return offre
-    titre_lower = (offre.get("titre") or "").lower()
-    desc_lower = (offre.get("description") or "").lower()
-    if reserve_public_specifique(desc_lower) or reserve_public_specifique(titre_lower):
-        offre["statut"], offre["raison_archivage"] = "archive", "public_specifique"
-        _log("     -> Archivée automatiquement (réservé public spécifique / BOETH)")
-    elif mode == "stage":
-        pass
-    elif est_ecole_cfa(offre):
-        offre["statut"], offre["raison_archivage"] = "archive", "ecole_cfa"
-        _log("     -> Archivée automatiquement (école/CFA détectée)")
-    elif "stage" in titre_lower:
-        offre["statut"], offre["raison_archivage"] = "archive", "stage"
-        _log("     -> Archivée automatiquement (stage détecté)")
+    raison = archivage_mots_cles(offre, mode)
+    if raison:
+        offre["statut"], offre["raison_archivage"] = "archive", raison
+        if verbeux:
+            print(f"     -> Archivée automatiquement ({MESSAGES_ARCHIVAGE[raison]})")
     return offre

@@ -366,8 +366,9 @@ function brancher() {
   // Analyse des offres en attente
   const btnAnalyse = document.querySelector("[data-analyse-lancer]");
   if (btnAnalyse) btnAnalyse.addEventListener("click", async () => {
-    const demandee = limite("analyses");
-    try { confirmerLancement("analyses", demandee, await api.analyseAttente(demandee)); }
+    const toute = !!document.querySelector("[data-analyse-toute-file]")?.checked;
+    const demandee = toute ? undefined : limite("analyses");
+    try { confirmerLancement("analyses", demandee, await api.analyseAttente(demandee, toute)); }
     catch (e) { alert(e.message); }
     surveiller();
   });

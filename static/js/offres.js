@@ -164,6 +164,15 @@ function rendreAttente(actives) {
   if (btn) btn.disabled = n === 0;
   const champ = document.querySelector('[data-limite="analyses"]');
   if (champ && n) champ.max = Math.min(n, Number(champ.dataset.plafond ??= champ.max));
+  // Temps estimé pour vider la file, d'après les analyses déjà chronométrées
+  const est = document.querySelector("[data-analyse-estimation]");
+  if (est && document.documentElement.dataset.analyseIa !== "non") {
+    api.analyseStatut().then(s => {
+      est.textContent = s.en_attente
+        ? `Pour vider la file : ${s.estimation.texte}${s.estimation.mesure ? "" : " (estimation avant toute mesure)"}.`
+        : "";
+    }, () => { est.textContent = ""; });
+  }
 }
 
 /* Échappement HTML basique */

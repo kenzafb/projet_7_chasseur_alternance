@@ -6,15 +6,17 @@
   </div>
 
   <label class="limite-lancement">
-    <span>Offres ajoutées au plus par recherche (max {{ limites.offres.max }})</span>
-    <input type="number" data-limite="offres" value="{{ limites.offres.defaut }}"
-           min="1" max="{{ limites.offres.max }}">
+    {% set limite_offres = limites.offres if analyse_ia|default(true) else limites.offres_sans_ia %}
+    <span>Offres ajoutées au plus par recherche (max {{ limite_offres.max }})</span>
+    <input type="number" data-limite="offres" value="{{ limite_offres.defaut }}"
+           min="1" max="{{ limite_offres.max }}">
   </label>
 
   <!-- Analyse en différé : la recherche ajoute les offres « non analysées » -->
   <div class="card analyse-attente" data-analyse-attente>
     <div class="analyse-attente__txt">
       <strong><span data-analyse-nombre>0</span> offre(s) en attente d'analyse</strong>
+      <span class="analyse-attente__sous" data-analyse-estimation></span>
       {% if analyse_ia|default(true) %}
       <span class="analyse-attente__sous">Analysées par l'IA locale ({{ modele_analyse|default("") }}), les plus récentes d'abord. Compte une à deux minutes par offre sur processeur.</span>
       {% else %}
@@ -27,6 +29,10 @@
         <span>Au plus (max {{ limites.analyses.max }})</span>
         <input type="number" data-limite="analyses" value="{{ limites.analyses.defaut }}"
                min="1" max="{{ limites.analyses.max }}">
+      </label>
+      <label class="domaine-case domaine-case--petit">
+        <input type="checkbox" data-analyse-toute-file>
+        <span>Toute la file (lancement de nuit)</span>
       </label>
       <button class="btn btn--signal" data-analyse-lancer>Analyser les offres en attente</button>
     </div>

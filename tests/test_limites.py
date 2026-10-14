@@ -43,6 +43,8 @@ def test_interface_reprend_defauts_et_plafonds(utilisateur):
     client, _ = utilisateur("a@test.fr", prenom="Alice")
     page = client.get("/alternance").text
     for cle, regle in config.LIMITES_LANCEMENT.items():
+        if cle == "offres_sans_ia":   # même champ que « offres », affiché quand ANALYSE_IA=false
+            continue
         assert f'data-limite="{cle}" value="{regle["defaut"]}"' in page
         assert f'max="{regle["max"]}"' in page
 
@@ -107,7 +109,7 @@ def test_recherche_lba_ignoree_quand_france_travail_epuise_la_limite(utilisateur
 
 def test_recherche_defaut_et_plafond_serveur(utilisateur, sources, pipelines_neufs, monkeypatch):
     client, user_id = utilisateur("a@test.fr", prenom="Alice")
-    assert _rechercher(client, user_id, pipelines_neufs)["max_offres"] == 100
+    assert _rechercher(client, user_id, pipelines_neufs)["max_offres"] == 30
     assert _rechercher(client, user_id, pipelines_neufs, max_offres=10**6)["max_offres"] == 500
     assert "ramené à 500" in client.get("/api/logs").text
     assert client.post("/api/recherche", json={"max_offres": 5, "autre": 1}).status_code == 422

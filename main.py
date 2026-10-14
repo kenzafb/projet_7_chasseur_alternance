@@ -52,7 +52,7 @@ from database.dates import maintenant_utc
 from france_travail.main import lancer_recherche
 from france_travail.generateur import generer_lettre
 from france_travail.analyseur import analyser_offre, marquer_non_analysee
-from france_travail.analyse_differee import analyser_en_attente, duree_lisible, enregistrer_analyse
+from france_travail.analyse_differee import analyser_en_attente, duree_lisible, enregistrer_analyse, estimation_file
 from shared.ia import ErreurIA, ErreurIABloquante
 from france_travail.pdf_generator import generer_pdf_lettre, nom_telechargement
 from france_travail.scraper_lba import ignoree_pour_profil as lba_ignoree_pour_profil
@@ -212,6 +212,7 @@ class Recherche(BaseModel):
 class Analyse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     max_analyses: int | None = None
+    toute_la_file: bool = False   # lancement de nuit : toutes les offres en attente, sans plafond
 
 class Fetch(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -486,8 +487,10 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
     « non analysées », sans attendre l'IA (D21) ; l'analyse vient après,
     lancée à la main ou d'elle-même si l'option du profil est cochée."""
     user_id = user.id   # capturé AVANT le thread (le thread n'a pas accès à request)
-    # Offres ajoutées au plus, France Travail et LBA confondues (D20)
-    max_offres, note = _limite("offres", body.max_offres if body else None)
+    # Offres ajoutées au plus, France Travail et LBA confondues : 30 par défaut
+    # avec l'IA (à analyser ensuite), 100 sans elle (D20)
+    max_offres, note = _limite("offres" if config.analyse_ia_active() else "offres_sans_ia",
+                               body.max_offres if body else None)
     cfg_mode = get_mode(mode)
     profil = lire_profil(user_id, mode=mode)
     exiger_profil(profil)   # 400 tout de suite plutôt qu'une erreur dans le thread
@@ -604,6 +607,8 @@ def _lancer_analyse(user_id: int, mode: str, maximum: int, note: str = "") -> bo
                                         on_progress=progression)
             fin = (f"{bilan['analysees']} offres analysées, {bilan['archivees']} archivées, "
                    f"{bilan['sautees']} sautées")
+            if bilan["mots_cles"]:
+                fin += f", {bilan['mots_cles']} archivées par mots-clés sans IA"
             pipelines.maj(ANALYSE, user_id, message=("Arrêtée : " if bilan["arret"] else "Terminée : ") + fin)
             log(f"✅ Analyse terminée : {fin}")
         except ErreurIABloquante as e:
@@ -643,11 +648,16 @@ def api_analyse(body: Analyse | None = None, user: User = Depends(utilisateur_re
     disponibles = compter_en_attente(user.id, mode)
     if not disponibles:
         raise ErreurUtilisateur("Aucune offre en attente d'analyse dans ce mode.")
-    maximum, note = _limite("analyses", body.max_analyses if body else None, disponibles)
+    if body and body.toute_la_file:
+        maximum = disponibles
+        note = f" (toute la file : {disponibles} offres, {estimation_file(disponibles)['texte']})"
+    else:
+        maximum, note = _limite("analyses", body.max_analyses if body else None, disponibles)
     if not _lancer_analyse(user.id, mode, maximum, note):
         en_cours = pipelines.etat(ANALYSE, user.id).get("mode")
         return JSONResponse({"erreur": f"Analyse déjà en cours (mode {en_cours})"}, status_code=400)
-    return {"status": "démarré", "max_analyses": maximum, "en_attente": disponibles}
+    return {"status": "démarré", "max_analyses": maximum, "en_attente": disponibles,
+            "estimation": estimation_file(maximum)}
 
 @prive.post("/api/analyse/stop")
 def api_analyse_stop(user: User = Depends(utilisateur_requis)):
@@ -659,7 +669,8 @@ def api_analyse_stop(user: User = Depends(utilisateur_requis)):
 
 @prive.get("/api/analyse/statut")
 def api_analyse_statut(user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
-    return {**pipelines.etat(ANALYSE, user.id), "en_attente": compter_en_attente(user.id, mode)}
+    en_attente = compter_en_attente(user.id, mode)
+    return {**pipelines.etat(ANALYSE, user.id), "en_attente": en_attente, "estimation": estimation_file(en_attente)}
 
 @prive.post("/api/generer_lettre")
 def api_generer_lettre(body: OffreId, request: Request, user: User = Depends(utilisateur_requis),
