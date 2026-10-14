@@ -369,9 +369,11 @@ Décisions données par l'humain au lancement de la phase et mises en œuvre. Le
 Décisions données par l'humain au lancement de la phase et mises en œuvre. Contexte : plus aucune IA extérieure ; Ollama tourne sur la machine (`http://localhost:11434`), sur processeur, avec `ministral-3:8b` (lecture 27 tokens/s, écriture 7 tokens/s) et `ministral-3:3b` (57 et 13 tokens/s), 12 Go de RAM visibles, un seul modèle chargé à la fois. Les choix faits pendant la mise en œuvre restent à valider dans `docs/PHASE_7_RAPPORT.md`.
 
 ### D77. IA interchangeable au format compatible OpenAI (remplace D10)
+- **Complétée** par D85 (API native d'Ollama par défaut) et D86 (aucun retrait silencieux).
 - **Décision.** `shared/ia.py` parle `chat/completions`, configuré par le `.env` : `IA_BASE_URL` (défaut `http://localhost:11434/v1`), `IA_API_KEY` (facultative), `IA_MODELE_ANALYSE`, `IA_MODELE_LETTRE`, `IA_MODELE_EXTRACTION` (défauts `ministral-3:8b`, `ministral-3:8b`, `ministral-3:3b`). Plus de SDK `mistralai`. Un seul appel à la fois dans tout le processus, délai d'attente long et réglable (`IA_DELAI_S`, 600 s par défaut). Serveur injoignable : arrêt du pipeline, « IA locale injoignable : vérifie qu'Ollama tourne », comme les autres erreurs bloquantes. Jamais de résultat inventé (D11).
 
 ### D78. Réponses structurées validées par Pydantic
+- **Complétée** par D86 et D87 : un refus du schéma ou de la coupure de la réflexion est bloquant ; score borné en Python.
 - **Décision.** Sortie JSON décrite par des modèles Pydantic (`shared/schemas_ia.py`), schéma imposé au serveur quand son API le permet (`response_format` de type `json_schema` ; un serveur qui le refuse est interrogé sans, la réponse restant validée). Une réponse invalide est redemandée une fois, puis l'offre est sautée et reste « non analysée ». Le mode de réflexion des modèles qui en ont un (Qwen notamment) est coupé dans la requête.
 
 ### D79. Prompts pour un petit modèle, un par mode
@@ -383,6 +385,7 @@ Décisions données par l'humain au lancement de la phase et mises en œuvre. Co
 
 ### D81. Emails du scraper : règles d'abord, IA pour les cas douteux (remplace D13, complète D15)
 - **Décision.** Des règles sans IA valident ou écartent d'office : domaine de l'adresse identique au domaine du site de l'entreprise, préfixes de contact ou de recrutement courants, liste d'exclusion existante (D47). L'IA (modèle d'extraction) ne sert qu'aux cas douteux ; sans IA, ils restent « non validés ». Règles dans un fichier de données facile à compléter (`shared/referentiels/validation_emails.txt`).
+- **Complétée** par D88 à D90 (garde-fous de la validation d'office, envoi par adresse, adresses écartées par l'IA visibles).
 
 ### D82. Lettre de motivation à la demande
 - **Décision.** Générée à la demande avec le modèle de lettre, avec un message d'attente dans l'interface.
@@ -392,3 +395,31 @@ Décisions données par l'humain au lancement de la phase et mises en œuvre. Co
 
 ### D84. Vérification de l'IA locale par un script lancé par l'humain
 - **Décision.** `scripts/verifier_ia_locale.py` vérifie qu'Ollama répond, liste les modèles, analyse 3 vraies offres « non analysées » lues en lecture seule et valide un email douteux ; plusieurs modèles comparés sur les mêmes offres (`--modeles`), tableau du temps par offre, de la validité du JSON, du score et du verdict. Rien n'est écrit en base. Remplace `scripts/verifier_mistral.py`.
+
+## Phase 7, corrections après le rapport (14 octobre 2026)
+
+Retour de l'humain après une recherche sur les modèles locaux et Ollama en octobre 2026 : points 1 à 4 du compte rendu tranchés, et deux constats sur l'API (le format compatible OpenAI n'a pas de paramètre documenté pour couper la réflexion ; le ticket Ollama #14645 rapporte que `format` est ignoré pour Qwen3.5 quand la réflexion est coupée).
+
+### D85. API native d'Ollama par défaut (complète D77)
+- **Décision.** `IA_API=ollama` (défaut) : `POST /api/chat`, `"think": false` au premier niveau de la requête, schéma JSON dans `"format"`, `stream` faux, `options.num_ctx` (`IA_NUM_CTX`, 8192) et `options.temperature` (0,1 pour l'analyse et les emails, 0,6 pour la lettre). `keep_alive` (`IA_KEEP_ALIVE`, 10 min) est envoyé au premier niveau, où l'API d'Ollama le lit (pas dans `options`). `IA_API=openai` garde le format compatible OpenAI comme alternative. Jamais `tools` et `format` dans la même requête.
+
+### D86. Aucun retrait silencieux, test de démarrage (complète D78)
+- **Décision.** Un serveur qui refuse le schéma ou la coupure de la réflexion, ou qui renvoie un texte de réflexion malgré elle : erreur bloquante avec un message clair, jamais de nouvel essai sans le paramètre. Test de démarrage (requête courte, petit schéma, réponse qui doit être l'objet JSON tel quel sans texte de réflexion) avant le premier appel structuré de chaque modèle, au lancement de chaque analyse et dans `scripts/verifier_ia_locale.py`. Échec : arrêt avec le message, pas d'analyse dégradée. `IA_FORMAT_JSON` disparaît.
+
+### D87. Contrôles en Python, pas confiés au modèle
+- **Décision.** Score sans bornes dans le schéma (Ollama ignore minimum et maximum), ramené à 0..10 en Python. Emails : un appel par entreprise ; adresses retenues et « meilleur contact » contraints par des énumérations construites à partir des adresses trouvées dans la page (ou null), revérifiés en Python. Les règles d'éligibilité vérifiables en code restent en Python et ne sont pas demandées au modèle : type et nature de contrat (filtres France Travail du mode, alternance écartée en job et en stage, intitulés du stage), lieu (Île-de-France), niveau visé des offres LBA. Les dates des offres, texte libre, restent jugées par le modèle.
+
+### D88. Validation d'office des emails avec garde-fous (point 1 du compte rendu, complète D81)
+- **Décision.** Acceptée, seulement si le domaine de l'adresse est celui du site de l'entreprise, que ce site a été retenu parce que son domaine correspond au nom de l'entreprise (ni annuaire, ni sous-domaine d'hébergeur) et que le domaine n'est pas un fournisseur générique (free.fr, orange.fr, wanadoo.fr, sfr.fr, laposte.net, gmail.com, outlook, hotmail, yahoo, icloud, wix... ; sections `[fournisseurs_generiques]` et `[hebergeurs]` du fichier de règles). Sinon l'adresse est douteuse : IA ou validation manuelle. L'interface indique pour chaque adresse comment elle a été validée (règle, IA, à la main).
+
+### D89. Envoi par adresse (point 2 du compte rendu)
+- **Décision.** Validé : une entreprise part vers ses adresses validées, même s'il lui reste des adresses douteuses.
+
+### D90. Avis négatif de l'IA visible (point 3 du compte rendu)
+- **Décision.** Pas d'écart définitif invisible : l'adresse est gardée, jamais envoyée, affichée « écartée par l'IA » avec un bouton pour la valider quand même.
+
+### D91. Limites avec l'IA, toute la file, mots-clés d'abord (point 4 du compte rendu, complète D80)
+- **Décision.** Quand ANALYSE_IA est vrai : 30 offres par défaut par recherche et 30 analyses par lancement, plus une option « analyser toute la file » pour un lancement de nuit. La taille de la file en attente et le temps estimé pour la vider sont affichés. Les règles d'archivage par mots-clés passent avant l'IA. Sans IA, 100 offres par recherche (D20).
+
+### D92. Autres points du rapport de la phase 7 : propositions gardées
+- **Décision.** Points 2 à 9 et 13 à 15 du rapport validés tels que proposés : délai de 600 s sans nouvel essai après un délai dépassé, 5xx retentée une fois ; file des offres non analysées et non archivées, par date de publication ; archivage après analyse seulement pour une offre encore « nouvelle » ; bouton « Analyser » avec domaine et archivage complet ; identité retirée des prompts d'analyse, champs ramenés à 400 caractères, trois projets au plus ; prompt et trame par défaut du stage ; adresse nominative du domaine et fournisseur générique toujours douteux, 5 adresses au plus par entreprise ; revalidation sans relire le site ; `ANALYSE_IA=true` dans `.env.example`, script de vérification qui ignore `ANALYSE_IA=false` ; modèles `ministral-3:8b` et `ministral-3:3b` jusqu'à la comparaison du script. Le point 6 (score strict de 1 à 10) est remplacé par D87 (score ramené à 0..10 en Python).

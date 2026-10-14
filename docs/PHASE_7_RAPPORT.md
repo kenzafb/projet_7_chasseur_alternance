@@ -14,7 +14,14 @@ Branche `phase-7-ia-locale`, 14 octobre 2026, créée depuis `main`. Non poussé
 | a6b68ad | Lettre à la demande avec le modèle de lettre, message d'attente, trame du stage |
 | 3c5b7b3 | `scripts/verifier_ia_locale.py` : serveur, modèles, vraies offres, tableau comparatif |
 | a0a2693 | README et `.env.example` : IA locale avec Ollama |
-| (dernier) | Décisions D77 à D84, recette, ce rapport |
+| c865442 | Décisions D77 à D84, recette, ce rapport |
+| 957d895 | Corrections : API native d'Ollama par défaut, format OpenAI en alternative |
+| 79e5516 | Corrections : aucun retrait silencieux, test de démarrage |
+| 14cfc43 | Corrections : score borné en Python, emails jugés sur énumérations, meilleur contact |
+| 1aed7bc | Corrections : garde-fous de la validation d'office, provenance de chaque adresse |
+| 72f1080 | Corrections : adresses écartées par l'IA visibles et validables |
+| b185736 | Corrections : limites de 30, toute la file, temps pour la vider, mots-clés avant l'IA |
+| (dernier) | Décisions D85 à D92, README, ce rapport |
 
 ## À lancer par l'humain
 
@@ -38,16 +45,20 @@ sudo systemctl edit ollama
 #   [Service]
 #   Environment="OLLAMA_MAX_LOADED_MODELS=1"
 sudo systemctl restart ollama
+ollama --version                    # à noter dans le retour
 ollama list                         # ministral-3:8b et ministral-3:3b doivent y être
 
 # 4. .env : recopier depuis .env.example la section IA
 #    ANALYSE_IA=true
-#    IA_BASE_URL=http://localhost:11434/v1
+#    IA_API=ollama
+#    IA_BASE_URL=http://localhost:11434      (sans /v1 : API native)
 #    IA_MODELE_ANALYSE=ministral-3:8b
 #    IA_MODELE_LETTRE=ministral-3:8b
 #    IA_MODELE_EXTRACTION=ministral-3:3b
 #    IA_DELAI_S=600
-#    (les anciennes variables MISTRAL_* et MODELE_MISTRAL* peuvent être retirées : plus lues)
+#    IA_NUM_CTX=8192
+#    IA_KEEP_ALIVE=10m
+#    (MISTRAL_*, MODELE_MISTRAL* et IA_FORMAT_JSON ne sont plus lus : à retirer)
 
 # 5. Vérification de l'IA locale sur de vraies offres (lecture seule, rien n'est écrit)
 venv/bin/python scripts/verifier_ia_locale.py
@@ -60,9 +71,9 @@ systemd-run --user --scope -p MemoryMax=2G venv/bin/python -m pytest -q
 uvicorn main:app --reload --port 5002
 ```
 
-Le script de l'étape 5 compte une à deux minutes par offre et par modèle avec `ministral-3:8b`, plus le chargement de chaque modèle (mesuré à part) : environ 10 minutes pour le premier lancement, 30 minutes pour la comparaison de trois modèles. Sur la copie de la base, les offres en attente sont 8 en alternance, 100 en job et 8 en stage : sans `--mode`, les 3 plus récentes sont des offres de job. Aucune entreprise n'a d'email douteux en attente (les deux marquées non validées n'ont aucune adresse) : le script prend alors un cas fictif, signalé comme tel. Merci de reporter le tableau obtenu, il servira à trancher les points 1, 2, 9 et 10 ci-dessous.
+Le script commence chaque modèle par le test de démarrage : « Test de démarrage ... : N s » (chargement compris) veut dire que le schéma et la coupure de la réflexion sont respectés ; sinon le message dit lequel est refusé ou ignoré, et le modèle n'est pas essayé plus loin. Pour `qwen3.5:9b`, c'est là que le ticket Ollama #14645 se verrait. Ensuite, une à deux minutes par offre et par modèle avec `ministral-3:8b`. Sur la copie de la base, les offres en attente sont 8 en alternance, 100 en job et 8 en stage : sans `--mode`, les 3 plus récentes sont des offres de job. Aucune entreprise n'a d'email douteux en attente : le script prend un cas fictif, signalé comme tel. Merci de reporter le tableau obtenu et la version d'Ollama.
 
-La recette (`docs/RECETTE.md`) a une étape 4 réécrite (vérification de l'IA locale), une étape 5 adaptée (la recherche n'analyse plus) et une étape 5 bis nouvelle (analyse des offres en attente).
+La recette (`docs/RECETTE.md`) a une étape 4 réécrite (vérification de l'IA locale), une étape 5 adaptée (la recherche n'analyse plus) et une étape 5 bis nouvelle (analyse des offres en attente). Avec les limites de D91, mettre 2 dans le champ « Au plus » de l'étape 5 bis reste valable.
 
 ## 1. IA interchangeable (D77)
 
@@ -142,7 +153,27 @@ Non vérifié faute d'appel réel (interdit ici, c'est l'objet du script de l'é
 - Téléphones et contact RH ne sont plus relevés par le scraper (ils ne l'étaient plus depuis l'arrêt de l'IA en ligne).
 - Une adresse écartée par l'IA n'est gardée nulle part (seulement dans les logs).
 
+## Corrections après le rapport (D85 à D92)
+
+- **API native d'Ollama par défaut** (`IA_API=ollama`) : `POST /api/chat` avec `"think": false` au premier niveau, le schéma dans `"format"`, `stream` faux, `options.num_ctx` (8192) et `options.temperature` (0,1 analyse et emails, 0,6 lettre) ; `keep_alive` au premier niveau, là où l'API le lit, et non dans `options` comme le demandait le retour ; liste des modèles par `/api/tags`. `IA_API=openai` garde l'ancien comportement. Une requête qui mêlerait `tools` et un format est refusée avant d'être envoyée.
+- **Aucun mode dégradé** : le retrait automatique d'un paramètre refusé est supprimé ; un refus de `format` ou `think` (ou de leurs équivalents OpenAI) et un texte de réflexion dans une réponse (`message.thinking`, `reasoning_content`, `<think>`) sont des erreurs bloquantes. Test de démarrage (`shared.ia.verifier_demarrage`) avant le premier appel structuré de chaque modèle, au lancement de chaque analyse et dans le script ; réussi, il n'est pas refait dans le même processus.
+- **Contrôles en Python** : score sans bornes dans le schéma, ramené à 0..10 par Pydantic (verdict « inéligible » de 0 à 2). Emails douteux jugés en un appel par entreprise : `valides` est une énumération des adresses douteuses, `meilleur_contact` une énumération des adresses trouvées ou null, tout revérifié en Python ; le meilleur contact n'est gardé que s'il est validé, et s'affiche dans la page Spontanées. Le prompt du stage ne parle plus d'alternance (écartée en code).
+- **Validation d'office avec garde-fous** : `site_fiable` exige un site dont le domaine correspond au nom de l'entreprise (même règle que la recherche du site), qui n'est ni un annuaire, ni un sous-domaine d'hébergeur (`[hebergeurs]` : wixsite.com, wordpress.com, blogspot.com...), ni un fournisseur générique (`[fournisseurs_generiques]`, qui remplace `[domaines_messagerie]`). Provenance gardée par adresse (`extra.validation_emails`) et affichée : validée par règle, par l'IA, à la main, fournie par LBA, validée avant la phase 7, non validée, écartée par l'IA.
+- **Adresses écartées par l'IA** : gardées (`extra.emails_ecartes_ia`), jamais envoyées, listées dans la carte « Emails non validés » avec « Valider quand même » ; `POST /api/spontanees/valider_adresse` valide une seule adresse (douteuse ou écartée). « Tout valider » reste pour l'entreprise entière.
+- **Limites** : 30 offres par recherche et 30 analyses par lancement avec l'IA, 100 offres sans elle ; case « Toute la file (lancement de nuit) » ; la carte de la page Offres donne le temps pour vider la file (moyenne des analyses chronométrées dans le processus, 90 s par offre avant toute mesure, signalé comme tel). Les mots-clés d'archivage sont réappliqués juste avant l'IA.
+
+Tests : 894 passent sous plafond mémoire.
+
 ## Points à valider
+
+Les points 1 à 15 ci-dessous ont été tranchés le 14 octobre 2026 (D88 à D92) ; le point 6 est remplacé par D87. Nouveaux points :
+
+16. **keep_alive** au premier niveau de la requête (l'API d'Ollama l'y lit) plutôt que dans `options`.
+17. **Estimation de la file** : moyenne des 50 dernières analyses du processus (perdue au redémarrage), 90 s avant toute mesure.
+18. **Test de démarrage** : refait à chaque redémarrage de l'application, une fois par modèle ; il vérifie la forme de la réponse, pas les valeurs (7, « ok »).
+19. **Meilleur contact** : affiché seulement ; l'envoi part toujours vers toutes les adresses validées.
+
+Points tranchés :
 
 1. **Limites par défaut** : 100 offres par recherche (500 au plus) ; 10 analyses par lancement (200 au plus). Faut-il baisser celle de la recherche, ou monter celle de l'analyse ?
 2. **Délai** : 600 s par réponse, sans nouvel essai après un délai dépassé ; une erreur 5xx retentée une fois après 5 s.
