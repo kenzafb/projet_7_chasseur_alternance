@@ -413,6 +413,8 @@ function brancher() {
   // rafraîchir le kanban quand on déplace une carte
   // « J'ai postulé » ou son annulation depuis la page Offres : le suivi suit
   document.addEventListener("candidatures:maj", () => Candidatures.charger());
+  // « Annuler la candidature » depuis le tableau : l'offre revient dans la page Offres
+  document.addEventListener("offres:maj", () => Offres.charger());
   Candidatures.onOuvrir(id => modal.ouvrir(id));
 }
 

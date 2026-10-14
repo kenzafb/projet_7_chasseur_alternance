@@ -66,10 +66,16 @@ def test_isolation_utilisateur_et_mode(alice, utilisateur):
 
 
 def test_interface():
+    """D110 : une offre postulée sort de la page Offres ; date et annulation se
+    font dans le tableau Candidatures ; les spontanées envoyées sortent de leur liste."""
     page = (config.TEMPLATES_DIR / "partials" / "offres.html").read_text(encoding="utf-8")
-    assert 'data-foffre="statut"' in page and '<option value="postulees">Postulées</option>' in page
+    assert 'data-foffre="statut"' not in page and "Postulées" not in page
     js = (config.STATIC_DIR / "js" / "offres.js").read_text(encoding="utf-8")
-    for attendu in ("J'ai postulé", "Annuler la candidature", "data-postuler-date", "date_candidature || \"\").localeCompare",
-                    'data-act="desarchiver"'):
-        assert attendu in js, attendu
-    assert '"Postulée"' in (config.STATIC_DIR / "js" / "candidatures.js").read_text(encoding="utf-8")
+    assert "J'ai postulé" in js and "if (estPostulee(o)) return false;" in js
+    assert "Annuler la candidature" not in js and 'data-act="desarchiver"' in js
+    cand = (config.STATIC_DIR / "js" / "candidatures.js").read_text(encoding="utf-8")
+    assert "data-cand-date" in cand and "data-annuler" in cand and "{ annuler: true }" in cand
+    assert 'new Event("offres:maj")' in cand and '"Postulée"' in cand
+    sp = (config.STATIC_DIR / "js" / "spontanees.js").read_text(encoding="utf-8")
+    assert "stats.dernieres" not in sp
+    assert 'data-filter="envoye"' not in (config.TEMPLATES_DIR / "partials" / "spontanees.html").read_text(encoding="utf-8")

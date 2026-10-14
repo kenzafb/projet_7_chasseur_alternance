@@ -10,12 +10,11 @@ const NON_ANALYSEE = "non_analysee";
 let cache = [];                  // offres chargées
 let filtre = "all";
 let modeArchives = false;   // false = offres à postuler, true = archivées
-let fOffres = { source: "all", zone: "all", score: "all", statut: "all" };
-// Offre où la personne a postulé (D105) : « envoye » puis le suivi de Mes candidatures
+let fOffres = { source: "all", zone: "all", score: "all" };  // filtres combinables du mode normal
+// Offre où la personne a postulé (D105) : suivie dans Candidatures seulement, plus dans cette page (D110)
 const POSTULEE = ["envoye", "a_relancer", "reponse", "entretien", "refus"];
 const estPostulee = o => POSTULEE.includes(o.statut);
 const aujourdhui = () => new Date().toLocaleDateString("sv-SE");   // AAAA-MM-JJ, jour local
-const dateFr = d => d ? d.split("-").reverse().join("/") : "";  // filtres combinables du mode normal
 const LABEL_RAISON = {
   manuel: "Manuel", ineligible: "Inéligible", note_basse: "Note basse", ecole_cfa: "École / CFA",
   hors_domaine: "Hors domaine", public_specifique: "Public spécifique", stage: "Stage",
@@ -73,8 +72,7 @@ function carte(o) {
         <div class="offre__tags">
           ${badgeSource(o.source)}
           ${nonAnalysee ? '<span class="chip chip--gris">non analysée</span>' : ""}
-          ${estPostulee(o) ? `<span class="chip chip--ft">postulée${o.date_candidature ? " le " + dateFr(o.date_candidature) : ""}</span>`
-            : score >= SEUIL ? '<span class="chip chip--vert">à postuler</span>' : ""}
+          ${score >= SEUIL ? '<span class="chip chip--vert">à postuler</span>' : ""}
           ${o.domaine ? `<span class="chip chip--gris">${esc(o.domaine)}</span>` : ""}
         </div>
         <div class="offre__title">${esc(o.titre || "Sans titre")}</div>
@@ -91,11 +89,7 @@ function carte(o) {
         <div class="analyse-col faibles"><h4>Points faibles</h4><ul>${faibles || "<li>—</li>"}</ul></div>
       </div>
       <div class="offre__postuler" data-postuler-bloc>
-        ${estPostulee(o) ? `
-          <label>Postulée le <input type="date" data-postuler-date value="${o.date_candidature || aujourdhui()}" max="${aujourdhui()}"></label>
-          <button class="btn btn--sm" data-act="postuler">Changer la date</button>
-          <button class="btn btn--sm btn--ghost" data-act="annuler-postuler">Annuler la candidature</button>`
-        : o.statut !== "archive" ? `
+        ${o.statut !== "archive" ? `
           <input type="date" data-postuler-date value="${aujourdhui()}" max="${aujourdhui()}" title="Date de candidature">
           <button class="btn btn--sm btn--signal" data-act="postuler">J'ai postulé</button>` : ""}
       </div>
@@ -143,9 +137,8 @@ function appliquerFiltre(o) {
   if (fOffres.source === "lba" && !estLba) return false;
   // Localisation (zone)
   if (fOffres.zone !== "all" && (o.zone || "") !== fOffres.zone) return false;
-  // Statut : à traiter (pas encore postulée) ou postulées
-  if (fOffres.statut === "postulees" && !estPostulee(o)) return false;
-  if (fOffres.statut === "a_traiter" && estPostulee(o)) return false;
+  // Offres à traiter seulement (nouveau, en cours) : une offre postulée est dans Candidatures (D110)
+  if (estPostulee(o)) return false;
   // Score
   const sc = o.score ?? 0;
   if (fOffres.score === "haut"  && sc < 7) return false;
@@ -155,11 +148,8 @@ function appliquerFiltre(o) {
 }
 
 function rendre() {
-  // Postulées : les plus récentes candidatures d'abord ; sinon, par score
-  const parDate = !modeArchives && fOffres.statut === "postulees";
   const visibles = cache.filter(appliquerFiltre)
-                        .sort(parDate ? (a, b) => (b.date_candidature || "").localeCompare(a.date_candidature || "")
-                                      : (a, b) => (b.score ?? 0) - (a.score ?? 0));
+                        .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   const el = $list();
   if (!visibles.length) {
     el.innerHTML = `<div class="empty">
@@ -173,14 +163,15 @@ function rendre() {
 
 /* Met à jour les KPI du haut de page */
 function rendreKpis() {
-  const actives = cache.filter(o => o.statut !== "archive");
+  // Offres à traiter : ni archivées, ni postulées (D110)
+  const actives = cache.filter(o => o.statut !== "archive" && !estPostulee(o));
   const scores  = actives.filter(o => o.verdict !== NON_ANALYSEE).map(o => o.score ?? 0);
   const moy     = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
   const set = (k, v) => { const e = document.querySelector(`[data-kpi="${k}"]`); if (e) e.textContent = v; };
   set("nouvelles", actives.length);
   set("nouvelles-note", actives.length ? "offres actives" : "—");
   set("score-moyen", moy ? moy.toFixed(1) : "—");
-  set("a-postuler", actives.filter(o => (o.score ?? 0) >= SEUIL && !estPostulee(o)).length);
+  set("a-postuler", actives.filter(o => (o.score ?? 0) >= SEUIL).length);
   set("lettres", actives.filter(o => o.lettre).length);
   const c = document.querySelector('[data-count="offres"]');
   if (c) c.textContent = actives.length;
@@ -282,9 +273,9 @@ export const Offres = {
       ouvrirLettre(id);
       return true;
     }
-    if (act === "postuler" || act === "annuler-postuler") {
+    if (act === "postuler") {
       const date = carteEl.querySelector("[data-postuler-date]")?.value;
-      api.postuler(id, act === "annuler-postuler" ? { annuler: true } : { date })
+      api.postuler(id, { date })
         .then(() => { this.charger(); document.dispatchEvent(new Event("candidatures:maj")); },
               err => alert(err.message));
       return true;

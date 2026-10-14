@@ -67,9 +67,9 @@ function rendreTable() {
   const el = document.querySelector('[data-list="spontanees"]');
   if (!el || !stats) return;
   // Prochaines entreprises (ordre du scraper et de l'envoyeur), puis les dernières envoyées
-  let items = [...(stats.prochaines || []), ...(stats.dernieres || [])];
+  // Entreprises à traiter seulement : une fois envoyées, elles sont dans Candidatures (D110)
+  let items = [...(stats.prochaines || [])];
   if (filtre === "email")  items = items.filter(e => e.email);
-  if (filtre === "envoye") items = items.filter(e => e.envoye);
   if (filtre === "lba" || filtre === "sirene") items = items.filter(e => (e.sources || []).includes(filtre));
 
   el.innerHTML = items.length

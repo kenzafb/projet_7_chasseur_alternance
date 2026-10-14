@@ -34,14 +34,18 @@ function ligne(c) {
   const lien = c.lien ? `<a class="cand-lien" href="${esc(c.lien)}" target="_blank" rel="noopener"
       title="${c.type === "offre" ? "Ouvrir l'offre en ligne" : "Site de l'entreprise"}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>` : "";
-  const voir = c.type === "offre" ? `<button class="btn btn--sm" data-voir="${esc(c.id)}">Voir</button>` : "";
+  // Offre : « Annuler la candidature » la remet dans la page Offres (D110)
+  const voir = c.type === "offre" ? `<button class="btn btn--sm" data-voir="${esc(c.id)}">Voir</button>
+    <button class="btn btn--sm btn--ghost" data-annuler="${esc(c.id)}" title="Remet l'offre dans la page Offres">Annuler</button>` : "";
   return `<div class="suivi-row" data-type="${c.type}" data-id="${esc(c.id)}">
     <span class="suivi-row__nom">${esc(c.entreprise || "—")}${c.historique
       ? ' <span class="chip chip--gris" title="Contactée avant la refonte (import de l\'historique)">historique</span>' : ""}${
       c.type === "spontanee" ? etiquettesAutresModes(c) : ""}</span>
     <span title="${esc(c.poste)}">${esc(c.poste || "—")}</span>
     <span><span class="chip ${c.type === "offre" ? "chip--ft" : "chip--gris"}">${TYPES[c.type]}</span></span>
-    <span>${dateFr(c.date)}</span>
+    <span>${c.type === "offre"
+      ? `<input type="date" class="cand-date" data-cand-date value="${esc(c.date)}" max="${new Date().toLocaleDateString("sv-SE")}" title="Date de candidature">`
+      : dateFr(c.date)}</span>
     <select class="suivi-statut st-${c.statut}" data-cand-select="1">${options}</select>
     <span class="cand-actions">${voir}${lien}${c.contact ? `<span class="trow__sub" title="${esc(c.contact)}">${esc(c.contact)}</span>` : ""}</span>
   </div>`;
@@ -67,6 +71,13 @@ export const Candidatures = {
     const liste = document.querySelector('[data-list="candidatures"]');
     // Changement de statut, écrit là où vit la candidature (offre ou spontanée)
     liste.addEventListener("change", async e => {
+      // Date de candidature d'une offre, modifiable depuis le tableau
+      if (e.target.matches("[data-cand-date]")) {
+        const row = e.target.closest(".suivi-row");
+        try { await api.postuler(row.dataset.id, { date: e.target.value }); } catch (err) { alert(err.message); }
+        this.charger();
+        return;
+      }
       if (!e.target.dataset.candSelect) return;
       const row = e.target.closest(".suivi-row");
       const statut = e.target.value;
@@ -78,7 +89,14 @@ export const Candidatures = {
       } catch (err) { alert(err.message); this.charger(); }
     });
     // Bouton « Voir » → modale offre + lettre
-    liste.addEventListener("click", e => {
+    liste.addEventListener("click", async e => {
+      const annuler = e.target.closest("[data-annuler]")?.dataset.annuler;
+      if (annuler) {
+        try { await api.postuler(annuler, { annuler: true }); } catch (err) { alert(err.message); }
+        await this.charger();
+        document.dispatchEvent(new Event("offres:maj"));   // l'offre revient dans la page Offres
+        return;
+      }
       const id = e.target.closest("[data-voir]")?.dataset.voir;
       if (id && _ouvrir) _ouvrir(id);
     });
