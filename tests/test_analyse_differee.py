@@ -105,19 +105,18 @@ def test_refus_avant_lancement(alice, ia):
 
 
 # ─── Archivage complet après l'analyse ───────────────────────────────────────
-@pytest.mark.parametrize("mode, reponse, raison", [
-    ("alternance", analyse(7, domaine="Hors domaine"), "hors_domaine"),
-    ("stage", analyse(6, domaine="Hors domaine"), "hors_domaine"),
-])
-def test_archivage_fonde_sur_l_analyse(alice, ia, mode, reponse, raison):
+@pytest.mark.parametrize("mode", ["alternance", "stage", "job"])
+def test_hors_domaine_n_archive_plus(alice, ia, mode):
+    """D102 : « Stage Ingénieur/e Système » archivé hors domaine alors que c'est de
+    l'informatique. Le hors domaine du modèle baisse la note, il n'archive pas."""
     client, uid = alice
     client.mode = mode
     client.post("/api/profil", json={"prenom": "Alice"})
-    en_attente(uid, "A", 1, mode=mode)
-    ia.reponse = reponse
+    en_attente(uid, "A", 1, mode=mode, titre="Ingénieur/e Système")
+    ia.reponse = analyse(2, domaine="Hors domaine")
     lancer(client, uid)
     o = lire_candidature(uid, "A", mode=mode)
-    assert (o["statut"], o["raison_archivage"]) == ("archive", raison)
+    assert (o["statut"], o["raison_archivage"], o["domaine"], o["score"]) == ("nouveau", "", "Hors domaine", 2)
 
 
 @pytest.mark.parametrize("mode, archivee", [("alternance", True), ("stage", False)])

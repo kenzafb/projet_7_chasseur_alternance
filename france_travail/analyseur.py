@@ -145,7 +145,7 @@ REGLES = {
         "absente du profil et de la formation est un point faible important. Si le poste correspond à ce que "
         "le candidat préfère éviter, baisse la note. La date de début et la disponibilité ne comptent pas.\n\n"
         "domaine : catégorie métier courte (ex. « Développement web », « Gestion locative »), ou exactement "
-        "« Hors domaine » si le poste réel est hors des domaines recherchés.",
+        "« Hors domaine » si le poste réel est hors des domaines recherchés (la note doit alors être basse).",
     ),
     "job": (
         "Tu évalues une offre de job court (mission, CDD, intérim, saisonnier) pour ce candidat : "
@@ -333,8 +333,10 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
     Règles d'archivage automatique d'une offre analysée, avec raison.
     Modifie offre en place (statut, raison_archivage).
 
-    Un domaine "Hors domaine" (valeur imposée par le prompt) donne la raison
-    "hors_domaine".
+    Le jugement du modèle n'archive jamais (D99, D102) : un domaine « Hors
+    domaine » ne fait que baisser la note. Archivent seulement les règles
+    Python : éligibilité (shared/eligibilite.py), mots-clés (public
+    réservé, école ou CFA, stage).
     verbeux : affiche la raison de l'archivage dans la console.
     """
     _log = print if verbeux else (lambda *a, **k: None)
@@ -357,10 +359,6 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
         elif analyse.get("statut_auto") == "archive":
             offre["statut"] = "archive"
             offre["raison_archivage"] = "ecole_cfa"
-        elif offre.get("domaine") == "Hors domaine":
-            offre["statut"] = "archive"
-            offre["raison_archivage"] = "hors_domaine"
-            _log(f"     -> Archivée automatiquement (hors domaine recherché)")
         elif "stage" in titre_lower and mode != "stage":
             offre["statut"] = "archive"
             offre["raison_archivage"] = "stage"
