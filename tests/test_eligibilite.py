@@ -15,7 +15,7 @@ BUT2 = {"prenom": "Alice", "formation": "BUT 2e année informatique", "date_debu
 
 
 O1_TEXTE = ("Stage de 6 mois à partir de janvier 2027. Profil : étudiant en dernière année d'école "
-            "d'ingénieurs (Bac+5), réseaux et télécoms.")
+            "d'ingénieurs, Bac+5 ingénieur exigé, réseaux et télécoms.")
 
 
 def extraits(niveau="non_precise", duree=None, debut=None, alternance=False, exigence="exige"):
@@ -169,9 +169,20 @@ def test_ohana_niveau_souhaite_eligible(ia):
     assert a["score"] == 6 and a["points_faibles"][0] == "Bac+5 souhaité, profil Bac+2"   # 3 crans : -2
 
 
-def test_moss_niveau_exige_ineligible(ia):
+def test_moss_sans_marqueur_d_exigence_souhaite_eligible(ia):
+    """D103 : le texte de MOSS n'a aucun mot d'exigence ; le modèle a beau
+    répondre « exige », le niveau n'est que souhaité : éligible, note baissée."""
     ia.reponse = reponse(8, niveau_requis="bac+5", niveau_exigence="exige")
     a = analyser_offre({"titre": "Stage réseau", "description": MOSS}, BUT2, mode="stage")
+    assert (a["eligible"], a["niveau_exigence"], a["score"]) == (True, "souhaite", 6)
+    assert a["raison_ineligibilite"] == "" and a["points_faibles"][0] == "Bac+5 souhaité, profil Bac+2"
+
+
+@pytest.mark.parametrize("phrase", ["Bac+5 exigé.", "Diplôme Bac+5 obligatoire.", "Master 2 impératif.",
+                                    "Bac+5 impérativement.", "Niveau requis : Bac+5.", "Bac+5 indispensable."])
+def test_marqueur_explicite_exige_ineligible(ia, phrase):
+    ia.reponse = reponse(8, niveau_requis="bac+5", niveau_exigence="souhaite")
+    a = analyser_offre({"titre": "Stage réseau", "description": MOSS + " " + phrase}, BUT2, mode="stage")
     assert (a["eligible"], a["niveau_exigence"], a["score"]) == (False, "exige", 3)
     assert a["raison_ineligibilite"] == "Bac+5 exigé, profil Bac+2"
 
@@ -226,11 +237,13 @@ def test_controle_de_la_date(texte, valeur, gardee):
 
 
 @pytest.mark.parametrize("texte, niveau, garde, exigence", [
-    ("Formation Bac+5 en informatique.", "bac+5", True, "exige"),
-    ("Étudiant en Master.", "bac+5", True, "exige"),
-    ("Étudiant en Master.", "bac+4", True, "exige"),
-    ("Titulaire d'un BTS SIO.", "bac+2", True, "exige"),
-    ("Étudiant en BUT informatique.", "bac+3", True, "exige"),
+    ("Formation Bac+5 en informatique.", "bac+5", True, "souhaite"),
+    ("Formation Bac+5 en informatique exigée.", "bac+5", True, "exige"),
+    ("Étudiant en Master.", "bac+5", True, "souhaite"),
+    ("Étudiant en Master.", "bac+4", True, "souhaite"),
+    ("Titulaire d'un BTS SIO.", "bac+2", True, "souhaite"),
+    ("Formation : Bac+2 informatique (indispensable)", "bac+2", True, "exige"),   # libellé de France Travail
+    ("Étudiant en BUT informatique.", "bac+3", True, "souhaite"),
     ("Licence ou équivalent.", "bac+3", True, "souhaite"),
     ("Idéalement en école d'ingénieurs.", "bac+5", True, "souhaite"),
     ("Formation : Bac+5 informatique (souhaitée)", "bac+5", True, "souhaite"),   # libellé de France Travail
@@ -260,17 +273,20 @@ def test_ohana_non_precise_par_le_modele_bac5_souhaite(ia):
     assert "remplacé par bac+5 (souhaite)" in a["extraits_ecartes"][0]
 
 
-def test_moss_non_precise_par_le_modele_bac5_exige(ia):
+def test_moss_non_precise_par_le_modele_bac5_souhaite(ia):
     ia.reponse = reponse(8)
     a = analyser_offre({"titre": "Stage réseau", "description": MOSS}, BUT2, mode="stage")
-    assert (a["niveau_requis"], a["niveau_exigence"], a["eligible"]) == ("bac+5", "exige", False)
+    assert (a["niveau_requis"], a["niveau_exigence"], a["eligible"]) == ("bac+5", "souhaite", True)
 
 
 @pytest.mark.parametrize("texte, attendu", [
     (OHANA, ("bac+5", "souhaite")),
-    (MOSS, ("bac+5", "exige")),
-    ("Titulaire d'un BTS ou d'une licence.", ("bac+2", "exige")),
-    ("Étudiant en Master.", ("bac+5", "exige")),
+    (MOSS, ("bac+5", "souhaite")),
+    (MOSS + " Bac+5 exigé.", ("bac+5", "exige")),
+    ("Titulaire d'un BTS ou d'une licence.", ("bac+2", "souhaite")),
+    ("BTS ou licence obligatoire.", ("bac+2", "exige")),
+    ("Étudiant en Master.", ("bac+5", "souhaite")),
+    ("Master exigé ou équivalent.", ("bac+5", "souhaite")),       # adouci
     ("Étudiant(e) en BUT ou équivalent.", ("bac+3", "souhaite")),
     ("Vous rejoindrez nos ingénieurs.", None),
     ("Aucun prérequis.", None),

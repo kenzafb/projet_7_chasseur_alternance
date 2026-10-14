@@ -479,3 +479,7 @@ Sur les 8 offres de stage : O1, O2 et O8 inéligibles pour de bonnes raisons, O3
 - **Constat.** « Stage Ingénieur/e Système » a été archivée hors domaine alors que c'est de l'informatique. Une offre archivée à tort est une erreur invisible ; une offre mal notée ne l'est pas.
 - **Décision.** Un domaine « Hors domaine » répondu par le modèle ne fait plus que baisser la note, comme ses autres critères ; il reste affiché comme catégorie de l'offre. Archivent automatiquement les seules règles Python : l'éligibilité de `shared/eligibilite.py`, et l'archivage par mots-clés déjà en place (public réservé, école ou CFA, stage ; D12, D20, D74). La raison `hors_domaine` reste disponible pour l'archivage à la main.
 
+### D103. Niveau « exigé » seulement avec un marqueur explicite (corrige D100 et D98)
+- **Décision.** Même principe que D102 : un niveau détecté sans mot d'exigence explicite vaut « souhaite », pas « exige ». L'exigence est décidée en Python à partir du texte, jamais par le modèle seul : « exige » seulement si un marqueur clair (exigé, obligatoire, impératif, impérativement, requis, indispensable) est proche de l'indice de niveau et qu'aucun marqueur de souhait (« ou équivalent », « idéalement »...) ne l'adoucit. Seul « exige » rend inéligible ; « souhaite » baisse la note de 1 à 2 points (D98).
+- **Conséquence acceptée.** MOSS (« dernière année d'école d'ingénieurs ou en Master 2 (Bac+5) », sans marqueur d'exigence) devient éligible, avec une note baissée de 2 points.
+

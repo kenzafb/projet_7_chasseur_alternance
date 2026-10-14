@@ -18,9 +18,10 @@ profil, 10 semaines, recopiée en duree_mois pour presque toutes les offres ;
 
 Règles (une information non précisée ne rend jamais inéligible) :
   - niveau requis supérieur au niveau du profil d'au moins deux crans, si
-    l'offre l'exige ; seulement souhaité (« ou équivalent », « idéalement »,
-    « de préférence », « souhaité »...) : score baissé de 1 à 2 points et
-    raison ajoutée aux points faibles, jamais inéligible ;
+    l'offre l'exige explicitement (exigé, obligatoire, impératif, requis,
+    indispensable, près du niveau, D103) ; sinon il n'est que souhaité :
+    score baissé de 1 à 2 points et raison ajoutée aux points faibles,
+    jamais inéligible ;
   - mode stage : durée de l'offre supérieure à celle du profil de plus de
     4 semaines, ou début de l'offre incompatible avec les dates du profil ;
   - modes stage et job : offre en alternance seulement.
@@ -63,6 +64,9 @@ INDICES_NIVEAU = [
 INDICE_BUT = re.compile(r"\bBUT\b")          # en majuscules : pas l'anglais « but »
 MARQUEURS_SOUHAIT = re.compile(r"ou [ée]quivalent|id[ée]alement|de pr[ée]f[ée]rence|souhait[ée]e?s?|appr[ée]ci[ée]e?s?"
                                r"|serait un plus|est un plus|un plus\b")
+# Exigence explicite (D103) : sans l'un de ces mots près de l'indice, le niveau n'est que souhaité
+MARQUEURS_EXIGENCE = re.compile(r"exig[ée]e?s?|obligatoires?|imp[ée]rati(?:f|fs|ve|ves|vement)|requise?s?"
+                                r"|indispensables?")
 FENETRE_SOUHAIT = (60, 120)                   # caractères avant et après l'indice de niveau
 TOLERANCE_DUREE_MOIS = 0.5
 
@@ -85,22 +89,31 @@ def niveaux_dans_texte(texte: str) -> tuple[set[str], list[tuple[int, int]]]:
     return set().union(*(p for _, p in trouves)) if trouves else set(), [pos for pos, _ in trouves]
 
 
-def _souhaite(texte: str, positions) -> bool:
+def _pres(motif, texte: str, positions) -> bool:
     avant, apres = FENETRE_SOUHAIT
-    return any(MARQUEURS_SOUHAIT.search(texte[max(0, a - avant):b + apres].lower()) for a, b in positions)
+    return any(motif.search(texte[max(0, a - avant):b + apres].lower()) for a, b in positions)
+
+
+def exigence_detectee(texte: str, positions) -> str:
+    """D103 : « exige » seulement si un marqueur clair (exigé, obligatoire,
+    impératif, requis, indispensable) est proche d'un indice de niveau et
+    qu'aucun marqueur de souhait (« ou équivalent »...) ne l'adoucit ;
+    « souhaite » dans tous les autres cas."""
+    if _pres(MARQUEURS_EXIGENCE, texte, positions) and not _pres(MARQUEURS_SOUHAIT, texte, positions):
+        return "exige"
+    return "souhaite"
 
 
 def niveau_detecte(texte: str) -> tuple[str, str] | None:
     """(niveau, exigence) lus par Python dans la description, ou None sans
     indice. Chaque indice vaut son niveau le plus haut (« Master » = bac+5) ;
     plusieurs indices (« BTS ou licence ») : le plus bas, celui qui suffit.
-    Exigence : souhaite si un marqueur (« ou équivalent »...) est proche
-    d'un indice, exige sinon."""
+    Exigence : exigence_detectee (exige seulement avec un marqueur clair)."""
     trouves = _indices(texte)
     if not trouves:
         return None
     niveau = min((max(permis, key=CRANS.get) for _, permis in trouves), key=CRANS.get)
-    return niveau, "souhaite" if _souhaite(texte, [pos for pos, _ in trouves]) else "exige"
+    return niveau, exigence_detectee(texte, [pos for pos, _ in trouves])
 
 
 def durees_dans_texte(texte: str) -> list[float]:
@@ -145,12 +158,8 @@ def controler_extraits(extraits: dict, offre: dict) -> list[str]:
         extraits["niveau_requis"], extraits["niveau_exigence"] = detecte
         ecartes.append(f"niveau_requis non_precise remplacé par {detecte[0]} ({detecte[1]}), lu dans l'offre")
         niveau = detecte[0]
-    if niveau == "non_precise":
-        extraits["niveau_exigence"] = "non_precise"
-    elif extraits.get("niveau_exigence") != "souhaite" and _souhaite(texte, positions):
-        extraits["niveau_exigence"] = "souhaite"
-    elif extraits.get("niveau_exigence") == "non_precise":
-        extraits["niveau_exigence"] = "exige"
+    # L'exigence vient du texte, jamais du modèle seul (D103)
+    extraits["niveau_exigence"] = "non_precise" if niveau == "non_precise" else exigence_detectee(texte, positions)
     debut = extraits.get("date_debut_offre")
     lu = lire_debut_offre(debut)
     if lu and not _date_dans_texte(lu[0], texte):
