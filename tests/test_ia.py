@@ -23,7 +23,7 @@ from shared.schemas_ia import AnalyseOffre, LettreIA
 from tests.conftest import erreur_http, reponse_chat
 from tests.test_envoyeur import attendre
 
-ANALYSE = '{"score": 8, "eligible": true, "points_forts": ["a"], "points_faibles": [], "domaine": "Dev", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false}'
+ANALYSE = '{"score": 8, "eligible": true, "points_forts": ["a"], "points_faibles": [], "domaine": "Dev", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false, "niveau_exigence": "non_precise"}'
 INTROUVABLE = 'model "ministral-3:8b" not found, try pulling it first'
 MESSAGE = [{"role": "user", "content": "x"}]
 
@@ -85,7 +85,8 @@ def test_requete_native(ia, monkeypatch):
     corps = ia.appels[0]
     assert corps["think"] is False and corps["stream"] is False      # premier niveau, pas dans options
     assert corps["format"]["required"] == ["score", "eligible", "points_forts", "points_faibles", "domaine", "resume",
-                                           "niveau_requis", "duree_mois", "date_debut_offre", "alternance_seulement"]
+                                           "niveau_requis", "duree_mois", "date_debut_offre", "alternance_seulement",
+                                           "niveau_exigence"]
     assert corps["format"]["properties"]["niveau_requis"]["enum"] == ["bac", "bac+2", "bac+3", "bac+4", "bac+5",
                                                                       "non_precise"]
     assert corps["options"] == {"num_ctx": 8192, "temperature": 0.1, "num_predict": 50}

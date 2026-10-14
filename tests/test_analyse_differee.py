@@ -27,7 +27,7 @@ def durees_neuves(monkeypatch):
 
 def analyse(score=8, eligible=True, domaine="Développement"):
     return ('{"score": %d, "eligible": %s, "points_forts": ["a"], "points_faibles": [], '
-            '"domaine": "%s", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false}' % (score, "true" if eligible else "false", domaine))
+            '"domaine": "%s", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false, "niveau_exigence": "non_precise"}' % (score, "true" if eligible else "false", domaine))
 
 
 def en_attente(uid, ref, jour, titre=None, mode="alternance", **champs):

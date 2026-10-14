@@ -36,6 +36,8 @@ class AnalyseOffre(_Reponse):
     duree_mois: float | None = Field(description="Durée du contrat ou du stage en mois, ou null")
     date_debut_offre: str | None = Field(description="Début écrit dans l'offre, ou null")
     alternance_seulement: bool = Field(description="Vrai si l'offre n'existe qu'en alternance ou apprentissage")
+    niveau_exigence: Literal["exige", "souhaite", "non_precise"] = Field(
+        description="Le niveau est-il exigé, seulement souhaité, ou non précisé")
 
     @field_validator("duree_mois")
     @classmethod

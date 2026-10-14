@@ -20,17 +20,22 @@ FORMAT_REPONSE = (
     '"domaine": "<catégorie métier en 2 à 4 mots>", "resume": "<12 mots au plus>", '
     '"niveau_requis": "<bac, bac+2, bac+3, bac+4, bac+5 ou non_precise>", '
     '"duree_mois": <nombre ou null>, "date_debut_offre": "<texte ou null>", '
-    '"alternance_seulement": <true ou false>}'
+    '"alternance_seulement": <true ou false>, "niveau_exigence": "<exige, souhaite ou non_precise>"}'
 )
 
 # Ce que le modèle recopie de l'offre, sans juger : l'éligibilité qui en
 # dépend (niveau, durée, dates, alternance) est décidée en Python (D94)
 EXTRACTION = (
-    "RECOPIE AUSSI, sans juger, ce que dit l'offre :\n"
-    "- niveau_requis : niveau d'études exigé ou demandé (« ingénieur », « master » ou « Bac+5 » = bac+5 ; "
-    "« licence » = bac+3 ; « BTS », « DUT » = bac+2) ; non_precise s'il n'est pas dit ;\n"
-    "- duree_mois : durée du stage ou du contrat en mois (6 mois = 6, 10 semaines = 2.5), null si non dite ;\n"
-    "- date_debut_offre : date ou mois de début écrit dans l'offre, avec l'année (mois puis année), null sinon ;\n"
+    "CHAMPS À RECOPIER DU TEXTE DE L'OFFRE, et de lui seul : jamais du profil du candidat. "
+    "null (ou non_precise) si l'offre ne le dit pas.\n"
+    "- niveau_requis : niveau d'études demandé au candidat dans le texte de l'offre (« école d'ingénieurs », "
+    "« Master 2 » ou « Bac+5 » = bac+5 ; « licence » = bac+3 ; « BTS », « DUT » = bac+2). L'intitulé du poste "
+    "(« Ingénieur système ») n'est pas un niveau d'études ;\n"
+    "- niveau_exigence : exige si ce niveau est obligatoire ; souhaite s'il est écrit « ou équivalent », "
+    "« idéalement », « de préférence » ou « souhaité » ; non_precise si l'offre ne demande aucun niveau ;\n"
+    "- duree_mois : durée du stage ou du contrat écrite dans l'offre, en mois (6 mois = 6, 10 semaines = 2.5) ; "
+    "ce n'est jamais la période du candidat ;\n"
+    "- date_debut_offre : date ou mois de début écrit dans l'offre, avec l'année, null sinon ;\n"
     "- alternance_seulement : true si l'offre n'est proposée qu'en alternance ou apprentissage.\n\n"
     "Le niveau, la durée et les dates sont vérifiés à part : ne les compte pas dans la note."
 )
@@ -189,12 +194,13 @@ def construire_messages(offre, profil, mode="alternance") -> list[dict]:
     description = _court(offre.get("description"), ia_longueur_description())
     prompt = (
         f"{intro}\n\n"
-        f"CANDIDAT\n{contexte(profil)}\n\n"
-        "OFFRE\n"
+        f"=== PROFIL DU CANDIDAT (sert seulement à la note) ===\n{contexte(profil)}\n\n"
+        "=== TEXTE DE L'OFFRE (seule source des champs à recopier) ===\n"
         f"Titre : {offre.get('titre', '')}\n"
         f"Entreprise : {offre.get('entreprise', '') or 'non précisée'}\n"
         f"Lieu : {offre.get('lieu', '') or 'non précisé'}\n"
-        f"Description : {description}\n\n"
+        f"Description : {description}\n"
+        "=== FIN DU TEXTE DE L'OFFRE ===\n\n"
         f"{regles}\n{ETALEMENT}\n\n"
         f"{EXTRACTION}\n\n"
         f"{FORMAT_REPONSE}"
@@ -211,7 +217,7 @@ def analyser_offre(offre, profil, mode="alternance", modele=None, essais=2):
     analyse = appeler_structure(construire_messages(offre, profil, mode), AnalyseOffre,
                                 usage="analyse", modele=modele, essais=essais, temperature=0.1)
     result = _valider_analyse(analyse)
-    appliquer_eligibilite(result, profil, mode)
+    appliquer_eligibilite(result, offre, profil, mode)
     # Mode stage : une école peut accueillir un stagiaire (D74), rien à archiver
     if mode == "alternance" and est_ecole_cfa(offre):
         result["statut_auto"] = "archive"
@@ -241,12 +247,23 @@ def est_ecole_cfa(offre) -> bool:
     )
 
 
-def appliquer_eligibilite(result: dict, profil: dict, mode: str) -> dict:
+def appliquer_eligibilite(result: dict, offre: dict, profil: dict, mode: str) -> dict:
     """Critères bloquants décidés en Python (shared/eligibilite.py) à partir
-    des champs extraits de l'offre : inéligible, score plafonné à 3, verdict
-    « ineligible », raison en tête des points faibles et dans
-    raison_ineligibilite. Une information non précisée ne bloque jamais."""
-    from shared.eligibilite import PLAFOND_SCORE_INELIGIBLE, raisons_ineligibilite
+    des champs extraits de l'offre, d'abord contrôlés contre son texte
+    (une valeur absente du texte devient non précisée, extraits_ecartes) :
+    inéligible, score plafonné à 3, verdict « ineligible », raison en tête
+    des points faibles et dans raison_ineligibilite. Niveau seulement
+    souhaité : score baissé de 1 à 2 points, raison dans les points faibles.
+    Une information non précisée ne bloque jamais."""
+    from shared.eligibilite import (PLAFOND_SCORE_INELIGIBLE, controler_extraits, penalite_souhait,
+                                    raisons_ineligibilite)
+    result["extraits_ecartes"] = controler_extraits(result, offre)
+    points, souhait = penalite_souhait(result, profil)
+    if points:
+        result["score"] = max(0, result["score"] - points)
+        if result["eligible"]:
+            result["verdict"] = score_to_verdict(result["score"])
+        result["points_faibles"] = [souhait] + result["points_faibles"][:2]
     raisons = raisons_ineligibilite(result, profil, mode)
     result["raison_ineligibilite"] = " ; ".join(raisons)
     if raisons:

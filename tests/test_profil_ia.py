@@ -16,7 +16,7 @@ STAGE = {"prenom": "Alice", "nom": "Martin", "email": "a@test.fr", "formation": 
 OFFRE = {"id": "R1", "titre": "Stagiaire développeur", "entreprise": "ACME", "lieu": "Paris", "description": "..."}
 REPONSE = ('{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Dev", '
            '"resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, '
-           '"alternance_seulement": false}')
+           '"alternance_seulement": false, "niveau_exigence": "non_precise"}')
 
 
 def _sections(page, titre):

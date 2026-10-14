@@ -14,8 +14,13 @@ BUT2 = {"prenom": "Alice", "formation": "BUT 2e année informatique", "date_debu
         "date_fin": "2027-04-09", "duree_semaines": 10, "recherche": {"domaines": ["M18"]}}
 
 
-def extraits(niveau="non_precise", duree=None, debut=None, alternance=False):
-    return {"niveau_requis": niveau, "duree_mois": duree, "date_debut_offre": debut, "alternance_seulement": alternance}
+O1_TEXTE = ("Stage de 6 mois à partir de janvier 2027. Profil : étudiant en dernière année d'école "
+            "d'ingénieurs (Bac+5), réseaux et télécoms.")
+
+
+def extraits(niveau="non_precise", duree=None, debut=None, alternance=False, exigence="exige"):
+    return {"niveau_requis": niveau, "duree_mois": duree, "date_debut_offre": debut, "alternance_seulement": alternance,
+            "niveau_exigence": exigence}
 
 
 def test_o1_orange_inéligible_pour_trois_raisons():
@@ -85,17 +90,18 @@ def test_niveau_inconnu_ou_ambigu_avertissement(profil):
 def reponse(score, **champs):
     base = {"score": score, "eligible": True, "points_forts": ["a"], "points_faibles": ["b"], "domaine": "Dev",
             "resume": "ok", "niveau_requis": "non_precise", "duree_mois": None, "date_debut_offre": None,
-            "alternance_seulement": False}
+            "alternance_seulement": False, "niveau_exigence": "non_precise"}
     return json.dumps({**base, **champs})
 
 
 def test_analyse_plafonnee_avec_la_raison(ia):
-    ia.reponse = reponse(9, niveau_requis="bac+5", duree_mois=6, date_debut_offre="janvier 2027")
-    a = analyser_offre({"titre": "Stage ingénieur", "description": "..."}, BUT2, mode="stage")
+    ia.reponse = reponse(9, niveau_requis="bac+5", duree_mois=6, date_debut_offre="janvier 2027",
+                         niveau_exigence="exige")
+    a = analyser_offre({"titre": "Stage ingénieur", "description": O1_TEXTE}, BUT2, mode="stage")
     assert (a["score"], a["eligible"], a["verdict"]) == (3, False, "ineligible")
     assert a["raison_ineligibilite"].startswith("Bac+5 exigé, profil Bac+2 ; 6 mois demandés")
     assert a["points_faibles"][0] == "Inéligible : Bac+5 exigé, profil Bac+2" and a["points_faibles"][-1] == "b"
-    offre = {"titre": "Stage ingénieur", "description": "..."}
+    offre = {"titre": "Stage ingénieur", "description": O1_TEXTE}
     appliquer_analyse(offre, a, mode="stage", verbeux=False)
     assert (offre["statut"], offre["raison_archivage"]) == ("archive", "ineligible")
 
@@ -131,9 +137,9 @@ def test_archive_ineligible_motif_filtre_et_retour(utilisateur, ia):
     client, uid = utilisateur("a@test.fr", prenom="Alice")
     client.mode = "stage"
     client.post("/api/profil", json={**{k: v for k, v in BUT2.items() if k != "duree_semaines"}})
-    ajouter_candidature(uid, marquer_non_analysee({"id": "O1", "titre": "Stage ingénieur", "description": "..."},
+    ajouter_candidature(uid, marquer_non_analysee({"id": "O1", "titre": "Stage ingénieur", "description": O1_TEXTE},
                                                   mode="stage"), mode="stage")
-    ia.reponse = reponse(8, niveau_requis="bac+5")
+    ia.reponse = reponse(8, niveau_requis="bac+5", niveau_exigence="exige")
     assert client.post("/api/analyser", json={"id": "O1"}).status_code == 200
     o = lire_candidature(uid, "O1", mode="stage")
     assert (o["statut"], o["raison_archivage"], o["score"]) == ("archive", "ineligible", 3)
@@ -146,3 +152,99 @@ def test_archive_ineligible_motif_filtre_et_retour(utilisateur, ia):
     assert 'data-filter="ineligible">Inéligible<' in page
     js = (config.STATIC_DIR / "js" / "offres.js").read_text(encoding="utf-8")
     assert "Remettre dans les offres actives" in js and "motifIneligible" in js
+
+
+# ─── D98 : valeurs extraites contrôlées contre le texte de l'offre ───────────
+OHANA = ("Au sein de notre équipe infrastructure, tu participeras à l'automatisation des déploiements. "
+         "Profil recherché : Étudiant(e) en informatique (école d'ingénieur, master ou équivalent), "
+         "curieux(se) et autonome.")
+MOSS = ("Missions : supervision réseau, scripts d'exploitation. Profil : vous êtes en dernière année d'école "
+        "d'ingénieurs ou en Master 2 (Bac+5) dans le domaine des réseaux.")
+
+
+def test_ohana_niveau_souhaite_eligible(ia):
+    ia.reponse = reponse(8, niveau_requis="bac+5", niveau_exigence="exige")    # le modèle se trompe d'exigence
+    a = analyser_offre({"titre": "Stage DevOps", "description": OHANA}, BUT2, mode="stage")
+    assert (a["eligible"], a["niveau_exigence"], a["raison_ineligibilite"]) == (True, "souhaite", "")
+    assert a["score"] == 6 and a["points_faibles"][0] == "Bac+5 souhaité, profil Bac+2"   # 3 crans : -2
+
+
+def test_moss_niveau_exige_ineligible(ia):
+    ia.reponse = reponse(8, niveau_requis="bac+5", niveau_exigence="exige")
+    a = analyser_offre({"titre": "Stage réseau", "description": MOSS}, BUT2, mode="stage")
+    assert (a["eligible"], a["niveau_exigence"], a["score"]) == (False, "exige", 3)
+    assert a["raison_ineligibilite"] == "Bac+5 exigé, profil Bac+2"
+
+
+@pytest.mark.parametrize("titre", ["Stage : Ingénieur/e Système", "Ingénieur/e Réseau H/F",
+                                   "Stage Ingénieur/e DevOps", "Ingénieur(e) sécurité - stage"])
+def test_intitule_ingenieur_n_est_pas_un_niveau(ia, titre):
+    """Cas réel : qwen3.5:9b a lu « Bac+5 exigé » dans quatre intitulés « Ingénieur/e ... »
+    dont le texte ne dit rien du niveau."""
+    ia.reponse = reponse(8, niveau_requis="bac+5", niveau_exigence="exige")
+    texte = "Vous participerez à l'administration des serveurs Linux et à la supervision, avec l'équipe ingénieur."
+    a = analyser_offre({"titre": titre, "description": texte}, BUT2, mode="stage")
+    assert (a["niveau_requis"], a["niveau_exigence"], a["eligible"], a["score"]) == ("non_precise", "non_precise", True, 8)
+    assert a["extraits_ecartes"] == ["niveau_requis bac+5 absent de l'offre"]
+
+
+def test_duree_du_profil_recopiee_ecartee(ia):
+    """Constat : duree_mois = 2,5 (les 10 semaines du profil) pour presque toutes les offres."""
+    ia.reponse = reponse(8, duree_mois=2.5)
+    a = analyser_offre({"titre": "Stage", "description": "Stage de développement web, dès que possible."}, BUT2,
+                       mode="stage")
+    assert a["duree_mois"] is None and a["extraits_ecartes"] == ["duree_mois 2.5 absente de l'offre"]
+    ia.reponse = reponse(8, duree_mois=6)
+    a = analyser_offre({"titre": "Stage", "description": "Stage de 6 mois."}, BUT2, mode="stage")
+    assert a["duree_mois"] == 6 and not a["eligible"]
+
+
+@pytest.mark.parametrize("texte, valeur, gardee", [
+    ("Stage de 24 semaines.", 5.5, True),
+    ("Stage de 6 mois.", 6, True),
+    ("Stage de 6 mois.", 2.5, False),
+    ("Expérience : 6 mois exigé(e)\nStage en équipe.", 6, False),     # ligne d'expérience de France Travail
+])
+def test_controle_de_la_duree(texte, valeur, gardee):
+    e = extraits(duree=valeur)
+    el.controler_extraits(e, {"description": texte})
+    assert (e["duree_mois"] == valeur) is gardee
+
+
+@pytest.mark.parametrize("texte, valeur, gardee", [
+    ("Début en janvier 2027.", "janvier 2027", True),
+    ("Début : 01/2027.", "janvier 2027", True),
+    ("Démarrage le 15/01/2027.", "15/01/2027", True),
+    ("Début en janvier.", "janvier 2027", False),          # année inventée
+    ("Stage dès que possible.", "février 2027", False),
+    ("Stage dès que possible.", "dès que possible", True),  # non lisible : gardé, jamais bloquant
+])
+def test_controle_de_la_date(texte, valeur, gardee):
+    e = extraits(debut=valeur)
+    el.controler_extraits(e, {"description": texte})
+    assert (e["date_debut_offre"] == valeur) is gardee
+
+
+@pytest.mark.parametrize("texte, niveau, garde, exigence", [
+    ("Formation Bac+5 en informatique.", "bac+5", True, "exige"),
+    ("Étudiant en Master.", "bac+5", True, "exige"),
+    ("Étudiant en Master.", "bac+4", True, "exige"),
+    ("Titulaire d'un BTS SIO.", "bac+2", True, "exige"),
+    ("Étudiant en BUT informatique.", "bac+3", True, "exige"),
+    ("Licence ou équivalent.", "bac+3", True, "souhaite"),
+    ("Idéalement en école d'ingénieurs.", "bac+5", True, "souhaite"),
+    ("Formation : Bac+5 informatique (souhaitée)", "bac+5", True, "souhaite"),   # libellé de France Travail
+    ("Vous rejoindrez une équipe d'ingénieurs.", "bac+5", False, "non_precise"),
+    ("Le but du stage est d'apprendre.", "bac+3", False, "non_precise"),          # « but » n'est pas le BUT
+])
+def test_controle_du_niveau_et_de_l_exigence(texte, niveau, garde, exigence):
+    e = extraits(niveau=niveau)
+    el.controler_extraits(e, {"description": texte})
+    assert (e["niveau_requis"] == niveau) is garde and e["niveau_exigence"] == exigence
+
+
+def test_souhait_a_deux_crans_un_point():
+    e = extraits(niveau="bac+4", exigence="souhaite")
+    assert el.penalite_souhait(e, BUT2) == (1, "Bac+4 souhaité, profil Bac+2")
+    assert el.raisons_ineligibilite(e, BUT2, "stage") == []
+    assert el.penalite_souhait(extraits(niveau="bac+3", exigence="souhaite"), BUT2) == (0, "")

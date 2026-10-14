@@ -51,7 +51,7 @@ def _prompts(ia):
 @pytest.mark.parametrize("mode", ["alternance", "job", "stage"])
 def test_prompts_sans_mention_d_un_utilisateur_reel(ia, mode):
     generateur.generer_lettre(OFFRE, PROFIL, mode=mode)
-    ia.reponse = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false}'
+    ia.reponse = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false, "niveau_exigence": "non_precise"}'
     analyseur.analyser_offre(OFFRE, PROFIL, mode=mode)
     texte = _prompts(ia)
     assert len(ia.appels) == 2
@@ -68,7 +68,7 @@ def test_prompt_de_lettre_neutre_et_fonde_sur_le_profil(ia):
 
 
 def test_analyse_job_tire_les_preferences_du_profil(ia):
-    ia.reponse = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false}'
+    ia.reponse = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false, "niveau_exigence": "non_precise"}'
     analyseur.analyser_offre(OFFRE, PROFIL, mode="job")
     texte = _prompts(ia)
     for valeur in ("TYPES-OK-DU-PROFIL", "TYPES-EVITER-DU-PROFIL", "HORAIRES-DU-PROFIL",
@@ -81,7 +81,7 @@ def test_analyse_job_tire_les_preferences_du_profil(ia):
     assert "N'applique AUCUNE préférence que le profil n'exprime pas" in texte
 
 
-REPONSE = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false}'
+REPONSE = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false, "niveau_exigence": "non_precise"}'
 PROFIL_STAGE = {"prenom": "Camille", "formation": "Licence 3 informatique", "etablissement": "Université X",
                 "missions": "MISSIONS-DU-PROFIL", "date_debut": "2027-01-04", "date_fin": "2027-06-25",
                 "duree_semaines": 25, "recherche": {"domaines": ["M18"]}}

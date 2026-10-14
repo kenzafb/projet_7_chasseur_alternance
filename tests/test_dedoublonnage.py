@@ -57,7 +57,7 @@ def test_offres_vues_separees_par_mode(a_et_b, france_travail_simule):
 
 def test_recherche_complete_ecrit_les_candidatures_de_chacun(a_et_b, france_travail_simule, ia):
     id_a, id_b = a_et_b
-    ia.reponse = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false}'
+    ia.reponse = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false, "niveau_exigence": "non_precise"}'
     for uid in (id_a, id_b):
         lancer_recherche(uid, {"prenom": "X"}, on_offre=lambda o, u=uid: ajouter_candidature(u, o))
     assert {c["id"] for c in lire_candidatures(id_a)} == {c["id"] for c in lire_candidatures(id_b)}

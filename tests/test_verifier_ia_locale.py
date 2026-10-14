@@ -14,7 +14,7 @@ from tests.conftest import erreur_http
 from tests.test_ia import texte_envoye
 
 ANALYSE = ('{"score": 7, "eligible": true, "points_forts": ["a"], "points_faibles": [], '
-           '"domaine": "Développement web", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false}')
+           '"domaine": "Développement web", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false, "niveau_exigence": "non_precise"}')
 
 
 def script():
@@ -146,12 +146,16 @@ def test_nombre_d_offres(donnees, ia):
 def test_colonnes_niveau_duree_et_raison(donnees, ia):
     from database.profil_db import sauvegarder_profil
     sauvegarder_profil(donnees, {"prenom": "Alice", "niveau_etudes": "Bac+2 en cours"})
+    from database.candidatures_db import modifier_candidature
+    modifier_candidature(donnees, "R3", {"description": "Stage de 6 mois, Master 2 ou école d'ingénieurs exigé."})
     ia.reponse = ANALYSE.replace('"niveau_requis": "non_precise", "duree_mois": null',
-                                 '"niveau_requis": "bac+5", "duree_mois": 6')
+                                 '"niveau_requis": "bac+5", "duree_mois": 6').replace(
+        '"niveau_exigence": "non_precise"', '"niveau_exigence": "exige"')
     _, sortie = lancer("--nombre", "1")
-    assert "Niveau requis" in sortie and "Durée (mois)" in sortie and "Inéligible (Python)" in sortie
+    assert "Niveau requis" in sortie and "Exigence" in sortie and "Durée (mois)" in sortie and "Inéligible (Python)" in sortie
     ligne = next(l for l in sortie.splitlines() if l.strip().startswith("ministral-3:8b  O1"))
-    assert "bac+5" in ligne and "  6  " in ligne and "Bac+5 exigé, profil Bac+2" in ligne and "3/10" in ligne
+    assert "bac+5" in ligne and "exige" in ligne and "  6  " in ligne and "Bac+5 exigé, profil Bac+2" in ligne
+    assert "3/10" in ligne
 
 
 def _lettre(corps):
