@@ -514,3 +514,6 @@ Sur les 8 offres de stage : O1, O2 et O8 inéligibles pour de bonnes raisons, O3
 ### D110. Une candidature n'est suivie que dans Candidatures (complète D105 et D107)
 - **Décision.** Une offre postulée sort de la page Offres, qui n'affiche plus que les offres à traiter (nouveau, en cours), compteurs compris ; le filtre « À traiter / Postulées » de D105 est retiré. Date de candidature et « Annuler » se font dans le tableau Candidatures ; annuler remet l'offre dans la page Offres. Même logique pour les spontanées : la liste de la page Spontanées ne montre plus que les entreprises pas encore envoyées (filtre « Envoyés » retiré), les envoyées ne sont plus que dans le tableau.
 
+### D111. Couleur du statut sur le menu fermé seulement
+- **Décision.** Dans le tableau Candidatures, la couleur du statut (fond, bordure, texte) ne s'applique qu'au menu fermé ; les options de la liste déroulante gardent le texte et le fond neutres de l'application. L'application n'a pas de thème sombre : rien d'autre à vérifier.
+

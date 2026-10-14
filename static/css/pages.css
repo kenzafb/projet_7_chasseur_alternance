@@ -297,6 +297,9 @@
 .st-entretien  { color: var(--vert); border-color: var(--vert); background: var(--vert-soft); }
 .st-refus      { color: var(--rouge); border-color: var(--rouge); background: var(--rouge-soft); }
 .st-bounce     { color: var(--violet); border-color: var(--violet); background: var(--violet-soft); }
+/* La couleur du statut ne vaut que pour le menu fermé : la liste déroulante
+   et ses options restent neutres et lisibles (D111) */
+.suivi-statut option { color: var(--txt); background-color: var(--surface); font-weight: 400; }
 .suivi-empty { padding: 40px; text-align: center; color: var(--txt-muted); }
 
 /* Tableau de suivi unique (6 colonnes, D107) */

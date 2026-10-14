@@ -84,3 +84,10 @@ def test_interface_une_seule_page():
     assert not (config.STATIC_DIR / "js" / "suivi.js").exists()
     offres = (config.STATIC_DIR / "js" / "offres.js").read_text(encoding="utf-8")
     assert 'new Event("candidatures:maj")' in offres     # le suivi suit « J'ai postulé » sans rechargement
+
+
+def test_options_du_statut_neutres():
+    """D111 : la couleur du statut s'appliquait aussi aux options de la liste."""
+    css = (config.STATIC_DIR / "css" / "pages.css").read_text(encoding="utf-8")
+    assert ".suivi-statut option { color: var(--txt); background-color: var(--surface);" in css
+    assert ".st-refus      { color: var(--rouge);" in css               # le menu fermé garde sa couleur
