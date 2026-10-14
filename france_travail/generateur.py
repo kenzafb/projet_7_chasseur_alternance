@@ -188,6 +188,15 @@ def construire_messages_lettre(offre, profil, mode="alternance") -> list[dict]:
             {"role": "user", "content": prompt}]
 
 
+def rediger_elements(offre, profil, mode="alternance", modele=None, essais=2) -> LettreIA:
+    """Les deux éléments rédigés par l'IA (bloc destinataire, paragraphe sur
+    l'entreprise), sans assemblage. Réponse hors schéma redemandée une fois ;
+    ErreurIABloquante et ErreurIAPassagere remontent : pas de lettre sans
+    paragraphe rédigé."""
+    return appeler_structure(construire_messages_lettre(offre, profil, mode), LettreIA, usage="lettre",
+                             modele=modele, essais=essais, temperature=0.6)
+
+
 def generer_lettre(offre, profil, mode="alternance", modele=None):
     """
     Demande à l'IA (modèle de l'usage « lettre », ou `modele`) uniquement :
@@ -202,15 +211,7 @@ def generer_lettre(offre, profil, mode="alternance", modele=None):
     template = preparer_lettre_type(profil.get("lettre_type") or lettre_par_defaut(mode))
     nom_entreprise = offre.get("entreprise", "")
 
-    # Réponse hors schéma redemandée une fois. ErreurIABloquante et
-    # ErreurIAPassagere remontent : pas de lettre sans paragraphe rédigé.
-    reponse = appeler_structure(
-        construire_messages_lettre(offre, profil, mode),
-        LettreIA,
-        usage="lettre",
-        modele=modele,
-        temperature=0.6,
-    )
+    reponse = rediger_elements(offre, profil, mode, modele)
     contact    = reponse.contact_entreprise or nom_entreprise
     paragraphe = reponse.paragraphe_entreprise   # jamais vide (schéma)
 

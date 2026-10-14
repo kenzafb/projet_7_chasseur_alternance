@@ -17,7 +17,8 @@ FORMAT_REPONSE = (
     "Réponds uniquement avec cet objet JSON :\n"
     '{"score": <entier de 0 à 10>, "eligible": <true ou false>, '
     '"points_forts": [<3 phrases courtes au plus>], "points_faibles": [<2 phrases courtes au plus>], '
-    '"domaine": "<catégorie métier en 2 à 4 mots>", "resume": "<12 mots au plus>"}'
+    '"domaine": "<catégorie métier en 2 à 4 mots>", "resume": "<12 mots au plus>", '
+    '"niveau_demande": "<niveau d\'études demandé par l\'offre, ou null s\'il n\'est pas dit>"}'
 )
 
 SYSTEME = ("Tu es un recruteur qui évalue des offres pour un candidat. Tu réponds uniquement par un "

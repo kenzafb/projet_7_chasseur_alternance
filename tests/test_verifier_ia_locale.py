@@ -131,3 +131,67 @@ def test_demarrage_echoue_modele_ecarte(donnees, ia):
     ia.reponse = ANALYSE
     code, sortie = lancer("--offres", "1")
     assert code == 1 and "Test de démarrage échoué" in sortie and ia.appels == []
+
+
+# ─── --nombre, colonne du niveau, --lettre à l'aveugle ───────────────────────
+def test_nombre_d_offres(donnees, ia):
+    ia.reponse = ANALYSE
+    lancer("--nombre", "4")
+    assert sum(1 for a in ia.appels if "OFFRE" in texte_envoye(a)) == 4
+    ia.appels.clear()
+    lancer("--offres", "2")                       # ancien nom gardé
+    assert sum(1 for a in ia.appels if "OFFRE" in texte_envoye(a)) == 2
+
+
+def test_colonne_du_niveau_demande(donnees, ia):
+    ia.reponse = ANALYSE[:-1] + ', "niveau_demande": "Bac+3"}'
+    _, sortie = lancer("--nombre", "1")
+    assert "Niveau demandé" in sortie and "Bac+3" in sortie
+    ia.reponse = ANALYSE                           # niveau absent de la réponse
+    _, sortie = lancer("--nombre", "1")
+    ligne = next(l for l in sortie.splitlines() if l.strip().startswith("ministral-3:8b  O1"))
+    assert "  -  " in ligne
+
+
+def _lettre(corps):
+    modele = corps["model"]
+    return ('{"contact_entreprise": "ACME\\nParis", "paragraphe_entreprise": "Texte de %s."}' % modele
+            if "lettre de motivation" in texte_envoye(corps) else None)
+
+
+@pytest.fixture
+def profil_complet(donnees, utilisateur):
+    from database.profil_db import sauvegarder_profil
+    sauvegarder_profil(donnees, {"prenom": "Alice", "nom": "Martin", "email": "a@test.fr"})
+    return donnees
+
+
+def test_lettre_a_l_aveugle(profil_complet, ia):
+    ia.panne = _lettre
+    lignes = []
+    s = script()
+    tirage = lambda etiquettes: etiquettes.reverse()        # m1 -> C, m2 -> B, m3 -> A
+    import shared.config as c
+    o = s.lire_offre(c.DATABASE_URL, "R0")
+    assert o["offre"]["titre"] == "Développeur 0"
+    assert s.comparer_lettres(o, ["m1", "m2", "m3"], lignes.append, tirage) == 0
+    sortie = "\n".join(lignes)
+    corps, fin = sortie.split("Correspondance (à lire après le jugement) :")
+    assert corps.index("── A ──\nTexte de m3.") < corps.index("── B ──\nTexte de m2.") < corps.index("── C ──\nTexte de m1.")
+    assert "A = m3" in fin and "B = m2" in fin and "C = m1" in fin
+    assert {a["model"] for a in ia.appels} == {"m1", "m2", "m3"} and len(ia.appels) == 3
+    assert {c_["verdict"] for c_ in lire_candidatures(profil_complet)} == {"non_analysee"}   # rien d'écrit
+
+
+def test_lettre_par_la_ligne_de_commande(profil_complet, ia):
+    ia.panne = _lettre
+    code, sortie = lancer("--lettre", "--modeles", "ministral-3:8b,ministral-3:3b", "--offre", "R1")
+    assert code == 0 and "Développeur 1" in sortie
+    blind = sortie.split("Paragraphes, à lire à l'aveugle")[1].split("Correspondance")[0]
+    assert "── A ──" in blind and "── B ──" in blind and "ministral" not in blind.replace("Texte de ministral", "")
+    assert "A = ministral-3:" in sortie and "B = ministral-3:" in sortie
+    assert not any("Tu évalues" in texte_envoye(a) for a in ia.appels)   # pas d'analyse en mode --lettre
+    code, sortie = lancer("--lettre")                               # sans --offre : la plus récente en attente
+    assert code == 0 and "Développeur 3" in sortie and "A = ministral-3:8b" in sortie
+    code, sortie = lancer("--lettre", "--offre", "INCONNUE")
+    assert code == 1 and "Offre introuvable : INCONNUE" in sortie

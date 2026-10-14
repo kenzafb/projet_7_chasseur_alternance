@@ -6,7 +6,8 @@ par l'humain, Ollama démarré :
 
     venv/bin/python scripts/verifier_ia_locale.py
     venv/bin/python scripts/verifier_ia_locale.py --modeles ministral-3:8b,ministral-3:3b,qwen3.5:9b
-    venv/bin/python scripts/verifier_ia_locale.py --user 1 --mode stage --offres 3
+    venv/bin/python scripts/verifier_ia_locale.py --user 1 --mode stage --nombre 5
+    venv/bin/python scripts/verifier_ia_locale.py --lettre --modeles a,b,c [--offre <id>]
 
 1. Vérifie que le serveur répond (IA_BASE_URL) et liste ses modèles.
 2. Lit dans la base, en LECTURE SEULE, les offres « non analysées » les
@@ -19,7 +20,14 @@ par l'humain, Ollama démarré :
    Un seul essai par réponse : on mesure ce que le modèle répond du
    premier coup.
 4. Affiche un tableau comparatif sur les mêmes offres : temps, JSON valide
-   ou non, score et verdict proposés ; puis l'avis sur l'email.
+   ou non, score, verdict et niveau d'études demandé par l'offre tel que le
+   modèle l'a compris (s'il l'a donné) ; puis l'avis sur l'email.
+
+--lettre : à la place, pour une offre (--offre <id>, sinon la plus récente
+des offres non analysées), rédige le paragraphe de lettre avec chaque
+modèle et affiche les textes sous des étiquettes A, B, C... tirées au
+hasard ; la correspondance étiquette-modèle n'est donnée qu'à la toute fin,
+pour une lecture à l'aveugle.
 
 Rien n'est écrit en base. Sans --modeles : IA_MODELE_ANALYSE pour les
 offres et IA_MODELE_EXTRACTION pour l'email. ANALYSE_IA=false dans le .env
@@ -104,6 +112,77 @@ def lire_donnees(url: str, nombre: int, user_id=None, mode=None) -> tuple[list[d
     return offres, cas
 
 
+def lire_offre(url: str, ref: str, user_id=None, mode=None) -> dict | None:
+    """Une offre précise (identifiant affiché dans l'application, analysée
+    ou non) et le profil de son utilisateur, lus en lecture seule."""
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from database.candidatures_db import candidature_vers_dict
+    from database.models import Candidature, Profil
+    from database.profil_db import profil_vers_dict
+
+    moteur = create_engine(url_lecture_seule(url))
+    try:
+        with Session(moteur) as db:
+            requete = db.query(Candidature).filter(Candidature.ref_offre == ref)
+            if user_id:
+                requete = requete.filter(Candidature.user_id == user_id)
+            if mode:
+                requete = requete.filter(Candidature.mode == mode)
+            for c in requete.order_by(Candidature.id.desc()):
+                p = db.query(Profil).filter_by(user_id=c.user_id, mode=c.mode).first()
+                if p:
+                    return {"offre": candidature_vers_dict(c), "profil": profil_vers_dict(p), "mode": c.mode,
+                            "user_id": c.user_id}
+    finally:
+        moteur.dispose()
+    return None
+
+
+ETIQUETTES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def comparer_lettres(o: dict, modeles: list[str], sortie=print, tirage=None) -> int:
+    """Paragraphe de lettre rédigé par chaque modèle pour l'offre o, affiché
+    sous des étiquettes tirées au hasard ; correspondance à la toute fin.
+    tirage : fonction qui mélange une liste en place (random.shuffle)."""
+    import random
+
+    from france_travail.generateur import rediger_elements
+    from shared import ia
+    from shared.ia import ErreurIA, ErreurIABloquante
+
+    sortie(f"\nOffre [{o['mode']}, utilisateur {o['user_id']}] {o['offre']['id']} : {o['offre']['titre'][:70]}")
+    textes = {}
+    for modele in modeles:
+        sortie(f"  {modele} : rédaction...")
+        try:
+            ia.verifier_demarrage(modele)
+            debut = time.monotonic()
+            textes[modele] = (rediger_elements(o["offre"], o["profil"], o["mode"], modele, essais=1)
+                              .paragraphe_entreprise, _secondes(debut))
+        except ErreurIABloquante as e:
+            sortie(f"  ❌ {modele} : {e}")
+        except ErreurIA as e:
+            textes[modele] = (f"(pas de paragraphe : {e})", "-")
+    if len(modeles) > len(ETIQUETTES):
+        sortie("❌ Trop de modèles pour les étiquettes A à Z.")
+        return 1
+    etiquettes = list(ETIQUETTES[:len(textes)])
+    (tirage or random.shuffle)(etiquettes)
+    correspondance = dict(zip(etiquettes, textes))          # étiquette -> modèle
+    sortie("\nParagraphes, à lire à l'aveugle :")
+    for etiquette in sorted(correspondance):
+        sortie(f"\n── {etiquette} ──\n{textes[correspondance[etiquette]][0]}")
+    sortie("\n" + "\n" * 3 + "Correspondance (à lire après le jugement) :")
+    for etiquette in sorted(correspondance):
+        modele = correspondance[etiquette]
+        sortie(f"  {etiquette} = {modele} ({textes[modele][1]})")
+    sortie("\nRien n'a été écrit en base.")
+    return 0 if textes else 1
+
+
 def _domaine(site: str) -> str | None:
     from urllib.parse import urlparse
     if not site:
@@ -125,7 +204,11 @@ def _tableau(entetes: list[str], lignes: list[list[str]]) -> list[str]:
 def main(argv=None, sortie=print) -> int:
     parser = argparse.ArgumentParser(description="Vérifie l'IA locale et compare des modèles, sans rien écrire.")
     parser.add_argument("--modeles", help="modèles à comparer, séparés par des virgules")
-    parser.add_argument("--offres", type=int, default=3, help="offres non analysées à essayer (défaut 3)")
+    parser.add_argument("--nombre", "--offres", dest="nombre", type=int, default=3,
+                        help="offres non analysées à essayer (défaut 3)")
+    parser.add_argument("--lettre", action="store_true",
+                        help="comparer à l'aveugle le paragraphe de lettre de chaque modèle")
+    parser.add_argument("--offre", help="identifiant de l'offre pour --lettre (défaut : la plus récente en attente)")
     parser.add_argument("--user", type=int, help="seulement les offres de cet utilisateur")
     parser.add_argument("--mode", choices=["alternance", "job", "stage"], help="seulement les offres de ce mode")
     args = parser.parse_args(argv)
@@ -160,6 +243,25 @@ def main(argv=None, sortie=print) -> int:
         for m in disponibles:
             sortie(f"  - {m}")
 
+    if args.lettre:
+        modeles = ([m.strip() for m in args.modeles.split(",") if m.strip()] if args.modeles
+                   else [config.modele_ia("lettre")])
+        for m in modeles:
+            if disponibles is not None and m not in disponibles:
+                sortie(f"⚠️  « {m} » n'est pas installé : ollama pull {m}")
+        try:
+            if args.offre:
+                o = lire_offre(config.DATABASE_URL, args.offre, args.user, args.mode)
+            else:
+                o = next(iter(lire_donnees(config.DATABASE_URL, 1, args.user, args.mode)[0]), None)
+        except Exception as e:
+            sortie(f"❌ Base illisible ({type(e).__name__}) : {e}")
+            return 1
+        if o is None:
+            sortie(f"❌ Offre introuvable{f' : {args.offre}' if args.offre else ' (aucune offre non analysée)'}.")
+            return 1
+        return comparer_lettres(o, modeles, sortie)
+
     if args.modeles:
         modeles = [m.strip() for m in args.modeles.split(",") if m.strip()]
         pour_email = {m: m for m in modeles}
@@ -172,7 +274,7 @@ def main(argv=None, sortie=print) -> int:
 
     # 2. Données réelles, lecture seule
     try:
-        offres, cas = lire_donnees(config.DATABASE_URL, max(1, args.offres), args.user, args.mode)
+        offres, cas = lire_donnees(config.DATABASE_URL, max(1, args.nombre), args.user, args.mode)
     except Exception as e:
         sortie(f"❌ Base illisible ({type(e).__name__}) : {e}")
         return 1
@@ -205,12 +307,12 @@ def main(argv=None, sortie=print) -> int:
             try:
                 a = analyser_offre(o["offre"], o["profil"], mode=o["mode"], modele=modele, essais=1)
                 ligne = [modele, f"O{i}", _secondes(debut), "oui", f"{a['score']}/10", a["verdict"],
-                         a["domaine"][:24]]
+                         (a.get("niveau_demande") or "-")[:24], a["domaine"][:24]]
                 valides += 1
             except ReponseInvalide as e:
-                ligne = [modele, f"O{i}", _secondes(debut), "non", "-", "-", str(e)[:40]]
+                ligne = [modele, f"O{i}", _secondes(debut), "non", "-", "-", "-", str(e)[:40]]
             except ErreurIAPassagere as e:
-                ligne = [modele, f"O{i}", _secondes(debut), "-", "-", "-", f"échec : {str(e)[:40]}"]
+                ligne = [modele, f"O{i}", _secondes(debut), "-", "-", "-", "-", f"échec : {str(e)[:40]}"]
             except ErreurIABloquante as e:
                 sortie(f"  ❌ {e}")
                 break
@@ -236,7 +338,8 @@ def main(argv=None, sortie=print) -> int:
     # 4. Tableaux comparatifs
     if lignes_offres:
         sortie("\nAnalyse des offres (un seul essai par réponse) :")
-        for l in _tableau(["Modèle", "Offre", "Temps", "JSON valide", "Score", "Verdict", "Domaine ou erreur"],
+        for l in _tableau(["Modèle", "Offre", "Temps", "JSON valide", "Score", "Verdict", "Niveau demandé",
+                           "Domaine ou erreur"],
                           lignes_offres):
             sortie("  " + l)
     if lignes_email:

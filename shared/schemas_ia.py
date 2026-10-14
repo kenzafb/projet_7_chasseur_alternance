@@ -29,6 +29,9 @@ class AnalyseOffre(_Reponse):
     points_faibles: list[str] = Field(description="2 au plus")
     domaine: str = Field(description="Catégorie métier en 2 à 4 mots")
     resume: str = Field(description="12 mots au plus")
+    # Facultatif (hors de « required ») : niveau d'études que demande l'offre,
+    # tel que le modèle l'a compris ; affiché par scripts/verifier_ia_locale.py
+    niveau_demande: str | None = Field(None, description="Niveau d'études demandé par l'offre, ou null")
 
     @field_validator("score")
     @classmethod
