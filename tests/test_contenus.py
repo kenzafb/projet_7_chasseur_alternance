@@ -249,3 +249,12 @@ def test_lettre_sans_markdown(ia):
     ia.reponse = '{"contact_entreprise": "**ACME**\\n75010 Paris", "paragraphe_entreprise": "**ACME**, *votre* projet me parle."}'
     lettre = generateur.generer_lettre(OFFRE, PROFIL, mode="alternance")
     assert "*" not in lettre and "ACME, votre projet me parle." in lettre
+
+
+@pytest.mark.parametrize("mode", ["alternance", "job", "stage"])
+def test_points_forts_tires_du_profil_seulement(mode):
+    """D104 : le 3b citait « C/C++/Qt », « VoIP », absents du profil."""
+    texte = analyseur.construire_messages(OFFRE, PROFIL, mode)[1]["content"]
+    assert "points_forts : seulement des compétences, projets ou expériences écrits dans le PROFIL" in texte
+    assert "jamais une compétence de l'offre absente du profil" in texte
+    assert "Aucune compétence du profil ne correspond à l'offre" in texte

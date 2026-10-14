@@ -483,3 +483,7 @@ Sur les 8 offres de stage : O1, O2 et O8 inéligibles pour de bonnes raisons, O3
 - **Décision.** Même principe que D102 : un niveau détecté sans mot d'exigence explicite vaut « souhaite », pas « exige ». L'exigence est décidée en Python à partir du texte, jamais par le modèle seul : « exige » seulement si un marqueur clair (exigé, obligatoire, impératif, impérativement, requis, indispensable) est proche de l'indice de niveau et qu'aucun marqueur de souhait (« ou équivalent », « idéalement »...) ne l'adoucit. Seul « exige » rend inéligible ; « souhaite » baisse la note de 1 à 2 points (D98).
 - **Conséquence acceptée.** MOSS (« dernière année d'école d'ingénieurs ou en Master 2 (Bac+5) », sans marqueur d'exigence) devient éligible, avec une note baissée de 2 points.
 
+### D104. Points forts tirés du profil seulement
+- **Constat.** `ministral-3:3b` attribue à la candidate des compétences absentes de son profil (« C/C++/Qt », « VoIP ») dans les points forts.
+- **Décision.** Le prompt d'analyse précise qu'un point fort ne cite que des compétences, projets ou expériences écrits dans le profil, jamais une compétence demandée par l'offre que le profil ne cite pas ; si rien ne correspond, il le dit (« Aucune compétence du profil ne correspond à l'offre »). Pas de contrôle Python : un test vérifie le prompt construit.
+

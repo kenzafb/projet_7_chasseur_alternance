@@ -43,6 +43,12 @@ EXTRACTION = (
 ETALEMENT = ("Étale les notes : réserve 8 à 10 aux offres qui correspondent vraiment au profil et aux missions "
              "visées ; une offre correcte sans plus vaut 5 à 7 ; une offre éloignée, 3 à 4.")
 
+# Constat (D104) : le petit modèle attribuait au candidat des compétences
+# absentes de son profil (« C/C++/Qt », « VoIP ») dans les points forts
+POINTS_FORTS = ("points_forts : seulement des compétences, projets ou expériences écrits dans le PROFIL, "
+                "jamais une compétence de l'offre absente du profil ; sinon : « Aucune compétence du profil ne "
+                "correspond à l'offre ».")
+
 SYSTEME = ("Tu es un recruteur qui évalue des offres pour un candidat. Tu réponds uniquement par un "
            "objet JSON valide, en français, sans texte autour.")
 
@@ -201,7 +207,7 @@ def construire_messages(offre, profil, mode="alternance") -> list[dict]:
         f"Lieu : {offre.get('lieu', '') or 'non précisé'}\n"
         f"Description : {description}\n"
         "=== FIN DU TEXTE DE L'OFFRE ===\n\n"
-        f"{regles}\n{ETALEMENT}\n\n"
+        f"{regles}\n{ETALEMENT}\n{POINTS_FORTS}\n\n"
         f"{EXTRACTION}\n\n"
         f"{FORMAT_REPONSE}"
     )
