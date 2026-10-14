@@ -423,3 +423,8 @@ Retour de l'humain après une recherche sur les modèles locaux et Ollama en oct
 
 ### D92. Autres points du rapport de la phase 7 : propositions gardées
 - **Décision.** Points 2 à 9 et 13 à 15 du rapport validés tels que proposés : délai de 600 s sans nouvel essai après un délai dépassé, 5xx retentée une fois ; file des offres non analysées et non archivées, par date de publication ; archivage après analyse seulement pour une offre encore « nouvelle » ; bouton « Analyser » avec domaine et archivage complet ; identité retirée des prompts d'analyse, champs ramenés à 400 caractères, trois projets au plus ; prompt et trame par défaut du stage ; adresse nominative du domaine et fournisseur générique toujours douteux, 5 adresses au plus par entreprise ; revalidation sans relire le site ; `ANALYSE_IA=true` dans `.env.example`, script de vérification qui ignore `ANALYSE_IA=false` ; modèles `ministral-3:8b` et `ministral-3:3b` jusqu'à la comparaison du script. Le point 6 (score strict de 1 à 10) est remplacé par D87 (score ramené à 0..10 en Python).
+
+### D93. Points 16 à 19 du rapport de la phase 7 : validés
+- **Décision.** `keep_alive` envoyé au premier niveau de la requête, où l'API d'Ollama le lit ; temps pour vider la file estimé sur la moyenne des 50 dernières analyses du processus, 90 s par offre avant toute mesure ; test de démarrage refait à chaque redémarrage de l'application, une fois par modèle, sur la forme de la réponse seulement ; meilleur contact affiché seulement, l'envoi partant vers toutes les adresses validées.
+- **En attente** : tableau de `scripts/verifier_ia_locale.py` et version d'Ollama, renvoyés par l'humain.
+

@@ -166,7 +166,7 @@ Tests : 894 passent sous plafond mémoire.
 
 ## Points à valider
 
-Les points 1 à 15 ci-dessous ont été tranchés le 14 octobre 2026 (D88 à D92) ; le point 6 est remplacé par D87. Nouveaux points :
+Tous les points sont tranchés : 1 à 15 par D88 à D92 (le point 6 remplacé par D87), 16 à 19 validés par D93. Reste à recevoir le tableau du script et la version d'Ollama.
 
 16. **keep_alive** au premier niveau de la requête (l'API d'Ollama l'y lit) plutôt que dans `options`.
 17. **Estimation de la file** : moyenne des 50 dernières analyses du processus (perdue au redémarrage), 90 s avant toute mesure.
