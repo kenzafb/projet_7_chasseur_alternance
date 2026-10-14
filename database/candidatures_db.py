@@ -32,7 +32,7 @@ def _ecrire(c: Candidature, champ: str, valeur):
     setattr(c, champ, vers_utc(valeur) if champ in _DATES else valeur)
 
 
-def _vers_dict(c: Candidature) -> dict:
+def candidature_vers_dict(c: Candidature) -> dict:
     """Transforme une ligne de base en dict au format de l'ancien JSON."""
     d = {champ: getattr(c, champ) for champ in _CHAMPS}
     for champ in _DATES:
@@ -49,7 +49,7 @@ def lire_candidatures(user_id: int, mode: str = "alternance") -> list[dict]:
                     .filter_by(user_id=user_id, mode=mode)
                     .order_by(Candidature.score.desc().nullslast())   # non analysées en dernier
                     .all())
-        return [_vers_dict(c) for c in lignes]
+        return [candidature_vers_dict(c) for c in lignes]
     finally:
         db.close()
 
@@ -75,7 +75,7 @@ def lire_en_attente(user_id: int, mode: str, limite: int | None = None) -> list[
                    .order_by(Candidature.date_trouvee.desc().nullslast(), Candidature.id.desc()))
         if limite:
             requete = requete.limit(limite)
-        return [_vers_dict(c) for c in requete.all()]
+        return [candidature_vers_dict(c) for c in requete.all()]
     finally:
         db.close()
 
@@ -93,7 +93,7 @@ def lire_candidature(user_id: int, ref_offre: str, mode: str = "alternance") -> 
     db = SessionLocal()
     try:
         c = db.query(Candidature).filter_by(user_id=user_id, ref_offre=ref_offre, mode=mode).first()
-        return _vers_dict(c) if c else None
+        return candidature_vers_dict(c) if c else None
     finally:
         db.close()
 

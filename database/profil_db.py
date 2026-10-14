@@ -18,49 +18,52 @@ def lire_profil(user_id: int, mode: str = "alternance") -> dict:
     db = SessionLocal()
     try:
         p = db.query(Profil).filter_by(user_id=user_id, mode=mode).first()
-        if not p:
-            return {}
-        return {
-            "prenom": p.prenom or "",
-            "nom": p.nom or "",
-            "email": p.email_contact or "",
-            "telephone": p.telephone or "",
-            "ville": p.ville or "",
-            "linkedin": p.linkedin or "",
-            "github": p.github or "",
-            "formation": p.formation or "",
-            "experience": p.experience or "",
-            "langues": p.langues or "",
-            "disponibilite": p.disponibilite or "",
-            "paragraphe_perso": p.paragraphe_perso or "",
-            "niveau_vise": p.niveau_vise or "",
-            "formation_apporte": p.formation_apporte or "",
-            "criteres_eviter": p.criteres_eviter or "",
-            "niveau_etudes": p.niveau_etudes or "",
-            "duree_souhaitee": p.duree_souhaitee or "",
-            "dispo_horaires": p.dispo_horaires or "",
-            "mobilite": p.mobilite or "",
-            "types_jobs_ok": p.types_jobs_ok or "",
-            "types_jobs_eviter": p.types_jobs_eviter or "",
-            "localisation_pref": p.localisation_pref or "",
-            # Mode stage : dates en AAAA-MM-JJ (vides si absentes), durée calculée
-            "date_debut": p.date_debut.isoformat() if p.date_debut else "",
-            "date_fin": p.date_fin.isoformat() if p.date_fin else "",
-            "duree_semaines": duree_semaines(p.date_debut, p.date_fin),
-            "etablissement": p.etablissement or "",
-            "missions": p.missions or "",
-            "portfolio": p.portfolio or "",
-            "analyse_auto": bool(p.analyse_auto),
-            "competences": p.competences or [],
-            "projets": p.projets or [],
-            "recherche": p.recherche or {},
-            "lettre_type": p.lettre_type or "",
-            "email_objet": p.email_objet or "",
-            "email_type": p.email_type or "",
-            "pieces_jointes": p.pieces_jointes or [],
-        }
+        return profil_vers_dict(p) if p else {}
     finally:
         db.close()
+
+
+def profil_vers_dict(p: Profil) -> dict:
+    """Une ligne de profils -> dict (format de lire_profil)."""
+    return {
+        "prenom": p.prenom or "",
+        "nom": p.nom or "",
+        "email": p.email_contact or "",
+        "telephone": p.telephone or "",
+        "ville": p.ville or "",
+        "linkedin": p.linkedin or "",
+        "github": p.github or "",
+        "formation": p.formation or "",
+        "experience": p.experience or "",
+        "langues": p.langues or "",
+        "disponibilite": p.disponibilite or "",
+        "paragraphe_perso": p.paragraphe_perso or "",
+        "niveau_vise": p.niveau_vise or "",
+        "formation_apporte": p.formation_apporte or "",
+        "criteres_eviter": p.criteres_eviter or "",
+        "niveau_etudes": p.niveau_etudes or "",
+        "duree_souhaitee": p.duree_souhaitee or "",
+        "dispo_horaires": p.dispo_horaires or "",
+        "mobilite": p.mobilite or "",
+        "types_jobs_ok": p.types_jobs_ok or "",
+        "types_jobs_eviter": p.types_jobs_eviter or "",
+        "localisation_pref": p.localisation_pref or "",
+        # Mode stage : dates en AAAA-MM-JJ (vides si absentes), durée calculée
+        "date_debut": p.date_debut.isoformat() if p.date_debut else "",
+        "date_fin": p.date_fin.isoformat() if p.date_fin else "",
+        "duree_semaines": duree_semaines(p.date_debut, p.date_fin),
+        "etablissement": p.etablissement or "",
+        "missions": p.missions or "",
+        "portfolio": p.portfolio or "",
+        "analyse_auto": bool(p.analyse_auto),
+        "competences": p.competences or [],
+        "projets": p.projets or [],
+        "recherche": p.recherche or {},
+        "lettre_type": p.lettre_type or "",
+        "email_objet": p.email_objet or "",
+        "email_type": p.email_type or "",
+        "pieces_jointes": p.pieces_jointes or [],
+    }
 
 
 def sauvegarder_profil(user_id: int, donnees: dict, mode: str = "alternance") -> bool:
