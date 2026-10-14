@@ -24,6 +24,21 @@ export function etiquettesAutresModes(e) {
   }).join("");
 }
 
+/* Comment chaque adresse a été validée (phase 7) */
+const VALIDATION = {
+  regle: ["validée par règle", "chip--vert"], ia: ["validée par l'IA", "chip--vert"],
+  manuelle: ["validée à la main", "chip--vert"], lba: ["fournie par LBA", "chip--lba"],
+  inconnue: ["validée avant la phase 7", "chip--gris"], douteuse: ["non validée", "chip--gris"],
+  ecartee_ia: ["écartée par l'IA", "chip--rouge"],
+};
+function etiquetteAdresse(a) {
+  const [texte, classe] = VALIDATION[a.validation] || [a.validation, "chip--gris"];
+  return `<span class="chip ${classe}" title="${esc(texte)}">${esc(texte)}</span>${a.meilleur ? ' <span class="chip chip--ft" title="Meilleur contact selon l\'IA">meilleur contact</span>' : ""}`;
+}
+function listeAdresses(adresses) {
+  return adresses.map(a => `<div>${esc(a.adresse)} ${etiquetteAdresse(a)}</div>`).join("");
+}
+
 function ligne(e) {
   const aEmail = !!e.email;
   const statut = e.envoye
@@ -42,7 +57,8 @@ function ligne(e) {
         <div class="trow__name">${esc(e.nom || "—")}${pastilles}${etiquettesAutresModes(e)}</div>
         <div class="trow__sub">${esc(e.ville || "")}</div>
       </div>
-      <div class="trow__mail ${aEmail ? "" : "trow__mail--none"}">${aEmail ? esc(e.email) : "non trouvé"}${origine}</div>
+      <div class="trow__mail ${aEmail ? "" : "trow__mail--none"}">${(e.adresses || []).length
+        ? listeAdresses(e.adresses) : aEmail ? esc(e.email) + origine : "non trouvé"}</div>
       <div>${statut}</div>
     </div>`;
 }

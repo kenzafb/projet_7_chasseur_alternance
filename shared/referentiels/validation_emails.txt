@@ -5,7 +5,11 @@
 #
 # Ordre d'application, pour chaque adresse trouvée sur le site d'une entreprise :
 #   1. liste d'exclusion (emails_exclus.txt) ou préfixe écarté : écartée d'office ;
-#   2. même domaine que le site de l'entreprise ET préfixe de contact : validée d'office ;
+#   2. validée d'office seulement si TOUT est vrai : même domaine que le site de
+#      l'entreprise ; ce site a été retenu parce que son domaine correspond au
+#      nom de l'entreprise (ni annuaire, ni sous-domaine d'hébergeur, cf.
+#      [hebergeurs]) ; le domaine n'est pas un fournisseur générique (cf.
+#      [fournisseurs_generiques]) ; préfixe de contact ;
 #   3. tout le reste est douteux : l'IA (modèle d'extraction) tranche si elle
 #      est active, sinon l'adresse reste « non validée » (jamais envoyée
 #      automatiquement, à valider à la main).
@@ -103,10 +107,11 @@ newsletter
 unsubscribe
 desabonnement
 
-[domaines_messagerie]
-# Messageries grand public : une petite entreprise s'en sert souvent, mais
-# rien ne prouve que l'adresse est la sienne. Toujours douteuses (l'IA lit
-# alors le texte autour de l'adresse).
+[fournisseurs_generiques]
+# Messageries et fournisseurs d'accès ou de sites grand public : une petite
+# entreprise s'en sert souvent, mais rien ne prouve que l'adresse est la
+# sienne. Jamais validées d'office (l'IA lit le texte autour de l'adresse,
+# ou validation à la main). Un domaine vaut aussi pour ses sous-domaines.
 gmail.com
 googlemail.com
 hotmail.com
@@ -118,17 +123,57 @@ live.fr
 msn.com
 yahoo.com
 yahoo.fr
+ymail.com
 icloud.com
 me.com
+mac.com
+aol.com
 orange.fr
 wanadoo.fr
 free.fr
+aliceadsl.fr
 sfr.fr
 neuf.fr
-laposte.net
+club-internet.fr
+cegetel.net
+numericable.fr
 bbox.fr
-aol.com
+laposte.net
 gmx.fr
 gmx.com
 protonmail.com
 proton.me
+mail.com
+wix.com
+wixsite.com
+ovh.net
+
+[hebergeurs]
+# Domaines d'hébergeurs et de créateurs de sites : un site sur l'un de leurs
+# sous-domaines (monentreprise.wixsite.com) n'est pas « le domaine de
+# l'entreprise ». Un domaine vaut aussi pour ses sous-domaines.
+wixsite.com
+wixstudio.io
+wordpress.com
+blogspot.com
+blogspot.fr
+over-blog.com
+canalblog.com
+jimdo.com
+jimdofree.com
+jimdosite.com
+webnode.fr
+webnode.com
+e-monsite.com
+site123.me
+business.site
+squarespace.com
+weebly.com
+strikingly.com
+godaddysites.com
+github.io
+netlify.app
+vercel.app
+pagesperso-orange.fr
+free.fr
+sfr.fr

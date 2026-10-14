@@ -19,7 +19,7 @@ from tests.conftest import erreur_http
     ("camille.martin@acme.fr", "acme.fr", ve.DOUTEUX),    # nominative
     ("contactless@acme.fr", "acme.fr", ve.DOUTEUX),       # « contact » n'est pas un préfixe ici
     ("contact@agence-web.fr", "acme.fr", ve.DOUTEUX),     # autre domaine
-    ("acme.paris@gmail.com", "acme.fr", ve.DOUTEUX),      # messagerie grand public
+    ("acme.paris@gmail.com", "acme.fr", ve.DOUTEUX),      # fournisseur générique
     ("contact@acme.fr", None, ve.DOUTEUX),                # site inconnu
     ("dpo@acme.fr", "acme.fr", ve.ECARTE),                # préfixe écarté
     ("presse.paris@acme.fr", "acme.fr", ve.ECARTE),
@@ -27,13 +27,42 @@ from tests.conftest import erreur_http
     ("votre@email.com", "email.com", ve.ECARTE),          # liste d'exclusion (D47)
     ("x@o123.ingest.sentry.io", "acme.fr", ve.ECARTE),
 ])
-def test_regles(email, site, decision):
-    assert ve.classer(email, site)[0] == decision
+def test_regles_avec_un_site_fiable(email, site, decision):
+    assert ve.classer(email, site, fiable=True)[0] == decision
+
+
+def test_jamais_validee_d_office_sans_site_fiable():
+    assert ve.classer("contact@acme.fr", "acme.fr")[0] == ve.DOUTEUX   # fiable=False par défaut
+    assert "ne correspond pas au nom" in ve.classer("contact@acme.fr", "acme.fr")[1]
+
+
+@pytest.mark.parametrize("domaine, nom, fiable", [
+    ("acme.fr", "ACME", True),
+    ("www.boulangerie-martin.fr", "Boulangerie Martin", True),
+    ("plomberie-dupuis.fr", "SARL Dupuis Plomberie", True),
+    ("acme.wixsite.com", "ACME", False),                 # sous-domaine d'hébergeur
+    ("acme.free.fr", "ACME", False),
+    ("pagesjaunes.fr", "ACME", False),                   # annuaire
+    ("monagence.fr", "ACME", False),                     # sans rapport avec le nom
+    (None, "ACME", False),
+])
+def test_site_fiable(domaine, nom, fiable):
+    assert ve.site_fiable(domaine, nom) is fiable
+
+
+@pytest.mark.parametrize("email, site", [
+    ("contact@orange.fr", "orange.fr"),                  # même domaine, mais fournisseur générique
+    ("contact@wanadoo.fr", "wanadoo.fr"),
+    ("contact@acme.wixsite.com", "acme.wixsite.com"),
+    ("info@laposte.net", "laposte.net"),
+])
+def test_fournisseur_generique_jamais_valide_d_office(email, site):
+    assert ve.classer(email, site, fiable=True)[0] == ve.DOUTEUX
 
 
 def test_raisons_lisibles():
-    assert ve.classer("x@gmail.com", "acme.fr")[1] == "messagerie grand public"
-    assert ve.classer("x@autre.fr", "acme.fr")[1] == "autre domaine que le site"
+    assert ve.classer("x@gmail.com", "acme.fr", True)[1] == "fournisseur générique"
+    assert ve.classer("x@autre.fr", "acme.fr", True)[1] == "autre domaine que le site"
 
 
 def test_fichier_de_regles_lisible_et_complet():
@@ -41,8 +70,16 @@ def test_fichier_de_regles_lisible_et_complet():
     assert set(r) == set(ve.SECTIONS)
     assert {"contact", "recrutement", "rh"} <= r["prefixes_contact"]
     assert {"dpo", "presse", "noreply"} <= r["prefixes_ecartes"]
-    assert "gmail.com" in r["domaines_messagerie"]
+    assert {"free.fr", "orange.fr", "wanadoo.fr", "sfr.fr", "laposte.net", "gmail.com", "outlook.com",
+            "hotmail.com", "yahoo.fr", "icloud.com", "wix.com"} <= r["fournisseurs_generiques"]
+    assert {"wixsite.com", "wordpress.com", "blogspot.com"} <= r["hebergeurs"]
     assert not r["prefixes_contact"] & r["prefixes_ecartes"]
+
+
+def test_provenance(ia):
+    ia.reponse = '{"valides": ["gerant@gmail.com"], "meilleur_contact": null}'
+    tri = ve.trier(["contact@acme.fr", "gerant@gmail.com"], "acme.fr", nom="ACME")
+    assert tri["provenance"] == {"contact@acme.fr": ve.REGLE, "gerant@gmail.com": ve.IA}
 
 
 def test_section_inconnue_refusee(tmp_path, monkeypatch):
@@ -65,7 +102,7 @@ def test_contexte_autour_de_l_adresse():
 
 
 def test_sans_ia_douteux_non_valides(ia):
-    tri = ve.trier(["contact@acme.fr", "dpo@acme.fr", "x@gmail.com"], "acme.fr",
+    tri = ve.trier(["contact@acme.fr", "dpo@acme.fr", "x@gmail.com"], "acme.fr", nom="ACME",
                    texte="Joindre x@gmail.com", ia=False)
     assert tri["valides"] == ["contact@acme.fr"] and tri["douteux"] == ["x@gmail.com"]
     assert tri["ecartes"] == [("dpo@acme.fr", "adresse qui ne sert pas à candidater")]
@@ -92,7 +129,7 @@ def test_un_appel_par_entreprise_pour_les_douteux(ia):
 
 
 def test_pas_d_appel_sans_douteuse(ia):
-    tri = ve.trier(["contact@acme.fr"], "acme.fr")
+    tri = ve.trier(["contact@acme.fr"], "acme.fr", nom="ACME")
     assert tri["valides"] == ["contact@acme.fr"] and ia.appels == [] and tri["meilleur_contact"] is None
 
 

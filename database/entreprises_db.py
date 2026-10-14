@@ -208,6 +208,7 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
                 "envoye":    False,
                 "sources":   list(e.sources or []),
                 "email_lba": bool(set(e.emails_trouves or []) & set((e.extra or {}).get("emails_lba") or [])),
+                "adresses":  adresses(e),
                 "contacts_autres_modes": ailleurs.get(e.id, []),
             }
             for e, m in prochaines_paires
@@ -236,7 +237,8 @@ _CHAMPS_EXTRA_REMONTES = ["nom", "url_scrapee", "source_recherche"]
 # page autour de chacune, pour la validation par l'IA plus tard
 # (shared/validation_emails.py)
 _CHAMPS_EXTRA_SCRAPER = ("telephone", "url_scrapee", "source_recherche", "tentatives_site",
-                         "emails_non_valides", "emails_douteux", "contextes_emails", "meilleur_contact")
+                         "emails_non_valides", "emails_douteux", "contextes_emails", "meilleur_contact",
+                         "validation_emails")
 
 
 def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
@@ -273,6 +275,7 @@ def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
     d["emails_douteux"] = extra.get("emails_douteux")   # None : avant la phase 7
     d["contextes_emails"] = dict(extra.get("contextes_emails") or {})
     d["meilleur_contact"] = extra.get("meilleur_contact")
+    d["validation_emails"] = dict(extra.get("validation_emails") or {})
     # On garde extra complet aussi, au cas où
     d["_extra"] = extra
     d["_id"] = e.id   # id technique en base, pour réécrire précisément
@@ -303,6 +306,21 @@ def _douteux(e: Entreprise) -> list[str]:
                            "emails_non_valides": extra.get("emails_non_valides")})
 
 
+def adresses(e: Entreprise) -> list[dict]:
+    """Chaque adresse de l'entreprise et comment elle a été validée :
+    regle, ia, manuelle, lba (fournie par La Bonne Alternance), inconnue
+    (validée avant la phase 7), ou douteuse (pas encore validée) ;
+    meilleur : désignée par l'IA comme meilleur contact."""
+    extra = e.extra or {}
+    douteux = set(_douteux(e))
+    provenance = extra.get("validation_emails") or {}
+    lba = set(extra.get("emails_lba") or [])
+    return [{"adresse": a,
+             "validation": "douteuse" if a in douteux else provenance.get(a) or ("lba" if a in lba else "inconnue"),
+             "meilleur": a == extra.get("meilleur_contact")}
+            for a in e.emails_trouves or []]
+
+
 def _en_attente_de_validation(e: Entreprise, m: EntrepriseMode) -> bool:
     """Adresses douteuses pas encore validées, entreprise pas encore envoyée
     dans ce mode (D15)."""
@@ -316,7 +334,8 @@ def lire_a_valider(user_id: int, mode: str = MODE_DEFAUT) -> list[dict]:
     try:
         return [{"id": e.id, "nom": e.nom_commercial or (e.extra or {}).get("nom", "") or "?",
                  "ville": e.ville or "", "site": e.site_web or "", "emails": _douteux(e),
-                 "valides": [a for a in e.emails_trouves or [] if a not in _douteux(e)]}
+                 "valides": [a for a in e.emails_trouves or [] if a not in _douteux(e)],
+                 "adresses": adresses(e)}
                 for e, m in _du_mode(db, user_id, mode)
                 if _en_attente_de_validation(e, m)]
     finally:
@@ -336,7 +355,10 @@ def valider_emails(user_id: int, entreprise_id: int) -> bool:
         e = db.query(Entreprise).filter_by(user_id=user_id, id=entreprise_id).first()
         if not e or not ((e.extra or {}).get("emails_non_valides") and _douteux(e)):
             return False
-        e.extra = {**(e.extra or {}), "emails_non_valides": False, "emails_douteux": [], "contextes_emails": {}}
+        extra = dict(e.extra or {})
+        extra["validation_emails"] = {**(extra.get("validation_emails") or {}),
+                                      **{a: "manuelle" for a in _douteux(e)}}
+        e.extra = {**extra, "emails_non_valides": False, "emails_douteux": [], "contextes_emails": {}}
         db.commit()
         return True
     finally:

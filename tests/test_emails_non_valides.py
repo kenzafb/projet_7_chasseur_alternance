@@ -112,16 +112,17 @@ def test_relance_regles_d_abord(alice, ia, pipelines_neufs):
     """Une adresse validée d'office par les règles n'est pas soumise à l'IA."""
     client, user_id, _ = alice
     liste = lire_entreprises(user_id)
-    liste[1].update(emails_trouves=["recrutement@acme1.fr", "x@agence.fr"],
-                    emails_douteux=["recrutement@acme1.fr", "x@agence.fr"],
+    liste[1].update(site_web="https://ent1.fr", emails_trouves=["recrutement@ent1.fr", "x@agence.fr"],
+                    emails_douteux=["recrutement@ent1.fr", "x@agence.fr"],
                     contextes_emails={"x@agence.fr": "Site réalisé par l'agence"})
     sauvegarder_enrichissement(user_id, liste)
-    ia.reponse = '{"valides": [], "meilleur_contact": "recrutement@acme1.fr"}'
+    ia.reponse = '{"valides": [], "meilleur_contact": "recrutement@ent1.fr"}'
     _revalider(client, user_id, pipelines_neufs, max_revalidations=1)
     assert len(ia.appels) == 1 and "Site réalisé par l'agence" in ia.textes(0)
     e = lire_entreprises(user_id)[1]
-    assert e["emails_trouves"] == ["recrutement@acme1.fr"] and e["emails_non_valides"] is False
-    assert e["meilleur_contact"] == "recrutement@acme1.fr"     # adresse validée par les règles
+    assert e["emails_trouves"] == ["recrutement@ent1.fr"] and e["emails_non_valides"] is False
+    assert e["meilleur_contact"] == "recrutement@ent1.fr"      # adresse validée par les règles
+    assert e["validation_emails"] == {"recrutement@ent1.fr": "regle"}
 
 
 def test_relance_ia_en_echec_passager_reste_a_valider(alice, ia, pipelines_neufs):
@@ -172,3 +173,19 @@ def test_maazi_ne_declenche_plus_l_archivage():
     assert reserve_public_specifique("Programme MAAZI, accompagnement des alternants.") is False
     source = (config.BASE_DIR / "france_travail" / "analyseur.py").read_text(encoding="utf-8").lower()
     assert "maazi" not in source
+
+
+def test_provenance_affichee_par_adresse(alice, ia, pipelines_neufs):
+    client, user_id, ids = alice
+    liste = lire_entreprises(user_id)
+    liste[0]["validation_emails"] = {"rh0@ent0.fr": "regle"}
+    sauvegarder_enrichissement(user_id, liste)
+    ia.file = ['{"valides": ["rh1@ent1.fr"], "meilleur_contact": "rh1@ent1.fr"}']
+    _revalider(client, user_id, pipelines_neufs, max_revalidations=1)
+    client.post("/api/spontanees/valider", json={"id": ids[2]})
+    lignes = {e["id"]: e["adresses"] for e in client.get("/api/spontanees/stats").json()["prochaines"]}
+    assert lignes[ids[0]] == [{"adresse": "rh0@ent0.fr", "validation": "regle", "meilleur": False}]
+    assert lignes[ids[1]] == [{"adresse": "rh1@ent1.fr", "validation": "ia", "meilleur": True}]
+    assert lignes[ids[2]] == [{"adresse": "rh2@ent2.fr", "validation": "manuelle", "meilleur": False}]
+    js = (config.STATIC_DIR / "js" / "spontanees.js").read_text(encoding="utf-8")
+    assert "validée par règle" in js and "validée par l'IA" in js and "validée à la main" in js

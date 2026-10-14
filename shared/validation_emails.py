@@ -9,8 +9,11 @@ Règles dans shared/referentiels/validation_emails.txt, fichier de données
 messageries grand public), en plus de la liste d'exclusion de D47
 (shared/referentiels/emails_exclus.txt) :
   - écartée d'office : adresse exclue, ou préfixe écarté (dpo@, presse@...) ;
-  - validée d'office : même domaine que le site de l'entreprise et préfixe
-    de contact ou de recrutement (contact@, rh@, recrutement@...) ;
+  - validée d'office : même domaine que le site de l'entreprise, site retenu
+    parce que son domaine correspond au nom de l'entreprise (ni annuaire, ni
+    sous-domaine d'hébergeur), domaine qui n'est pas un fournisseur
+    générique (gmail.com, orange.fr, wix.com...), et préfixe de contact ou
+    de recrutement (contact@, rh@, recrutement@...) ;
   - douteuse : tout le reste (autre domaine, messagerie grand public,
     adresse nominative). L'IA (modèle d'extraction) tranche en un appel par
     entreprise, à partir du texte qui entoure chaque adresse sur la page, et
@@ -35,7 +38,9 @@ from shared.emails_exclus import email_exclu
 FICHIER = Path(__file__).resolve().parent / "referentiels" / "validation_emails.txt"
 
 VALIDE, ECARTE, DOUTEUX = "valide", "ecarte", "douteux"
-SECTIONS = ("prefixes_contact", "prefixes_ecartes", "domaines_messagerie")
+SECTIONS = ("prefixes_contact", "prefixes_ecartes", "fournisseurs_generiques", "hebergeurs")
+# Comment une adresse a été validée (extra.validation_emails), affiché dans l'interface
+REGLE, IA, MANUELLE = "regle", "ia", "manuelle"
 RAYON_CONTEXTE = 200   # caractères gardés de part et d'autre de l'adresse
 
 
@@ -71,8 +76,34 @@ def domaine_parent(domaine: str) -> str:
     return ".".join(parties[-2:]) if len(parties) >= 2 else ".".join(parties)
 
 
-def classer(email: str, domaine_site: str | None) -> tuple[str, str]:
-    """(VALIDE, ECARTE ou DOUTEUX ; raison lisible) d'après les règles seules."""
+def _dans(domaine: str, domaines) -> bool:
+    """domaine est l'un de `domaines` ou l'un de leurs sous-domaines."""
+    parties = (domaine or "").lower().strip(".").split(".")
+    return any(".".join(parties[i:]) in domaines for i in range(len(parties) - 1))
+
+
+def generique(domaine: str) -> bool:
+    """Fournisseur grand public (gmail.com, orange.fr, wix.com...)."""
+    return _dans(domaine, regles()["fournisseurs_generiques"])
+
+
+def site_fiable(domaine_site: str | None, nom: str) -> bool:
+    """Le site a-t-il été retenu parce que son domaine correspond au nom de
+    l'entreprise ? Faux pour un annuaire, un sous-domaine d'hébergeur, un
+    fournisseur générique, ou un domaine sans rapport avec le nom."""
+    if not domaine_site:
+        return False
+    domaine = domaine_site.lower().removeprefix("www.")
+    if _dans(domaine, regles()["hebergeurs"]) or generique(domaine):
+        return False
+    from spontanees.scraper_emails import analyser_nom, domaine_correspond, est_annuaire
+    return not est_annuaire(domaine) and domaine_correspond(domaine, analyser_nom(nom or ""))[0]
+
+
+def classer(email: str, domaine_site: str | None, fiable: bool = False) -> tuple[str, str]:
+    """(VALIDE, ECARTE ou DOUTEUX ; raison lisible) d'après les règles seules.
+    fiable : le site correspond au nom de l'entreprise (site_fiable) ; sans
+    cela, aucune adresse n'est validée d'office."""
     email = (email or "").strip().lower()
     local, _, domaine = email.rpartition("@")
     r = regles()
@@ -80,13 +111,15 @@ def classer(email: str, domaine_site: str | None) -> tuple[str, str]:
         return ECARTE, "liste d'exclusion"
     if _a_le_prefixe(local, r["prefixes_ecartes"]):
         return ECARTE, "adresse qui ne sert pas à candidater"
+    if generique(domaine):
+        return DOUTEUX, "fournisseur générique"
     meme_domaine = bool(domaine_site) and domaine_parent(domaine) == domaine_parent(domaine_site)
+    if meme_domaine and not fiable:
+        return DOUTEUX, "site dont le domaine ne correspond pas au nom de l'entreprise"
     if meme_domaine and _a_le_prefixe(local, r["prefixes_contact"]):
         return VALIDE, "domaine du site, adresse de contact"
     if meme_domaine:
         return DOUTEUX, "domaine du site, adresse nominative ou inhabituelle"
-    if domaine in r["domaines_messagerie"]:
-        return DOUTEUX, "messagerie grand public"
     if not domaine_site:
         return DOUTEUX, "site de l'entreprise inconnu"
     return DOUTEUX, "autre domaine que le site"
@@ -152,19 +185,25 @@ def trier(emails, domaine_site: str | None, nom: str = "", texte: str = "", ia: 
     texte : texte des pages lues (pour l'extrait autour de chaque adresse) ;
     contextes : extraits déjà connus {adresse: texte} (validation ultérieure) ;
     deja_valides : adresses déjà validées, proposées comme meilleur contact.
-    Retourne {"valides", "douteux", "ecartes" [(adresse, raison)],
-    "contextes" (des douteuses restantes), "meilleur_contact", "ia_bloquee"
-    ou "erreur_ia" (message) si l'IA a échoué : les douteuses le restent."""
+    Retourne {"valides", "provenance" {adresse validée: REGLE ou IA},
+    "douteux", "ecartes" [(adresse, raison)], "ecartes_ia" (adresses que
+    l'IA n'a pas retenues), "contextes" (des douteuses restantes),
+    "meilleur_contact", "ia_bloquee" ou "erreur_ia" (message) si l'IA a
+    échoué : les douteuses le restent. La validation d'office exige un site
+    fiable (site_fiable(domaine_site, nom))."""
     from shared.ia import ErreurIABloquante, ErreurIAPassagere
     contextes = dict(contextes or {})
-    resultat = {"valides": [], "douteux": [], "ecartes": [], "contextes": {}, "meilleur_contact": None}
+    resultat = {"valides": [], "provenance": {}, "douteux": [], "ecartes": [], "ecartes_ia": [],
+                "contextes": {}, "meilleur_contact": None}
     raisons = {}
+    fiable = site_fiable(domaine_site, nom)
     for email in dict.fromkeys(e.strip().lower() for e in emails or [] if e and e.strip()):
-        decision, raison = classer(email, domaine_site)
+        decision, raison = classer(email, domaine_site, fiable)
         if decision == ECARTE:
             resultat["ecartes"].append((email, raison))
         elif decision == VALIDE:
             resultat["valides"].append(email)
+            resultat["provenance"][email] = REGLE
         else:
             raisons[email] = raison
             resultat["contextes"][email] = contextes.get(email) or contexte(email, texte)
@@ -181,10 +220,12 @@ def trier(emails, domaine_site: str | None, nom: str = "", texte: str = "", ia: 
             for email in douteuses:
                 if email in retenues:
                     resultat["valides"].append(email)
+                    resultat["provenance"][email] = IA
                     if log:
                         log(f"    IA : {email} validée ({raisons[email]})")
                 else:
                     resultat["ecartes"].append((email, f"écartée par l'IA ({raisons[email]})"))
+                    resultat["ecartes_ia"].append(email)
             douteuses = []
             if meilleur in [*deja_valides, *resultat["valides"]]:
                 resultat["meilleur_contact"] = meilleur
