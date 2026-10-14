@@ -16,11 +16,11 @@ def ada(utilisateur):
     return client
 
 
-def test_lettre_profil_incomplet(ada, mistral):
+def test_lettre_profil_incomplet(ada, ia):
     r = ada.post("/api/generer_lettre", json={"id": "OFFRE-1"})
     assert r.status_code == 400
     assert r.json()["erreur"] == "Profil incomplet : renseigne prénom, nom dans l'onglet Profil."
-    assert mistral.appels == []   # refus avant tout appel à l'IA
+    assert ia.appels == []   # refus avant tout appel à l'IA
 
 
 def test_recherche_profil_absent_en_mode_job(ada):
@@ -45,15 +45,15 @@ def test_pdf_profil_incomplet(ada):
     ("{date.__class__} {paragraphe_entreprise}", "balise inconnue : {date.__class__}"),
     ("{date!r} {paragraphe_entreprise}", "balise inconnue : {date}"),
 ])
-def test_lettre_type_avec_accolade(ada, mistral, lettre_type, attendu):
+def test_lettre_type_avec_accolade(ada, ia, lettre_type, attendu):
     ada.post("/api/profil", json={**PROFIL_COMPLET, "lettre_type": lettre_type})
     r = ada.post("/api/generer_lettre", json={"id": "OFFRE-1"})
     assert r.status_code == 400
     assert attendu in r.json()["erreur"]
-    assert mistral.appels == []
+    assert ia.appels == []
 
 
-def test_lettre_type_valide_balises_avec_espaces(ada, mistral):
+def test_lettre_type_valide_balises_avec_espaces(ada, ia):
     ada.post("/api/profil", json={**PROFIL_COMPLET,
                                   "lettre_type": "{ contact_entreprise }\nLe {date}\n{paragraphe_entreprise}"})
     r = ada.post("/api/generer_lettre", json={"id": "OFFRE-1"})
@@ -61,7 +61,7 @@ def test_lettre_type_valide_balises_avec_espaces(ada, mistral):
     lettre = r.json()["lettre"]
     assert lettre.startswith("ACME\n75010 Paris\nLe ")
     assert "ACME, votre contexte me parle." in lettre
-    assert len(mistral.appels) == 1   # le faux client a bien servi
+    assert len(ia.appels) == 1   # le faux client a bien servi
 
 
 def test_pdf_profil_complet(ada, tmp_path):

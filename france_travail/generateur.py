@@ -2,7 +2,7 @@ import re
 import json
 import string
 from database.dates import maintenant_affichage
-from shared.ia import ErreurIAPassagere, appeler_mistral
+from shared.ia import ErreurIAPassagere, appeler_ia
 from shared.erreurs import ErreurUtilisateur, exiger_profil, CHAMPS_IDENTITE
 
 # ─── Lettre de motivation fixe ────────────────────────────────────────────────
@@ -112,13 +112,13 @@ def _nettoyer_contact(contact):
 
 def generer_lettre(offre, profil, mode="alternance"):
     """
-    Demande à Mistral uniquement :
+    Demande à l'IA uniquement :
     1. Le bloc contact de l'entreprise (coin haut gauche de la lettre)
     2. Le paragraphe de personnalisation (~3 phrases max)
 
     Assemble ensuite la lettre complète avec le template fixe.
     Lève ProfilIncomplet ou LettreTypeInvalide (erreurs 400) AVANT tout
-    appel à Mistral.
+    appel à l'IA.
     """
     exiger_profil(profil, CHAMPS_IDENTITE)
     template = preparer_lettre_type(profil.get("lettre_type") or lettre_par_defaut(mode))
@@ -214,18 +214,15 @@ def generer_lettre(offre, profil, mode="alternance"):
 
     # Un seul essai, pas de retry (comportement historique). ErreurIABloquante
     # et ErreurIAPassagere remontent : pas de lettre sans paragraphe rédigé.
-    response = appeler_mistral(
+    texte = appeler_ia(
         [{"role": "user", "content": prompt}],
         usage="lettre",
         tentatives=1,
         response_format={"type": "json_object"},
         temperature=0.6,
     )
-    finish = response.choices[0].finish_reason
-    texte = re.sub(r'```json\s*', '', response.choices[0].message.content or "")
+    texte = re.sub(r'```json\s*', '', texte)
     texte = re.sub(r'```\s*', '', texte).strip()
-    if finish != "stop":
-        print(f"  ⚠️  Mistral finish_reason={finish} — réponse potentiellement tronquée")
     result = json_parse(texte)
     if not isinstance(result, dict):
         result = {}
@@ -248,7 +245,7 @@ def generer_lettre(offre, profil, mode="alternance"):
     # ── Paragraphe manquant : pas de lettre incomplète ────────────────────
     if not paragraphe:
         raise ErreurIAPassagere(
-            "Mistral n'a pas rédigé le paragraphe sur l'entreprise : réessaie.")
+            "L'IA n'a pas rédigé le paragraphe sur l'entreprise : réessaie.")
 
     lettre = template.format(
         contact_entreprise=contact,

@@ -4,7 +4,7 @@ france_travail/pdf_generator.py
 Lettre de motivation -> PDF (WeasyPrint).
 
 Sécurité :
-  - tout ce qui vient de l'utilisateur ou de Mistral (lettre, profil, offre)
+  - tout ce qui vient de l'utilisateur ou de l'IA (lettre, profil, offre)
     est échappé avant d'entrer dans le HTML : une balise tapée dans la lettre
     s'imprime comme du texte, elle n'est jamais interprétée ;
   - le gabarit n'a besoin d'aucune ressource (styles en ligne, polices du

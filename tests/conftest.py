@@ -5,7 +5,7 @@ Isolation complète :
   - le vrai .env n'est pas lu (CHASSEUR_ENV_FILE pointe vers un fichier absent) ;
   - la base est un SQLite temporaire (DATABASE_URL) : schéma créé une fois
     par `alembic upgrade head` dans un modèle, recopié avant chaque test ;
-  - Mistral, SMTP et tout accès réseau sont neutralisés : un appel non prévu
+  - IA, SMTP et tout accès réseau sont neutralisés : un appel non prévu
     fait échouer le test au lieu de partir sur Internet ;
   - PDF et pièces jointes écrits dans un dossier temporaire, jamais dans data/.
 
@@ -20,19 +20,19 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from types import SimpleNamespace
 
 _TMP = Path(tempfile.mkdtemp(prefix="chasseur_tests_"))
 os.environ["CHASSEUR_ENV_FILE"] = str(_TMP / "absent.env")
 os.environ["DATABASE_URL"] = f"sqlite:///{_TMP / 'test.db'}"
 os.environ["SECRET_KEY"] = "cle-de-test-" + "x" * 40
 os.environ["COOKIE_SECURE"] = "false"
-os.environ["MISTRAL_API_KEY"] = "factice"
-os.environ["MISTRAL_INTERVALLE_MIN_S"] = "0"   # pas d'attente entre appels simulés
 for _var in ("CODE_INVITATION", "FT_CLIENT_ID", "FT_CLIENT_SECRET", "LBA_API_KEY",
-             "INSEE_API_KEY", "CLE_CHIFFREMENT", "PLAFOND_ENVOIS_JOUR", "ANALYSE_IA"):
+             "INSEE_API_KEY", "CLE_CHIFFREMENT", "PLAFOND_ENVOIS_JOUR", "ANALYSE_IA",
+             "IA_BASE_URL", "IA_API_KEY", "IA_MODELE_ANALYSE", "IA_MODELE_LETTRE", "IA_MODELE_EXTRACTION",
+             "IA_DELAI_S", "IA_LONGUEUR_DESCRIPTION", "IA_FORMAT_JSON", "IA_REFLEXION"):
     os.environ.pop(_var, None)
 
+import httpx  # noqa: E402
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -68,24 +68,60 @@ def pas_de_reseau(monkeypatch):
     monkeypatch.setattr("smtplib.SMTP_SSL", refuser)
 
 
-class FauxMistral:
-    """Remplace le client Mistral : enregistre les appels, renvoie `reponse`."""
+REPONSE_LETTRE = '{"contact_entreprise": "ACME\\n75010 Paris", "paragraphe_entreprise": "ACME, votre contexte me parle."}'
+
+
+def reponse_chat(contenu: str) -> httpx.Response:
+    """Réponse du serveur d'IA (format chat/completions) portant `contenu`."""
+    return httpx.Response(200, json={"choices": [{"index": 0, "finish_reason": "stop",
+                                                  "message": {"role": "assistant", "content": contenu}}]})
+
+
+def erreur_http(statut: int, message: str = "erreur") -> httpx.Response:
+    """Réponse d'erreur telle qu'Ollama la renvoie."""
+    return httpx.Response(statut, json={"error": {"message": message, "type": "api_error"}})
+
+
+class FausseIA:
+    """Remplace le serveur d'IA (shared.ia._poster et _obtenir). Enregistre
+    le corps de chaque requête (appels[i]["model"], ["messages"]...).
+    Réponse : `panne(corps)` si elle renvoie quelque chose (httpx.Response
+    ou exception levée), sinon le prochain élément de `file`, sinon
+    `reponse` (texte du message)."""
 
     def __init__(self):
         self.appels = []
-        self.reponse = '{"contact_entreprise": "ACME\\n75010 Paris", "paragraphe_entreprise": "ACME, votre contexte me parle."}'
-        self.chat = SimpleNamespace(complete=self._complete)
+        self.urls = []
+        self.reponse = REPONSE_LETTRE
+        self.file = []
+        self.panne = None
+        self.modeles = ["ministral-3:8b", "ministral-3:3b"]
 
-    def _complete(self, **kwargs):
-        self.appels.append(kwargs)
-        message = SimpleNamespace(content=self.reponse)
-        return SimpleNamespace(choices=[SimpleNamespace(message=message, finish_reason="stop")])
+    def __call__(self, url, corps, entetes, delai):
+        self.appels.append(corps)
+        self.urls.append(url)
+        r = self.panne(corps) if self.panne else None
+        if r is None:
+            r = self.file.pop(0) if self.file else self.reponse
+        if isinstance(r, BaseException):
+            raise r
+        return r if isinstance(r, httpx.Response) else reponse_chat(r)
+
+    def obtenir(self, url, entetes, delai):
+        self.urls.append(url)
+        return httpx.Response(200, json={"object": "list", "data": [{"id": m, "object": "model"}
+                                                                   for m in self.modeles]})
+
+    def textes(self, i=-1) -> str:
+        """Contenu des messages envoyés lors de l'appel i."""
+        return "\n".join(m["content"] for m in self.appels[i]["messages"])
 
 
 @pytest.fixture(autouse=True)
-def mistral(monkeypatch):
-    faux = FauxMistral()
-    monkeypatch.setattr(shared.ia, "client", faux)
+def ia(monkeypatch):
+    faux = FausseIA()
+    monkeypatch.setattr(shared.ia, "_poster", faux)
+    monkeypatch.setattr(shared.ia, "_obtenir", faux.obtenir)
     return faux
 
 

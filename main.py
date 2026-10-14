@@ -119,7 +119,7 @@ def chiffrement_indisponible(request: Request, exc: ChiffrementIndisponible):
 
 @app.exception_handler(ErreurIA)
 def erreur_ia(request: Request, exc: ErreurIA):
-    """Échec Mistral sur une route directe (lettre, réanalyse) : rien n'est
+    """Échec de l'IA sur une route directe (lettre, réanalyse) : rien n'est
     enregistré. 503 si la configuration est en cause, 502 sinon."""
     statut = 503 if isinstance(exc, ErreurIABloquante) else 502
     return JSONResponse({"erreur": str(exc)}, status_code=statut)
@@ -543,7 +543,7 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
                         etat(message=f"Analyse LBA {i}/{len(nouvelles_lba)}...",
                              pourcentage=40 + round(i / len(nouvelles_lba) * 60))
                         try:
-                            # Pas de pause ici : shared.ia espace déjà les appels Mistral
+                            # Un seul appel à l'IA à la fois : shared.ia s'en charge
                             analyse = analyser_offre(offre, profil)
                         except ErreurIAPassagere as e:
                             # Ni écrite ni archivée : elle reviendra au prochain lancement

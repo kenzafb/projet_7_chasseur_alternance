@@ -56,10 +56,10 @@ def test_candidature_de_b_non_modifiable(a_et_b, chemin, corps):
 
 
 @pytest.mark.parametrize("chemin", ["/api/generer_lettre", "/api/analyser", "/api/telecharger_pdf"])
-def test_candidature_de_b_introuvable_pour_a(a_et_b, mistral, chemin):
+def test_candidature_de_b_introuvable_pour_a(a_et_b, ia, chemin):
     client_a, _, _, _ = a_et_b
     assert client_a.post(chemin, json={"id": "OFFRE-B"}).status_code == 404
-    assert mistral.appels == []
+    assert ia.appels == []
 
 
 def test_suivi_spontanees_de_b_inaccessible(a_et_b):

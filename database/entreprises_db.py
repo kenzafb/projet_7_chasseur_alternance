@@ -56,7 +56,7 @@ def _avec_source(e, source: str) -> bool:
 
 def normaliser_contact_rh(valeur) -> str:
     """contact_rh sous une seule forme partout : un texte lisible.
-    Mistral peut renvoyer une chaîne, une liste de noms ou de dicts, ou un
+    L'IA peut renvoyer une chaîne, une liste de noms ou de dicts, ou un
     dict {prenom, nom, poste} ; d'anciennes lignes contiennent ces structures
     en JSON brut. Tout devient « Prénom Nom (poste), Autre Nom », borné à la
     taille de la colonne."""
@@ -230,7 +230,7 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
 # attendent au niveau racine du dict.
 _CHAMPS_EXTRA_REMONTES = ["nom", "url_scrapee", "source_recherche"]
 # Champs du scraper gardés dans extra (bug 5 : ils étaient perdus)
-# emails_non_valides : emails lus dans la page sans validation par Mistral
+# emails_non_valides : emails lus dans la page sans validation (par l'IA ou à la main)
 _CHAMPS_EXTRA_SCRAPER = ("telephone", "url_scrapee", "source_recherche", "tentatives_site",
                          "emails_non_valides")
 

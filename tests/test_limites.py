@@ -62,14 +62,13 @@ def _lba(i):
 
 
 @pytest.fixture
-def sources(monkeypatch, mistral):
+def sources(monkeypatch, ia):
     """France Travail et LBA simulés : nb_ft et nb_lba offres à chaque appel."""
     nombres = {"ft": 0, "lba": 0}
     monkeypatch.setattr(scraper, "recuperer_offres",
                         lambda criteres, log=print, **_: [_brut_ft(i) for i in range(nombres["ft"])])
     monkeypatch.setattr(main, "rechercher_lba", lambda profil, log=print: {"offres": [_lba(i) for i in range(nombres["lba"])], "entreprises": [], "requetes": 0})
-    monkeypatch.setattr(france_travail.analyseur, "PAUSE_MISTRAL", 0)
-    mistral.reponse = ANALYSE
+    ia.reponse = ANALYSE
     return nombres
 
 
@@ -80,33 +79,33 @@ def _rechercher(client, user_id, pipelines, **corps):
     return r.json()
 
 
-def test_recherche_limite_france_travail_et_lba_ensemble(utilisateur, sources, mistral, pipelines_neufs):
+def test_recherche_limite_france_travail_et_lba_ensemble(utilisateur, sources, ia, pipelines_neufs):
     client, user_id = utilisateur("a@test.fr", prenom="Alice")
     sources.update(ft=3, lba=10)
     assert _rechercher(client, user_id, pipelines_neufs, max_analyses=5)["max_analyses"] == 5
-    assert len(mistral.appels) == 5
+    assert len(ia.appels) == 5
     refs = {c["id"] for c in lire_candidatures(user_id)}
     assert len(refs) == 5 and sorted(r for r in refs if r.startswith("LBA")) == ["LBA0", "LBA1"]
     assert "limite" in client.get("/api/logs").text.lower()
 
 
-def test_offres_au_dela_de_la_limite_reproposees(utilisateur, sources, mistral, pipelines_neufs):
+def test_offres_au_dela_de_la_limite_reproposees(utilisateur, sources, ia, pipelines_neufs):
     client, user_id = utilisateur("a@test.fr", prenom="Alice")
     sources.update(ft=10)
     _rechercher(client, user_id, pipelines_neufs, max_analyses=4)
-    assert len(mistral.appels) == 4
+    assert len(ia.appels) == 4
     assert len(lire_offres_vues(user_id, "alternance")) == 4   # les 6 autres ne sont pas perdues
     assert len(lire_candidatures(user_id)) == 4
     _rechercher(client, user_id, pipelines_neufs, max_analyses=100)
     assert len(lire_candidatures(user_id)) == 10
 
 
-def test_recherche_lba_ignoree_quand_france_travail_epuise_la_limite(utilisateur, sources, mistral,
+def test_recherche_lba_ignoree_quand_france_travail_epuise_la_limite(utilisateur, sources, ia,
                                                                      pipelines_neufs):
     client, user_id = utilisateur("a@test.fr", prenom="Alice")
     sources.update(ft=6, lba=4)
     _rechercher(client, user_id, pipelines_neufs, max_analyses=6)
-    assert len(mistral.appels) == 6
+    assert len(ia.appels) == 6
     assert "LBA ignorée" in client.get("/api/logs").text
 
 
@@ -117,13 +116,13 @@ def test_recherche_defaut_et_plafond_serveur(utilisateur, sources, pipelines_neu
     assert client.post("/api/recherche", json={"max_analyses": 5, "autre": 1}).status_code == 422
 
 
-def test_limite_du_mode_job_reste_un_plafond(utilisateur, sources, mistral, pipelines_neufs):
+def test_limite_du_mode_job_reste_un_plafond(utilisateur, sources, ia, pipelines_neufs):
     client, user_id = utilisateur("a@test.fr", prenom="Alice")
     client.mode = "job"
     client.post("/api/profil", json={"prenom": "Alice"})
     sources.update(ft=8)
     _rechercher(client, user_id, pipelines_neufs, max_analyses=3)
-    assert len(mistral.appels) == 3
+    assert len(ia.appels) == 3
 
 
 # ─── Fetch des entreprises ───────────────────────────────────────────────────

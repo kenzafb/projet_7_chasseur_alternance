@@ -8,7 +8,7 @@ variable d'environnement doit l'importer (directement ou via un autre
 module du projet) pour que les valeurs du .env soient visibles.
 
 Il expose aussi les chemins du projet (indépendants du dossier courant),
-le modèle Mistral et la géographie de recherche (Île-de-France).
+le serveur et les modèles d'IA, et la géographie de recherche (Île-de-France).
 """
 
 import os
@@ -96,7 +96,7 @@ LIMITE_ENVOIS_PAR_LANCEMENT = 50
 # Choisies dans l'interface au moment de lancer. Valeur absente : défaut ;
 # inférieure à 1 : 1 ; au-delà du plafond : ramenée au plafond (côté serveur).
 LIMITES_LANCEMENT = {
-    "analyses":    {"defaut": 30,  "max": 200},    # offres analysées par Mistral (France Travail + LBA)
+    "analyses":    {"defaut": 30,  "max": 200},    # offres analysées par l'IA (France Travail + LBA)
     "sans_ia":     {"defaut": 100, "max": 500},    # offres ajoutées sans analyse, ANALYSE_IA=false (D20)
     "entreprises": {"defaut": 200, "max": 5000},   # nouvelles entreprises récupérées (Sirene)
     "scrapees":    {"defaut": 20,  "max": 200},    # entreprises dont on cherche le site et les emails
@@ -114,29 +114,50 @@ def limite_lancement(cle: str, demandee) -> int:
 # ─── IA ───────────────────────────────────────────────────────────────────────
 def analyse_ia_active() -> bool:
     """Interrupteur ANALYSE_IA du .env (vrai par défaut). Faux : aucun appel
-    à Mistral nulle part ; offres insérées « non analysées », scraper en
-    lecture directe seulement. Relu à chaque appel."""
+    à l'IA nulle part ; offres laissées « non analysées », emails douteux
+    laissés « non validés ». Relu à chaque appel."""
     valeur = os.getenv("ANALYSE_IA", "").strip().lower()
     return valeur not in ("0", "false", "non", "no", "off")
 
-MESSAGE_IA_DESACTIVEE = "IA désactivée (ANALYSE_IA=false dans le .env) : aucun appel à Mistral."
+MESSAGE_IA_DESACTIVEE = "IA désactivée (ANALYSE_IA=false dans le .env) : aucun appel à l'IA."
 
-# Modèle par usage : MODELE_MISTRAL_<USAGE> du .env, sinon MODELE_MISTRAL, sinon
-# le défaut de l'usage. scripts/verifier_mistral.py teste ceux de la clé.
-USAGES_MISTRAL = {
-    "analyse":    "mistral-medium-latest",   # notation des offres
-    "lettre":     "mistral-medium-latest",   # paragraphe des lettres de motivation
-    "extraction": "mistral-small-latest",    # emails et contacts des pages d'entreprise
+# Serveur d'IA au format compatible OpenAI (POST <IA_BASE_URL>/chat/completions) :
+# Ollama sur la machine par défaut. Tout est relu dans l'environnement à
+# chaque appel (un changement du .env vaut au lancement suivant).
+IA_BASE_URL_DEFAUT = "http://localhost:11434/v1"
+
+def ia_base_url() -> str:
+    return (os.getenv("IA_BASE_URL", "").strip() or IA_BASE_URL_DEFAUT).rstrip("/")
+
+def ia_api_key() -> str:
+    """Clé facultative (Ollama n'en demande pas), envoyée en « Bearer »."""
+    return os.getenv("IA_API_KEY", "").strip()
+
+# Modèle par usage : IA_MODELE_<USAGE> du .env, sinon le défaut de l'usage.
+# Sur processeur, un seul modèle chargé à la fois (OLLAMA_MAX_LOADED_MODELS=1)
+USAGES_IA = {
+    "analyse":    "ministral-3:8b",   # notation des offres
+    "lettre":     "ministral-3:8b",   # paragraphe des lettres de motivation
+    "extraction": "ministral-3:3b",   # validation des emails douteux du scraper
 }
 
-def modele_mistral(usage: str) -> str:
-    """Modèle Mistral d'un usage, relu dans l'environnement à chaque appel."""
-    return (os.getenv(f"MODELE_MISTRAL_{usage.upper()}", "").strip()
-            or os.getenv("MODELE_MISTRAL", "").strip()
-            or USAGES_MISTRAL[usage])
-# Intervalle minimum entre deux appels Mistral, commun à tout le processus
-# (tous utilisateurs et pipelines confondus). Surchargeable dans le .env.
-MISTRAL_INTERVALLE_MIN_S = float(os.getenv("MISTRAL_INTERVALLE_MIN_S") or 2.0)
+def modele_ia(usage: str) -> str:
+    """Modèle d'un usage, relu dans l'environnement à chaque appel."""
+    return os.getenv(f"IA_MODELE_{usage.upper()}", "").strip() or USAGES_IA[usage]
+
+def _reel(variable: str, defaut: float, minimum: float) -> float:
+    try:
+        return max(minimum, float(os.getenv(variable, "").strip() or defaut))
+    except ValueError:
+        return defaut
+
+def ia_delai_s() -> float:
+    """Attente maximale d'une réponse (secondes, défaut 600). Sur processeur,
+    une analyse prend une à deux minutes, plus le chargement du modèle."""
+    return _reel("IA_DELAI_S", 600, 10)
+
+# Attente maximale de l'ouverture de la connexion : au-delà, serveur injoignable
+IA_DELAI_CONNEXION_S = 10
 
 # ─── Géographie (Île-de-France) ───────────────────────────────────────────────
 # France Travail : code région INSEE de l'Île-de-France

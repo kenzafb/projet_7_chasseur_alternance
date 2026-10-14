@@ -21,8 +21,8 @@ argon2-cffi==25.1.0
 bcrypt==5.0.0
 cryptography==46.0.6        # chiffrement des mots de passe SMTP (Fernet)
 
-# IA
-mistralai==2.4.9
+# IA (serveur compatible OpenAI, Ollama par défaut)
+httpx==0.28.1
 
 # Scraping
 requests==2.33.1

@@ -12,7 +12,7 @@ from france_travail.analyseur import reserve_public_specifique
 from shared import config
 from tests.conftest import compte_verifie
 from tests.test_envoyeur import attendre, entreprises
-from tests.test_mistral import TIER, echouer, erreur_http
+from tests.test_ia import INTROUVABLE, echouer, erreur_http
 from tests.test_scraper_sans_ia import sites  # noqa: F401  (fixture)
 
 
@@ -95,9 +95,9 @@ def _revalider(client, user_id, pipelines, **corps):
     return r
 
 
-def test_relance_ia_valide_et_remplace(alice, sites, mistral, pipelines_neufs):  # noqa: F811
+def test_relance_ia_valide_et_remplace(alice, sites, ia, pipelines_neufs):  # noqa: F811
     client, user_id, _ = alice
-    mistral.reponse = '{"emails": ["recrutement@acme1.fr"], "telephones": [], "contact_rh": null, "fiable": true}'
+    ia.reponse = '{"emails": ["recrutement@acme1.fr"], "telephones": [], "contact_rh": null, "fiable": true}'
     r = _revalider(client, user_id, pipelines_neufs, max_revalidations=1)
     assert r.json()["max_revalidations"] == 1
     e = lire_entreprises(user_id)[1]
@@ -106,20 +106,20 @@ def test_relance_ia_valide_et_remplace(alice, sites, mistral, pipelines_neufs): 
     assert "Validation IA terminée : 1/1" in client.get("/api/logs").text
 
 
-def test_relance_ia_en_echec_passager_reste_a_valider(alice, sites, mistral, monkeypatch, pipelines_neufs):  # noqa: F811
+def test_relance_ia_en_echec_passager_reste_a_valider(alice, sites, ia, monkeypatch, pipelines_neufs):  # noqa: F811
     client, user_id, _ = alice
-    echouer(mistral, monkeypatch, erreur_http(503))
+    echouer(ia, erreur_http(503))
     _revalider(client, user_id, pipelines_neufs)
     assert [e["emails_non_valides"] for e in lire_entreprises(user_id)] == [False, True, True]
     assert lire_entreprises(user_id)[1]["emails_trouves"] == ["rh1@ent1.fr"]
 
 
-def test_relance_ia_bloquante_un_message_et_arret(alice, sites, mistral, monkeypatch, pipelines_neufs):  # noqa: F811
+def test_relance_ia_bloquante_un_message_et_arret(alice, sites, ia, monkeypatch, pipelines_neufs):  # noqa: F811
     client, user_id, _ = alice
-    echouer(mistral, monkeypatch, erreur_http(403, TIER))
+    echouer(ia, erreur_http(404, INTROUVABLE))
     _revalider(client, user_id, pipelines_neufs)
-    assert len(mistral.appels) == 1
-    assert client.get("/api/logs").text.count("Mistral refuse les appels") == 1
+    assert len(ia.appels) == 1
+    assert client.get("/api/logs").text.count("IA indisponible") == 1
     assert len(client.get("/api/spontanees/a_valider").json()) == 2
 
 

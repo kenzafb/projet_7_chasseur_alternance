@@ -1,4 +1,4 @@
-"""Scraper : si Mistral échoue, les emails lus directement dans la page
+"""Scraper : si l'IA échoue, les emails lus directement dans la page
 (regex, déobfuscation) sont gardés, marqués non validés par l'IA ; une
 erreur bloquante ne donne qu'un message pour tout le lancement."""
 
@@ -10,18 +10,17 @@ import pytest
 import shared.ia
 import spontanees.scraper_emails as se
 from database.entreprises_db import ajouter_entreprises, lire_entreprises, sauvegarder_enrichissement
-from tests.test_mistral import TIER, echouer, erreur_http
+from tests.test_ia import INTROUVABLE, echouer, erreur_http
 
 PAGE = ('<html><body><h1>ACME</h1><p>Écrivez-nous : <a href="mailto:recrutement@{d}">recrutement</a> '
         'ou contact [at] {d}</p></body></html>')
 
 
 @pytest.fixture
-def sites(monkeypatch, mistral):
+def sites(monkeypatch, ia):
     """Pages simulées : la page d'accueil de chaque site contient ses adresses."""
     monkeypatch.setattr(se, "time", SimpleNamespace(sleep=lambda s: None))
     monkeypatch.setattr(shared.ia, "time", SimpleNamespace(sleep=lambda s: None, monotonic=time.monotonic))
-    monkeypatch.setattr(se, "PAUSE_MISTRAL", 0)
     monkeypatch.setattr(se, "lire_sitemap", lambda url: [])
 
     def get_page(url, timeout=8):
@@ -31,7 +30,7 @@ def sites(monkeypatch, mistral):
         return None, None
 
     monkeypatch.setattr(se, "get_page", get_page)
-    mistral.reponse = '{"emails": ["recrutement@acme1.fr"], "telephones": [], "contact_rh": null, "fiable": true}'
+    ia.reponse = '{"emails": ["recrutement@acme1.fr"], "telephones": [], "contact_rh": null, "fiable": true}'
 
 
 @pytest.fixture
@@ -57,8 +56,8 @@ def test_avec_ia_emails_valides(sites, user_id):
     assert e["emails_trouves"] == ["recrutement@acme1.fr"] and e["emails_non_valides"] is False
 
 
-def test_erreur_passagere_emails_de_la_page_gardes(sites, user_id, mistral, monkeypatch):
-    echouer(mistral, monkeypatch, erreur_http(503))
+def test_erreur_passagere_emails_de_la_page_gardes(sites, user_id, ia, monkeypatch):
+    echouer(ia, erreur_http(503))
     entreprises, logs = _lancer(user_id, max_scrapees=1)
     e = entreprises["ACME 1"]
     assert set(e["emails_trouves"]) == {"recrutement@acme1.fr", "contact@acme1.fr"}   # mailto et déobfusqué
@@ -66,12 +65,12 @@ def test_erreur_passagere_emails_de_la_page_gardes(sites, user_id, mistral, monk
     assert "non validés par l'IA" in logs and "Aucun email" not in logs
 
 
-def test_erreur_bloquante_un_seul_message(sites, user_id, mistral, monkeypatch):
-    echouer(mistral, monkeypatch, erreur_http(403, TIER))
+def test_erreur_bloquante_un_seul_message(sites, user_id, ia, monkeypatch):
+    echouer(ia, erreur_http(404, INTROUVABLE))
     entreprises, logs = _lancer(user_id)
-    assert len(mistral.appels) == 1                       # plus d'appel après le refus
-    assert logs.count("Mistral refuse les appels") == 1
-    assert "non autorisé" in logs
+    assert len(ia.appels) == 1                       # plus d'appel après le refus
+    assert logs.count("IA indisponible") == 1
+    assert "ollama pull" in logs
     for nom in ("ACME 1", "ACME 2", "ACME 3"):
         assert entreprises[nom]["emails_trouves"] and entreprises[nom]["emails_non_valides"] is True
 

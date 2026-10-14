@@ -1,4 +1,4 @@
-"""Contenus envoyés à Mistral ou aux entreprises : aucune mention d'un
+"""Contenus envoyés à l'IA ou aux entreprises : aucune mention d'un
 utilisateur réel, pas de genre imposé, pas de date en dur, préférences
 tirées du profil, trames adaptées au mode."""
 
@@ -43,34 +43,34 @@ def _sans_mention_reelle(texte, quoi):
         assert not re.search(r"(?<![a-z])" + re.escape(mot) + r"(?![a-z])", bas), f"{quoi} : « {mot} »"
 
 
-def _prompts(mistral):
-    return "\n".join(m["content"] for appel in mistral.appels for m in appel["messages"])
+def _prompts(ia):
+    return "\n".join(m["content"] for appel in ia.appels for m in appel["messages"])
 
 
 # ─── Prompts ──────────────────────────────────────────────────────────────────
 @pytest.mark.parametrize("mode", ["alternance", "job"])
-def test_prompts_sans_mention_d_un_utilisateur_reel(mistral, mode):
+def test_prompts_sans_mention_d_un_utilisateur_reel(ia, mode):
     generateur.generer_lettre(OFFRE, PROFIL, mode=mode)
-    mistral.reponse = '{"score": 7, "verdict": "bon", "eligible": true, "domaine": "Vente"}'
+    ia.reponse = '{"score": 7, "verdict": "bon", "eligible": true, "domaine": "Vente"}'
     analyseur.analyser_offre(OFFRE, PROFIL, mode=mode)
-    texte = _prompts(mistral)
-    assert len(mistral.appels) == 2
+    texte = _prompts(ia)
+    assert len(ia.appels) == 2
     _sans_mention_reelle(texte, f"prompts {mode}")
     assert not ANNEE.search(texte)
 
 
-def test_prompt_de_lettre_neutre_et_fonde_sur_le_profil(mistral):
+def test_prompt_de_lettre_neutre_et_fonde_sur_le_profil(ia):
     generateur.generer_lettre(OFFRE, PROFIL, mode="alternance")
-    texte = _prompts(mistral)
+    texte = _prompts(ia)
     assert "personne candidate" in texte and "neutre" in texte
     assert "Excel, Accueil" in texte                       # bagage réel du profil
     assert "N'invente AUCUNE compétence" in texte
 
 
-def test_analyse_job_tire_les_preferences_du_profil(mistral):
-    mistral.reponse = '{"score": 7, "verdict": "bon", "eligible": true, "domaine": "Vente"}'
+def test_analyse_job_tire_les_preferences_du_profil(ia):
+    ia.reponse = '{"score": 7, "verdict": "bon", "eligible": true, "domaine": "Vente"}'
     analyseur.analyser_offre(OFFRE, PROFIL, mode="job")
-    texte = _prompts(mistral)
+    texte = _prompts(ia)
     for valeur in ("TYPES-OK-DU-PROFIL", "TYPES-EVITER-DU-PROFIL", "HORAIRES-DU-PROFIL",
                    "MOBILITE-DU-PROFIL", "DUREE-DU-PROFIL", "LOCALISATION-DU-PROFIL",
                    "Systèmes d'information et de télécommunication"):
@@ -98,13 +98,13 @@ def test_trames_par_defaut_generiques():
 
 
 @pytest.mark.parametrize("mode", ["alternance", "job"])
-def test_lettre_generee_avec_la_trame_du_mode(mistral, mode):
+def test_lettre_generee_avec_la_trame_du_mode(ia, mode):
     lettre = generateur.generer_lettre(OFFRE, PROFIL, mode=mode)
     assert ("alternance" in lettre.lower()) == (mode == "alternance")
     assert "ACME, votre contexte me parle." in lettre
 
 
-def test_lettre_type_du_profil_prioritaire(mistral):
+def test_lettre_type_du_profil_prioritaire(ia):
     profil = {**PROFIL, "lettre_type": "Ma trame. {paragraphe_entreprise}"}
     assert generateur.generer_lettre(OFFRE, profil, mode="job").startswith("Ma trame. ACME")
 

@@ -1,10 +1,8 @@
-import time
 import json
 import re
-from shared.ia import ErreurIABloquante, ErreurIAPassagere, appeler_mistral, reponse_json
+from shared.ia import ErreurIABloquante, ErreurIAPassagere, appeler_ia, reponse_json
 from shared.erreurs import exiger_profil
 
-PAUSE_MISTRAL = 10 # secondes entre chaque appel Mistral (rate limit)
 
 def construire_contexte_profil(profil):
     """Construit le contexte candidat à partir du profil de l'utilisateur (depuis la base)."""
@@ -150,9 +148,9 @@ def _analyser_offre_job(offre, profil):
         '"resume": "max 12 mots factuels"}'
     )
 
-    # Appel Mistral avec retry sur les erreurs passagères (4 tentatives, pauses 15s, 30s, 45s).
-    # ErreurIABloquante / ErreurIAPassagere remontent : jamais de note inventée.
-    response = appeler_mistral(
+    # Retry sur les erreurs passagères du serveur. ErreurIABloquante /
+    # ErreurIAPassagere remontent : jamais de note inventée.
+    response = appeler_ia(
         [
             {"role": "system", "content": (
                 "Tu es un recruteur spécialisé dans les jobs courts et missions. "
@@ -242,9 +240,9 @@ def analyser_offre(offre, profil, mode="alternance"):
 
     est_ecole = est_ecole_cfa(offre)
 
-    # Appel Mistral avec retry sur les erreurs passagères (4 tentatives, pauses 15s, 30s, 45s).
-    # ErreurIABloquante / ErreurIAPassagere remontent : jamais de note inventée.
-    response = appeler_mistral(
+    # Retry sur les erreurs passagères du serveur. ErreurIABloquante /
+    # ErreurIAPassagere remontent : jamais de note inventée.
+    response = appeler_ia(
         [
             {"role": "system", "content": (
                 "Tu es un recruteur spécialisé en alternance. Tu reponds UNIQUEMENT en JSON valide sans backticks. "
@@ -254,8 +252,6 @@ def analyser_offre(offre, profil, mode="alternance"):
         ],
         usage="analyse",
         response_format={"type": "json_object"},
-        on_attente=lambda t, n, s: print(
-            f"     Mistral indisponible - pause {s}s puis nouvelle tentative ({t}/{n - 1})"),
     )
     result = _valider_analyse(reponse_json(response))
     if est_ecole:
@@ -287,13 +283,13 @@ def est_ecole_cfa(offre) -> bool:
 
 
 def _valider_analyse(result: dict) -> dict:
-    """Analyse renvoyée par Mistral, contrôlée : un score entier de 1 à 10 est
+    """Analyse renvoyée par l'IA, contrôlée : un score entier de 1 à 10 est
     exigé (sinon ErreurIAPassagere, l'offre sera reprise), le reste est
     normalisé. Aucune valeur de repli pour le score ou l'éligibilité."""
     try:
         score = int(result["score"])
     except (KeyError, TypeError, ValueError):
-        raise ErreurIAPassagere("Réponse de Mistral sans score exploitable") from None
+        raise ErreurIAPassagere("Réponse de l'IA sans score exploitable") from None
     result["score"] = max(1, min(10, score))
     result["eligible"] = bool(result.get("eligible", True))
     if not result["eligible"]:
@@ -458,7 +454,6 @@ def analyser_offres(offres, profil, callback=None, mode="alternance", log_fn=Non
             analyse = analyser_offre(offre, profil, mode=mode)
         except ErreurIAPassagere as e:
             _log(f"  ⚠️  Offre sautée, « {offre['titre'][:50]} » : {e}. Elle reviendra au prochain lancement.")
-            time.sleep(PAUSE_MISTRAL)
             continue
         appliquer_analyse(offre, analyse, mode=mode)
         eligible_str = "eligible" if offre["eligible"] else "INELIGIBLE"
@@ -466,6 +461,5 @@ def analyser_offres(offres, profil, callback=None, mode="alternance", log_fn=Non
         offres_analysees.append(offre)
         if callback:
             callback(i, len(offres), offre)
-        time.sleep(PAUSE_MISTRAL)
     offres_analysees.sort(key=lambda x: x["score"], reverse=True)
     return offres_analysees

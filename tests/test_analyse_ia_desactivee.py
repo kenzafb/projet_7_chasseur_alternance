@@ -1,4 +1,4 @@
-"""ANALYSE_IA=false : aucun appel à Mistral nulle part ; offres insérées
+"""ANALYSE_IA=false : aucun appel à l'IA nulle part ; offres insérées
 « non analysées », marquées vues, archivées seulement par mots-clés ;
 lettre, réanalyse et revalidation refusées ; scraper en lecture directe."""
 
@@ -9,10 +9,9 @@ from database.candidatures_db import ajouter_candidature, lire_candidature, lire
 from database.dedup_db import lire_offres_vues
 from database.entreprises_db import lire_entreprises, sauvegarder_enrichissement
 from france_travail.analyseur import VERDICT_NON_ANALYSEE, marquer_non_analysee
-from scripts import verifier_mistral
 from shared import config
-from shared.ia import IADesactivee, appeler_mistral
-from tests.test_mistral import _brut_ft, _lba, recherche, sans_attente  # noqa: F401  (fixtures)
+from shared.ia import IADesactivee, appeler_ia
+from tests.test_ia import _brut_ft, _lba, recherche, sans_attente  # noqa: F401  (fixtures)
 from tests.test_scraper_sans_ia import _lancer, sites, user_id  # noqa: F401  (fixtures)
 
 
@@ -32,18 +31,18 @@ def test_interrupteur(monkeypatch, valeur, attendu):
     assert config.analyse_ia_active() is attendu
 
 
-def test_appel_mistral_refuse(ia_coupee, mistral):
+def test_appel_ia_refuse(ia_coupee, ia):
     with pytest.raises(IADesactivee, match="ANALYSE_IA=false"):
-        appeler_mistral([{"role": "user", "content": "x"}])
-    assert mistral.appels == []
+        appeler_ia([{"role": "user", "content": "x"}])
+    assert ia.appels == []
 
 
 # ─── Recherche ────────────────────────────────────────────────────────────────
-def test_recherche_sans_analyse(ia_coupee, recherche, mistral):
+def test_recherche_sans_analyse(ia_coupee, recherche, ia):
     recherche.sources["lba"] = [_lba(0)]
     etat = recherche.lancer()
     assert etat["message"] == "Terminé !"
-    assert mistral.appels == []
+    assert ia.appels == []
     offres = {c["titre"]: c for c in lire_candidatures(recherche.user_id)}
     assert set(offres) == {"Poste 0", "Poste 1", "Poste 2", "Alternance 0"}
     for o in offres.values():
@@ -95,12 +94,12 @@ def test_non_analysees_triees_en_dernier(utilisateur):
 
 # ─── Routes directes ─────────────────────────────────────────────────────────
 @pytest.mark.parametrize("route", ["/api/generer_lettre", "/api/analyser"])
-def test_lettre_et_reanalyse_refusees(ia_coupee, utilisateur, mistral, route):
+def test_lettre_et_reanalyse_refusees(ia_coupee, utilisateur, ia, route):
     client, uid = utilisateur("a@test.fr", prenom="Alice")
     ajouter_candidature(uid, marquer_non_analysee({"id": "REF1", "titre": "Dev", "description": "..."}))
     r = client.post(route, json={"id": "REF1"})
     assert r.status_code == 503 and "IA est désactivée" in r.json()["erreur"]
-    assert mistral.appels == []
+    assert ia.appels == []
     assert lire_candidature(uid, "REF1")["verdict"] == VERDICT_NON_ANALYSEE
 
 
@@ -121,22 +120,22 @@ def test_interface_ia_active(utilisateur):
 
 
 # ─── Scraper et validation des emails ────────────────────────────────────────
-def test_scraper_lecture_directe(ia_coupee, sites, user_id, mistral):
+def test_scraper_lecture_directe(ia_coupee, sites, user_id, ia):
     entreprises, logs = _lancer(user_id)
-    assert mistral.appels == []
+    assert ia.appels == []
     for nom in ("ACME 1", "ACME 2", "ACME 3"):
         assert entreprises[nom]["emails_trouves"] and entreprises[nom]["emails_non_valides"] is True
-    assert logs.count("IA désactivée") == 1 and "Mistral refuse" not in logs
+    assert logs.count("IA désactivée") == 1 and "IA indisponible" not in logs
 
 
-def test_revalidation_refusee(ia_coupee, user_id, mistral, utilisateur):
+def test_revalidation_refusee(ia_coupee, user_id, ia, utilisateur):
     liste = lire_entreprises(user_id)
     liste[0].update(emails_trouves=["a@acme1.fr"], emails_non_valides=True, traite=True)
     sauvegarder_enrichissement(user_id, liste)
     from spontanees.scraper_emails import revalider
     logs = []
     revalider(user_id, log_fn=logs.append)
-    assert mistral.appels == [] and "IA désactivée" in logs[0]
+    assert ia.appels == [] and "IA désactivée" in logs[0]
     assert lire_entreprises(user_id)[0]["emails_non_valides"] is True
 
 
@@ -144,13 +143,6 @@ def test_route_revalider_refusee(ia_coupee, utilisateur):
     client, _ = utilisateur("b@test.fr", prenom="Bob")
     r = client.post("/api/spontanees/revalider", json={})
     assert r.status_code == 400 and "IA est désactivée" in r.json()["erreur"]
-
-
-def test_verifier_mistral_n_appelle_rien(ia_coupee, mistral, monkeypatch):
-    monkeypatch.setattr(verifier_mistral, "client", None)   # tout accès planterait
-    sorties = []
-    assert verifier_mistral.main(sortie=sorties.append) == 0
-    assert "IA désactivée" in sorties[0] and mistral.appels == []
 
 
 # ─── Plafond propre sans IA (D20) ────────────────────────────────────────────

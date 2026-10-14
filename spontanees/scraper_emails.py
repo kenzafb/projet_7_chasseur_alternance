@@ -12,7 +12,7 @@ Corrections v15 :
   - FIX 11 — Retry non fiable : si la deuxième recherche DDG retourne la
     même URL que celle qui a échoué, on ne retente pas et on marque
     l'entreprise comme non fiable directement.
-  - FIX 12 — Troncature texte Mistral à 2000 chars et HTML contact à
+  - FIX 12 — Troncature texte IA à 2000 chars et HTML contact à
     3000 chars pour éviter les dépassements de rate limit.
   - Tous les correctifs v14 conservés.
 """
@@ -30,8 +30,8 @@ from shared.emails_exclus import email_exclu
 from bs4 import BeautifulSoup
 from ddgs import DDGS
 from ddgs.exceptions import RatelimitException
-from shared.config import MESSAGE_IA_DESACTIVEE, analyse_ia_active, modele_mistral
-from shared.ia import ErreurIABloquante, ErreurIAPassagere, appeler_mistral, reponse_json
+from shared.config import MESSAGE_IA_DESACTIVEE, analyse_ia_active, modele_ia
+from shared.ia import ErreurIABloquante, ErreurIAPassagere, appeler_ia, reponse_json
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -43,7 +43,6 @@ PAUSE_DDG        = (3, 6)
 PAUSE_LONGUE_N   = 15
 PAUSE_LONGUE     = 45
 PAUSE_RATELIMIT  = 90
-PAUSE_MISTRAL    = 30
 
 PAGES_CONTACT = [
     "/contact", "/contact/",
@@ -347,9 +346,9 @@ def extraire_emails_html(html, domaine_entreprise=None):
     return valides
 
 
-# ─── Mistral ──────────────────────────────────────────────────────────────────
+# ─── IA ───────────────────────────────────────────────────────────────────────
 
-def mistral_extraire_contact(texte_page, nom_entreprise, emails_bruts,
+def ia_extraire_contact(texte_page, nom_entreprise, emails_bruts,
                               html_contact=None):
     emails_str   = ", ".join(emails_bruts) if emails_bruts else "aucun trouvé par regex"
     html_section = f"\n\n=== HTML BRUT PAGE CONTACT ===\n{html_contact}\n" if html_contact else ""
@@ -379,12 +378,9 @@ def mistral_extraire_contact(texte_page, nom_entreprise, emails_bruts,
         '"contact_rh": null, "fiable": true}'
     )
 
-    MAX_RETRIES = 20
-
-    # Retry sur les erreurs passagères : 20 tentatives, attente 60s doublée à
-    # chaque fois (max 300s). ErreurIABloquante et ErreurIAPassagere remontent :
-    # l'appelant garde alors les emails lus dans la page, non validés.
-    response = appeler_mistral(
+    # Erreur passagère retentée une fois. ErreurIABloquante et ErreurIAPassagere
+    # remontent : l'appelant garde alors les emails lus dans la page, non validés.
+    texte = appeler_ia(
         [
             {"role": "system", "content": (
                 "Tu es un expert en extraction de données de contact. "
@@ -394,17 +390,10 @@ def mistral_extraire_contact(texte_page, nom_entreprise, emails_bruts,
             {"role": "user", "content": prompt},
         ],
         usage="extraction",
-        tentatives=MAX_RETRIES,
-        attente=lambda n: min(60 * 2 ** (n - 1), 300),
-        on_attente=lambda t, n, s: print(
-            f"    ⚠️  Mistral indisponible (tentative {t}/{n}) — attente {s}s..."),
         response_format={"type": "json_object"},
     )
-    try:
-        result = reponse_json(response)
-    finally:
-        time.sleep(PAUSE_MISTRAL)
-    dbg(f"Mistral → {result}")
+    result = reponse_json(texte)
+    dbg(f"IA → {result}")
     return result
 
 
@@ -641,7 +630,7 @@ def meilleurs_emails(emails):
 
 def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
     """Emails, téléphones et contact d'une entreprise. Avec l'IA (ia=True),
-    Mistral valide et complète ce que la page donne ; s'il échoue, ou sans
+    l'IA valide et complète ce que la page donne ; s'il échoue, ou sans
     IA, les emails lus directement dans les pages (regex, déobfuscation)
     sont gardés avec valide_ia=False. Une erreur bloquante est signalée dans
     "ia_bloquee" (message) au lieu d'être levée."""
@@ -741,9 +730,9 @@ def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
     emails_bruts_uniques = list(set(tous_emails_bruts))
     dbg(f"Emails bruts : {emails_bruts_uniques}")
 
-    # FIX 12 — troncature pour éviter les dépassements de rate limit Mistral
-    texte_pour_mistral = "\n\n---\n\n".join(pages_texte)
-    texte_pour_mistral = texte_pour_mistral[:2000]
+    # FIX 12 — troncature : prompt court pour un modèle sur processeur
+    texte_pour_ia = "\n\n---\n\n".join(pages_texte)
+    texte_pour_ia = texte_pour_ia[:2000]
     html_contact_brut_tronque = html_contact_brut[:3000] if html_contact_brut else None
 
     # Sans IA : ce que la page donne directement, non validé
@@ -752,8 +741,8 @@ def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
     if not ia:
         return sans_ia
     try:
-        resultat = mistral_extraire_contact(
-            texte_pour_mistral,
+        resultat = ia_extraire_contact(
+            texte_pour_ia,
             nom_entreprise,
             emails_bruts_uniques,
             html_contact=html_contact_brut_tronque,
@@ -800,8 +789,8 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
     au plus max_scrapees par lancement (None : toutes)."""
     _log = log_fn or print
     ia_configuree = analyse_ia_active()   # ANALYSE_IA=false : lecture directe seulement
-    mistral = modele_mistral("extraction") if ia_configuree else "désactivé"
-    _log(f"Scraper Emails v15 | Mistral = {mistral} | Moteur = DDG")
+    modele = modele_ia("extraction") if ia_configuree else "désactivée"
+    _log(f"Scraper Emails v15 | IA = {modele} | Moteur = DDG")
     if DEBUG:
         _log("  [Mode DEBUG activé — logs DDG détaillés]")
 
@@ -825,7 +814,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
         return
 
     traites_ce_run = 0
-    # Coupée pour tout le lancement sur une erreur Mistral bloquante, ou d'emblée sans IA
+    # Coupée pour tout le lancement sur une erreur bloquante de l'IA, ou d'emblée sans IA
     ia_active = ia_configuree
     if not ia_configuree:
         _log(f"ℹ️  {MESSAGE_IA_DESACTIVEE} Emails lus directement dans les pages, notés non validés.")
@@ -835,10 +824,10 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
         resultat = scraper_et_extraire(url, nom, dirigeant=dirigeant, ia=ia_active)
         if resultat.get("ia_bloquee") and ia_active:
             ia_active = False   # un seul message, pas un par entreprise
-            _log(f"❌ Mistral refuse les appels : {resultat['ia_bloquee']} Suite du lancement sans IA : "
+            _log(f"❌ IA indisponible : {resultat['ia_bloquee']} Suite du lancement sans IA : "
                  "emails lus directement dans les pages, non validés.")
         elif resultat.get("erreur_ia"):
-            _log(f"  ⚠️  Mistral : {resultat['erreur_ia']} Emails de la page gardés, non validés par l'IA.")
+            _log(f"  ⚠️  IA : {resultat['erreur_ia']} Emails de la page gardés, non validés par l'IA.")
         return resultat
 
     try:
@@ -945,7 +934,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
 
 
 def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=None, mode=MODE_DEFAUT):
-    """Relance la validation par Mistral des emails gardés sans elle (D15) :
+    """Relance la validation par l'IA des emails gardés sans elle (D15) :
     pages relues, puis emails, téléphones et contact remplacés par ceux que
     l'IA retient. Échec passager : l'entreprise reste à valider. Erreur
     bloquante : arrêt du lancement, un seul message."""
@@ -958,7 +947,7 @@ def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=Non
               if e.get("emails_non_valides") and e.get("emails_trouves") and not e.get("mail_envoye")]
     if max_n:
         cibles = cibles[:max_n]
-    _log(f"Validation IA | Mistral = {modele_mistral('extraction')} | {len(cibles)} entreprise(s)")
+    _log(f"Validation IA | modèle = {modele_ia('extraction')} | {len(cibles)} entreprise(s)")
     validees = 0
     for i, e in enumerate(cibles, 1):
         if stop_event and stop_event.is_set():
@@ -973,7 +962,7 @@ def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=Non
             continue
         resultat = scraper_et_extraire(url, nom, dirigeant=e.get("dirigeant", ""), ia=True)
         if resultat.get("ia_bloquee"):
-            _log(f"❌ Mistral refuse les appels : {resultat['ia_bloquee']} Validation arrêtée, "
+            _log(f"❌ IA indisponible : {resultat['ia_bloquee']} Validation arrêtée, "
                  "les entreprises restantes attendent toujours.")
             break
         if not resultat.get("valide_ia"):
