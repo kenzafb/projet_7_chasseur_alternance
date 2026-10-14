@@ -193,8 +193,13 @@ def test_messages_clairs(ia):
         appeler_ia(MESSAGE)
 
 
-def test_raisonnement_retire_de_la_reponse(ia):
-    ia.reponse = "<think>je réfléchis</think>\n{\"a\": 1}"
+@pytest.mark.parametrize("reponse", [reponse_chat('{"a": 1}', reflexion="je réfléchis"),
+                                     "<think>je réfléchis</think>\n{\"a\": 1}"])
+def test_reflexion_non_coupee_bloquante(ia, reponse, monkeypatch):
+    ia.reponse = reponse
+    with pytest.raises(ErreurIABloquante, match="réflexion .* n'est pas coupée"):
+        appeler_ia(MESSAGE)
+    monkeypatch.setenv("IA_REFLEXION", "true")     # réflexion voulue : retirée du texte
     assert appeler_ia(MESSAGE) == '{"a": 1}'
 
 
@@ -253,22 +258,42 @@ def test_paragraphe_vide_invalide(ia):
         appeler_structure(MESSAGE, LettreIA)
 
 
-def test_parametre_refuse_retire_et_retenu(ia):
-    refus = erreur_http(400, '"ministral-3:8b" does not support thinking')
-    ia.panne = lambda corps: refus if "think" in corps else None
-    ia.reponse = "ok"
-    assert appeler_ia(MESSAGE, tentatives=1) == "ok"
-    assert len(ia.appels) == 2 and "think" not in ia.appels[1]
-    appeler_ia(MESSAGE, tentatives=1)
-    assert len(ia.appels) == 3   # retenu : plus envoyé
+@pytest.mark.parametrize("parametre, detail, message", [
+    ("think", '"ministral-3:8b" does not support thinking', "refuse de couper la réflexion"),
+    ("format", "invalid format: schema not supported", "refuse le schéma JSON imposé"),
+])
+def test_parametre_refuse_bloquant_jamais_retire(ia, parametre, detail, message):
+    ia.panne = lambda corps: erreur_http(400, detail) if parametre in corps else None
+    with pytest.raises(ErreurIABloquante, match=message):
+        shared.ia.appeler_ia(MESSAGE, schema=AnalyseOffre, tentatives=3)
+    assert len(ia.appels) == 1 and parametre in ia.appels[0]   # pas de nouvel essai sans le paramètre
 
 
-def test_schema_refuse_retire(ia):
-    refus = erreur_http(400, "invalid format: schema not supported")
-    ia.panne = lambda corps: refus if "format" in corps else None
+# ─── Test de démarrage ───────────────────────────────────────────────────────
+def test_demarrage_avant_le_premier_appel_structure(ia):
+    ia.reponse = ANALYSE
+    appeler_structure(MESSAGE, AnalyseOffre)
+    appeler_structure(MESSAGE, AnalyseOffre)
+    assert len(ia.demarrages) == 1 and len(ia.appels) == 2          # une fois par modèle et par processus
+    corps = ia.demarrages[0]
+    assert corps["format"]["required"] == ["nombre", "mot"] and corps["think"] is False
+    appeler_structure(MESSAGE, AnalyseOffre, modele="autre:1b")
+    assert len(ia.demarrages) == 2
+
+
+@pytest.mark.parametrize("reponse, message", [
+    ('Voici : {"nombre": 7, "mot": "ok"}', "n'est pas l'objet JSON demandé"),   # texte autour
+    ('{"nombre": "sept"}', "n'est pas l'objet JSON demandé"),
+    (reponse_chat('{"nombre": 7, "mot": "ok"}', reflexion="hmm"), "pas coupée"),
+])
+def test_demarrage_echoue_rien_n_est_analyse(ia, reponse, message):
+    ia.demarrage = reponse
+    with pytest.raises(ErreurIABloquante, match=message):
+        appeler_structure(MESSAGE, AnalyseOffre)
+    assert ia.appels == []
+    ia.demarrage = '{"nombre": 7, "mot": "ok"}'      # serveur corrigé : le test est refait
     ia.reponse = ANALYSE
     assert appeler_structure(MESSAGE, AnalyseOffre).score == 8
-    assert "format" not in ia.appels[-1]
 
 
 # ─── Analyse : aucun résultat par défaut ─────────────────────────────────────

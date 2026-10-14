@@ -135,7 +135,7 @@ def test_relance_ia_bloquante_un_message_et_arret(alice, ia, pipelines_neufs):
     client, user_id, _ = alice
     echouer(ia, erreur_http(404, INTROUVABLE))
     _revalider(client, user_id, pipelines_neufs)
-    assert len(ia.appels) == 1
+    assert len(ia.demarrages) == 1 and ia.appels == []   # arrêté au test de démarrage
     assert client.get("/api/logs").text.count("IA indisponible") == 1
     assert len(client.get("/api/spontanees/a_valider").json()) == 2
 

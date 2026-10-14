@@ -36,9 +36,15 @@ Réponses structurées : appeler_structure(messages, Modele) impose le
 schéma JSON du modèle Pydantic au serveur ("format" de l'API native,
 response_format en OpenAI), puis valide la réponse avec ce modèle. Le mode
 de réflexion des modèles qui en ont un est coupé ("think": false,
-reasoning_effort "none" en OpenAI), sauf IA_REFLEXION=true. Un paramètre
-facultatif que le serveur refuse (400 qui le nomme) est retiré pour ce
-serveur et ce modèle, sans compter d'essai.
+reasoning_effort "none" en OpenAI), sauf IA_REFLEXION=true.
+
+Jamais de mode dégradé : un serveur qui refuse le schéma ou la coupure de
+la réflexion, ou qui renvoie un texte de réflexion malgré elle, donne une
+erreur bloquante avec un message clair. Avant le premier appel structuré
+d'un modèle (dans le processus), un test de démarrage (verifier_demarrage)
+envoie une requête courte avec un petit schéma : la réponse doit être un
+objet JSON valide, sans rien autour ni texte de réflexion. Échec : erreur
+bloquante, rien n'est analysé.
 
 ANALYSE_IA=false (shared.config.analyse_ia_active) : appeler_ia lève
 IADesactivee sans rien appeler.
@@ -165,17 +171,21 @@ def classer_exception(err: Exception, modele: str) -> tuple[ErreurIA, bool]:
     return ErreurIAPassagere(f"Échec de l'appel à l'IA : {type(err).__name__}", None, modele), True
 
 
-def _contenu(reponse: httpx.Response) -> str:
-    """Texte de la réponse (API native : message.content ; OpenAI :
-    choices[0].message.content), sans le raisonnement éventuel (<think>...</think>)."""
+def _contenu(reponse: httpx.Response) -> tuple[str, str]:
+    """(texte de la réponse, texte de réflexion éventuel). API native :
+    message.content et message.thinking ; OpenAI : choices[0].message.content
+    et reasoning_content. Un bloc <think>...</think> du texte compte comme
+    réflexion et en est retiré."""
     try:
         donnees = reponse.json()
         message = donnees["message"] if ia_api() == "ollama" else donnees["choices"][0]["message"]
-        texte = message["content"] or ""
+        texte = str(message["content"] or "")
     except (ValueError, KeyError, IndexError, TypeError):
         raise ErreurIAPassagere("Réponse du serveur d'IA illisible (format de l'API "
                                 f"{ia_api()} attendu)") from None
-    return re.sub(r"<think>.*?</think>", "", str(texte), flags=re.DOTALL).strip()
+    reflexion = " ".join(str(message.get(cle) or "") for cle in ("thinking", "reasoning_content", "reasoning"))
+    reflexion += " ".join(re.findall(r"<think>(.*?)</think>", texte, flags=re.DOTALL))
+    return re.sub(r"<think>.*?</think>", "", texte, flags=re.DOTALL).strip(), reflexion.strip()
 
 
 def _requete(modele: str, messages, schema_json: dict | None, options: dict) -> tuple[str, dict, dict]:
@@ -211,10 +221,9 @@ def _requete(modele: str, messages, schema_json: dict | None, options: dict) -> 
     return f"{base}/chat/completions", corps, facultatifs
 
 
-# Paramètres facultatifs refusés par un serveur : (IA_BASE_URL, modèle) ->
-# paramètres retirés jusqu'au redémarrage. Mots qui, dans un refus (400),
-# désignent chacun d'eux.
-_refuses: dict[tuple[str, str], set[str]] = {}
+# Mots qui, dans un refus du serveur (400 ou 422), désignent un des paramètres
+# de sortie : le refus devient une erreur bloquante explicite, jamais un
+# retrait du paramètre.
 MOTS_DES_FACULTATIFS = {
     "think": ("think", "reasoning"),
     "format": ("format", "schema"),
@@ -224,7 +233,7 @@ MOTS_DES_FACULTATIFS = {
 
 
 def _facultatif_refuse(reponse: httpx.Response, envoyes) -> str | None:
-    """Paramètre facultatif envoyé que ce refus (400 ou 422) désigne, sinon None."""
+    """Paramètre de sortie envoyé que ce refus (400 ou 422) désigne, sinon None."""
     if reponse.status_code not in (400, 422):
         return None
     detail = _detail(reponse).lower()
@@ -232,6 +241,15 @@ def _facultatif_refuse(reponse: httpx.Response, envoyes) -> str | None:
         if any(mot in detail for mot in MOTS_DES_FACULTATIFS.get(nom, (nom,))):
             return nom
     return None
+
+
+def message_refus(parametre: str, modele: str, detail: str) -> str:
+    if parametre in ("think", "reasoning_effort"):
+        return (f"Le serveur d'IA refuse de couper la réflexion ({parametre}) avec « {modele} » : {detail}. "
+                "Mets à jour Ollama ou choisis un autre modèle (IA_MODELE_<USAGE>) ; rien n'est analysé "
+                "sans cette coupure.")
+    return (f"Le serveur d'IA refuse le schéma JSON imposé ({parametre}) avec « {modele} » : {detail}. "
+            "Mets à jour Ollama ou choisis un autre modèle ; rien n'est analysé sans schéma.")
 
 
 def schema_json(schema: type[BaseModel]) -> dict:
@@ -242,18 +260,14 @@ def schema_json(schema: type[BaseModel]) -> dict:
 
 
 def _envoyer(url: str, modele: str, corps: dict, facultatifs: dict) -> httpx.Response:
-    """Un essai : envoie corps et les facultatifs que ce serveur accepte ;
-    un facultatif refusé est retiré et la requête renvoyée aussitôt."""
-    retires = _refuses.setdefault((ia_base_url(), modele), set())
-    while True:
-        envoyes = {k: v for k, v in facultatifs.items() if k not in retires}
-        with verrou:
-            reponse = _poster(url, {**corps, **envoyes}, _entetes(), ia_delai_s())
-        refuse = _facultatif_refuse(reponse, envoyes)
-        if not refuse:
-            return reponse
-        retires.add(refuse)
-        print(f"  ℹ️  Le serveur d'IA refuse « {refuse} » avec « {modele} » : paramètre retiré.")
+    """Un essai, sous le verrou commun. Un paramètre de sortie refusé :
+    ErreurIABloquante explicite (aucun retrait silencieux)."""
+    with verrou:
+        reponse = _poster(url, {**corps, **facultatifs}, _entetes(), ia_delai_s())
+    refuse = _facultatif_refuse(reponse, facultatifs)
+    if refuse:
+        raise ErreurIABloquante(message_refus(refuse, modele, _detail(reponse)), reponse.status_code, modele)
+    return reponse
 
 
 def appeler_ia(messages, *, usage="analyse", modele=None, tentatives=2, attente=lambda n: 5 * n,
@@ -283,7 +297,12 @@ def appeler_ia(messages, *, usage="analyse", modele=None, tentatives=2, attente=
             erreur, a_retenter = classer_exception(err, modele)
         else:
             if reponse.status_code < 400:
-                return _contenu(reponse)
+                texte, reflexion = _contenu(reponse)
+                if reflexion and not ia_reflexion():
+                    raise ErreurIABloquante(
+                        f"La réflexion de « {modele} » n'est pas coupée malgré la demande (texte de réflexion "
+                        "dans la réponse) : mets à jour Ollama ou choisis un autre modèle.", None, modele)
+                return texte
             erreur, a_retenter = classer_statut(reponse, modele)
         if not a_retenter or tentative >= tentatives:
             raise erreur
@@ -321,11 +340,52 @@ def lire_structure(texte: str, schema: type[BaseModel]) -> BaseModel:
         raise ReponseInvalide(f"Réponse de l'IA hors du schéma {schema.__name__} (champs : {champs})") from None
 
 
+class TestDemarrage(BaseModel):
+    """Petit schéma du test de démarrage."""
+    nombre: int
+    mot: str
+
+
+MESSAGES_DEMARRAGE = [
+    {"role": "system", "content": "Tu réponds uniquement par un objet JSON valide, sans texte autour."},
+    {"role": "user", "content": "TEST DE DÉMARRAGE. Réponds avec l'objet JSON où nombre vaut 7 et mot vaut \"ok\"."},
+]
+
+# Modèles qui ont passé le test de démarrage dans ce processus : (API, serveur, modèle)
+_verifies: set[tuple[str, str, str]] = set()
+
+
+def verifier_demarrage(modele: str | None = None, usage: str = "analyse") -> float:
+    """Test de démarrage d'un modèle : requête courte avec un petit schéma,
+    réponse qui doit être un objet JSON valide tel quel, sans texte autour
+    ni réflexion. Retourne sa durée (secondes ; 0 s'il a déjà réussi dans ce
+    processus). Échec : ErreurIABloquante avec la raison (IAInjoignable si
+    le serveur ne répond pas)."""
+    modele = modele or modele_ia(usage)
+    cle = (ia_api(), ia_base_url(), modele)
+    if cle in _verifies:
+        return 0.0
+    debut = time.monotonic()
+    texte = appeler_ia(MESSAGES_DEMARRAGE, modele=modele, tentatives=1, schema=TestDemarrage, temperature=0,
+                       max_tokens=50)
+    try:
+        TestDemarrage.model_validate(json.loads(texte))
+    except (ValueError, ValidationError):
+        raise ErreurIABloquante(
+            f"Test de démarrage échoué avec « {modele} » : la réponse n'est pas l'objet JSON demandé "
+            f"(« {texte[:80]} »). Le serveur n'applique pas le schéma : mets à jour Ollama ou choisis un "
+            "autre modèle ; rien n'est analysé.", None, modele) from None
+    _verifies.add(cle)
+    return time.monotonic() - debut
+
+
 def appeler_structure(messages, schema: type[BaseModel], *, usage="analyse", modele=None, essais=2,
                       **options) -> BaseModel:
     """appeler_ia avec le schéma JSON de `schema` imposé, réponse validée.
     Une réponse invalide est redemandée (essais au total, 2 par défaut),
-    puis ReponseInvalide : l'élément est sauté, rien n'est inventé."""
+    puis ReponseInvalide : l'élément est sauté, rien n'est inventé. Le test
+    de démarrage du modèle passe avant son premier appel."""
+    verifier_demarrage(modele, usage)
     for essai in range(1, essais + 1):
         texte = appeler_ia(messages, usage=usage, modele=modele, schema=schema, **options)
         try:

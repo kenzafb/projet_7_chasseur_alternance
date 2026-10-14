@@ -12,8 +12,10 @@ par l'humain, Ollama démarré :
 2. Lit dans la base, en LECTURE SEULE, les offres « non analysées » les
    plus récentes (3 par défaut) et le profil de leur utilisateur, et un
    email douteux en attente de validation (à défaut, un cas fictif).
-3. Pour chaque modèle : un appel minimal (chargement du modèle, mesuré à
-   part), l'analyse de chaque offre, puis la validation de l'email douteux.
+3. Pour chaque modèle : le test de démarrage de shared/ia.py (petit schéma,
+   réponse JSON valide sans texte de réflexion ; chargement du modèle mesuré
+   à part), puis l'analyse de chaque offre et la validation de l'email douteux.
+   Un modèle qui échoue au test de démarrage n'est pas essayé plus loin.
    Un seul essai par réponse : on mesure ce que le modèle répond du
    premier coup.
 4. Affiche un tableau comparatif sur les mêmes offres : temps, JSON valide
@@ -188,16 +190,16 @@ def main(argv=None, sortie=print) -> int:
     lignes_offres, lignes_email, valides = [], [], 0
     for modele in dict.fromkeys(modeles):
         sortie(f"\n── {modele} ──")
-        debut = time.monotonic()
         try:
-            ia.appeler_ia([{"role": "user", "content": "Réponds seulement : OK"}], modele=modele,
-                          tentatives=1, max_tokens=5)
-            sortie(f"  Chargement et premier appel : {_secondes(debut)}")
+            # Test de démarrage : chargement du modèle, schéma imposé, réflexion coupée
+            duree = ia.verifier_demarrage(modele)
+            sortie(f"  ✅ Test de démarrage (chargement compris, schéma JSON, sans réflexion) : {duree:.0f} s")
         except ErreurIABloquante as e:
             sortie(f"  ❌ {e}")
             continue
         except ErreurIAPassagere as e:
-            sortie(f"  ⚠️  Premier appel en échec : {e}")
+            sortie(f"  ⚠️  Test de démarrage en échec passager : {e}")
+            continue
         for i, o in enumerate(offres, 1):
             debut = time.monotonic()
             try:

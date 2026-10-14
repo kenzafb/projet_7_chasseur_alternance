@@ -21,7 +21,7 @@ import time
 
 from database.candidatures_db import lire_candidature, lire_en_attente, modifier_candidature
 from france_travail.analyseur import analyser_offre, appliquer_analyse
-from shared.ia import ErreurIAPassagere
+from shared.ia import ErreurIAPassagere, verifier_demarrage
 
 # Champs de l'offre écrits après une analyse réussie
 CHAMPS_ANALYSE = ("score", "verdict", "eligible", "points_forts", "points_faibles", "domaine",
@@ -63,6 +63,8 @@ def analyser_en_attente(user_id: int, mode: str, profil: dict, maximum: int, sto
     durée moyenne d'une offre traitée fois le nombre restant).
     Retourne {"analysees", "sautees", "archivees", "arret"}. Les erreurs
     bloquantes de l'IA remontent (le lancement s'arrête)."""
+    # Test de démarrage du modèle avant tout : échec = arrêt, aucune analyse dégradée
+    verifier_demarrage(usage="analyse")
     offres = lire_en_attente(user_id, mode, limite=maximum)
     total = len(offres)
     bilan = {"analysees": 0, "sautees": 0, "archivees": 0, "arret": False}

@@ -88,7 +88,7 @@ def test_ia_seulement_pour_les_douteux(ia):
 def test_ia_bloquante_coupee_pour_la_suite(ia):
     ia.panne = lambda corps: httpx.ConnectError("refused")
     tri = ve.trier(["a@gmail.com", "b@gmail.com"], "acme.fr")
-    assert tri["douteux"] == ["a@gmail.com", "b@gmail.com"] and len(ia.appels) == 1
+    assert tri["douteux"] == ["a@gmail.com", "b@gmail.com"] and len(ia.demarrages) == 1 and ia.appels == []
     assert "IA locale injoignable" in tri["ia_bloquee"]
 
 

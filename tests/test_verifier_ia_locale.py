@@ -46,8 +46,7 @@ def donnees(utilisateur):
 
 
 def test_tableau_comparatif_sans_rien_ecrire(donnees, ia):
-    ia.panne = lambda corps: ('{"valide": true}' if "Adresse :" in texte_envoye(corps)
-                              else "OK" if "seulement : OK" in texte_envoye(corps) else None)
+    ia.panne = lambda corps: '{"valide": true}' if "Adresse :" in texte_envoye(corps) else None
     ia.reponse = ANALYSE
     code, sortie = lancer("--modeles", "ministral-3:8b,qwen3.5:9b")
     assert code == 0
@@ -55,7 +54,9 @@ def test_tableau_comparatif_sans_rien_ecrire(donnees, ia):
     assert "« qwen3.5:9b » n'est pas installé : ollama pull qwen3.5:9b" in sortie
     assert "Développeur 3" in sortie and "Développeur 0" not in sortie     # les 3 plus récentes
     for modele in ("ministral-3:8b", "qwen3.5:9b"):
-        assert sum(1 for a in ia.appels if a["model"] == modele) == 1 + 3 + 1   # chargement, offres, email
+        assert sum(1 for a in ia.appels if a["model"] == modele) == 3 + 1        # offres, email
+        assert sum(1 for a in ia.demarrages if a["model"] == modele) == 1      # test de démarrage
+    assert "Test de démarrage (chargement compris, schéma JSON, sans réflexion)" in sortie
     assert "JSON valide" in sortie and "7/10" in sortie and "bon" in sortie
     assert "x@gmail.com" in sortie and "valide" in sortie
     assert "Rien n'a été écrit en base." in sortie
@@ -69,7 +70,8 @@ def test_modeles_par_defaut_et_json_invalide(donnees, ia):
     code, sortie = lancer("--offres", "1")
     assert code == 0                               # l'email a reçu une réponse valide
     modeles = [a["model"] for a in ia.appels]
-    assert modeles == ["ministral-3:8b", "ministral-3:8b", "ministral-3:3b"]
+    assert modeles == ["ministral-3:8b", "ministral-3:3b"]
+    assert [a["model"] for a in ia.demarrages] == ["ministral-3:8b", "ministral-3:3b"]
     assert "  non  " in sortie and "écartée" in sortie
     assert sum(1 for a in ia.appels if "OFFRE" in texte_envoye(a)) == 1   # un seul essai
 
@@ -101,7 +103,7 @@ def test_modele_absent_passe_au_suivant(donnees, ia):
     ia.reponse = ANALYSE
     code, sortie = lancer("--modeles", "absent:1b,ministral-3:8b", "--offres", "1")
     assert "ollama pull absent:1b" in sortie and code == 0
-    assert [a["model"] for a in ia.appels].count("absent:1b") == 1
+    assert [a["model"] for a in ia.appels].count("absent:1b") == 0          # arrêté au test de démarrage
 
 
 def test_lecture_seule():
@@ -121,3 +123,10 @@ def test_ecriture_impossible(donnees):
                 cx.execute(text("update candidatures set verdict = 'bon'"))
     finally:
         moteur.dispose()
+
+
+def test_demarrage_echoue_modele_ecarte(donnees, ia):
+    ia.demarrage = "Voici : rien"
+    ia.reponse = ANALYSE
+    code, sortie = lancer("--offres", "1")
+    assert code == 1 and "Test de démarrage échoué" in sortie and ia.appels == []

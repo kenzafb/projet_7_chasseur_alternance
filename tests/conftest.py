@@ -94,7 +94,9 @@ class FausseIA:
     le corps de chaque requête (appels[i]["model"], ["messages"]...).
     Réponse : `panne(corps)` si elle renvoie quelque chose (httpx.Response
     ou exception levée), sinon le prochain élément de `file`, sinon
-    `reponse` (texte du message)."""
+    `reponse` (texte du message). Le test de démarrage de shared.ia reçoit
+    `demarrage` (une réponse valide par défaut) et n'est noté que dans
+    `demarrages`, pas dans `appels`."""
 
     def __init__(self):
         self.appels = []
@@ -103,8 +105,16 @@ class FausseIA:
         self.file = []
         self.panne = None
         self.modeles = ["ministral-3:8b", "ministral-3:3b"]
+        self.demarrage = '{"nombre": 7, "mot": "ok"}'
+        self.demarrages = []
 
     def __call__(self, url, corps, entetes, delai):
+        if "TEST DE DÉMARRAGE" in corps["messages"][-1]["content"]:
+            self.demarrages.append(corps)
+            r = (self.panne(corps) if self.panne else None) or self.demarrage
+            if isinstance(r, BaseException):
+                raise r
+            return r if isinstance(r, httpx.Response) else reponse_chat(r, native=url.endswith("/api/chat"))
         self.appels.append(corps)
         self.urls.append(url)
         r = self.panne(corps) if self.panne else None
@@ -131,7 +141,7 @@ def ia(monkeypatch):
     faux = FausseIA()
     monkeypatch.setattr(shared.ia, "_poster", faux)
     monkeypatch.setattr(shared.ia, "_obtenir", faux.obtenir)
-    monkeypatch.setattr(shared.ia, "_refuses", {})   # paramètres refusés : oubliés entre les tests
+    monkeypatch.setattr(shared.ia, "_verifies", set())   # test de démarrage : refait à chaque test
     # Pauses entre deux essais instantanées
     monkeypatch.setattr(shared.ia, "time", types.SimpleNamespace(sleep=lambda s: None, monotonic=time.monotonic))
     return faux

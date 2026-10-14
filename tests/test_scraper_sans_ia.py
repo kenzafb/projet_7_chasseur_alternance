@@ -94,7 +94,7 @@ def test_erreur_bloquante_un_seul_message(sites, user_id, ia):
     sites.douteux = {"acme1.fr", "acme2.fr", "acme3.fr"}
     echouer(ia, erreur_http(404, INTROUVABLE))
     entreprises, logs = _lancer(user_id)
-    assert len(ia.appels) == 1                       # plus d'appel après le refus
+    assert len(ia.demarrages) == 1 and ia.appels == []   # plus d'appel après le refus
     assert logs.count("IA indisponible") == 1
     assert "ollama pull" in logs
     for nom in ("ACME 1", "ACME 2", "ACME 3"):

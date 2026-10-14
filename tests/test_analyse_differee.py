@@ -164,9 +164,18 @@ def test_erreur_bloquante_arrete_tout(alice, ia, panne, message):
     echouer(ia, panne)
     _, etat = lancer(client, uid)
     assert etat["message"].startswith("Erreur : ") and message in etat["message"]
-    assert len(ia.appels) == 1                                    # arrêt immédiat
+    assert len(ia.demarrages) == 1 and ia.appels == []                                 # arrêt immédiat
     assert compter_en_attente(uid, "alternance") == 2             # rien d'écrit
     assert "Analyse arrêtée" in client.get("/api/logs").text
+
+
+def test_demarrage_echoue_analyse_non_lancee(alice, ia):
+    client, uid = alice
+    en_attente(uid, "A", 1)
+    ia.demarrage = "Bien sûr ! Voici le JSON demandé."
+    _, etat = lancer(client, uid)
+    assert etat["message"].startswith("Erreur : Test de démarrage échoué")
+    assert ia.appels == [] and compter_en_attente(uid, "alternance") == 1
 
 
 # ─── Arrêt et temps restant ──────────────────────────────────────────────────
@@ -178,6 +187,9 @@ def test_arret_apres_l_offre_en_cours(alice, ia, monkeypatch):
     import shared.ia
 
     def lente(url, corps, entetes, delai):
+        from tests.conftest import reponse_chat
+        if "TEST DE DÉMARRAGE" in corps["messages"][-1]["content"]:
+            return reponse_chat('{"nombre": 7, "mot": "ok"}')
         ia.appels.append(corps)
         premiere.set()
         liberer.wait(5)
