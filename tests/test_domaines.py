@@ -10,7 +10,7 @@ from alembic import command
 import main
 from database.profil_db import lire_profil, sauvegarder_profil
 from database.schema import config_alembic
-from france_travail.analyseur import construire_contexte_profil_job
+from france_travail.analyseur import contexte_job
 from shared import domaines as d
 
 
@@ -41,8 +41,8 @@ def test_normalisation(entree, sortie):
 def test_libelles():
     assert d.libelles_domaines(["informatique", "C"]) == [
         "Systèmes d'information et de télécommunication", "Banque, assurance, immobilier"]
-    contexte = construire_contexte_profil_job({"recherche": {"domaines": ["C15"]}})
-    assert "DOMAINES PRÉFÉRÉS (optionnel) : Immobilier" in contexte
+    contexte = contexte_job({"recherche": {"domaines": ["C15"]}})
+    assert "- Domaines préférés : Immobilier" in contexte
 
 
 def test_codes_metiers_lba_tires_du_referentiel():

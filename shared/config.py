@@ -159,6 +159,12 @@ def ia_delai_s() -> float:
 # Attente maximale de l'ouverture de la connexion : au-delà, serveur injoignable
 IA_DELAI_CONNEXION_S = 10
 
+def ia_longueur_description() -> int:
+    """Caractères de la description d'une offre envoyés à l'IA (défaut
+    2000) : sur processeur, chaque millier de caractères coûte une dizaine
+    de secondes de lecture."""
+    return int(_reel("IA_LONGUEUR_DESCRIPTION", 2000, 200))
+
 # Format de sortie imposé au serveur : "schema" (schéma JSON du modèle
 # Pydantic, sortie contrainte par Ollama), "json" (objet JSON quelconque),
 # "aucun" (rien d'imposé, la réponse est seulement validée). Défaut : schema

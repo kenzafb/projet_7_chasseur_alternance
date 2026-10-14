@@ -48,7 +48,7 @@ def _prompts(ia):
 
 
 # ─── Prompts ──────────────────────────────────────────────────────────────────
-@pytest.mark.parametrize("mode", ["alternance", "job"])
+@pytest.mark.parametrize("mode", ["alternance", "job", "stage"])
 def test_prompts_sans_mention_d_un_utilisateur_reel(ia, mode):
     generateur.generer_lettre(OFFRE, PROFIL, mode=mode)
     ia.reponse = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok"}'
@@ -79,6 +79,51 @@ def test_analyse_job_tire_les_preferences_du_profil(ia):
     for mot in ("calme", "surveillance", "pénibilité", "arrondissement"):
         assert mot not in texte.lower(), mot
     assert "N'applique AUCUNE préférence que le profil n'exprime pas" in texte
+
+
+REPONSE = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok"}'
+PROFIL_STAGE = {"prenom": "Camille", "formation": "Licence 3 informatique", "etablissement": "Université X",
+                "missions": "MISSIONS-DU-PROFIL", "date_debut": "2027-01-04", "date_fin": "2027-06-25",
+                "duree_semaines": 25, "recherche": {"domaines": ["M18"]}}
+
+
+@pytest.mark.parametrize("mode", ["alternance", "job", "stage"])
+def test_prompt_court_avec_schema_explicite(ia, mode, monkeypatch):
+    ia.reponse = REPONSE
+    monkeypatch.setenv("IA_LONGUEUR_DESCRIPTION", "300")
+    offre = {**OFFRE, "description": "mot " * 2000}
+    analyseur.analyser_offre(offre, PROFIL_STAGE if mode == "stage" else PROFIL, mode=mode)
+    texte = _prompts(ia)
+    assert '"score": <entier de 1 à 10>' in texte and '"eligible": <true ou false>' in texte
+    assert len(texte) < 4500                                  # description tronquée à 300 caractères
+    assert "Camille" not in texte and "06 00" not in texte    # identité inutile à la notation
+
+
+def test_prompt_stage(ia):
+    ia.reponse = REPONSE
+    analyseur.analyser_offre(OFFRE, PROFIL_STAGE, mode="stage")
+    texte = _prompts(ia)
+    assert "offre de stage" in texte and "MISSIONS-DU-PROFIL" in texte
+    assert "du 4 janvier 2027 au 25 juin 2027 (25 semaines)" in texte
+    assert "Licence 3 informatique" in texte and "Université X" in texte
+    assert "dates sont incompatibles" in texte and "Hors domaine" in texte
+    assert "Systèmes d'information" in texte
+
+
+def test_prompt_alternance_garde_ses_regles(ia):
+    ia.reponse = REPONSE
+    analyseur.analyser_offre(OFFRE, {**PROFIL, "niveau_vise": "NIVEAU-VISE", "formation_apporte": "APPORT"})
+    texte = _prompts(ia)
+    for attendu in ("NIVEAU-VISE", "APPORT", "3 ans d'expérience", "Hors domaine", "point faible mineur",
+                    "La date de début et la disponibilité ne comptent pas"):
+        assert attendu in texte, attendu
+
+
+@pytest.mark.parametrize("mode, archive", [("alternance", True), ("stage", False)])
+def test_ecole_archivee_en_alternance_seulement(ia, mode, archive):
+    ia.reponse = REPONSE
+    analyse = analyseur.analyser_offre({**OFFRE, "entreprise": "Epitech"}, PROFIL_STAGE, mode=mode)
+    assert (analyse.get("statut_auto") == "archive") is archive
 
 
 # ─── Trames par défaut ────────────────────────────────────────────────────────

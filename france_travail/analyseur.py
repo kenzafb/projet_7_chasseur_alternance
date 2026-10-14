@@ -2,263 +2,192 @@ import json
 import re
 from shared.ia import ErreurIABloquante, ErreurIAPassagere, appeler_structure
 from shared.schemas_ia import AnalyseOffre
+from shared.config import ia_longueur_description
 from shared.erreurs import exiger_profil
 
 
-def construire_contexte_profil(profil):
-    """Construit le contexte candidat à partir du profil de l'utilisateur (depuis la base)."""
-    nom_complet = f"{profil.get('prenom','')} {profil.get('nom','')}".strip() or "Le candidat"
-    ville       = profil.get("ville", "")
-    competences = ", ".join(profil.get("competences", []))
-    projets     = " | ".join(
-        f"{p.get('nom','')} : {p.get('description','')}"
-        for p in profil.get("projets", [])
-    )
-    formation     = (profil.get("formation", "") or "").strip()
-    experience    = (profil.get("experience", "") or "").strip()
-    langues       = profil.get("langues", "")
-    disponibilite = (profil.get("disponibilite", "") or "").strip()
-    niveau_vise       = (profil.get("niveau_vise", "") or "").strip()
-    formation_apporte = (profil.get("formation_apporte", "") or "").strip()
-    criteres_eviter   = (profil.get("criteres_eviter", "") or "").strip()
-    localisation = (profil.get("recherche", {}) or {}).get("localisation", "")
+# ─── Prompts d'analyse, un par mode ──────────────────────────────────────────
+# Écrits pour un petit modèle local : courts, en français, seulement les
+# champs du profil qui servent à noter, description tronquée
+# (IA_LONGUEUR_DESCRIPTION), schéma JSON écrit en toutes lettres en plus du
+# format imposé au serveur (shared.schemas_ia.AnalyseOffre).
 
-    parties = [f"Candidat : {nom_complet}" + (f", {ville}." if ville else ".")]
-    if niveau_vise:       parties.append(f"NIVEAU D'ÉTUDES VISÉ (ce que le contrat prépare) :\n{niveau_vise}")
-    if formation:         parties.append(f"FORMATION :\n{formation}")
-    if formation_apporte: parties.append(f"COMPÉTENCES QUE LA FORMATION VA APPORTER (ne pas pénaliser si l'offre les demande) :\n{formation_apporte}")
-    if competences:       parties.append(f"COMPÉTENCES DÉJÀ MAÎTRISÉES : {competences}")
-    if projets:           parties.append(f"PROJETS : {projets}")
-    if experience:        parties.append(f"EXPÉRIENCE :\n{experience}")
-    if langues:           parties.append(f"LANGUES : {langues}")
-    if localisation:      parties.append(f"LOCALISATION SOUHAITÉE : {localisation}")
-    if disponibilite:     parties.append(f"DISPONIBILITÉ : {disponibilite}")
-    if criteres_eviter:   parties.append(f"CE QUE LE CANDIDAT PRÉFÈRE ÉVITER :\n{criteres_eviter}")
-    return "\n\n".join(parties)
+LONGUEUR_CHAMP = 400   # caractères gardés d'un champ libre du profil
 
-def construire_contexte_profil_job(profil):
-    """Contexte candidat pour le mode JOB (job court / mission)."""
-    nom = f"{profil.get('prenom','')} {profil.get('nom','')}".strip() or "Le candidat"
-    ville = profil.get("ville", "")
-    niveau_etudes   = (profil.get("niveau_etudes", "") or "").strip()
-    experience      = (profil.get("experience", "") or "").strip()
-    competences     = ", ".join(profil.get("competences", [])) if profil.get("competences") else ""
-    atouts          = (profil.get("langues", "") or "").strip()   # langues/permis/savoir-être
-    duree           = (profil.get("duree_souhaitee", "") or "").strip()
-    dispo_dates     = (profil.get("recherche", {}) or {}).get("disponibilite", "")
-    dispo_horaires  = (profil.get("dispo_horaires", "") or "").strip()
-    mobilite        = (profil.get("mobilite", "") or "").strip()
-    jobs_ok         = (profil.get("types_jobs_ok", "") or "").strip()
-    jobs_eviter     = (profil.get("types_jobs_eviter", "") or "").strip()
-    loc_pref        = (profil.get("localisation_pref", "") or "").strip()
+FORMAT_REPONSE = (
+    "Réponds uniquement avec cet objet JSON :\n"
+    '{"score": <entier de 1 à 10>, "eligible": <true ou false>, '
+    '"points_forts": [<3 phrases courtes au plus>], "points_faibles": [<2 phrases courtes au plus>], '
+    '"domaine": "<catégorie métier en 2 à 4 mots>", "resume": "<12 mots au plus>"}'
+)
+
+SYSTEME = ("Tu es un recruteur qui évalue des offres pour un candidat. Tu réponds uniquement par un "
+           "objet JSON valide, en français, sans texte autour.")
+
+
+def _court(texte, longueur=LONGUEUR_CHAMP) -> str:
+    texte = " ".join(str(texte or "").split())
+    return texte if len(texte) <= longueur else texte[:longueur].rsplit(" ", 1)[0] + "…"
+
+
+def _lignes(champs) -> str:
+    """« - Libellé : valeur » pour chaque valeur non vide."""
+    return "\n".join(f"- {libelle} : {valeur}" for libelle, valeur in champs if valeur)
+
+
+def _domaines(profil) -> str:
     from shared.domaines import domaines_du_profil, libelles_domaines
-    domaines_pref   = ", ".join(libelles_domaines(domaines_du_profil(profil)))
-
-    parties = [f"Candidat : {nom}" + (f", {ville}." if ville else ".")]
-    if niveau_etudes:  parties.append(f"NIVEAU D'ÉTUDES OBTENU : {niveau_etudes}")
-    if experience:     parties.append(f"EXPÉRIENCE :\n{experience}")
-    if competences:    parties.append(f"COMPÉTENCES : {competences}")
-    if atouts:         parties.append(f"ATOUTS (langues, permis, savoir-être) : {atouts}")
-    if duree:          parties.append(f"DURÉE DE CONTRAT SOUHAITÉE : {duree}")
-    if dispo_dates:    parties.append(f"DISPONIBILITÉ (dates) : {dispo_dates}")
-    if dispo_horaires: parties.append(f"DISPONIBILITÉ HORAIRE : {dispo_horaires}")
-    if mobilite:       parties.append(f"MOBILITÉ : {mobilite}")
-    if jobs_ok:        parties.append(f"TYPES DE JOBS QUI CONVIENNENT : {jobs_ok}")
-    if jobs_eviter:    parties.append(f"TYPES DE JOBS À ÉVITER : {jobs_eviter}")
-    if loc_pref:       parties.append(f"LOCALISATION PRÉFÉRÉE (optionnel) : {loc_pref}")
-    if domaines_pref:  parties.append(f"DOMAINES PRÉFÉRÉS (optionnel) : {domaines_pref}")
-    return "\n\n".join(parties)
+    return ", ".join(libelles_domaines(domaines_du_profil(profil)))
 
 
-def _analyser_offre_job(offre, profil):
-    """Analyse d'une offre en mode JOB (job court / mission accessible)."""
-    contexte = construire_contexte_profil_job(profil)
+def contexte_alternance(profil) -> str:
+    projets = " | ".join(_court(f"{p.get('nom', '')} : {p.get('description', '')}", 150)
+                         for p in (profil.get("projets") or [])[:3])
+    return _lignes([
+        ("Niveau visé (diplôme préparé par le contrat)", _court(profil.get("niveau_vise"))),
+        ("Formation", _court(profil.get("formation"))),
+        ("Ce que la formation va lui apporter", _court(profil.get("formation_apporte"))),
+        ("Compétences", _court(", ".join(profil.get("competences") or []))),
+        ("Expérience", _court(profil.get("experience"))),
+        ("Projets", projets),
+        ("Langues", _court(profil.get("langues"), 150)),
+        ("Préfère éviter", _court(profil.get("criteres_eviter"))),
+        ("Domaines recherchés", _domaines(profil) or "ceux qui correspondent au profil"),
+    ])
+
+
+def contexte_job(profil) -> str:
+    return _lignes([
+        ("Niveau d'études obtenu", _court(profil.get("niveau_etudes"), 150)),
+        ("Expérience", _court(profil.get("experience"))),
+        ("Compétences", _court(", ".join(profil.get("competences") or []))),
+        ("Atouts (langues, permis, savoir-être)", _court(profil.get("langues"), 200)),
+        ("Durée de contrat souhaitée", _court(profil.get("duree_souhaitee"), 150)),
+        ("Disponibilité (dates)", _court((profil.get("recherche") or {}).get("disponibilite"), 150)),
+        ("Disponibilité horaire", _court(profil.get("dispo_horaires"), 150)),
+        ("Mobilité", _court(profil.get("mobilite"), 150)),
+        ("Types de jobs qui conviennent", _court(profil.get("types_jobs_ok"))),
+        ("Types de jobs à éviter", _court(profil.get("types_jobs_eviter"))),
+        ("Localisation préférée", _court(profil.get("localisation_pref"), 150)),
+        ("Domaines préférés", _domaines(profil)),
+    ])
+
+
+def contexte_stage(profil) -> str:
+    from shared.stage import date_en_lettres, lire_date
+    debut, fin = lire_date(profil.get("date_debut") or None), lire_date(profil.get("date_fin") or None)
+    periode = ""
+    if debut and fin:
+        periode = f"du {date_en_lettres(debut)} au {date_en_lettres(fin)}"
+        if profil.get("duree_semaines"):
+            periode += f" ({profil['duree_semaines']} semaines)"
+    return _lignes([
+        ("Formation", _court(profil.get("formation"), 200)),
+        ("Établissement", _court(profil.get("etablissement"), 200)),
+        ("Missions visées", _court(profil.get("missions"))),
+        ("Période du stage", periode or "non précisée"),
+        ("Domaines recherchés", _domaines(profil) or "ceux qui correspondent aux missions visées"),
+    ])
+
+
+REGLES = {
+    "alternance": (
+        "Tu évalues une offre d'alternance pour ce candidat.",
+        contexte_alternance,
+        "INÉLIGIBLE (eligible false, score 1 ou 2) si l'une de ces conditions est vraie :\n"
+        "- le poste réel est hors des domaines recherchés ;\n"
+        "- l'offre exige un niveau d'études nettement supérieur au niveau visé (ex. Bac+5 pour un Bac+2) ;\n"
+        "- l'offre exige 3 ans d'expérience ou plus ;\n"
+        "- le poste est senior (ingénieur confirmé, architecte, senior), sauf offre d'une école ou d'un CFA.\n\n"
+        "NOTE de 1 à 10, d'après les missions réelles et non le seul titre :\n"
+        "- 9-10 : domaine recherché, niveau cohérent avec le niveau visé, plusieurs compétences du candidat utiles ;\n"
+        "- 7-8 : bon accord avec une ou deux réserves (niveau non précisé, compétences manquantes, lieu éloigné) ;\n"
+        "- 5-6 : accord moyen (niveau un peu au-dessus, compétences importantes manquantes) ;\n"
+        "- 3-4 : faible accord (domaine éloigné, prérequis incompatibles) ;\n"
+        "- 1-2 : inéligible.\n"
+        "Une compétence demandée que la formation va apporter n'est qu'un point faible mineur ; une compétence "
+        "absente du profil et de la formation est un point faible important. Si le poste correspond à ce que "
+        "le candidat préfère éviter, baisse la note. La date de début et la disponibilité ne comptent pas.\n\n"
+        "domaine : catégorie métier courte (ex. « Développement web », « Gestion locative »), ou exactement "
+        "« Hors domaine » si le poste réel est hors des domaines recherchés.",
+    ),
+    "job": (
+        "Tu évalues une offre de job court (mission, CDD, intérim, saisonnier) pour ce candidat : "
+        "est-elle accessible et adaptée ?",
+        contexte_job,
+        "INÉLIGIBLE (eligible false, score 1 ou 2) si l'une de ces conditions est vraie :\n"
+        "- l'offre exige un diplôme que le candidat n'a pas ;\n"
+        "- l'offre exige plus d'expérience que la sienne (« souhaitée » ou « appréciée » n'élimine pas) ;\n"
+        "- la durée minimale du contrat dépasse ce que le candidat peut faire (plus court : c'est bien) ;\n"
+        "- le poste correspond clairement aux types de jobs à éviter.\n\n"
+        "NOTE de 1 à 10. Critère principal : l'accord avec les préférences écrites dans le profil (types de "
+        "jobs, horaires, mobilité, durée, localisation, domaines). N'applique AUCUNE préférence que le profil "
+        "n'exprime pas. Utilise toute l'échelle et départage nettement deux offres :\n"
+        "- 9-10 : un type de job qui convient, rien ne contredit ses contraintes, proche de sa localisation préférée ;\n"
+        "- 7-8 : accessible (débutant accepté) et compatible sans correspondre exactement, ou dans un domaine préféré ;\n"
+        "- 5-6 : accessible avec un vrai bémol (horaires peu compatibles, loin, hors de ses types de jobs) ;\n"
+        "- 3-4 : proche de ce qu'il veut éviter, ou plusieurs défauts ;\n"
+        "- 1-2 : inéligible.\n"
+        "Un job sans diplôme ni expérience exigés vaut environ 7 au départ. Une durée minimale nettement trop "
+        "longue plafonne la note vers 4-5 ; des horaires incompatibles coûtent plusieurs points ; sans "
+        "permis, préfère un lieu accessible en transports. Sans localisation préférée, la distance ne compte "
+        "pas. La date de début ne compte pas.\n\n"
+        "domaine : catégorie métier courte (ex. « Vente », « Restauration », « Manutention »).",
+    ),
+    "stage": (
+        "Tu évalues une offre de stage pour cet étudiant.",
+        contexte_stage,
+        "INÉLIGIBLE (eligible false, score 1 ou 2) si l'une de ces conditions est vraie :\n"
+        "- ce n'est pas un stage pour un étudiant (emploi salarié, alternance, formation payante) ;\n"
+        "- le poste réel est hors des domaines recherchés ;\n"
+        "- l'offre exige un niveau d'études nettement supérieur à la formation de l'étudiant ;\n"
+        "- les dates sont incompatibles : durée minimale exigée nettement plus longue que sa période, ou "
+        "début après la fin de sa période.\n\n"
+        "NOTE de 1 à 10, d'après les missions réelles et non le seul titre :\n"
+        "- 9-10 : missions proches des missions visées, domaine recherché, niveau et dates compatibles ;\n"
+        "- 7-8 : bon accord avec une ou deux réserves (missions un peu différentes, dates non précisées) ;\n"
+        "- 5-6 : accord moyen (missions assez éloignées, niveau un peu au-dessus) ;\n"
+        "- 3-4 : faible accord ;\n"
+        "- 1-2 : inéligible.\n"
+        "Des dates absentes de l'offre ne sont pas une pénalité.\n\n"
+        "domaine : catégorie métier courte, ou exactement « Hors domaine » si le poste réel est hors des "
+        "domaines recherchés.",
+    ),
+}
+
+
+def construire_messages(offre, profil, mode="alternance") -> list[dict]:
+    """Messages envoyés à l'IA pour analyser une offre dans un mode."""
+    intro, contexte, regles = REGLES.get(mode, REGLES["alternance"])
+    description = _court(offre.get("description"), ia_longueur_description())
     prompt = (
-        "Tu es un recruteur. Un candidat cherche un JOB COURT (mission, CDD, intérim, saisonnier) "
-        "pour une période limitée. Analyse si cette offre lui est ACCESSIBLE et adaptée.\n"
-        "Réponds UNIQUEMENT en JSON valide, sans backticks ni texte autour.\n\n"
-
-        "=== PROFIL DU CANDIDAT ===\n"
-        f"{contexte}\n\n"
-
-        "=== OFFRE ===\n"
+        f"{intro}\n\n"
+        f"CANDIDAT\n{contexte(profil)}\n\n"
+        "OFFRE\n"
         f"Titre : {offre.get('titre', '')}\n"
-        f"Entreprise : {offre.get('entreprise', '')}\n"
-        f"Lieu : {offre.get('lieu', '')}\n"
-        f"Description : {offre.get('description', '')[:1000]}\n\n"
-
-        "=== INÉLIGIBILITÉ (score max 2, eligible: false) ===\n"
-        "Marque INÉLIGIBLE si l'une de ces conditions est vraie :\n"
-        "- L'offre EXIGE un diplôme/une formation que le candidat n'a PAS "
-        "(se baser sur son niveau d'études obtenu).\n"
-        "- L'offre EXIGE plus d'expérience que celle du candidat "
-        "(une expérience 'souhaitée' ou 'appréciée' n'est PAS éliminatoire).\n"
-        "- La durée MINIMALE du contrat dépasse la durée maximale que le candidat peut faire "
-        "(voir sa durée souhaitée / ses dates de disponibilité). Une durée plus COURTE est OK.\n"
-        "- Le poste correspond clairement à ce que le candidat veut ÉVITER.\n\n"
-
-        "=== SCORING (1-10) — UTILISE TOUTE L'ÉCHELLE, NE METS PAS TOUT À 7 ===\n"
-        "Le critère N°1 est l'ADÉQUATION AUX PRÉFÉRENCES DU CANDIDAT telles qu'il les a écrites "
-        "dans son profil : types de jobs qui lui conviennent, types de jobs à éviter, disponibilité "
-        "horaire, mobilité, durée souhaitée, localisation et domaines préférés. Juge la nature réelle "
-        "du poste (rythme, effort physique, contact client, horaires, tâches) depuis la description "
-        "et compare-la à ces préférences. N'applique AUCUNE préférence que le profil n'exprime pas.\n\n"
-        "Barème (sois DISCRIMINANT, écarte vraiment les notes) :\n"
-        "9-10 : le poste correspond clairement à un type de job qui convient au candidat, rien ne "
-        "contredit ses contraintes (horaires, durée, mobilité) ET il est proche de sa localisation "
-        "préférée s'il en a une. Le top du candidat.\n"
-        "7-8 : bon job accessible (débutant accepté, pas d'expérience exigée) et compatible avec ses "
-        "préférences sans y correspondre exactement, OU dans un de ses domaines préférés. "
-        "Job 'standard correct'.\n"
-        "5-6 : accessible MAIS avec un vrai bémol : horaires peu compatibles avec sa disponibilité "
-        "horaire, OU loin de sa localisation préférée, OU éloigné des types de jobs qui lui conviennent.\n"
-        "3-4 : peu adapté : proche de ce que le candidat veut éviter, ou cumul de défauts "
-        "(loin + horaires incompatibles + hors de ses types de jobs).\n"
-        "1-2 : inéligible (voir section inéligibilité).\n\n"
-        "Principes IMPORTANTS :\n"
-        "- PRÉFÉRENCES = critère prioritaire. Deux postes également accessibles ne doivent PAS avoir "
-        "la même note si l'un correspond mieux aux types de jobs souhaités ou s'éloigne moins de ce "
-        "que le candidat veut éviter : départage-les nettement.\n"
-        "- Si le profil ne précise ni types de jobs souhaités ni types à éviter, juge surtout "
-        "l'accessibilité et la compatibilité pratique (horaires, durée, trajet).\n"
-        "- DURÉE : si la durée MINIMALE du contrat dépasse nettement le maximum du candidat "
-        "(ex. un CDD de plusieurs mois pour quelqu'un qui ne peut travailler que quelques semaines), "
-        "ce n'est pas qu'un détail : BAISSE la note de plusieurs points (plafonne autour de 4-5 même "
-        "si le job est sympa). Une durée plus courte ou flexible (intérim, saisonnier) est au "
-        "contraire un BON point.\n"
-        "- HORAIRES : compare les horaires de l'offre (nuit, week-end, coupures, temps partiel...) à "
-        "la disponibilité horaire du candidat ; une incompatibilité nette coûte plusieurs points.\n"
-        "- LOCALISATION : si une localisation préférée est indiquée, plus c'est proche, mieux c'est ; "
-        "un poste juste à côté mérite un bonus, un poste loin perd des points (sans être éliminé). "
-        "Sans localisation préférée, ne note pas la distance.\n"
-        "- DOMAINE : un job dans un des domaines préférés du candidat, ou proche de son expérience, "
-        "est un bon point.\n"
-        "- Un job qui ne demande NI diplôme NI expérience est ACCESSIBLE : bon point de base (~7).\n"
-        "- Ne JAMAIS pénaliser pour la date de début ou la disponibilité.\n"
-        "- Tenir compte de la mobilité (pas de permis → privilégier accessible en transports).\n\n"
-
-        "=== CLASSIFICATION ===\n"
-        "Renseigne 'domaine' avec une courte catégorie métier du job (2-4 mots, "
-        "ex. 'Vente', 'Restauration', 'Manutention', 'Accueil', 'Saisie de données'...).\n\n"
-
-        "=== FORMAT RÉPONSE ===\n"
-        '{"score": 7, "verdict": "bon", "eligible": true, '
-        '"points_forts": ["max 3 points concrets : accessibilité, type de job, localisation"], '
-        '"points_faibles": ["max 2 points : ce qui pourrait gêner le candidat"], '
-        '"domaine": "courte catégorie métier", '
-        '"resume": "max 12 mots factuels"}'
+        f"Entreprise : {offre.get('entreprise', '') or 'non précisée'}\n"
+        f"Lieu : {offre.get('lieu', '') or 'non précisé'}\n"
+        f"Description : {description}\n\n"
+        f"{regles}\n\n"
+        f"{FORMAT_REPONSE}"
     )
-
-    # Retry sur les erreurs passagères du serveur. ErreurIABloquante /
-    # ErreurIAPassagere remontent : jamais de note inventée.
-    analyse = appeler_structure(
-        [
-            {"role": "system", "content": (
-                "Tu es un recruteur spécialisé dans les jobs courts et missions. "
-                "Tu reponds UNIQUEMENT en JSON valide sans backticks. "
-                "Tu ignores totalement la date de debut et la disponibilite dans ta notation."
-            )},
-            {"role": "user", "content": prompt},
-        ],
-        AnalyseOffre,
-        usage="analyse",
-    )
-    return _valider_analyse(analyse)
+    return [{"role": "system", "content": SYSTEME}, {"role": "user", "content": prompt}]
 
 
-def analyser_offre(offre, profil, mode="alternance"):
-    # Profil obligatoire (plus de repli sur un utilisateur par défaut)
-    exiger_profil(profil)
-
-    # ─── Mode JOB : prompt dédié (job court accessible) ───
-    if mode == "job":
-        return _analyser_offre_job(offre, profil)
-
-    contexte = construire_contexte_profil(profil)
-    # Domaines recherchés par le candidat (libellés lisibles)
-    from shared.domaines import domaines_du_profil, libelles_domaines
-    _labels = libelles_domaines(domaines_du_profil(profil))
-    domaines_txt = ", ".join(_labels) if _labels else "le domaine correspondant au profil ci-dessus"
-
-    prompt = (
-        "Tu es un recruteur spécialisé en alternance. Analyse cette offre pour le candidat ci-dessous.\n"
-        "Réponds UNIQUEMENT en JSON valide, sans backticks ni texte autour.\n\n"
-
-        "=== PROFIL DU CANDIDAT ===\n"
-        f"{contexte}\n\n"
-
-        f"=== DOMAINE(S) RECHERCHÉ(S) ===\n{domaines_txt}\n\n"
-
-        "=== OFFRE ===\n"
-        f"Titre : {offre.get('titre', '')}\n"
-        f"Entreprise : {offre.get('entreprise', '')}\n"
-        f"Lieu : {offre.get('lieu', '')}\n"
-        f"Description : {offre.get('description', '')[:1000]}\n\n"
-
-        "=== INÉLIGIBILITÉ (score max 2, eligible: false) ===\n"
-        "Marque INÉLIGIBLE si l'une de ces conditions est vraie :\n"
-        "- Le poste réel est clairement hors du/des domaine(s) recherché(s) par le candidat.\n"
-        "- L'offre exige un niveau d'études NETTEMENT supérieur au niveau visé par le candidat "
-        "(ex. Master/Bac+5 exigé alors que le candidat vise un Bac+2).\n"
-        "- L'offre exige une expérience professionnelle importante (ex. 3 ans ou plus).\n"
-        "- Le poste correspond à un niveau de séniorité incompatible avec une alternance "
-        "(ex. 'Ingénieur', 'Architecte', 'Senior' exigé), sauf si l'offre vient d'une école/CFA.\n\n"
-
-        "=== SCORING (1-10) ===\n"
-        "Juge la correspondance ENTRE CE CANDIDAT (son niveau visé, ses compétences, ce que sa "
-        "formation va lui apporter, sa localisation) ET cette offre.\n"
-        "9-10 : excellent match — domaine recherché, niveau cohérent avec le niveau visé, "
-        "plusieurs compétences du candidat correspondent, localisation compatible.\n"
-        "7-8 : bon match avec 1-2 réserves (niveau non précisé, quelques compétences manquantes, "
-        "ou localisation un peu éloignée).\n"
-        "5-6 : correspondance moyenne (niveau demandé un peu supérieur au niveau visé, "
-        "compétences importantes manquantes).\n"
-        "3-4 : faible correspondance (domaine éloigné, prérequis incompatibles).\n"
-        "1-2 : inéligible.\n\n"
-        "Principes IMPORTANTS :\n"
-        "- Ne JAMAIS pénaliser pour la date de début ou la disponibilité.\n"
-        "- Une compétence demandée par l'offre que le candidat NE maîtrise pas encore MAIS que sa "
-        "formation va lui apporter = point faible MINEUR (il va l'acquérir), pas rédhibitoire.\n"
-        "- Une compétence demandée hors de ce que le candidat a ET hors de ce que la formation "
-        "apporte = point faible IMPORTANT.\n"
-        "- Si l'offre correspond à ce que le candidat préfère ÉVITER, baisse le score en conséquence.\n"
-        "- Juge sur les MISSIONS réelles décrites, pas sur le titre seul.\n\n"
-
-        "=== CLASSIFICATION ===\n"
-        "Renseigne le champ 'domaine' avec une courte catégorie métier de l'offre (2-4 mots, "
-        "ex. selon le secteur : 'Administration systèmes', 'Développement web', 'Gestion locative', "
-        "'Transaction immobilière'...).\n"
-        "Si le poste réel est HORS du/des domaine(s) recherché(s) par le candidat, mets "
-        "EXACTEMENT 'Hors domaine' comme valeur de 'domaine'.\n\n"
-
-        "=== FORMAT RÉPONSE ===\n"
-        '{"score": 7, "verdict": "bon", "eligible": true, '
-        '"points_forts": ["max 3 points concrets liés à l\'offre"], '
-        '"points_faibles": ["max 2 points, préciser si la formation couvre la lacune ou non"], '
-        '"domaine": "courte catégorie métier, ou Hors domaine", '
-        '"resume": "max 12 mots factuels"}'
-    )
-
-    est_ecole = est_ecole_cfa(offre)
-
-    # Retry sur les erreurs passagères du serveur. ErreurIABloquante /
-    # ErreurIAPassagere remontent : jamais de note inventée.
-    analyse = appeler_structure(
-        [
-            {"role": "system", "content": (
-                "Tu es un recruteur spécialisé en alternance. Tu reponds UNIQUEMENT en JSON valide sans backticks. "
-                "Tu ignores totalement la date de debut et la disponibilite dans ta notation."
-            )},
-            {"role": "user", "content": prompt},
-        ],
-        AnalyseOffre,
-        usage="analyse",
-    )
+def analyser_offre(offre, profil, mode="alternance", modele=None, essais=2):
+    """Analyse d'une offre par l'IA (modèle de l'usage « analyse », ou
+    `modele`). ErreurIABloquante et ErreurIAPassagere (dont ReponseInvalide)
+    remontent : jamais de note inventée. En alternance, une offre d'école ou
+    de CFA est marquée à archiver (statut_auto)."""
+    exiger_profil(profil)   # plus de repli sur un utilisateur par défaut
+    analyse = appeler_structure(construire_messages(offre, profil, mode), AnalyseOffre,
+                                usage="analyse", modele=modele, essais=essais, temperature=0.2)
     result = _valider_analyse(analyse)
-    if est_ecole:
+    # Mode stage : une école peut accueillir un stagiaire (D74), rien à archiver
+    if mode == "alternance" and est_ecole_cfa(offre):
         result["statut_auto"] = "archive"
-        print(f"     → Archivée automatiquement (école/CFA détectée)")
     return result
+
 
 # Détection écoles/CFA (mots-clés) → archivage automatique
 ECOLES_MOTS_CLES = [
