@@ -73,10 +73,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         <span>Candidatures</span><span class="nav__count" data-count="candidatures">0</span>
       </button>
-      <button class="nav__item" data-page="spontanees-suivi">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3z"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>
-        <span>Spontanées envoyées</span><span class="nav__count" data-count="spontanees-suivi">0</span>
-      </button>
 
       <p class="nav__label">Mon compte</p>
       <button class="nav__item" data-page="profil">
@@ -139,7 +135,6 @@
       {% include "partials/offres.html" %}
       {% include "partials/candidatures.html" %}
       {% include "partials/spontanees.html" %}
-      {% include "partials/spontanees_suivi.html" %}
       {% include "partials/profil.html" %}
     </div>
   </main>

@@ -162,7 +162,8 @@ class OffreId(BaseModel):
     id: str
 
 # Valeurs autorisées (cf. database/models.py)
-StatutCandidature = Literal["nouveau", "en_cours", "envoye", "reponse", "entretien", "refus", "archive"]
+StatutCandidature = Literal["nouveau", "en_cours", "envoye", "a_relancer", "reponse", "entretien", "refus", "archive"]
+# « a_relancer » : statut de suivi commun aux offres et aux spontanées (D107)
 RaisonArchivage = Literal["manuel", "note_basse", "ineligible", "ecole_cfa", "hors_domaine", "public_specifique",
                           "stage"]
 
@@ -741,7 +742,7 @@ def api_analyser(body: OffreId, request: Request, user: User = Depends(utilisate
 def api_maj_statut(body: MajStatut, request: Request, user: User = Depends(utilisateur_requis),
                    mode: str = Depends(mode_requis)):
     modifs = {"statut": body.statut}
-    if body.statut in ["envoye", "reponse", "entretien", "refus"]:
+    if body.statut in STATUTS_POSTULEE:
         offre = lire_candidature(user.id, body.id, mode=mode)
         if offre and not offre.get("date_candidature"):
             modifs["date_candidature"] = maintenant_utc()
@@ -750,7 +751,7 @@ def api_maj_statut(body: MajStatut, request: Request, user: User = Depends(utili
 
 # Statuts d'une offre où la personne a postulé (D105) : « envoye » (affiché
 # « Postulée »), puis le suivi de la page Mes candidatures
-STATUTS_POSTULEE = ("envoye", "reponse", "entretien", "refus")
+STATUTS_POSTULEE = ("envoye", "a_relancer", "reponse", "entretien", "refus")
 
 
 @prive.post("/api/offre/postuler")
@@ -842,7 +843,30 @@ def api_lettre_pdf(ref_offre: str, request: Request, user: User = Depends(utilis
     return FileResponse(chemin, media_type="application/pdf", filename=nom)
 
 
-# ─── Spontanées — Suivi des candidatures ──────────────────────────────────────
+# ─── Suivi unique des candidatures : offres postulées et spontanées (D107) ────
+class StatutSuivi(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    type: Literal["offre", "spontanee"]
+    id: str = Field(min_length=1, max_length=64)
+    statut: str = Field(min_length=1, max_length=30)
+
+
+@prive.get("/api/suivi")
+def api_suivi(user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
+    """Toutes les candidatures du mode, les plus récentes d'abord."""
+    from database.suivi_db import lire_suivi
+    return lire_suivi(user.id, mode)
+
+
+@prive.post("/api/suivi/statut")
+def api_suivi_statut(body: StatutSuivi, user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
+    from database.suivi_db import modifier_statut
+    if not modifier_statut(user.id, mode, body.type, body.id, body.statut):
+        return JSONResponse({"erreur": "Candidature introuvable, ou statut impossible pour ce type"}, status_code=404)
+    return {"ok": True}
+
+
+# ─── Spontanées — Suivi des candidatures (API gardée ; l'interface passe par /api/suivi) ─
 @prive.get("/api/spontanees/suivi")
 def api_spontanees_suivi(request: Request, user: User = Depends(utilisateur_requis),
                          mode: str = Depends(mode_requis)):

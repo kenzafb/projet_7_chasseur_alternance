@@ -8,7 +8,6 @@ import { Offres }        from "./offres.js";
 import { Candidatures }  from "./candidatures.js";
 import { Spontanees }    from "./spontanees.js";
 import { Profil }        from "./profil.js";
-import { Suivi }         from "./suivi.js";
 
 /* Contenu contextuel de la topbar selon la page */
 const TOPBAR = {
@@ -16,10 +15,9 @@ const TOPBAR = {
     const demandee = limite("offres");
     confirmerLancement("offres", demandee, await api.recherche(demandee));
   } },
-  candidatures: { title: "Mes candidatures",      action: "Actualiser",          run: () => recharger() },
+  candidatures: { title: "Suivi des candidatures", action: "Actualiser",         run: () => Candidatures.charger() },
   spontanees:   { title: "Candidatures spontanées", action: "Récupérer",         run: () => Spontanees.action("fetch") },
   profil:       { title: "Mon profil",            action: "Enregistrer",         run: () => sauvegarderProfil() },
-  "spontanees-suivi": { title: "Suivi des candidatures spontanées", action: "Actualiser", run: () => Suivi.charger() },
 };
 
 let pageCourante = "offres";
@@ -37,7 +35,7 @@ function aller(page) {
     n.classList.toggle("is-active", n.dataset.page === page));
 
   if (page === "profil" && !Profil._charge) Profil.charger();
-  if (page === "spontanees-suivi") Suivi.charger();
+  if (page === "candidatures") Candidatures.charger();
   const t = TOPBAR[page];
   let titre = t.title;
   // Le titre de la page Offres s'adapte au mode (alternance / job / stage)
@@ -53,7 +51,7 @@ function majBadge() {
   const badge = document.querySelector('[data-topbar="badge"]');
   const compteur = document.querySelector(`[data-count="${pageCourante}"]`);
   const n = compteur ? compteur.textContent : "0";
-  const mots = { offres: "offres", candidatures: "candidatures", spontanees: "entreprises", profil: "", "spontanees-suivi": "envoyées" };
+  const mots = { offres: "offres", candidatures: "candidatures", spontanees: "entreprises", profil: "" };
   if (pageCourante === "profil") { badge.textContent = ""; return; }
   badge.textContent = `${n} ${mots[pageCourante]}`;
 }
@@ -136,19 +134,9 @@ const modal = {
 /* ── Chargement global ───────────────────────────────────────────────────── */
 async function recharger() {
   await Offres.charger();
-  Candidatures.rendre(Offres.data());
+  await Candidatures.charger();   // suivi unique : offres postulées et spontanées envoyées
   await Spontanees.charger();
-  majCompteurSuivi();
   majBadge();
-}
-
-// Met à jour le compteur "Spontanées envoyées" dans la sidebar (sans tout charger)
-async function majCompteurSuivi() {
-  try {
-    const d = await api.spSuivi();
-    const cnt = document.querySelector('[data-count="spontanees-suivi"]');
-    if (cnt) cnt.textContent = d.length;
-  } catch (_) {}
 }
 
 /* ── Polling : reflète l'état des pipelines en haut de page ───────────────
@@ -253,7 +241,6 @@ const LISTES_RECHERCHE = {
   offres:             { liste: '[data-list="offres"]',        ligne: ".offre" },
   candidatures:       { liste: '[data-list="candidatures"]',  ligne: ".suivi-row" },
   spontanees:         { liste: '[data-list="spontanees"]',    ligne: ".trow:not(.thead)" },
-  "spontanees-suivi": { liste: '[data-list="suivi"]',         ligne: ".suivi-row" },
 };
 
 function rechercher(texte) {
@@ -404,7 +391,8 @@ function brancher() {
   });
 
   // rafraîchir le kanban quand on déplace une carte
-  Candidatures.onRefresh(() => recharger());
+  // « J'ai postulé » ou son annulation depuis la page Offres : le suivi suit
+  document.addEventListener("candidatures:maj", () => Candidatures.charger());
   Candidatures.onOuvrir(id => modal.ouvrir(id));
 }
 
@@ -430,8 +418,9 @@ recharger();
     history.replaceState(null, "", location.pathname);
   } else {
     // Reprendre la page mémorisée dans l'URL (#candidatures, etc.), sinon Offres
-    const PAGES_VALIDES = ["offres", "candidatures", "spontanees", "spontanees-suivi", "profil"];
-    const hash = location.hash.replace("#", "");
+    const PAGES_VALIDES = ["offres", "candidatures", "spontanees", "profil"];
+    // Ancienne page « Spontanées envoyées » : fondue dans le suivi unique (D107)
+    const hash = location.hash.replace("#", "") === "spontanees-suivi" ? "candidatures" : location.hash.replace("#", "");
     aller(PAGES_VALIDES.includes(hash) ? hash : "offres");
   }
 })();

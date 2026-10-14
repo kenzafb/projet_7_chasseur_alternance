@@ -158,8 +158,9 @@ export const api = {
   modeTestCompte:       (actif) => post("/api/compte_envoi/mode_test", { actif }),
 
   // Spontanées
-  spSuivi:       ()           => get("/api/spontanees/suivi"),
-  spSuiviStatut: (id, statut) => post("/api/spontanees/suivi/statut", { id, statut }),
+  // Suivi unique des candidatures (offres postulées et spontanées, D107)
+  suivi:         ()           => get("/api/suivi"),
+  suiviStatut:   (type, id, statut) => post("/api/suivi/statut", { type, id, statut }),
   spStats:    ()       => get("/api/spontanees/stats"),
   spFetch:    (max)    => post("/api/spontanees/fetch", { max_entreprises: max }),
   spScraper:  (max)    => post("/api/spontanees/scraper", { max_scrapees: max }),

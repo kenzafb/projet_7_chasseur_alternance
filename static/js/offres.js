@@ -12,7 +12,7 @@ let filtre = "all";
 let modeArchives = false;   // false = offres à postuler, true = archivées
 let fOffres = { source: "all", zone: "all", score: "all", statut: "all" };
 // Offre où la personne a postulé (D105) : « envoye » puis le suivi de Mes candidatures
-const POSTULEE = ["envoye", "reponse", "entretien", "refus"];
+const POSTULEE = ["envoye", "a_relancer", "reponse", "entretien", "refus"];
 const estPostulee = o => POSTULEE.includes(o.statut);
 const aujourdhui = () => new Date().toLocaleDateString("sv-SE");   // AAAA-MM-JJ, jour local
 const dateFr = d => d ? d.split("-").reverse().join("/") : "";  // filtres combinables du mode normal
@@ -285,7 +285,8 @@ export const Offres = {
     if (act === "postuler" || act === "annuler-postuler") {
       const date = carteEl.querySelector("[data-postuler-date]")?.value;
       api.postuler(id, act === "annuler-postuler" ? { annuler: true } : { date })
-        .then(() => this.charger(), err => alert(err.message));
+        .then(() => { this.charger(); document.dispatchEvent(new Event("candidatures:maj")); },
+              err => alert(err.message));
       return true;
     }
     if (act === "desarchiver") {

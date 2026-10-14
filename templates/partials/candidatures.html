@@ -1,27 +1,35 @@
-<!-- ════════════ PAGE CANDIDATURES (tableau de suivi) ════════════ -->
+<!-- ════════════ PAGE CANDIDATURES : suivi unique (offres postulées et spontanées, D107) ════════════ -->
 <section class="page" data-page-content="candidatures">
   <div class="guide" data-guide="candidatures">
-    <span class="guide__txt">Le suivi de tes candidatures (offres marquées « J'ai postulé » dans la page Offres). Mets à jour le statut au fil des réponses, et clique sur <strong>Voir</strong> pour revoir l'offre et la lettre — pratique pour préparer un entretien.</span>
+    <span class="guide__txt">Toutes tes candidatures de ce mode : les offres marquées « J'ai postulé » et les candidatures spontanées envoyées. Une candidature restée « Envoyée » 7 jours passe d'elle-même <strong>À relancer</strong>. Change le statut quand on te répond.</span>
     <span class="guide__x" data-guide-close="candidatures">×</span>
   </div>
 
   <div class="section-bar">
     <div class="filters" data-filters="candidatures">
       <button class="filter is-active" data-filter="all">Toutes</button>
-      <button class="filter" data-filter="envoye">Postulée</button>
+      <button class="filter" data-filter="envoye">Envoyée</button>
+      <button class="filter" data-filter="a_relancer">À relancer</button>
       <button class="filter" data-filter="reponse">Réponse</button>
       <button class="filter" data-filter="entretien">Entretien</button>
       <button class="filter" data-filter="refus">Refus</button>
+      <button class="filter" data-filter="bounce">Bounce</button>
     </div>
+    <select class="filtre-menu" data-suivi-type>
+      <option value="all">Offres et spontanées</option>
+      <option value="offre">Offres</option>
+      <option value="spontanee">Spontanées</option>
+    </select>
   </div>
 
   <div class="suivi-table">
     <div class="suivi-row suivi-head suivi-row--cand">
       <span>Entreprise</span>
       <span>Poste</span>
-      <span>Score</span>
+      <span>Type</span>
+      <span>Candidature</span>
       <span>Statut</span>
-      <span></span>
+      <span>Offre ou contact</span>
     </div>
     <div data-list="candidatures">
       <!-- lignes injectées par candidatures.js -->

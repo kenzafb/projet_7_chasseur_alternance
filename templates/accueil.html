@@ -10,7 +10,7 @@
     // Anciennes URL (« /#candidatures », du temps du mode en session) : la
     // page demandée est reprise dans le mode d'alors
     (function () {
-      const pages = ["offres", "candidatures", "spontanees", "spontanees-suivi", "profil"];
+      const pages = ["offres", "candidatures", "spontanees", "profil"];
       const page = location.hash.replace("#", "");
       if (pages.includes(page)) location.replace("/{{ ancien_mode }}#" + page);
     })();
