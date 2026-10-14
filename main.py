@@ -229,6 +229,11 @@ class ValiderEmails(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: int
 
+class ValiderAdresse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: int
+    adresse: str = Field(min_length=3, max_length=255)
+
 class Envoyer(BaseModel):
     limite: int | None = None
     test: bool = False
@@ -913,6 +918,14 @@ def api_spontanees_valider(body: ValiderEmails, user: User = Depends(utilisateur
     from database.entreprises_db import valider_emails
     if not valider_emails(user.id, body.id):
         return JSONResponse({"erreur": "Entreprise introuvable ou sans email à valider"}, status_code=404)
+    return {"ok": True}
+
+@prive.post("/api/spontanees/valider_adresse")
+def api_spontanees_valider_adresse(body: ValiderAdresse, user: User = Depends(utilisateur_requis)):
+    """Validation manuelle d'une adresse, douteuse ou écartée par l'IA."""
+    from database.entreprises_db import valider_adresse
+    if not valider_adresse(user.id, body.id, body.adresse):
+        return JSONResponse({"erreur": "Adresse introuvable ou déjà validée"}, status_code=404)
     return {"ok": True}
 
 @prive.post("/api/spontanees/revalider")

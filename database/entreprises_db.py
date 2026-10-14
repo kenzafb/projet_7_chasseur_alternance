@@ -238,7 +238,7 @@ _CHAMPS_EXTRA_REMONTES = ["nom", "url_scrapee", "source_recherche"]
 # (shared/validation_emails.py)
 _CHAMPS_EXTRA_SCRAPER = ("telephone", "url_scrapee", "source_recherche", "tentatives_site",
                          "emails_non_valides", "emails_douteux", "contextes_emails", "meilleur_contact",
-                         "validation_emails")
+                         "validation_emails", "emails_ecartes_ia")
 
 
 def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
@@ -276,6 +276,7 @@ def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
     d["contextes_emails"] = dict(extra.get("contextes_emails") or {})
     d["meilleur_contact"] = extra.get("meilleur_contact")
     d["validation_emails"] = dict(extra.get("validation_emails") or {})
+    d["emails_ecartes_ia"] = list(extra.get("emails_ecartes_ia") or [])
     # On garde extra complet aussi, au cas où
     d["_extra"] = extra
     d["_id"] = e.id   # id technique en base, pour réécrire précisément
@@ -309,7 +310,8 @@ def _douteux(e: Entreprise) -> list[str]:
 def adresses(e: Entreprise) -> list[dict]:
     """Chaque adresse de l'entreprise et comment elle a été validée :
     regle, ia, manuelle, lba (fournie par La Bonne Alternance), inconnue
-    (validée avant la phase 7), ou douteuse (pas encore validée) ;
+    (validée avant la phase 7), douteuse (pas encore validée), ou
+    ecartee_ia (écartée par l'IA, jamais envoyée, validable à la main) ;
     meilleur : désignée par l'IA comme meilleur contact."""
     extra = e.extra or {}
     douteux = set(_douteux(e))
@@ -318,7 +320,9 @@ def adresses(e: Entreprise) -> list[dict]:
     return [{"adresse": a,
              "validation": "douteuse" if a in douteux else provenance.get(a) or ("lba" if a in lba else "inconnue"),
              "meilleur": a == extra.get("meilleur_contact")}
-            for a in e.emails_trouves or []]
+            for a in e.emails_trouves or []] + [
+            {"adresse": a, "validation": "ecartee_ia", "meilleur": False}
+            for a in extra.get("emails_ecartes_ia") or [] if a not in (e.emails_trouves or [])]
 
 
 def _en_attente_de_validation(e: Entreprise, m: EntrepriseMode) -> bool:
@@ -327,23 +331,62 @@ def _en_attente_de_validation(e: Entreprise, m: EntrepriseMode) -> bool:
     return bool((e.extra or {}).get("emails_non_valides")) and bool(_douteux(e)) and not m.mail_envoye
 
 
+def _ecartees_ia(e: Entreprise) -> list[str]:
+    return [a for a in (e.extra or {}).get("emails_ecartes_ia") or [] if a not in (e.emails_trouves or [])]
+
+
 def lire_a_valider(user_id: int, mode: str = MODE_DEFAUT) -> list[dict]:
-    """Entreprises du mode dont les emails attendent une validation
-    (manuelle ou par l'IA ; la validation vaut pour tous les modes)."""
+    """Entreprises du mode, pas encore envoyées, qui ont des adresses
+    douteuses (à valider à la main ou par l'IA) ou écartées par l'IA
+    (visibles, validables quand même). La validation vaut pour tous les modes."""
     db = SessionLocal()
     try:
         return [{"id": e.id, "nom": e.nom_commercial or (e.extra or {}).get("nom", "") or "?",
                  "ville": e.ville or "", "site": e.site_web or "", "emails": _douteux(e),
                  "valides": [a for a in e.emails_trouves or [] if a not in _douteux(e)],
-                 "adresses": adresses(e)}
+                 "ecartees_ia": _ecartees_ia(e), "adresses": adresses(e)}
                 for e, m in _du_mode(db, user_id, mode)
-                if _en_attente_de_validation(e, m)]
+                if _en_attente_de_validation(e, m) or (_ecartees_ia(e) and not m.mail_envoye)]
     finally:
         db.close()
 
 
 def compter_a_valider(user_id: int, mode: str = MODE_DEFAUT) -> int:
-    return len(lire_a_valider(user_id, mode))
+    """Entreprises aux adresses douteuses (le maximum d'une revalidation)."""
+    return sum(1 for e in lire_a_valider(user_id, mode) if e["emails"])
+
+
+def valider_adresse(user_id: int, entreprise_id: int, adresse: str) -> bool:
+    """Validation manuelle d'une seule adresse, douteuse ou écartée par l'IA
+    (elle rejoint alors les adresses envoyées). False si l'entreprise n'est
+    pas à l'utilisateur ou si l'adresse n'attend rien."""
+    adresse = (adresse or "").strip().lower()
+    db = SessionLocal()
+    try:
+        e = db.query(Entreprise).filter_by(user_id=user_id, id=entreprise_id).first()
+        if not e:
+            return False
+        extra = dict(e.extra or {})
+        douteux = _douteux(e)
+        if adresse in douteux:
+            restantes = [a for a in douteux if a != adresse]
+            extra["emails_douteux"] = restantes
+            extra["contextes_emails"] = {a: t for a, t in (extra.get("contextes_emails") or {}).items()
+                                         if a in restantes}
+            extra["emails_non_valides"] = bool(restantes)
+        elif adresse in _ecartees_ia(e):
+            extra["emails_ecartes_ia"] = [a for a in extra["emails_ecartes_ia"] if a != adresse]
+            e.emails_trouves = list(e.emails_trouves or []) + [adresse]
+            if "emails_douteux" not in extra:   # entreprise d'avant : ses autres adresses restent en l'état
+                extra["emails_douteux"] = douteux
+        else:
+            return False
+        extra["validation_emails"] = {**(extra.get("validation_emails") or {}), adresse: "manuelle"}
+        e.extra = extra
+        db.commit()
+        return True
+    finally:
+        db.close()
 
 
 def valider_emails(user_id: int, entreprise_id: int) -> bool:

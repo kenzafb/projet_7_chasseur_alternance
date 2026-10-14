@@ -181,13 +181,16 @@ function rendreAValider() {
   carte.hidden = aValider.length === 0;
   const nb = document.querySelector("[data-a-valider-nombre]");
   if (nb) nb.textContent = fmt(aValider.length);
+  // Chaque adresse avec sa mention ; douteuses et écartées par l'IA validables une à une
+  const adresse = (e, a) => `<div>${esc(a.adresse)} ${etiquetteAdresse(a)}${
+    ["douteuse", "ecartee_ia"].includes(a.validation)
+      ? ` <button class="btn btn--sm btn--ghost" data-valider-adresse="${esc(a.adresse)}" data-entreprise="${e.id}">${
+          a.validation === "ecartee_ia" ? "Valider quand même" : "Valider"}</button>` : ""}</div>`;
   liste.innerHTML = aValider.map(e => `
     <div class="a-valider__ligne">
       <div><div class="trow__name">${esc(e.nom)}</div><div class="trow__sub">${esc(e.ville)}</div></div>
-      <div class="trow__mail">${e.emails.map(esc).join(", ")}${(e.valides || []).length
-        ? `<div class="trow__sub">déjà validées : ${e.valides.map(esc).join(", ")}</div>` : ""}</div>
-      <span class="chip chip--gris">non validé</span>
-      <button class="btn btn--sm" data-valider="${e.id}">Valider</button>
+      <div class="trow__mail">${(e.adresses || []).map(a => adresse(e, a)).join("")}</div>
+      ${e.emails.length ? `<button class="btn btn--sm" data-valider="${e.id}">Tout valider</button>` : ""}
     </div>`).join("");
 }
 
@@ -217,9 +220,13 @@ export const Spontanees = {
     if (!this._brancheValider) {
       const liste = document.querySelector('[data-list="a-valider"]');
       if (liste) liste.addEventListener("click", async e => {
-        const id = e.target.closest("[data-valider]")?.dataset.valider;
+        const une = e.target.closest("[data-valider-adresse]");
+        const id = une ? une.dataset.entreprise : e.target.closest("[data-valider]")?.dataset.valider;
         if (!id) return;
-        try { await api.spValider(parseInt(id, 10)); } catch (err) { alert(err.message); }
+        try {
+          if (une) await api.spValiderAdresse(parseInt(id, 10), une.dataset.validerAdresse);
+          else await api.spValider(parseInt(id, 10));
+        } catch (err) { alert(err.message); }
         this.charger();
       });
       this._brancheValider = true;

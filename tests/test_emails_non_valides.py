@@ -189,3 +189,40 @@ def test_provenance_affichee_par_adresse(alice, ia, pipelines_neufs):
     assert lignes[ids[2]] == [{"adresse": "rh2@ent2.fr", "validation": "manuelle", "meilleur": False}]
     js = (config.STATIC_DIR / "js" / "spontanees.js").read_text(encoding="utf-8")
     assert "validée par règle" in js and "validée par l'IA" in js and "validée à la main" in js
+
+
+# ─── Adresses écartées par l'IA : visibles, validables quand même ────────────
+def test_ecartee_par_l_ia_visible_et_validable(alice, ia, pipelines_neufs, smtp_simule, utilisateur):
+    client, user_id, ids = alice
+    ia.file = ['{"valides": [], "meilleur_contact": null}', '{"valides": ["rh2@ent2.fr"], "meilleur_contact": null}']
+    _revalider(client, user_id, pipelines_neufs)
+    e1 = lire_entreprises(user_id)[1]
+    assert e1["emails_trouves"] == [] and e1["emails_ecartes_ia"] == ["rh1@ent1.fr"]
+    a_valider = {e["id"]: e for e in client.get("/api/spontanees/a_valider").json()}
+    assert list(a_valider) == [ids[1]]                                  # plus de douteuse, mais visible
+    assert a_valider[ids[1]]["adresses"] == [{"adresse": "rh1@ent1.fr", "validation": "ecartee_ia", "meilleur": False}]
+    assert client.get("/api/spontanees/stats").json()["a_valider"] == 0   # rien à repasser à l'IA
+    assert envoyeur.compter_a_envoyer(user_id, "alternance") == 2         # écartée : jamais envoyée
+    # Une autre personne ne peut pas la valider
+    client_b, _ = utilisateur("b@test.fr")
+    assert client_b.post("/api/spontanees/valider_adresse", json={"id": ids[1], "adresse": "rh1@ent1.fr"}).status_code == 404
+    # Validée quand même, à la main
+    assert client.post("/api/spontanees/valider_adresse", json={"id": ids[1], "adresse": "rh1@ent1.fr"}).json() == {"ok": True}
+    e1 = lire_entreprises(user_id)[1]
+    assert e1["emails_trouves"] == ["rh1@ent1.fr"] and e1["validation_emails"]["rh1@ent1.fr"] == "manuelle"
+    assert client.get("/api/spontanees/a_valider").json() == []
+    assert envoyeur.compter_a_envoyer(user_id, "alternance") == 3
+    assert client.post("/api/spontanees/valider_adresse", json={"id": ids[1], "adresse": "rh1@ent1.fr"}).status_code == 404
+    js = (config.STATIC_DIR / "js" / "spontanees.js").read_text(encoding="utf-8")
+    assert "écartée par l'IA" in js and "Valider quand même" in js and "api.spValiderAdresse" in js
+
+
+def test_validation_d_une_seule_douteuse(alice):
+    client, user_id, ids = alice
+    liste = lire_entreprises(user_id)
+    liste[1].update(emails_trouves=["a@gmail.com", "b@gmail.com"], emails_douteux=["a@gmail.com", "b@gmail.com"])
+    sauvegarder_enrichissement(user_id, liste)
+    assert client.post("/api/spontanees/valider_adresse", json={"id": ids[1], "adresse": "a@gmail.com"}).json()["ok"]
+    e = lire_entreprises(user_id)[1]
+    assert e["emails_douteux"] == ["b@gmail.com"] and e["emails_non_valides"] is True
+    assert envoyeur.emails_valides(e) == ["a@gmail.com"]

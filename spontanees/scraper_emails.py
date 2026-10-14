@@ -688,6 +688,7 @@ def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
         "ecartes":    tri["ecartes"],
         "meilleur_contact": tri["meilleur_contact"],
         "provenance": tri["provenance"],
+        "ecartes_ia": tri["ecartes_ia"],
         "telephones": [],
         "contact_rh": None,
         "url_finale": url_finale or url_racine,
@@ -857,6 +858,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
             e["contextes_emails"] = resultat.get("contextes", {})
             e["meilleur_contact"] = resultat.get("meilleur_contact")
             e["validation_emails"] = resultat.get("provenance", {})
+            e["emails_ecartes_ia"] = resultat.get("ecartes_ia", [])
             e["url_scrapee"]      = resultat.get("url_finale") or url
             e["source_recherche"] = source_site
             e["traite"]           = True
@@ -912,6 +914,7 @@ def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=Non
         e["contextes_emails"]   = tri["contextes"]
         e["emails_non_valides"] = bool(tri["douteux"])
         e["validation_emails"] = {**(e.get("validation_emails") or {}), **tri["provenance"]}
+        e["emails_ecartes_ia"] = list(dict.fromkeys([*(e.get("emails_ecartes_ia") or []), *tri["ecartes_ia"]]))
         if tri["meilleur_contact"]:
             e["meilleur_contact"] = tri["meilleur_contact"]
         if tri["ecartes"]:

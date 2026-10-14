@@ -105,7 +105,8 @@ def test_inventaire_des_routes_du_mode():
     sans = {re.sub(r"\{[^}]+\}", "1", r.path) for r in ROUTES_APP
             if isinstance(r, APIRoute) and r.path.startswith("/api/")} - chemins
     assert sans == {"/api/logs", "/api/statut_recherche", "/api/statut_pipelines", "/api/spontanees/statut",
-                    "/api/spontanees/stop", "/api/spontanees/valider", "/api/analyse/stop", "/api/domaines", "/api/criteres_options",
+                    "/api/spontanees/stop", "/api/spontanees/valider", "/api/analyse/stop",
+                    "/api/spontanees/valider_adresse", "/api/domaines", "/api/criteres_options",
                     "/api/compte_envoi", "/api/compte_envoi/supprimer", "/api/compte_envoi/tester",
                     "/api/compte_envoi/mode_test", "/api/compte_envoi/mail_test"}
 
