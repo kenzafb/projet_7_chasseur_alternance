@@ -25,7 +25,8 @@ par l'humain, Ollama démarré :
    puis l'avis sur l'email.
 
 --lettre : à la place, pour une offre (--offre <id>, sinon la plus récente
-des offres non analysées), rédige le paragraphe de lettre avec chaque
+des offres non analysées), rédige le paragraphe personnalisé de la lettre
+type (D106 : celle du profil, sinon l'exemple du mode) avec chaque
 modèle et affiche les textes sous des étiquettes A, B, C... tirées au
 hasard ; la correspondance étiquette-modèle n'est donnée qu'à la toute fin,
 pour une lecture à l'aveugle.
@@ -145,24 +146,32 @@ ETIQUETTES = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 
 def comparer_lettres(o: dict, modeles: list[str], sortie=print, tirage=None) -> int:
-    """Paragraphe de lettre rédigé par chaque modèle pour l'offre o, affiché
+    """Paragraphe personnalisé (D106) rédigé par chaque modèle pour l'offre o,
+    avec la lettre type du profil (sinon l'exemple du mode, signalé), affiché
     sous des étiquettes tirées au hasard ; correspondance à la toute fin.
     tirage : fonction qui mélange une liste en place (random.shuffle)."""
     import random
 
-    from france_travail.generateur import rediger_elements
+    from france_travail.generateur import (LettreTypeInvalide, exiger_lettre_type, lettre_par_defaut,
+                                           rediger_paragraphe)
     from shared import ia
     from shared.ia import ErreurIA, ErreurIABloquante
 
     sortie(f"\nOffre [{o['mode']}, utilisateur {o['user_id']}] {o['offre']['id']} : {o['offre']['titre'][:70]}")
+    try:
+        lettre_type = exiger_lettre_type(o["profil"])
+        sortie("  Lettre type du profil utilisée.")
+    except LettreTypeInvalide as e:
+        lettre_type = lettre_par_defaut(o["mode"])
+        sortie(f"  ℹ️  {e} Pour ce test : l'exemple de lettre type du mode {o['mode']}.")
     textes = {}
     for modele in modeles:
         sortie(f"  {modele} : rédaction...")
         try:
             ia.verifier_demarrage(modele)
             debut = time.monotonic()
-            textes[modele] = (rediger_elements(o["offre"], o["profil"], o["mode"], modele, essais=1)
-                              .paragraphe_entreprise, _secondes(debut))
+            textes[modele] = (rediger_paragraphe(o["offre"], o["profil"], o["mode"], modele, essais=1,
+                                                 lettre_type=lettre_type), _secondes(debut))
         except ErreurIABloquante as e:
             sortie(f"  ❌ {modele} : {e}")
         except ErreurIA as e:

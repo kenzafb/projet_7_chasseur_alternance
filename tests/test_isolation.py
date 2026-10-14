@@ -55,7 +55,7 @@ def test_candidature_de_b_non_modifiable(a_et_b, chemin, corps):
     assert offre["raison_archivage"] == ""
 
 
-@pytest.mark.parametrize("chemin", ["/api/generer_lettre", "/api/analyser", "/api/telecharger_pdf"])
+@pytest.mark.parametrize("chemin", ["/api/lettre/paragraphe", "/api/analyser", "/api/telecharger_pdf"])
 def test_candidature_de_b_introuvable_pour_a(a_et_b, ia, chemin):
     client_a, _, _, _ = a_et_b
     assert client_a.post(chemin, json={"id": "OFFRE-B"}).status_code == 404
@@ -70,3 +70,9 @@ def test_suivi_spontanees_de_b_inaccessible(a_et_b):
     assert r.json() == {"ok": False}
     assert lire_entreprises(id_b)[0].get("statut_suivi") != "refus"
     assert client_a.get("/api/spontanees/stats").json()["raw"] == 0
+
+
+def test_assemblage_de_b_introuvable_pour_a(a_et_b, ia):
+    client_a, _, _, id_b = a_et_b
+    assert client_a.post("/api/lettre/assembler", json={"id": "OFFRE-B", "paragraphe": "P."}).status_code == 404
+    assert lire_candidature(id_b, "OFFRE-B")["lettre"] == "Lettre de B"

@@ -30,7 +30,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from auth.routes import router as auth_router
 from auth.securite import NonConnecte, utilisateur_requis
 from database.models import User
-from shared.erreurs import ErreurUtilisateur, exiger_profil
+from shared.erreurs import CHAMPS_IDENTITE, ErreurUtilisateur, exiger_profil
 from database.candidatures_db import (lire_candidatures, lire_candidature, modifier_candidature, ajouter_candidature,
                                      lire_lettre_pdf, enregistrer_lettre_pdf, compter_en_attente)
 from database.profil_db import (lire_profil, sauvegarder_profil, ajouter_piece_jointe, supprimer_piece_jointe,
@@ -50,7 +50,7 @@ from database.dates import maintenant_utc
 
 # ─── Modules métier ───────────────────────────────────────────────
 from france_travail.main import lancer_recherche
-from france_travail.generateur import generer_lettre
+from france_travail.generateur import assembler_lettre, lettre_par_defaut, rediger_paragraphe
 from france_travail.analyseur import analyser_offre, marquer_non_analysee
 from france_travail.analyse_differee import analyser_en_attente, duree_lisible, enregistrer_analyse, estimation_file
 from shared.ia import ErreurIA, ErreurIABloquante
@@ -184,6 +184,11 @@ class Archivage(BaseModel):
             raise ValueError("indiquer soit desarchiver: true, soit une raison d'archivage")
         return self
 
+class Assembler(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(min_length=1, max_length=64)
+    paragraphe: str = Field(max_length=3000)
+
 class Postuler(BaseModel):
     """J'ai postulé (date du jour par défaut, modifiable), ou retour en arrière."""
     model_config = ConfigDict(extra="forbid")
@@ -298,7 +303,8 @@ def _page_du_mode(request: Request, mode: str):
                                                              "sources": get_mode(mode)["sources"],
                                                              "limites": config.LIMITES_LANCEMENT,
                                                              "analyse_ia": config.analyse_ia_active(),
-                                                             "modele_analyse": config.modele_ia("analyse")})
+                                                             "modele_analyse": config.modele_ia("analyse"),
+                                                             "exemple_lettre": lettre_par_defaut(mode)})
 
 @prive.get("/alternance")
 def page_alternance(request: Request):
@@ -680,19 +686,38 @@ def api_analyse_statut(user: User = Depends(utilisateur_requis), mode: str = Dep
     en_attente = compter_en_attente(user.id, mode)
     return {**pipelines.etat(ANALYSE, user.id), "en_attente": en_attente, "estimation": estimation_file(en_attente)}
 
-@prive.post("/api/generer_lettre")
-def api_generer_lettre(body: OffreId, request: Request, user: User = Depends(utilisateur_requis),
-                       mode: str = Depends(mode_requis)):
+# ─── Lettre : lettre type du profil, paragraphe par l'IA (D106) ───────────────
+@prive.post("/api/lettre/paragraphe")
+def api_lettre_paragraphe(body: OffreId, user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
+    """Paragraphe personnalisé rédigé par l'IA, rien n'est enregistré : il
+    est affiché, modifiable, puis inséré par /api/lettre/assembler. Lettre
+    type absente ou sans {paragraphe} : 400 qui renvoie au profil, avant
+    tout appel à l'IA."""
     offre = lire_candidature(user.id, body.id, mode=mode)
     if not offre:
         return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
-    if not config.analyse_ia_active():
-        return JSONResponse({"erreur": "Génération de lettre indisponible : l'IA est désactivée "
-                                       "(ANALYSE_IA=false). Écris la lettre toi-même ou réactive l'IA."},
-                            status_code=503)
     profil = lire_profil(user.id, mode=mode)
-    lettre = generer_lettre(offre, profil, mode=mode)
-    modifier_candidature(user.id, body.id, {"lettre": lettre, "statut": "en_cours"}, mode=mode)
+    from france_travail.generateur import exiger_lettre_type
+    exiger_profil(profil, CHAMPS_IDENTITE)
+    exiger_lettre_type(profil)
+    if not config.analyse_ia_active():
+        return JSONResponse({"erreur": "Rédaction du paragraphe indisponible : l'IA est désactivée "
+                                       "(ANALYSE_IA=false). Écris le paragraphe toi-même, puis insère-le."},
+                            status_code=503)
+    return {"paragraphe": rediger_paragraphe(offre, profil, mode=mode)}
+
+@prive.post("/api/lettre/assembler")
+def api_lettre_assembler(body: Assembler, user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
+    """Insère le paragraphe validé dans la lettre type (sans IA) et enregistre
+    la lettre ; une offre « nouvelle » passe « en cours »."""
+    offre = lire_candidature(user.id, body.id, mode=mode)
+    if not offre:
+        return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
+    lettre = assembler_lettre(offre, lire_profil(user.id, mode=mode), body.paragraphe)
+    modifs = {"lettre": lettre}
+    if offre.get("statut") in (None, "", "nouveau"):
+        modifs["statut"] = "en_cours"
+    modifier_candidature(user.id, body.id, modifs, mode=mode)
     return {"lettre": lettre}
 
 @prive.post("/api/analyser")

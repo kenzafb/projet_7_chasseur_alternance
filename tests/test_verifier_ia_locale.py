@@ -160,7 +160,7 @@ def test_colonnes_niveau_duree_et_raison(donnees, ia):
 
 def _lettre(corps):
     modele = corps["model"]
-    return ('{"contact_entreprise": "ACME\\nParis", "paragraphe_entreprise": "Texte de %s."}' % modele
+    return ('{"paragraphe": "Texte de %s."}' % modele
             if "lettre de motivation" in texte_envoye(corps) else None)
 
 

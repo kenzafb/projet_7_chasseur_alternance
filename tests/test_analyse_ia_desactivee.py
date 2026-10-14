@@ -91,9 +91,10 @@ def test_non_analysees_triees_en_dernier(utilisateur):
 
 
 # ─── Routes directes ─────────────────────────────────────────────────────────
-@pytest.mark.parametrize("route", ["/api/generer_lettre", "/api/analyser"])
+@pytest.mark.parametrize("route", ["/api/lettre/paragraphe", "/api/analyser"])
 def test_lettre_et_reanalyse_refusees(ia_coupee, utilisateur, ia, route):
     client, uid = utilisateur("a@test.fr", prenom="Alice")
+    client.post("/api/profil", json={"prenom": "Alice", "nom": "A", "email": "a@test.fr", "lettre_type": "{paragraphe}"})
     ajouter_candidature(uid, marquer_non_analysee({"id": "REF1", "titre": "Dev", "description": "..."}))
     r = client.post(route, json={"id": "REF1"})
     assert r.status_code == 503 and "IA est désactivée" in r.json()["erreur"]
@@ -107,7 +108,7 @@ def test_interface(ia_coupee, utilisateur):
     assert 'data-analyse-ia="non"' in page and "data-bandeau-ia" in page and "IA désactivée" in page
     assert 'data-action="revalider"' not in page
     js = (config.STATIC_DIR / "js" / "offres.js").read_text(encoding="utf-8")
-    assert "non analysée" in js and "Génération de lettre indisponible" in js
+    assert "non analysée" in js and "écris toi-même le paragraphe personnalisé" in js
 
 
 def test_interface_ia_active(utilisateur):

@@ -59,9 +59,15 @@ class AnalyseOffre(_Reponse):
 
 
 class LettreIA(_Reponse):
-    """Les deux éléments de la lettre rédigés par l'IA."""
+    """Ancien format (bloc destinataire et paragraphe) : gardé pour les tests
+    de shared.ia ; la lettre n'utilise plus que ParagrapheIA (D106)."""
     contact_entreprise: str = Field(description="Nom de l'entreprise puis ville, 2 à 3 lignes")
     paragraphe_entreprise: str = Field(min_length=1, description="2 à 3 phrases sur l'entreprise")
+
+
+class ParagrapheIA(_Reponse):
+    """Le seul paragraphe personnalisé de la lettre, rédigé par l'IA (D106)."""
+    paragraphe: str = Field(min_length=1, description="3 à 5 phrases à la première personne")
 
 
 def modele_avis_emails(douteuses: list[str], trouvees: list[str]) -> type[_Reponse]:

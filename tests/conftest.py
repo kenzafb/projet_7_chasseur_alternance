@@ -70,7 +70,7 @@ def pas_de_reseau(monkeypatch):
     monkeypatch.setattr("smtplib.SMTP_SSL", refuser)
 
 
-REPONSE_LETTRE = '{"contact_entreprise": "ACME\\n75010 Paris", "paragraphe_entreprise": "ACME, votre contexte me parle."}'
+REPONSE_LETTRE = '{"paragraphe": "ACME, votre contexte me parle."}'
 
 
 def reponse_chat(contenu: str, native: bool = True, reflexion: str = "") -> httpx.Response:

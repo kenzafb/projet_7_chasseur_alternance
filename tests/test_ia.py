@@ -15,7 +15,7 @@ import shared.ia
 from database.candidatures_db import ajouter_candidature, lire_candidature, lire_candidatures
 from database.dedup_db import lire_offres_vues
 from france_travail.analyseur import analyser_offre
-from france_travail.generateur import generer_lettre
+from france_travail.generateur import rediger_paragraphe
 from shared import config
 from shared.ia import (ErreurIABloquante, ErreurIAPassagere, IAInjoignable, ReponseInvalide, appeler_ia,
                        appeler_structure)
@@ -135,8 +135,8 @@ def test_chaque_usage_appelle_son_modele(ia, monkeypatch):
     profil = {"prenom": "A", "nom": "B", "email": "a@b.fr"}
     ia.reponse = ANALYSE
     analyser_offre({"titre": "Dev", "description": "..."}, profil)
-    ia.reponse = '{"contact_entreprise": "ACME", "paragraphe_entreprise": "ACME me parle."}'
-    generer_lettre({"titre": "Dev", "entreprise": "ACME"}, profil)
+    ia.reponse = '{"paragraphe": "ACME me parle."}'
+    rediger_paragraphe({"titre": "Dev", "entreprise": "ACME"}, profil, lettre_type="{paragraphe}")
     from shared.validation_emails import avis_ia
     ia.reponse = '{"valides": ["x@gmail.com"], "meilleur_contact": null}'
     avis_ia("ACME", "acme.fr", ["x@gmail.com"], [])
@@ -381,15 +381,15 @@ def test_reanalyse_en_echec_ne_touche_pas_l_offre(utilisateur, ia, monkeypatch):
 
 def test_lettre_en_echec_rien_d_enregistre(utilisateur, ia, monkeypatch):
     client, user_id = utilisateur("a@test.fr", prenom="Alice", nom="A")
-    client.post("/api/profil", json={"prenom": "Alice", "nom": "A", "email": "a@test.fr"})
+    client.post("/api/profil", json={"prenom": "Alice", "nom": "A", "email": "a@test.fr", "lettre_type": "{paragraphe}"})
     _offre_en_base(user_id)
     echouer(ia, erreur_http(404, INTROUVABLE))
-    r = client.post("/api/generer_lettre", json={"id": "REF1"})
+    r = client.post("/api/lettre/paragraphe", json={"id": "REF1"})
     assert r.status_code == 503 and "introuvable" in r.json()["erreur"]
     ia.appels.clear()
     ia.panne = None   # IA rétablie
-    ia.reponse = '{"contact_entreprise": "ACME"}'   # pas de paragraphe : pas de lettre
-    assert client.post("/api/generer_lettre", json={"id": "REF1"}).status_code == 502
+    ia.reponse = '{"autre": "ACME"}'   # pas de paragraphe : rien
+    assert client.post("/api/lettre/paragraphe", json={"id": "REF1"}).status_code == 502
     offre = lire_candidature(user_id, "REF1")
     assert offre["lettre"] == "" and offre["statut"] == "nouveau"
 

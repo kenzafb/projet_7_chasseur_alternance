@@ -111,7 +111,7 @@ Les erreurs de France Travail ou de LBA (identifiants, quota) apparaissent dans 
 
 ## 6. Lettre de motivation et PDF (A)
 
-**Faire (A)** : ouvrir une des nouvelles offres, « Générer la lettre » (la fenêtre affiche un message d'attente et les secondes écoulées, environ une minute). Modifier une phrase dans la fenêtre, « Enregistrer ». Rouvrir la lettre (« Voir la lettre »), puis « Télécharger en PDF ».
+**Faire (A)** : écrire d'abord une lettre type dans le profil avec `{paragraphe}` (ou « Partir d'un exemple »). Ouvrir une des nouvelles offres, « Préparer la lettre » : le paragraphe personnalisé s'écrit (message d'attente et secondes écoulées, environ une minute), le relire, le modifier, « Insérer dans ma lettre type ». Modifier une phrase dans la fenêtre, « Enregistrer ». Rouvrir la lettre (« Voir la lettre »), puis « Télécharger en PDF ».
 
 **Observer** :
 - la lettre contient le nom de l'entreprise de l'offre et un paragraphe qui lui est propre, ton identité en signature, aucune information inventée ;

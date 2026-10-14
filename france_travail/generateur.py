@@ -1,28 +1,45 @@
+"""
+france_travail/generateur.py
+============================
+Lettre de motivation (D106) : la personne écrit sa lettre type dans son
+profil, avec des balises ; l'IA (IA_MODELE_LETTRE) n'écrit que le
+paragraphe personnalisé, affiché et modifiable avant d'être inséré.
+
+Balises de la lettre type, remplacées en Python sauf {paragraphe} :
+  {entreprise}          nom de l'entreprise de l'offre
+  {poste}               intitulé du poste
+  {date}                date du jour, en toutes lettres
+  {contact_entreprise}  bloc destinataire (nom de l'entreprise, puis lieu)
+  {paragraphe}          paragraphe rédigé par l'IA (ou à la main)
+  {paragraphe_entreprise}  ancien nom de {paragraphe}, toujours accepté
+Sans lettre type, ou sans {paragraphe} : message qui renvoie au profil,
+aucune lettre générée en entier en secours.
+"""
+
 import re
 import string
+
 from database.dates import maintenant_affichage
+from shared.erreurs import CHAMPS_IDENTITE, ErreurUtilisateur, exiger_profil
 from shared.ia import appeler_structure
-from shared.schemas_ia import LettreIA
-from shared.erreurs import ErreurUtilisateur, exiger_profil, CHAMPS_IDENTITE
+from shared.schemas_ia import ParagrapheIA
 
-# ─── Lettre de motivation fixe ────────────────────────────────────────────────
-# Seuls {contact_entreprise} et {paragraphe_entreprise} sont générés par l'IA.
-# Trame par défaut de chaque mode, utilisée quand le profil n'a pas sa propre
-# lettre type : générique, sans date, sans diplôme, sans accord de genre.
-
+# Exemples de lettre type par mode, proposés dans le profil (bouton « Partir
+# d'un exemple ») : génériques, sans date, sans diplôme, sans accord de genre.
+# Ils ne servent jamais de lettre en secours.
 LETTRES_PAR_DEFAUT = {
     "alternance": """\
 {contact_entreprise}
 
 Le {date}
 
-Objet : Candidature en alternance
+Objet : Candidature en alternance, {poste}
 
 Madame, Monsieur,
 
-Actuellement en formation et à la recherche d'une alternance, je vous adresse ma candidature pour rejoindre votre équipe.
+Actuellement en formation et à la recherche d'une alternance, je vous adresse ma candidature pour rejoindre {entreprise}.
 
-{paragraphe_entreprise}
+{paragraphe}
 
 Mon parcours et ma motivation m'amènent à vouloir mettre mes compétences au service de votre structure, dans le cadre de mon alternance. Avec sérieux, implication et l'envie d'apprendre, je m'investirai pleinement dans les missions qui me seront confiées.
 
@@ -35,13 +52,13 @@ Dans l'attente de votre retour, je vous prie d'agréer, Madame, Monsieur, mes sa
 
 Le {date}
 
-Objet : Candidature
+Objet : Candidature, {poste}
 
 Madame, Monsieur,
 
-Je vous adresse ma candidature pour le poste que vous proposez.
+Je vous adresse ma candidature pour le poste de {poste} chez {entreprise}.
 
-{paragraphe_entreprise}
+{paragraphe}
 
 Le sérieux, la ponctualité et l'esprit d'équipe guident ma façon de travailler, et je prends vite mes repères sur un nouveau poste comme avec de nouvelles consignes. Mes disponibilités figurent dans mon CV.
 
@@ -54,13 +71,13 @@ Dans l'attente de votre retour, je vous prie d'agréer, Madame, Monsieur, mes sa
 
 Le {date}
 
-Objet : Candidature pour un stage
+Objet : Candidature pour un stage, {poste}
 
 Madame, Monsieur,
 
-Actuellement en formation, je recherche un stage conventionné et vous adresse ma candidature pour rejoindre votre équipe.
+Actuellement en formation, je recherche un stage conventionné et vous adresse ma candidature pour rejoindre {entreprise}.
 
-{paragraphe_entreprise}
+{paragraphe}
 
 Ce stage serait l'occasion de mettre en pratique ce que j'apprends et de contribuer concrètement à vos projets, avec sérieux et l'envie d'apprendre. Les dates et la durée du stage figurent dans mon CV.
 
@@ -72,11 +89,13 @@ Dans l'attente de votre retour, je vous prie d'agréer, Madame, Monsieur, mes sa
 
 
 def lettre_par_defaut(mode: str) -> str:
+    """Exemple de lettre type du mode (proposé dans le profil, jamais utilisé seul)."""
     return LETTRES_PAR_DEFAUT.get(mode, LETTRES_PAR_DEFAUT["alternance"])
 
 
-# Balises permises dans une lettre type (profil.lettre_type)
-BALISES_LETTRE = ("contact_entreprise", "date", "paragraphe_entreprise")
+BALISES_LETTRE = ("entreprise", "poste", "date", "contact_entreprise", "paragraphe", "paragraphe_entreprise")
+BALISES_PARAGRAPHE = ("paragraphe", "paragraphe_entreprise")
+ALLER_AU_PROFIL = "Profil, section « Lettre de motivation type »"
 
 
 class LettreTypeInvalide(ErreurUtilisateur):
@@ -86,24 +105,40 @@ class LettreTypeInvalide(ErreurUtilisateur):
 def preparer_lettre_type(modele):
     """
     Vérifie une lettre type avant de l'utiliser avec str.format.
-    Tolère les espaces dans les balises ("{ date }", accepté par le front),
-    refuse toute autre accolade avec un message lisible (LettreTypeInvalide).
-    Retourne le modèle normalisé.
+    Tolère les espaces dans les balises (« { poste } »), refuse toute autre
+    accolade avec un message lisible (LettreTypeInvalide). Retourne le
+    modèle normalisé.
     """
     modele = re.sub(r"\{\s*(" + "|".join(BALISES_LETTRE) + r")\s*\}", r"{\1}", modele)
-    permises = ", ".join("{" + b + "}" for b in BALISES_LETTRE)
+    permises = ", ".join("{" + b + "}" for b in BALISES_LETTRE[:5])
     try:
         champs = [(champ, spec, conv) for _, champ, spec, conv in string.Formatter().parse(modele)
                   if champ is not None]
     except ValueError:
         raise LettreTypeInvalide(
             "Ta lettre type contient une accolade { ou } isolée. "
-            f"Seules les balises {permises} sont permises : corrige-la dans l'onglet Profil.")
+            f"Seules les balises {permises} sont permises : corrige-la dans {ALLER_AU_PROFIL}.")
     for champ, spec, conv in champs:
         if champ not in BALISES_LETTRE or spec or conv:
             raise LettreTypeInvalide(
                 f"Ta lettre type contient une balise inconnue : {{{champ}}}. "
-                f"Seules {permises} sont permises : corrige-la dans l'onglet Profil.")
+                f"Seules {permises} sont permises : corrige-la dans {ALLER_AU_PROFIL}.")
+    return modele
+
+
+def exiger_lettre_type(profil: dict) -> str:
+    """Lettre type du profil, vérifiée, avec la balise du paragraphe. Sinon
+    LettreTypeInvalide (400) qui renvoie au profil, avant tout appel à l'IA."""
+    modele = (profil.get("lettre_type") or "").strip()
+    if not modele:
+        raise LettreTypeInvalide(
+            f"Écris d'abord ta lettre type dans {ALLER_AU_PROFIL}, avec {{paragraphe}} à l'endroit où "
+            "doit aller le paragraphe personnalisé. L'IA n'écrit que ce paragraphe.")
+    modele = preparer_lettre_type(modele)
+    if not any("{" + b + "}" in modele for b in BALISES_PARAGRAPHE):
+        raise LettreTypeInvalide(
+            f"Ta lettre type n'a pas de balise {{paragraphe}} : ajoute-la dans {ALLER_AU_PROFIL}, "
+            "à l'endroit où doit aller le paragraphe personnalisé.")
     return modele
 
 
@@ -114,88 +149,17 @@ def _date_du_jour():
     return f"{today.day} {mois[today.month - 1]} {today.year}"
 
 
-def _nettoyer_contact(contact):
-    """
-    Supprime les lignes parasites qu'un LLM peut glisser dans le bloc contact :
-    dates, lignes "Objet :", formules de politesse, etc.
-    Ne garde que les 3 premières lignes utiles au maximum.
-    """
-    PARASITES = re.compile(
-        r'(?i)^(paris\s*,?\s*le|objet\s*:|madame|monsieur|le\s+\d|'
-        r'candidature|cordialement|sincères|bonjour|\d{1,2}\s+\w+\s+20\d{2})',
-    )
-    lignes = [l.strip() for l in contact.splitlines() if l.strip()]
-    lignes_propres = [l for l in lignes if not PARASITES.match(l)]
-    return "\n".join(lignes_propres[:3]).strip()
+# Entreprise masquée par France Travail (environ une offre sur deux)
+NOMS_VIDES = {"", "inconnue", "inconnu", "non précisé", "non precise", "non renseigné", "non renseigne", "n/a", "na"}
 
 
-# ─── Prompt de la lettre, écrit pour un petit modèle local ────────────────────
-POSTE_PAR_MODE = {"alternance": "une alternance", "job": "un job", "stage": "un stage"}
-
-CONSIGNE_PAR_MODE = {
-    "alternance": "- relie les compétences RÉELLES de la personne (bagage ci-dessous) aux missions du poste ;\n",
-    "job": ("- mets en avant des qualités utiles pour un job court : fiabilité, sérieux, polyvalence, sens du "
-            "contact, capacité à apprendre vite et à s'intégrer dans une équipe ;\n"
-            "- pas de compétence technique pointue, sauf si le poste la demande explicitement ;\n"),
-    "stage": "- relie les missions visées par la personne et son bagage (ci-dessous) aux missions du poste ;\n",
-}
-
-
-def bagage_candidat(profil, mode="alternance") -> str:
-    """Ce que la lettre peut citer du profil, rien d'autre (aucune invention)."""
-    def court(texte, n=200):
-        return " ".join(str(texte or "").split())[:n]
-    lignes = []
-    if mode == "stage":
-        lignes.append(("Missions visées", court(profil.get("missions"), 300)))
-        lignes.append(("Formation", court(profil.get("formation"))))
-    lignes.append(("Compétences", ", ".join(profil.get("competences", []) or [])))
-    if mode != "stage":
-        lignes.append(("Formation", court(profil.get("formation"))))
-    lignes.append(("Expérience", court(profil.get("experience"))))
-    projets = [court(f"{p.get('nom', '')} : {p.get('description', '')}", 150)
-               for p in (profil.get("projets") or [])[:2] if p.get("nom") or p.get("description")]
-    lignes.append(("Projets", " | ".join(projets)))
-    texte = "\n".join(f"- {libelle} : {valeur}" for libelle, valeur in lignes if valeur)
-    return texte or "- Rien de renseigné : reste sur l'intérêt pour l'entreprise, sans inventer de compétence."
-
-
-def construire_messages_lettre(offre, profil, mode="alternance") -> list[dict]:
-    """Messages envoyés à l'IA pour les deux éléments rédigés de la lettre."""
-    from shared.config import ia_longueur_description
-    description = " ".join((offre.get("description", "") or "").split())[:ia_longueur_description()]
-    prompt = (
-        f"Tu aides une personne candidate à personnaliser sa lettre de motivation pour "
-        f"{POSTE_PAR_MODE.get(mode, 'une alternance')}. Rédige deux éléments.\n\n"
-        "OFFRE\n"
-        f"Entreprise : {offre.get('entreprise', '') or 'non précisée'} ({offre.get('lieu', '') or 'lieu non précisé'})\n"
-        f"Poste : {offre.get('titre', '')}\n"
-        f"Description : {description}\n\n"
-        f"BAGAGE DE LA PERSONNE\n{bagage_candidat(profil, mode)}\n\n"
-        "1. contact_entreprise : bloc destinataire en 2 lignes, le nom de l'entreprise puis la ville "
-        "(ex. « ACME Solutions\\n75010 Paris »). Rien d'autre : ni date, ni objet, ni formule de politesse.\n"
-        "2. paragraphe_entreprise : un seul paragraphe de 2 à 3 phrases, 350 caractères au plus :\n"
-        "- ne commence pas par « Je » : commence par le nom de l'entreprise, « Votre » ou « C'est » ;\n"
-        "- montre un intérêt précis pour cette entreprise ou ce poste (activité, missions, contexte) ;\n"
-        f"{CONSIGNE_PAR_MODE.get(mode, CONSIGNE_PAR_MODE['alternance'])}"
-        "- écris à la première personne : c'est la personne candidate qui parle au recruteur (« j'ai », « mon », "
-        "« votre entreprise ») ; jamais « vous » pour parler d'elle, et l'entreprise n'est pas attirée par elle, "
-        "c'est elle qui s'intéresse à l'entreprise ;\n"
-        "- N'invente AUCUNE compétence ni expérience absente du bagage : ne cite que des compétences et des outils "
-        "écrits dans le bagage ou dans l'offre ;\n"
-        "- la personne est en formation ou débutante : pas de mot comme « expertise », « expert » ou « maîtrise "
-        "parfaite » ;\n"
-        "- texte brut : aucune mise en forme (ni astérisques, ni dièses, ni tirets de liste, ni gras) ;\n"
-        "- écris de façon neutre : aucun adjectif ni participe accordé au genre de la personne candidate "
-        "(« j'ai le sens de la rigueur » plutôt qu'un adjectif comme « je suis rigoureux ») ;\n"
-        "- ton direct et sincère, sans superlatifs (« incroyable », « idéal », « parfait ») ;\n"
-        "- ne parle ni de la formation, ni de la disponibilité, ni des dates : la lettre le dit déjà.\n\n"
-        "Réponds uniquement avec cet objet JSON :\n"
-        '{"contact_entreprise": "<nom de l\'entreprise\\nville>", "paragraphe_entreprise": "<2 à 3 phrases>"}'
-    )
-    return [{"role": "system", "content": "Tu rédiges en français. Tu réponds uniquement par un objet JSON "
-                                          "valide, sans texte autour."},
-            {"role": "user", "content": prompt}]
+def contact_entreprise(offre) -> str:
+    """Bloc destinataire écrit en Python : nom de l'entreprise puis lieu, ou
+    une formule neutre si France Travail masque le nom."""
+    nom = (offre.get("entreprise") or "").strip()
+    lieu = (offre.get("lieu") or "").strip()
+    tete = "À l'attention du service recrutement" if nom.lower() in NOMS_VIDES else nom
+    return "\n".join(x for x in (tete, lieu) if x)
 
 
 def sans_markdown(texte: str) -> str:
@@ -213,48 +177,92 @@ def sans_markdown(texte: str) -> str:
     return "\n".join(" ".join(l.split()) for l in t.splitlines()).strip()
 
 
-def rediger_elements(offre, profil, mode="alternance", modele=None, essais=2) -> LettreIA:
-    """Les deux éléments rédigés par l'IA (bloc destinataire, paragraphe sur
-    l'entreprise), sans assemblage. Réponse hors schéma redemandée une fois ;
-    ErreurIABloquante et ErreurIAPassagere remontent : pas de lettre sans
-    paragraphe rédigé."""
-    return appeler_structure(construire_messages_lettre(offre, profil, mode), LettreIA, usage="lettre",
-                             modele=modele, essais=essais, temperature=0.6)
+def nettoyer_paragraphe(texte: str) -> str:
+    """Paragraphe d'un seul bloc, sans markdown, sans tiret cadratin ni
+    demi-cadratin (remplacés par une virgule), sans esperluette (« et »)."""
+    t = sans_markdown(texte)
+    t = re.sub(r"\s*[—–]\s*", ", ", t)
+    t = re.sub(r"\s*&\s*", " et ", t)
+    t = re.sub(r",\s*,", ",", t)
+    return " ".join(t.split())
 
 
-def generer_lettre(offre, profil, mode="alternance", modele=None):
-    """
-    Demande à l'IA (modèle de l'usage « lettre », ou `modele`) uniquement :
-    1. Le bloc contact de l'entreprise (coin haut gauche de la lettre)
-    2. Le paragraphe de personnalisation (~3 phrases max)
+# ─── Prompt du paragraphe, écrit pour un petit modèle local ──────────────────
+POSTE_PAR_MODE = {"alternance": "une alternance", "job": "un job", "stage": "un stage"}
 
-    Assemble ensuite la lettre complète avec le template fixe.
-    Lève ProfilIncomplet ou LettreTypeInvalide (erreurs 400) AVANT tout
-    appel à l'IA.
-    """
-    exiger_profil(profil, CHAMPS_IDENTITE)
-    template = preparer_lettre_type(profil.get("lettre_type") or lettre_par_defaut(mode))
-    nom_entreprise = offre.get("entreprise", "")
 
-    reponse = rediger_elements(offre, profil, mode, modele)
-    contact    = sans_markdown(reponse.contact_entreprise) or nom_entreprise
-    paragraphe = sans_markdown(reponse.paragraphe_entreprise) or reponse.paragraphe_entreprise
+def bagage_candidat(profil, mode="alternance") -> str:
+    """Ce que le paragraphe peut citer du profil, rien d'autre (aucune invention)."""
+    def court(texte, n=200):
+        return " ".join(str(texte or "").split())[:n]
+    lignes = []
+    if mode == "stage":
+        lignes.append(("Missions visées", court(profil.get("missions"), 300)))
+    lignes.append(("Formation", court(profil.get("formation"))))
+    lignes.append(("Compétences", ", ".join(profil.get("competences", []) or [])))
+    lignes.append(("Expérience", court(profil.get("experience"))))
+    projets = [court(f"{p.get('nom', '')} : {p.get('description', '')}", 150)
+               for p in (profil.get("projets") or [])[:2] if p.get("nom") or p.get("description")]
+    lignes.append(("Projets", " | ".join(projets)))
+    texte = "\n".join(f"- {libelle} : {valeur}" for libelle, valeur in lignes if valeur)
+    return texte or "- Rien de renseigné : reste sur l'intérêt pour l'entreprise, sans inventer de compétence."
 
-    # ── Nettoyage défensif du bloc contact ────────────────────────────────
-    contact = _nettoyer_contact(contact)
-    # Entreprise masquée par France Travail (~1 offre sur 2) :
-    # on bascule sur une formule neutre plutôt qu'un nom bidon.
-    noms_vides = {"", "inconnue", "inconnu", "non précisé", "non precise",
-                  "non renseigné", "non renseigne", "n/a", "na"}
-    if not contact or nom_entreprise.strip().lower() in noms_vides:
-        ville = (offre.get("lieu", "") or "").strip()
-        contact = "À l'attention du service recrutement"
-        if ville:
-            contact += "\n" + ville
 
-    lettre = template.format(
-        contact_entreprise=contact,
-        date=_date_du_jour(),
-        paragraphe_entreprise=paragraphe,
+def construire_messages_paragraphe(offre, profil, mode="alternance", lettre_type="") -> list[dict]:
+    """Messages envoyés à l'IA pour le seul paragraphe personnalisé."""
+    from shared.config import ia_longueur_description
+    description = " ".join((offre.get("description", "") or "").split())[:ia_longueur_description()]
+    reste = " ".join(re.sub(r"\{[^}]*\}", " ", lettre_type or "").split())[:1200]
+    prompt = (
+        f"Tu aides une personne candidate à {POSTE_PAR_MODE.get(mode, 'une alternance')} à écrire le paragraphe "
+        "personnalisé de sa lettre de motivation. Le reste de la lettre est déjà écrit.\n\n"
+        "=== TEXTE DE L'OFFRE ===\n"
+        f"Entreprise : {offre.get('entreprise', '') or 'non précisée'} ({offre.get('lieu', '') or 'lieu non précisé'})\n"
+        f"Poste : {offre.get('titre', '')}\n"
+        f"Description : {description}\n"
+        "=== FIN DE L'OFFRE ===\n\n"
+        f"=== PROFIL DE LA PERSONNE ===\n{bagage_candidat(profil, mode)}\n\n"
+        f"=== RESTE DE LA LETTRE (ne pas le redire) ===\n{reste or '(vide)'}\n\n"
+        "Écris UN paragraphe de 3 à 5 phrases :\n"
+        "- à la première personne : c'est la personne candidate qui parle au recruteur (« je », « mon ») ; "
+        "jamais « vous » pour parler d'elle ;\n"
+        "- ce qui l'attire dans cette entreprise et ce poste, en t'appuyant sur le texte de l'offre ;\n"
+        "- le lien avec un élément réel de son profil (compétence, projet ou expérience écrit ci-dessus) ; "
+        "n'invente rien et ne cite que des compétences et outils présents dans le profil ou l'offre ;\n"
+        "- écris de façon neutre : aucun adjectif ni participe accordé au genre de la personne candidate ;\n"
+        "- pas de formule de politesse, et rien de ce que dit déjà le reste de la lettre ;\n"
+        "- texte brut : ni markdown, ni tiret cadratin, ni esperluette, ni le mot « expertise ».\n\n"
+        'Réponds uniquement avec cet objet JSON : {"paragraphe": "<le paragraphe>"}'
     )
-    return lettre
+    return [{"role": "system", "content": "Tu rédiges en français. Tu réponds uniquement par un objet JSON "
+                                          "valide, sans texte autour."},
+            {"role": "user", "content": prompt}]
+
+
+def rediger_paragraphe(offre, profil, mode="alternance", modele=None, essais=2, lettre_type=None) -> str:
+    """Paragraphe personnalisé rédigé par l'IA (IA_MODELE_LETTRE, ou
+    `modele`), nettoyé. Profil incomplet ou lettre type sans {paragraphe} :
+    erreur 400 AVANT tout appel à l'IA (lettre_type donnée : pas de contrôle
+    du profil, pour le script de vérification). Les erreurs de l'IA
+    remontent : rien n'est inventé."""
+    if lettre_type is None:
+        exiger_profil(profil, CHAMPS_IDENTITE)
+        lettre_type = exiger_lettre_type(profil)
+    reponse = appeler_structure(construire_messages_paragraphe(offre, profil, mode, lettre_type), ParagrapheIA,
+                                usage="lettre", modele=modele, essais=essais, temperature=0.6)
+    return nettoyer_paragraphe(reponse.paragraphe) or reponse.paragraphe
+
+
+def assembler_lettre(offre, profil, paragraphe: str) -> str:
+    """Lettre type du profil, balises remplacées en Python, avec le
+    paragraphe validé par la personne. Sans IA."""
+    exiger_profil(profil, CHAMPS_IDENTITE)
+    modele = exiger_lettre_type(profil)
+    paragraphe = " ".join((paragraphe or "").split())
+    if not paragraphe:
+        raise ErreurUtilisateur("Le paragraphe personnalisé est vide : écris-le ou fais-le rédiger avant de "
+                                "l'insérer dans la lettre.")
+    return modele.format(entreprise=(offre.get("entreprise") or "").strip() or "votre entreprise",
+                         poste=(offre.get("titre") or "").strip() or "le poste proposé",
+                         date=_date_du_jour(), contact_entreprise=contact_entreprise(offre),
+                         paragraphe=paragraphe, paragraphe_entreprise=paragraphe)

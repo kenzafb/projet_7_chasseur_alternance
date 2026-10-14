@@ -67,7 +67,7 @@ def test_prompt_d_analyse_du_stage_utilise_ces_champs(ia):
 
 
 def test_prompt_de_lettre_du_stage_utilise_ces_champs(ia):
-    generateur.generer_lettre(OFFRE, STAGE, mode="stage")
+    generateur.rediger_paragraphe(OFFRE, STAGE, "stage", lettre_type="{paragraphe}")
     texte = ia.textes(0)
     for attendu in ("MISSIONS-VISEES", "COMPETENCE-A, COMPETENCE-B", "EXPERIENCE-DU-PROFIL", "PROJET-X : appli web"):
         assert attendu in texte, attendu

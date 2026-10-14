@@ -140,24 +140,26 @@
     <button class="btn" type="button" data-projet-add>+ Ajouter un projet</button>
   </div>
 
-  <!-- ─── Section 5 : Lettre type (alternance) ─── -->
-  <div class="card profil-card" data-mode-section="alternance">
+  <!-- ─── Section 5 : Lettre type (tous les modes, une par mode, D106) ─── -->
+  <div class="card profil-card" data-mode-section="alternance stage job">
     <div class="profil-card__head">
       <span class="profil-card__num">05</span>
       <div>
         <h3 class="profil-card__title">Lettre de motivation type</h3>
-        <p class="profil-card__sub">Ta trame de lettre. L'IA remplacera seulement le paragraphe sur l'entreprise.</p>
+        <p class="profil-card__sub">Ta lettre, écrite par toi. L'IA n'écrit que le paragraphe personnalisé pour chaque offre ; tu le relis avant de l'insérer.</p>
       </div>
     </div>
     <div class="profil-aide">
-      <strong>Important :</strong> insère <code>{paragraphe_entreprise}</code> à l'endroit où l'IA doit écrire
-      le paragraphe personnalisé sur l'entreprise. Tu peux aussi utiliser <code>{contact_entreprise}</code>
-      (bloc destinataire) et <code>{date}</code>. N'utilise pas d'autres accolades.
+      <strong>Balises :</strong> <code>{paragraphe}</code> (obligatoire) à l'endroit du paragraphe personnalisé ;
+      <code>{entreprise}</code> et <code>{poste}</code>, remplacés par ceux de l'offre ; <code>{date}</code> ;
+      <code>{contact_entreprise}</code> (bloc destinataire : entreprise puis lieu). N'utilise pas d'autres accolades.
     </div>
     <label class="field field--full">
       <textarea class="field__area" data-profil="lettre_type" rows="14"
-        placeholder="{contact_entreprise}&#10;&#10;Paris, le {date}&#10;&#10;Objet : ...&#10;&#10;Madame, Monsieur,&#10;&#10;...&#10;&#10;{paragraphe_entreprise}&#10;&#10;..."></textarea>
+        placeholder="{contact_entreprise}&#10;&#10;Paris, le {date}&#10;&#10;Objet : Candidature, {poste}&#10;&#10;Madame, Monsieur,&#10;&#10;...&#10;&#10;{paragraphe}&#10;&#10;..."></textarea>
     </label>
+    <button class="btn btn--sm" type="button" data-lettre-exemple>Partir d'un exemple</button>
+    <template data-lettre-exemple-texte>{{ exemple_lettre|default("") }}</template>
   </div>
 
   <!-- ─── Section 6 : Mail type (commun) ─── -->

@@ -153,7 +153,20 @@
       <button class="btn btn--ghost btn--sm" data-modal-close>Fermer</button>
     </div>
     <div class="modal__body">
-      <textarea class="modal__letter" data-modal-letter spellcheck="false"></textarea>
+      <!-- Paragraphe personnalisé rédigé par l'IA : modifiable avant d'être inséré (D106) -->
+      <div class="modal__paragraphe">
+        <span class="field__label">Paragraphe personnalisé</span>
+        <textarea class="modal__para" data-modal-paragraphe rows="6" spellcheck="true"
+          placeholder="Le paragraphe rédigé pour cette offre apparaît ici. Tu peux aussi l'écrire toi-même."></textarea>
+        <div class="modal__para-actions">
+          <button class="btn btn--sm" data-modal-regenerer {% if not analyse_ia|default(true) %}disabled title="IA désactivée"{% endif %}>Régénérer le paragraphe</button>
+          <button class="btn btn--sm btn--signal" data-modal-assembler>Insérer dans ma lettre type</button>
+          <span class="modal__para-etat" data-modal-para-etat></span>
+        </div>
+      </div>
+      <span class="field__label">Lettre</span>
+      <textarea class="modal__letter" data-modal-letter spellcheck="false"
+        placeholder="La lettre apparaît ici une fois le paragraphe inséré dans ta lettre type."></textarea>
     </div>
     <div class="modal__foot">
       <button class="btn" data-modal-pdf>Télécharger en PDF</button>

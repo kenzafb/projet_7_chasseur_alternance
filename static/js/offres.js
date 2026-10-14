@@ -65,7 +65,6 @@ function carte(o) {
   const aLettre = !!o.lettre;
   const nonAnalysee = o.verdict === NON_ANALYSEE;
   const ineligible = o.raison_archivage === "ineligible" || (o.eligible === false && !nonAnalysee);
-  const lettreBloquee = !IA_ACTIVE && !aLettre;   // une lettre déjà écrite reste ouvrable
 
   return `
   <article class="card offre" data-id="${o.id}" data-search-text="${esc((o.titre||'')+' '+(o.entreprise||'')+' '+(o.lieu||o.zone||'')).toLowerCase()}">
@@ -103,8 +102,8 @@ function carte(o) {
       <div class="offre__actions">
         ${o.lien ? `<a class="btn" href="${o.lien}" target="_blank" rel="noopener">Voir l'offre</a>` : ""}
         <button class="btn" data-act="analyser"${IA_ACTIVE ? "" : ' disabled title="IA désactivée"'}>${nonAnalysee ? "Analyser" : "Réanalyser"}</button>
-        <button class="btn btn--signal" data-act="lettre"${lettreBloquee ? ' disabled title="IA désactivée"' : ""}>${aLettre ? "Voir la lettre" : "Générer la lettre"}</button>
-        ${lettreBloquee ? '<span class="offre__note">Génération de lettre indisponible : l\'IA est désactivée.</span>' : ""}
+        <button class="btn btn--signal" data-act="lettre">${aLettre ? "Voir la lettre" : "Préparer la lettre"}</button>
+        ${!IA_ACTIVE && !aLettre ? '<span class="offre__note">IA désactivée : écris toi-même le paragraphe personnalisé.</span>' : ""}
         ${o.statut !== "archive" ? `
         <select class="archiver-select" data-archiver-select>
           <option value="">Archiver…</option>

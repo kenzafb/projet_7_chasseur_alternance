@@ -43,6 +43,11 @@ def _sans_mention_reelle(texte, quoi):
         assert not re.search(r"(?<![a-z])" + re.escape(mot) + r"(?![a-z])", bas), f"{quoi} : « {mot} »"
 
 
+def _paragraphe(profil, mode="alternance"):
+    """Paragraphe rédigé avec l'exemple de lettre type du mode (D106)."""
+    return generateur.rediger_paragraphe(OFFRE, profil, mode, lettre_type=generateur.lettre_par_defaut(mode))
+
+
 def _prompts(ia):
     return "\n".join(m["content"] for appel in ia.appels for m in appel["messages"])
 
@@ -50,7 +55,7 @@ def _prompts(ia):
 # ─── Prompts ──────────────────────────────────────────────────────────────────
 @pytest.mark.parametrize("mode", ["alternance", "job", "stage"])
 def test_prompts_sans_mention_d_un_utilisateur_reel(ia, mode):
-    generateur.generer_lettre(OFFRE, PROFIL, mode=mode)
+    _paragraphe(PROFIL, mode)
     ia.reponse = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false, "niveau_exigence": "non_precise"}'
     analyseur.analyser_offre(OFFRE, PROFIL, mode=mode)
     texte = _prompts(ia)
@@ -60,11 +65,11 @@ def test_prompts_sans_mention_d_un_utilisateur_reel(ia, mode):
 
 
 def test_prompt_de_lettre_neutre_et_fonde_sur_le_profil(ia):
-    generateur.generer_lettre(OFFRE, PROFIL, mode="alternance")
+    _paragraphe(PROFIL)
     texte = _prompts(ia)
     assert "personne candidate" in texte and "neutre" in texte
     assert "Excel, Accueil" in texte                       # bagage réel du profil
-    assert "N'invente AUCUNE compétence" in texte
+    assert "n'invente rien" in texte
 
 
 def test_analyse_job_tire_les_preferences_du_profil(ia):
@@ -145,28 +150,49 @@ def test_trames_par_defaut_generiques():
         assert "alternance" not in texte.lower()
 
 
+# ─── Lettre type et paragraphe personnalisé (D106) ───────────────────────────
+LETTRE_TYPE = "{contact_entreprise}\nObjet : {poste}\nMadame, Monsieur,\nJ'aime {entreprise}.\n{paragraphe}\nCordialement."
+
+
 @pytest.mark.parametrize("mode", ["alternance", "job", "stage"])
-def test_lettre_generee_avec_la_trame_du_mode(ia, mode):
-    lettre = generateur.generer_lettre(OFFRE, PROFIL, mode=mode)
-    assert ("alternance" in lettre.lower()) == (mode == "alternance")
-    assert ("stage" in lettre.lower()) == (mode == "stage")
-    assert "ACME, votre contexte me parle." in lettre
+def test_paragraphe_par_le_modele_de_lettre(ia, mode):
+    assert _paragraphe(PROFIL, mode) == "ACME, votre contexte me parle."
     assert ia.appels[-1]["model"] == "ministral-3:8b"
-    assert ia.appels[-1]["format"]["title"] == "LettreIA"
+    assert ia.appels[-1]["format"]["title"] == "ParagrapheIA" and ia.appels[-1]["options"]["temperature"] == 0.6
+    assert f"candidate à {generateur.POSTE_PAR_MODE[mode]}" in ia.textes()
 
 
-def test_prompt_de_lettre_par_mode(ia):
-    generateur.generer_lettre(OFFRE, {**PROFIL, "missions": "MISSIONS-VISEES"}, mode="stage")
-    generateur.generer_lettre(OFFRE, PROFIL, mode="job")
-    stage, job = ia.textes(0), ia.textes(1)
-    assert "pour un stage" in stage and "MISSIONS-VISEES" in stage
-    assert "pour un job" in job and "fiabilité" in job and "MISSIONS-VISEES" not in job
-    assert '"paragraphe_entreprise": "<2 à 3 phrases>"' in stage
+def test_prompt_du_paragraphe(ia):
+    generateur.rediger_paragraphe(OFFRE, {**PROFIL, "missions": "MISSIONS-VISEES"}, "stage", lettre_type=LETTRE_TYPE)
+    texte = ia.textes(0)
+    for attendu in ("MISSIONS-VISEES", "Vente en magasin", "3 à 5 phrases", "première personne",
+                    "ce qui l'attire dans cette entreprise et ce poste", "élément réel de son profil",
+                    "pas de formule de politesse",
+                    "ni markdown, ni tiret cadratin, ni esperluette, ni le mot « expertise »",
+                    "J'aime", '{"paragraphe": "<le paragraphe>"}'):
+        assert attendu in texte, attendu
+    assert "{paragraphe}" not in texte and "{entreprise}" not in texte   # balises retirées du rappel de la lettre
 
 
-def test_lettre_type_du_profil_prioritaire(ia):
-    profil = {**PROFIL, "lettre_type": "Ma trame. {paragraphe_entreprise}"}
-    assert generateur.generer_lettre(OFFRE, profil, mode="job").startswith("Ma trame. ACME")
+def test_assemblage_en_python():
+    profil = {**PROFIL, "lettre_type": LETTRE_TYPE}
+    lettre = generateur.assembler_lettre({**OFFRE, "lieu": "Lyon"}, profil, "  Mon   paragraphe.  ")
+    assert lettre == "ACME\nLyon\nObjet : Vendeur\nMadame, Monsieur,\nJ'aime ACME.\nMon paragraphe.\nCordialement."
+    ancienne = {**PROFIL, "lettre_type": "Le {date}\n{paragraphe_entreprise}"}       # ancien nom de la balise
+    assert generateur.assembler_lettre(OFFRE, ancienne, "P.").endswith("\nP.")
+
+
+@pytest.mark.parametrize("lettre_type, message", [
+    ("", "Écris d'abord ta lettre type"),
+    ("Madame, Monsieur, {entreprise}.", "n'a pas de balise {paragraphe}"),
+])
+def test_sans_lettre_type_ni_paragraphe_rien_n_est_genere(ia, lettre_type, message):
+    profil = {**PROFIL, "lettre_type": lettre_type}
+    with pytest.raises(generateur.LettreTypeInvalide, match=message):
+        generateur.rediger_paragraphe(OFFRE, profil, "alternance")
+    with pytest.raises(generateur.LettreTypeInvalide, match="Lettre de motivation type"):
+        generateur.assembler_lettre(OFFRE, profil, "P.")
+    assert ia.appels == []
 
 
 # ─── Mail de candidature spontanée ────────────────────────────────────────────
@@ -227,11 +253,11 @@ def test_code_actif_sans_mention_d_un_utilisateur_reel():
 
 # ─── Lettre : première personne, rien d'inventé, texte brut (après comparaison) ──
 def test_consignes_de_la_lettre(ia):
-    generateur.generer_lettre(OFFRE, PROFIL, mode="stage")
+    _paragraphe(PROFIL, "stage")
     texte = _prompts(ia)
     assert "première personne" in texte and "jamais « vous » pour parler d'elle" in texte
-    assert "ne cite que des compétences et des outils écrits dans le bagage ou dans l'offre" in texte
-    assert "« expertise »" in texte and "aucune mise en forme" in texte
+    assert "ne cite que des compétences et outils présents dans le profil ou l'offre" in texte
+    assert "« expertise »" in texte and "ni markdown" in texte
 
 
 @pytest.mark.parametrize("brut, propre", [
@@ -245,10 +271,9 @@ def test_markdown_retire(brut, propre):
     assert generateur.sans_markdown(brut) == propre
 
 
-def test_lettre_sans_markdown(ia):
-    ia.reponse = '{"contact_entreprise": "**ACME**\\n75010 Paris", "paragraphe_entreprise": "**ACME**, *votre* projet me parle."}'
-    lettre = generateur.generer_lettre(OFFRE, PROFIL, mode="alternance")
-    assert "*" not in lettre and "ACME, votre projet me parle." in lettre
+def test_paragraphe_nettoye(ia):
+    ia.reponse = '{"paragraphe": "**ACME** — votre projet & vos équipes *me* parlent.\\n- Je veux apprendre."}'
+    assert _paragraphe(PROFIL) == "ACME, votre projet et vos équipes me parlent. Je veux apprendre."
 
 
 @pytest.mark.parametrize("mode", ["alternance", "job", "stage"])

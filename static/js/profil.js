@@ -94,8 +94,8 @@ function brancherProjets() {
 /* ── Module ────────────────────────────────────────────────────────────── */
 /* ── Validation de la lettre type ──────────────────────────────────────── */
 function validerLettre(txt) {
-  // Placeholders autorisés
-  const autorises = ["contact_entreprise", "date", "paragraphe_entreprise"];
+  // Balises autorisées (D106) ; {paragraphe_entreprise} : ancien nom de {paragraphe}
+  const autorises = ["entreprise", "poste", "date", "contact_entreprise", "paragraphe", "paragraphe_entreprise"];
   // Trouve tous les {...}
   const trouves = [...txt.matchAll(/\{([^}]*)\}/g)].map(m => m[1].trim());
   // Accolades non fermées / vides
@@ -104,11 +104,11 @@ function validerLettre(txt) {
   if (ouvrantes !== fermantes) return "accolade non fermée détectée. Vérifie les { et }.";
   for (const t of trouves) {
     if (!autorises.includes(t)) {
-      return `accolade non autorisée : {${t}}. Seuls {contact_entreprise}, {date} et {paragraphe_entreprise} sont permis.`;
+      return `accolade non autorisée : {${t}}. Seuls {paragraphe}, {entreprise}, {poste}, {date} et {contact_entreprise} sont permis.`;
     }
   }
-  if (!trouves.includes("paragraphe_entreprise")) {
-    return "il manque {paragraphe_entreprise} — c'est là que l'IA écrit le paragraphe personnalisé. Ajoute-le.";
+  if (!trouves.includes("paragraphe") && !trouves.includes("paragraphe_entreprise")) {
+    return "il manque {paragraphe} : c'est là que va le paragraphe personnalisé. Ajoute-le.";
   }
   return null;
 }
@@ -507,7 +507,14 @@ export const Profil = {
       // Domaines, secteurs, « tous les secteurs » : message des spontanées à jour
       document.querySelector('[data-page-content="profil"]')?.addEventListener("change", () =>
         majMessageSpontanees(_modeProfilCourant));
-      brancherTags("competences");
+      // Exemple de lettre type du mode, seulement dans un champ vide (ou après confirmation)
+      document.querySelector("[data-lettre-exemple]")?.addEventListener("click", () => {
+        const champ = [...document.querySelectorAll('[data-profil="lettre_type"]')].find(_champVisible);
+        const exemple = document.querySelector("[data-lettre-exemple-texte]")?.innerHTML
+          .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/&quot;/g, '"');
+        if (champ && exemple && (!champ.value.trim() || confirm("Remplacer ta lettre type par l'exemple ?"))) champ.value = exemple;
+      });
+            brancherTags("competences");
       brancherProjets();
       brancherPiecesJointes();
       this._charge = true;

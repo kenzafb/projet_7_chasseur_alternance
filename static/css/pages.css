@@ -530,3 +530,9 @@
 /* J'ai postulé (D105) */
 .offre__postuler { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0; font-size: 13px; }
 .offre__postuler input[type="date"] { font: inherit; padding: 4px 6px; }
+
+/* Lettre : paragraphe personnalisé avant insertion (D106) */
+.modal__paragraphe { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.modal__para { width: 100%; font: inherit; padding: 8px; border-radius: 6px; resize: vertical; }
+.modal__para-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.modal__para-etat { font-size: 13px; opacity: .8; }

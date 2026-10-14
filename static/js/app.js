@@ -62,46 +62,61 @@ function majBadge() {
 const modal = {
   el:    () => document.querySelector("[data-modal]"),
   area:  () => document.querySelector("[data-modal-letter]"),
+  para:  () => document.querySelector("[data-modal-paragraphe]"),
+  etat:  () => document.querySelector("[data-modal-para-etat]"),
   id:    null,
+  /* Lettre déjà prête : affichée ; sinon le paragraphe est rédigé tout de
+     suite (IA active), à relire avant de l'insérer dans la lettre type */
   async ouvrir(id) {
     this.id = id;
     const offre = Offres.data().find(o => o.id === id);
-    let lettre = offre?.lettre || "";
-    if (!lettre) {
-      // IA locale sur processeur : la rédaction prend environ une minute,
-      // davantage si une analyse d'offres occupe déjà l'IA (une demande à la fois)
-      const debut = Date.now();
-      const attente = () => {
-        const s = Math.round((Date.now() - debut) / 1000);
-        this.area().value = "Rédaction de la lettre par l'IA locale… " + s + " s\n\n"
-          + "Compte environ une minute, davantage si une analyse d'offres est en cours : "
-          + "l'IA traite une demande à la fois. Tu peux laisser cette fenêtre ouverte.";
-      };
-      let minuteur = null;   // compteur de secondes, une mise à jour par seconde
-      const tic = () => { attente(); minuteur = setTimeout(tic, 1000); };
-      tic();
-      this.attendre(true);
-      this.el().classList.add("is-open");
-      try {
-        lettre = (await api.genererLettre(id)).lettre;
-      } catch (e) {
-        // Rien à enregistrer : pas de texte d'erreur dans la zone de la lettre
-        this.fermer();
-        alert("Lettre non générée : " + e.message);
-        return;
-      } finally {
-        clearTimeout(minuteur);
-        this.attendre(false);
-      }
-      if (this.id !== id) { recharger(); return; }   // fenêtre fermée pendant la rédaction : la lettre est en base
-    }
-    this.area().value = lettre;
+    this.area().value = offre?.lettre || "";
+    this.para().value = "";
+    this.etat().textContent = "";
     this.el().classList.add("is-open");
+    if (!offre?.lettre && document.documentElement.dataset.analyseIa !== "non") await this.rediger();
   },
-  /* Pendant la rédaction : zone en lecture seule, ni enregistrement ni PDF */
+  /* IA locale : environ une minute, davantage si une analyse occupe déjà l'IA */
+  async rediger() {
+    const id = this.id;
+    const debut = Date.now();
+    let minuteur = null;
+    const tic = () => {
+      const s = Math.round((Date.now() - debut) / 1000);
+      this.etat().textContent = `Rédaction par l'IA locale… ${s} s (environ une minute, davantage si une `
+        + "analyse d'offres est en cours : l'IA traite une demande à la fois).";
+      minuteur = setTimeout(tic, 1000);
+    };
+    tic();
+    this.attendre(true);
+    try {
+      const { paragraphe } = await api.paragrapheLettre(id);
+      if (this.id !== id) return;
+      this.para().value = paragraphe;
+      this.etat().textContent = "Relis et modifie le paragraphe, puis insère-le dans ta lettre type.";
+    } catch (e) {
+      // Lettre type absente, sans {paragraphe}, IA indisponible : message, rien d'inventé
+      this.etat().textContent = "";
+      alert("Paragraphe non rédigé : " + e.message);
+    } finally {
+      clearTimeout(minuteur);
+      this.attendre(false);
+    }
+  },
+  async assembler() {
+    if (!this.id) return;
+    try {
+      this.area().value = (await api.assemblerLettre(this.id, this.para().value)).lettre;
+      this.etat().textContent = "Paragraphe inséré : la lettre est enregistrée, modifiable ci-dessous.";
+      Offres.charger();
+    } catch (e) { alert(e.message); }
+  },
+  /* Pendant la rédaction : ni insertion, ni enregistrement, ni PDF */
   attendre(oui) {
-    this.area().readOnly = oui;
-    document.querySelectorAll("[data-modal-save], [data-modal-pdf]").forEach(b => { b.disabled = oui; });
+    this.para().readOnly = oui;
+    document.querySelectorAll("[data-modal-save], [data-modal-pdf], [data-modal-assembler], [data-modal-regenerer]")
+      .forEach(b => { b.disabled = oui || (b.matches("[data-modal-regenerer]")
+        && document.documentElement.dataset.analyseIa === "non"); });
   },
   fermer() { this.el().classList.remove("is-open"); this.id = null; },
   async enregistrer() {
@@ -352,6 +367,8 @@ function brancher() {
   document.querySelector("[data-modal-close]").addEventListener("click", () => modal.fermer());
   document.querySelector("[data-modal-save]").addEventListener("click", () => modal.enregistrer());
   document.querySelector("[data-modal-pdf]").addEventListener("click", () => modal.pdf());
+  document.querySelector("[data-modal-regenerer]").addEventListener("click", () => modal.rediger());
+  document.querySelector("[data-modal-assembler]").addEventListener("click", () => modal.assembler());
   document.querySelector("[data-modal]").addEventListener("click", e => {
     if (e.target.matches("[data-modal]")) modal.fermer();
   });
