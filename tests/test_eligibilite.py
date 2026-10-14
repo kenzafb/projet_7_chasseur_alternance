@@ -248,3 +248,39 @@ def test_souhait_a_deux_crans_un_point():
     assert el.penalite_souhait(e, BUT2) == (1, "Bac+4 souhaité, profil Bac+2")
     assert el.raisons_ineligibilite(e, BUT2, "stage") == []
     assert el.penalite_souhait(extraits(niveau="bac+3", exigence="souhaite"), BUT2) == (0, "")
+
+
+# ─── D100 : niveau de secours lu par Python ──────────────────────────────────
+def test_ohana_non_precise_par_le_modele_bac5_souhaite(ia):
+    """Cas réel : OHana ressort non_precise chez les deux modèles."""
+    ia.reponse = reponse(8)                                   # niveau_requis non_precise
+    a = analyser_offre({"titre": "Stage DevOps", "description": OHANA}, BUT2, mode="stage")
+    assert (a["niveau_requis"], a["niveau_exigence"], a["eligible"]) == ("bac+5", "souhaite", True)
+    assert a["score"] == 6 and a["points_faibles"][0] == "Bac+5 souhaité, profil Bac+2"
+    assert "remplacé par bac+5 (souhaite)" in a["extraits_ecartes"][0]
+
+
+def test_moss_non_precise_par_le_modele_bac5_exige(ia):
+    ia.reponse = reponse(8)
+    a = analyser_offre({"titre": "Stage réseau", "description": MOSS}, BUT2, mode="stage")
+    assert (a["niveau_requis"], a["niveau_exigence"], a["eligible"]) == ("bac+5", "exige", False)
+
+
+@pytest.mark.parametrize("texte, attendu", [
+    (OHANA, ("bac+5", "souhaite")),
+    (MOSS, ("bac+5", "exige")),
+    ("Titulaire d'un BTS ou d'une licence.", ("bac+2", "exige")),
+    ("Étudiant en Master.", ("bac+5", "exige")),
+    ("Étudiant(e) en BUT ou équivalent.", ("bac+3", "souhaite")),
+    ("Vous rejoindrez nos ingénieurs.", None),
+    ("Aucun prérequis.", None),
+])
+def test_niveau_detecte(texte, attendu):
+    assert el.niveau_detecte(texte) == attendu
+
+
+def test_pas_de_secours_sans_indice(ia):
+    ia.reponse = reponse(8)
+    a = analyser_offre({"titre": "Stage : Ingénieur/e Système", "description": "Administration Linux."}, BUT2,
+                       mode="stage")
+    assert (a["niveau_requis"], a["niveau_exigence"], a["extraits_ecartes"]) == ("non_precise", "non_precise", [])
