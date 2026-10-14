@@ -165,7 +165,7 @@ def ia_api_key() -> str:
 # Modèle par usage : IA_MODELE_<USAGE> du .env, sinon le défaut de l'usage.
 # Sur processeur, un seul modèle chargé à la fois (OLLAMA_MAX_LOADED_MODELS=1)
 USAGES_IA = {
-    "analyse":    "ministral-3:8b",   # notation des offres
+    "analyse":    "ministral-3:3b",   # notation des offres (critères bloquants en Python, D101)
     "lettre":     "ministral-3:8b",   # paragraphe des lettres de motivation
     "extraction": "ministral-3:3b",   # validation des emails douteux du scraper
 }

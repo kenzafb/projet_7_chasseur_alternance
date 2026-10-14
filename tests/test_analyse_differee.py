@@ -166,7 +166,7 @@ def test_reponse_invalide_offre_sautee_puis_reprise(alice, ia):
 
 @pytest.mark.parametrize("panne, message", [
     (httpx.ConnectError("refused"), "IA locale injoignable : vérifie qu'Ollama tourne"),
-    (erreur_http(404, INTROUVABLE), "Modèle « ministral-3:8b » introuvable"),
+    (erreur_http(404, INTROUVABLE), "Modèle « ministral-3:3b » introuvable"),
 ])
 def test_erreur_bloquante_arrete_tout(alice, ia, panne, message):
     client, uid = alice
@@ -283,7 +283,7 @@ def test_interface(alice):
     page = client.get("/alternance").text
     assert "data-analyse-lancer" in page and 'data-limite="analyses" value="30"' in page
     assert "data-analyse-toute-file" in page and "data-analyse-estimation" in page
-    assert "ministral-3:8b" in page and 'data-profil-case="analyse_auto"' in page
+    assert "ministral-3:3b" in page and 'data-profil-case="analyse_auto"' in page
     from shared import config
     app = (config.STATIC_DIR / "js" / "app.js").read_text(encoding="utf-8")
     assert "api.analyseStop()" in app and "api.analyseAttente(" in app

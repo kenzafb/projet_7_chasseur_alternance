@@ -93,11 +93,11 @@ Installer Ollama (Linux ; pour macOS et Windows, voir [ollama.com/download](http
 
 ```bash
 curl -fsSL https://ollama.com/install.sh | sh
-ollama pull ministral-3:8b     # analyse des offres et lettres
-ollama pull ministral-3:3b     # validation des emails douteux
+ollama pull ministral-3:3b     # analyse des offres et validation des emails douteux
+ollama pull ministral-3:8b     # lettres de motivation
 ```
 
-Mesures sur processeur, sans carte graphique : `ministral-3:8b` lit 27 tokens/s et écrit 7 tokens/s, soit une à deux minutes par offre ; `ministral-3:3b` lit 57 tokens/s et écrit 13 tokens/s. Sur une machine à peu de RAM (12 Go par exemple), n'autoriser qu'un modèle chargé à la fois, sans quoi le passage de l'un à l'autre peut manquer de mémoire :
+Modèles par défaut : `ministral-3:3b` pour l'analyse et les emails, `ministral-3:8b` pour les lettres (`IA_MODELE_ANALYSE`, `IA_MODELE_LETTRE`, `IA_MODELE_EXTRACTION`). Les critères bloquants (niveau, durée, dates, alternance) sont vérifiés en Python : le modèle d'analyse ne fait que noter et recopier des informations de l'offre, ce qu'un petit modèle fait bien ; comparés à l'aveugle, les paragraphes de lettre du 8b sont nettement meilleurs. Mesures sur processeur, sans carte graphique : `ministral-3:8b` lit 27 tokens/s et écrit 7 tokens/s, soit une à deux minutes par offre ; `ministral-3:3b` lit 57 tokens/s et écrit 13 tokens/s. Avec une carte graphique intégrée AMD (Radeon 660M), `OLLAMA_IGPU_ENABLE=1` l'utilise : environ 30 s par offre. Sur une machine à peu de RAM (12 Go par exemple), n'autoriser qu'un modèle chargé à la fois, sans quoi le passage de l'un à l'autre peut manquer de mémoire :
 
 ```bash
 sudo systemctl edit ollama         # service installé par le script d'Ollama

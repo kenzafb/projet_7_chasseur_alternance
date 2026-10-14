@@ -71,8 +71,8 @@ def test_modeles_par_defaut_et_json_invalide(donnees, ia):
     code, sortie = lancer("--offres", "1")
     assert code == 0                               # l'email a reçu une réponse valide
     modeles = [a["model"] for a in ia.appels]
-    assert modeles == ["ministral-3:8b", "ministral-3:3b"]
-    assert [a["model"] for a in ia.demarrages] == ["ministral-3:8b", "ministral-3:3b"]
+    assert modeles == ["ministral-3:3b", "ministral-3:3b"]          # analyse et emails : le 3b (D101)
+    assert [a["model"] for a in ia.demarrages] == ["ministral-3:3b"]   # testé une fois
     assert "  non  " in sortie and "écartée" in sortie
     assert sum(1 for a in ia.appels if "OFFRE" in texte_envoye(a)) == 1   # un seul essai
 
@@ -153,7 +153,7 @@ def test_colonnes_niveau_duree_et_raison(donnees, ia):
         '"niveau_exigence": "non_precise"', '"niveau_exigence": "exige"')
     _, sortie = lancer("--nombre", "1")
     assert "Niveau requis" in sortie and "Exigence" in sortie and "Durée (mois)" in sortie and "Inéligible (Python)" in sortie
-    ligne = next(l for l in sortie.splitlines() if l.strip().startswith("ministral-3:8b  O1"))
+    ligne = next(l for l in sortie.splitlines() if l.strip().startswith("ministral-3:3b  O1"))
     assert "bac+5" in ligne and "exige" in ligne and "  6  " in ligne and "Bac+5 exigé, profil Bac+2" in ligne
     assert "3/10" in ligne
 

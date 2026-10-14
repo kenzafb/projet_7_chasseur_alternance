@@ -49,7 +49,7 @@ def connexion_refusee():
 
 # ─── Configuration ───────────────────────────────────────────────────────────
 def test_modeles_par_defaut():
-    assert config.modele_ia("analyse") == "ministral-3:8b"
+    assert config.modele_ia("analyse") == "ministral-3:3b"
     assert config.modele_ia("lettre") == "ministral-3:8b"
     assert config.modele_ia("extraction") == "ministral-3:3b"
 
@@ -187,7 +187,7 @@ def test_delai_depasse_passager_sans_retry(ia):
 
 def test_messages_clairs(ia):
     echouer(ia, erreur_http(404, INTROUVABLE))
-    with pytest.raises(ErreurIABloquante, match=r"ollama pull ministral-3:8b"):
+    with pytest.raises(ErreurIABloquante, match=r"ollama pull ministral-3:3b"):
         appeler_ia(MESSAGE)
     echouer(ia, erreur_http(401))
     with pytest.raises(ErreurIABloquante, match="IA_API_KEY"):

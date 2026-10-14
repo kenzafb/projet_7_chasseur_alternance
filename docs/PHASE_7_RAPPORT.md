@@ -52,7 +52,7 @@ ollama list                         # ministral-3:8b et ministral-3:3b doivent y
 #    ANALYSE_IA=true
 #    IA_API=ollama
 #    IA_BASE_URL=http://localhost:11434      (sans /v1 : API native)
-#    IA_MODELE_ANALYSE=ministral-3:8b
+#    IA_MODELE_ANALYSE=ministral-3:3b
 #    IA_MODELE_LETTRE=ministral-3:8b
 #    IA_MODELE_EXTRACTION=ministral-3:3b
 #    IA_DELAI_S=600
