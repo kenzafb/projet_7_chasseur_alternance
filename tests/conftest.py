@@ -122,6 +122,7 @@ def ia(monkeypatch):
     faux = FausseIA()
     monkeypatch.setattr(shared.ia, "_poster", faux)
     monkeypatch.setattr(shared.ia, "_obtenir", faux.obtenir)
+    monkeypatch.setattr(shared.ia, "_refuses", {})   # paramètres refusés : oubliés entre les tests
     return faux
 
 

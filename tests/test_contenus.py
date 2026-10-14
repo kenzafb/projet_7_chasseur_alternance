@@ -51,7 +51,7 @@ def _prompts(ia):
 @pytest.mark.parametrize("mode", ["alternance", "job"])
 def test_prompts_sans_mention_d_un_utilisateur_reel(ia, mode):
     generateur.generer_lettre(OFFRE, PROFIL, mode=mode)
-    ia.reponse = '{"score": 7, "verdict": "bon", "eligible": true, "domaine": "Vente"}'
+    ia.reponse = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok"}'
     analyseur.analyser_offre(OFFRE, PROFIL, mode=mode)
     texte = _prompts(ia)
     assert len(ia.appels) == 2
@@ -68,7 +68,7 @@ def test_prompt_de_lettre_neutre_et_fonde_sur_le_profil(ia):
 
 
 def test_analyse_job_tire_les_preferences_du_profil(ia):
-    ia.reponse = '{"score": 7, "verdict": "bon", "eligible": true, "domaine": "Vente"}'
+    ia.reponse = '{"score": 7, "eligible": true, "points_forts": [], "points_faibles": [], "domaine": "Vente", "resume": "ok"}'
     analyseur.analyser_offre(OFFRE, PROFIL, mode="job")
     texte = _prompts(ia)
     for valeur in ("TYPES-OK-DU-PROFIL", "TYPES-EVITER-DU-PROFIL", "HORAIRES-DU-PROFIL",

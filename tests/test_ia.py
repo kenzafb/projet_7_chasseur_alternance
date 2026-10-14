@@ -17,7 +17,9 @@ from database.dedup_db import lire_offres_vues
 from france_travail.analyseur import analyser_offre
 from france_travail.generateur import generer_lettre
 from shared import config
-from shared.ia import ErreurIABloquante, ErreurIAPassagere, IAInjoignable, appeler_ia
+from shared.ia import (ErreurIABloquante, ErreurIAPassagere, IAInjoignable, ReponseInvalide, appeler_ia,
+                       appeler_structure)
+from shared.schemas_ia import AnalyseOffre, LettreIA
 from tests.conftest import erreur_http, reponse_chat
 from tests.test_envoyeur import attendre
 
@@ -177,6 +179,70 @@ def test_un_seul_appel_a_la_fois(ia, monkeypatch):
     from tests.conftest import en_parallele
     assert en_parallele(lambda: appeler_ia(MESSAGE), 6) == []
     assert maximum[0] == 1
+
+
+# ─── Réponses structurées ────────────────────────────────────────────────────
+def test_schema_impose_et_reflexion_coupee(ia):
+    ia.reponse = ANALYSE
+    analyse = appeler_structure(MESSAGE, AnalyseOffre)
+    assert analyse.score == 8
+    corps = ia.appels[0]
+    assert corps["response_format"]["type"] == "json_schema"
+    assert corps["response_format"]["json_schema"]["schema"]["required"] == [
+        "score", "eligible", "points_forts", "points_faibles", "domaine", "resume"]
+    assert corps["reasoning_effort"] == "none" and corps["stream"] is False
+
+
+def test_reflexion_et_format_reglables(ia, monkeypatch):
+    ia.reponse = ANALYSE
+    monkeypatch.setenv("IA_REFLEXION", "true")
+    monkeypatch.setenv("IA_FORMAT_JSON", "json")
+    appeler_structure(MESSAGE, AnalyseOffre)
+    assert "reasoning_effort" not in ia.appels[-1] and ia.appels[-1]["response_format"] == {"type": "json_object"}
+    monkeypatch.setenv("IA_FORMAT_JSON", "aucun")
+    appeler_structure(MESSAGE, AnalyseOffre)
+    assert "response_format" not in ia.appels[-1]
+
+
+@pytest.mark.parametrize("texte", ['```json\n{"valide": true}\n```', 'Voici : {"valide": true} !'])
+def test_json_entoure_accepte(ia, texte):
+    from shared.schemas_ia import ValidationEmail
+    ia.reponse = texte
+    assert appeler_structure(MESSAGE, ValidationEmail).valide is True
+
+
+def test_reponse_invalide_retentee_une_fois(ia):
+    ia.file = ['{"score": 11}', ANALYSE]
+    assert appeler_structure(MESSAGE, AnalyseOffre).score == 8 and len(ia.appels) == 2
+    ia.appels.clear()
+    ia.reponse = "pas du json"
+    with pytest.raises(ReponseInvalide):
+        appeler_structure(MESSAGE, AnalyseOffre)
+    assert len(ia.appels) == 2
+
+
+def test_paragraphe_vide_invalide(ia):
+    ia.reponse = '{"contact_entreprise": "ACME", "paragraphe_entreprise": "  "}'
+    with pytest.raises(ReponseInvalide, match="paragraphe_entreprise"):
+        appeler_structure(MESSAGE, LettreIA)
+
+
+def test_parametre_refuse_retire_et_retenu(ia):
+    refus = erreur_http(400, 'json: unknown field "reasoning_effort"')
+    ia.panne = lambda corps: refus if "reasoning_effort" in corps else None
+    ia.reponse = "ok"
+    assert appeler_ia(MESSAGE, tentatives=1) == "ok"
+    assert len(ia.appels) == 2 and "reasoning_effort" not in ia.appels[1]
+    appeler_ia(MESSAGE, tentatives=1)
+    assert len(ia.appels) == 3   # retenu : plus envoyé
+
+
+def test_schema_refuse_retire(ia):
+    refus = erreur_http(400, "invalid response_format: json_schema not supported")
+    ia.panne = lambda corps: refus if "response_format" in corps else None
+    ia.reponse = ANALYSE
+    assert appeler_structure(MESSAGE, AnalyseOffre).score == 8
+    assert "response_format" not in ia.appels[-1]
 
 
 # ─── Analyse : aucun résultat par défaut ─────────────────────────────────────

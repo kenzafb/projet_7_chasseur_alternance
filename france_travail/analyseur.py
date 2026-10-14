@@ -1,6 +1,7 @@
 import json
 import re
-from shared.ia import ErreurIABloquante, ErreurIAPassagere, appeler_ia, reponse_json
+from shared.ia import ErreurIABloquante, ErreurIAPassagere, appeler_structure
+from shared.schemas_ia import AnalyseOffre
 from shared.erreurs import exiger_profil
 
 
@@ -150,7 +151,7 @@ def _analyser_offre_job(offre, profil):
 
     # Retry sur les erreurs passagères du serveur. ErreurIABloquante /
     # ErreurIAPassagere remontent : jamais de note inventée.
-    response = appeler_ia(
+    analyse = appeler_structure(
         [
             {"role": "system", "content": (
                 "Tu es un recruteur spécialisé dans les jobs courts et missions. "
@@ -159,10 +160,10 @@ def _analyser_offre_job(offre, profil):
             )},
             {"role": "user", "content": prompt},
         ],
+        AnalyseOffre,
         usage="analyse",
-        response_format={"type": "json_object"},
     )
-    return _valider_analyse(reponse_json(response))
+    return _valider_analyse(analyse)
 
 
 def analyser_offre(offre, profil, mode="alternance"):
@@ -242,7 +243,7 @@ def analyser_offre(offre, profil, mode="alternance"):
 
     # Retry sur les erreurs passagères du serveur. ErreurIABloquante /
     # ErreurIAPassagere remontent : jamais de note inventée.
-    response = appeler_ia(
+    analyse = appeler_structure(
         [
             {"role": "system", "content": (
                 "Tu es un recruteur spécialisé en alternance. Tu reponds UNIQUEMENT en JSON valide sans backticks. "
@@ -250,10 +251,10 @@ def analyser_offre(offre, profil, mode="alternance"):
             )},
             {"role": "user", "content": prompt},
         ],
+        AnalyseOffre,
         usage="analyse",
-        response_format={"type": "json_object"},
     )
-    result = _valider_analyse(reponse_json(response))
+    result = _valider_analyse(analyse)
     if est_ecole:
         result["statut_auto"] = "archive"
         print(f"     → Archivée automatiquement (école/CFA détectée)")
@@ -282,26 +283,18 @@ def est_ecole_cfa(offre) -> bool:
     )
 
 
-def _valider_analyse(result: dict) -> dict:
-    """Analyse renvoyée par l'IA, contrôlée : un score entier de 1 à 10 est
-    exigé (sinon ErreurIAPassagere, l'offre sera reprise), le reste est
-    normalisé. Aucune valeur de repli pour le score ou l'éligibilité."""
-    try:
-        score = int(result["score"])
-    except (KeyError, TypeError, ValueError):
-        raise ErreurIAPassagere("Réponse de l'IA sans score exploitable") from None
-    result["score"] = max(1, min(10, score))
-    result["eligible"] = bool(result.get("eligible", True))
+def _valider_analyse(analyse: AnalyseOffre) -> dict:
+    """Analyse validée par son schéma (score entier de 1 à 10, tous les champs
+    présents), mise au format de l'application : verdict déduit du score,
+    score ramené à 2 pour une offre inéligible, listes raccourcies. Rien
+    n'est complété par défaut, sauf un domaine vide (« Non classé »)."""
+    result = analyse.model_dump()
     if not result["eligible"]:
         result["score"] = min(result["score"], 2)
     result["verdict"] = score_to_verdict(result["score"])
-    for cle in ("points_forts", "points_faibles"):
-        if not isinstance(result.get(cle), list):
-            result[cle] = []
-    # Domaine : on garde la catégorie libre donnée par l'IA (ou "Non classé" si vide)
-    if not result.get("domaine"):
-        result["domaine"] = "Non classé"
-    result["resume"] = str(result.get("resume") or "")
+    result["points_forts"] = result["points_forts"][:3]
+    result["points_faibles"] = result["points_faibles"][:2]
+    result["domaine"] = result["domaine"] or "Non classé"
     return result
 
 

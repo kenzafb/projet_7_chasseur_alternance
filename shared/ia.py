@@ -23,6 +23,17 @@ Erreurs, jamais d'exception brute ni de résultat inventé :
     (modèle absent, clé refusée, requête refusée). Inutile d'insister.
   - ErreurIAPassagere : 429, 5xx (retentés), délai dépassé, réponse
     illisible. L'élément en cours est sauté, il reviendra.
+  - ReponseInvalide (ErreurIAPassagere) : réponse qui ne respecte pas le
+    schéma JSON attendu, une fois retentée (appeler_structure).
+
+Réponses structurées : appeler_structure(messages, Modele) impose le
+schéma JSON du modèle Pydantic au serveur (response_format json_schema,
+qu'Ollama traduit en grammaire de sortie ; IA_FORMAT_JSON pour un serveur
+qui ne le permet pas), puis valide la réponse avec ce modèle. Le mode de
+réflexion des modèles qui en ont un est coupé (reasoning_effort "none"),
+sauf IA_REFLEXION=true. Un paramètre facultatif que le serveur refuse
+(400 qui le nomme) est retiré pour ce serveur et ce modèle, sans compter
+d'essai.
 
 ANALYSE_IA=false (shared.config.analyse_ia_active) : appeler_ia lève
 IADesactivee sans rien appeler.
@@ -34,9 +45,10 @@ import threading
 import time
 
 import httpx
+from pydantic import BaseModel, ValidationError
 
 from shared.config import (IA_DELAI_CONNEXION_S, MESSAGE_IA_DESACTIVEE, analyse_ia_active, ia_api_key,
-                           ia_base_url, ia_delai_s, modele_ia)
+                           ia_base_url, ia_delai_s, ia_format_json, ia_reflexion, modele_ia)
 
 CODES_BLOQUANTS = {400, 401, 403, 404, 422}
 
@@ -56,6 +68,10 @@ class ErreurIABloquante(ErreurIA):
 
 class ErreurIAPassagere(ErreurIA):
     """Échec ponctuel (serveur occupé, délai dépassé, réponse illisible)."""
+
+
+class ReponseInvalide(ErreurIAPassagere):
+    """Réponse hors du schéma JSON attendu, même après un second essai."""
 
 
 class IAInjoignable(ErreurIABloquante):
@@ -152,16 +168,73 @@ def _contenu(reponse: httpx.Response) -> str:
     return re.sub(r"<think>.*?</think>", "", str(texte), flags=re.DOTALL).strip()
 
 
+# Paramètres facultatifs refusés par un serveur : (IA_BASE_URL, modèle) ->
+# paramètres retirés jusqu'au redémarrage. Mots qui, dans un refus (400),
+# désignent chacun d'eux.
+_refuses: dict[tuple[str, str], set[str]] = {}
+MOTS_DES_FACULTATIFS = {
+    "reasoning_effort": ("reasoning", "think"),
+    "response_format": ("response_format", "json_schema", "schema", "format"),
+}
+
+
+def _facultatif_refuse(reponse: httpx.Response, envoyes) -> str | None:
+    """Paramètre facultatif envoyé que ce refus (400 ou 422) désigne, sinon None."""
+    if reponse.status_code not in (400, 422):
+        return None
+    detail = _detail(reponse).lower()
+    for nom in envoyes:
+        if any(mot in detail for mot in MOTS_DES_FACULTATIFS.get(nom, (nom,))):
+            return nom
+    return None
+
+
+def format_reponse(schema: type[BaseModel]) -> dict | None:
+    """response_format imposé pour ce schéma, selon IA_FORMAT_JSON."""
+    choix = ia_format_json()
+    if choix == "schema":
+        return {"type": "json_schema",
+                "json_schema": {"name": schema.__name__, "schema": schema.model_json_schema(), "strict": True}}
+    if choix == "json":
+        return {"type": "json_object"}
+    return None
+
+
+def facultatifs_par_defaut(schema: type[BaseModel] | None = None) -> dict:
+    """Réflexion coupée (sauf IA_REFLEXION=true), format de sortie imposé."""
+    facultatifs = {} if ia_reflexion() else {"reasoning_effort": "none"}
+    if schema is not None and (fmt := format_reponse(schema)):
+        facultatifs["response_format"] = fmt
+    return facultatifs
+
+
+def _envoyer(url: str, modele: str, corps: dict, facultatifs: dict) -> httpx.Response:
+    """Un essai : envoie corps et les facultatifs que ce serveur accepte ;
+    un facultatif refusé est retiré et la requête renvoyée aussitôt."""
+    retires = _refuses.setdefault((ia_base_url(), modele), set())
+    while True:
+        envoyes = {k: v for k, v in facultatifs.items() if k not in retires}
+        with verrou:
+            reponse = _poster(url, {**corps, **envoyes}, _entetes(), ia_delai_s())
+        refuse = _facultatif_refuse(reponse, envoyes)
+        if not refuse:
+            return reponse
+        retires.add(refuse)
+        print(f"  ℹ️  Le serveur d'IA refuse « {refuse} » avec « {modele} » : paramètre retiré.")
+
+
 def appeler_ia(messages, *, usage="analyse", modele=None, tentatives=2, attente=lambda n: 5 * n,
-               on_attente=None, **options) -> str:
+               on_attente=None, facultatifs=None, **options) -> str:
     """
     Envoie messages au modèle de l'usage (ou `modele`) et renvoie le texte de
     la réponse. Retente les erreurs passagères du serveur (429, 5xx, réseau).
 
-    tentatives : nombre total d'essais (1 = pas de retry)
-    attente    : fonction n° de tentative échouée -> secondes d'attente
-    on_attente : callback (tentative, tentatives, secondes) avant chaque pause
-    options    : ajoutées telles quelles au corps (temperature, max_tokens...)
+    tentatives  : nombre total d'essais (1 = pas de retry)
+    attente     : fonction n° de tentative échouée -> secondes d'attente
+    on_attente  : callback (tentative, tentatives, secondes) avant chaque pause
+    facultatifs : paramètres retirés si le serveur les refuse (défaut :
+                  facultatifs_par_defaut(), réflexion coupée)
+    options     : ajoutées telles quelles au corps (temperature, max_tokens...)
 
     Lève ErreurIABloquante tout de suite (IAInjoignable si le serveur ne
     répond pas), ErreurIAPassagere une fois les tentatives épuisées.
@@ -170,12 +243,12 @@ def appeler_ia(messages, *, usage="analyse", modele=None, tentatives=2, attente=
     if not analyse_ia_active():
         raise IADesactivee(MESSAGE_IA_DESACTIVEE)
     modele = modele or modele_ia(usage)
+    facultatifs = facultatifs_par_defaut() if facultatifs is None else facultatifs
     corps = {"model": modele, "messages": messages, "stream": False, **options}
     url = f"{ia_base_url()}/chat/completions"
     for tentative in range(1, tentatives + 1):
         try:
-            with verrou:
-                reponse = _poster(url, corps, _entetes(), ia_delai_s())
+            reponse = _envoyer(url, modele, corps, facultatifs)
         except httpx.HTTPError as err:
             erreur, a_retenter = classer_exception(err, modele)
         else:
@@ -188,6 +261,50 @@ def appeler_ia(messages, *, usage="analyse", modele=None, tentatives=2, attente=
         if on_attente:
             on_attente(tentative, tentatives, secondes)
         time.sleep(secondes)
+
+
+def _objet_json(texte: str):
+    """Objet JSON d'un texte : tel quel, sans blocs ```json, ou entre la
+    première accolade ouvrante et la dernière fermante."""
+    texte = re.sub(r"```(?:json)?\s*", "", texte or "").strip()
+    try:
+        return json.loads(texte)
+    except ValueError:
+        debut, fin = texte.find("{"), texte.rfind("}")
+        if 0 <= debut < fin:
+            try:
+                return json.loads(texte[debut:fin + 1])
+            except ValueError:
+                pass
+    return None
+
+
+def lire_structure(texte: str, schema: type[BaseModel]) -> BaseModel:
+    """Réponse validée par le modèle Pydantic ; ReponseInvalide sinon."""
+    donnees = _objet_json(texte)
+    if not isinstance(donnees, dict):
+        raise ReponseInvalide(f"Réponse de l'IA illisible (objet JSON {schema.__name__} attendu)")
+    try:
+        return schema.model_validate(donnees)
+    except ValidationError as err:
+        champs = ", ".join(sorted({".".join(map(str, e["loc"])) or "?" for e in err.errors()}))
+        raise ReponseInvalide(f"Réponse de l'IA hors du schéma {schema.__name__} (champs : {champs})") from None
+
+
+def appeler_structure(messages, schema: type[BaseModel], *, usage="analyse", modele=None, essais=2,
+                      **options) -> BaseModel:
+    """appeler_ia avec le schéma JSON de `schema` imposé, réponse validée.
+    Une réponse invalide est redemandée (essais au total, 2 par défaut),
+    puis ReponseInvalide : l'élément est sauté, rien n'est inventé."""
+    for essai in range(1, essais + 1):
+        texte = appeler_ia(messages, usage=usage, modele=modele, facultatifs=facultatifs_par_defaut(schema),
+                           **options)
+        try:
+            return lire_structure(texte, schema)
+        except ReponseInvalide as err:
+            if essai >= essais:
+                raise
+            print(f"  ⚠️  {err} : nouvel essai.")
 
 
 def lister_modeles() -> list[str]:

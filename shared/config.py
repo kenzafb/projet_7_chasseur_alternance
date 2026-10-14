@@ -159,6 +159,21 @@ def ia_delai_s() -> float:
 # Attente maximale de l'ouverture de la connexion : au-delà, serveur injoignable
 IA_DELAI_CONNEXION_S = 10
 
+# Format de sortie imposé au serveur : "schema" (schéma JSON du modèle
+# Pydantic, sortie contrainte par Ollama), "json" (objet JSON quelconque),
+# "aucun" (rien d'imposé, la réponse est seulement validée). Défaut : schema
+FORMATS_JSON = ("schema", "json", "aucun")
+
+def ia_format_json() -> str:
+    valeur = os.getenv("IA_FORMAT_JSON", "").strip().lower()
+    return valeur if valeur in FORMATS_JSON else "schema"
+
+def ia_reflexion() -> bool:
+    """Mode de réflexion des modèles qui en ont un (Qwen 3...) : coupé par
+    défaut (IA_REFLEXION=false), il multiplie le temps de réponse sans
+    améliorer un résultat aussi court."""
+    return os.getenv("IA_REFLEXION", "").strip().lower() in ("1", "true", "oui", "yes")
+
 # ─── Géographie (Île-de-France) ───────────────────────────────────────────────
 # France Travail : code région INSEE de l'Île-de-France
 FT_REGION = "11"

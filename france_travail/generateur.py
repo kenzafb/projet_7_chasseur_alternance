@@ -1,8 +1,8 @@
 import re
-import json
 import string
 from database.dates import maintenant_affichage
-from shared.ia import ErreurIAPassagere, appeler_ia
+from shared.ia import appeler_structure
+from shared.schemas_ia import LettreIA
 from shared.erreurs import ErreurUtilisateur, exiger_profil, CHAMPS_IDENTITE
 
 # ─── Lettre de motivation fixe ────────────────────────────────────────────────
@@ -212,23 +212,16 @@ def generer_lettre(offre, profil, mode="alternance"):
     )
 
 
-    # Un seul essai, pas de retry (comportement historique). ErreurIABloquante
-    # et ErreurIAPassagere remontent : pas de lettre sans paragraphe rédigé.
-    texte = appeler_ia(
+    # Réponse hors schéma redemandée une fois. ErreurIABloquante et
+    # ErreurIAPassagere remontent : pas de lettre sans paragraphe rédigé.
+    reponse = appeler_structure(
         [{"role": "user", "content": prompt}],
+        LettreIA,
         usage="lettre",
-        tentatives=1,
-        response_format={"type": "json_object"},
         temperature=0.6,
     )
-    texte = re.sub(r'```json\s*', '', texte)
-    texte = re.sub(r'```\s*', '', texte).strip()
-    result = json_parse(texte)
-    if not isinstance(result, dict):
-        result = {}
-
-    contact    = result.get("contact_entreprise", nom_entreprise)
-    paragraphe = result.get("paragraphe_entreprise", "")
+    contact    = reponse.contact_entreprise or nom_entreprise
+    paragraphe = reponse.paragraphe_entreprise   # jamais vide (schéma)
 
     # ── Nettoyage défensif du bloc contact ────────────────────────────────
     contact = _nettoyer_contact(contact)
@@ -242,40 +235,9 @@ def generer_lettre(offre, profil, mode="alternance"):
         if ville:
             contact += "\n" + ville
 
-    # ── Paragraphe manquant : pas de lettre incomplète ────────────────────
-    if not paragraphe:
-        raise ErreurIAPassagere(
-            "L'IA n'a pas rédigé le paragraphe sur l'entreprise : réessaie.")
-
     lettre = template.format(
         contact_entreprise=contact,
         date=_date_du_jour(),
         paragraphe_entreprise=paragraphe,
     )
     return lettre
-
-
-def json_parse(texte):
-    """
-    Parse JSON avec double fallback :
-    1. json.loads direct
-    2. Extraction regex si le JSON est tronqué (ex: string non fermée)
-    """
-    try:
-        return json.loads(texte)
-    except Exception:
-        pass
-
-    # Fallback : extraction champ par champ avec regex
-    result = {}
-    for champ in ("contact_entreprise", "paragraphe_entreprise"):
-        m = re.search(rf'"{champ}"\s*:\s*"((?:[^"\\]|\\.)*)"', texte)
-        if m:
-            result[champ] = m.group(1).replace("\\n", "\n")
-
-    if result:
-        print(f"  [json_parse] récupération partielle via regex : {list(result.keys())}")
-        return result
-
-    print(f"  ⚠️  json_parse échec total — texte reçu : {texte[:300]!r}")
-    return {}
