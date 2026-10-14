@@ -69,7 +69,7 @@ def test_prompt_de_lettre_neutre_et_fonde_sur_le_profil(ia):
     texte = _prompts(ia)
     assert "personne candidate" in texte and "neutre" in texte
     assert "Excel, Accueil" in texte                       # bagage réel du profil
-    assert "n'invente rien" in texte
+    assert "n'invente pas de lien" in texte
 
 
 def test_analyse_job_tire_les_preferences_du_profil(ia):
@@ -159,19 +159,60 @@ def test_paragraphe_par_le_modele_de_lettre(ia, mode):
     assert _paragraphe(PROFIL, mode) == "ACME, votre contexte me parle."
     assert ia.appels[-1]["model"] == "ministral-3:8b"
     assert ia.appels[-1]["format"]["title"] == "ParagrapheIA" and ia.appels[-1]["options"]["temperature"] == 0.6
-    assert f"candidate à {generateur.POSTE_PAR_MODE[mode]}" in ia.textes()
+    assert f"lettre de motivation pour {generateur.POSTE_PAR_MODE[mode]}" in ia.textes()
 
 
 def test_prompt_du_paragraphe(ia):
-    generateur.rediger_paragraphe(OFFRE, {**PROFIL, "missions": "MISSIONS-VISEES"}, "stage", lettre_type=LETTRE_TYPE)
+    """D109 : paragraphe IPv6 impersonnel, qui reprenait des projets de la lettre type et inventait des liens."""
+    lettre_type = LETTRE_TYPE.replace("J'aime {entreprise}.", "J'ai installé Arch Linux et créé le Chasseur.")
+    generateur.rediger_paragraphe(OFFRE, {**PROFIL, "missions": "MISSIONS-VISEES"}, "stage", lettre_type=lettre_type)
     texte = ia.textes(0)
-    for attendu in ("MISSIONS-VISEES", "Vente en magasin", "3 à 5 phrases", "première personne",
-                    "ce qui l'attire dans cette entreprise et ce poste", "élément réel de son profil",
-                    "pas de formule de politesse",
-                    "ni markdown, ni tiret cadratin, ni esperluette, ni le mot « expertise »",
-                    "J'aime", '{"paragraphe": "<le paragraphe>"}'):
+    for attendu in ("=== CE QUE LA PERSONNE VISE ===\n- Missions visées : MISSIONS-VISEES", "Vente en magasin",
+                    "=== SA LETTRE TYPE, DÉJÀ ÉCRITE ===", "J'ai installé Arch Linux et créé le Chasseur.",
+                    "ne cite aucun fait, projet ou expérience qui figure déjà dans sa lettre type",
+                    "2 ou 3 phrases, 60 mots au plus", "« je », « me », « mon »",
+                    "aucune tournure impersonnelle", "« correspondent à », « renforcent »",
+                    "ce qui l'attire précisément dans cette mission ou cette entreprise, d'après le texte de l'offre",
+                    "pourquoi cela rejoint ce qu'elle vise", "pas de liste de compétences",
+                    "aucun intérêt ni aucune compétence absents de son profil", "pas de formule de politesse",
+                    "ni markdown, ni tiret cadratin, ni esperluette, ni le mot « expertise »"):
         assert attendu in texte, attendu
-    assert "{paragraphe}" not in texte and "{entreprise}" not in texte   # balises retirées du rappel de la lettre
+    assert "{paragraphe}" not in texte and "{entreprise}" not in texte   # balises retirées de la lettre type
+
+
+@pytest.mark.parametrize("mode, attendu", [("stage", "Missions visées : MISSIONS"), ("job", "Types de jobs qui conviennent : TYPES-OK-DU-PROFIL"),
+                                           ("alternance", "Domaines : Systèmes d'information")])
+def test_ce_que_la_personne_vise_par_mode(mode, attendu):
+    profil = {**PROFIL, "missions": "MISSIONS", "recherche": {"domaines": ["M18"]}}
+    assert attendu in generateur.ce_qui_est_vise(profil, mode)
+
+
+LONG = " ".join(["mot"] * 85) + "."
+
+
+def test_trop_long_redemande_une_fois(ia):
+    ia.file = ['{"paragraphe": "%s"}' % LONG, '{"paragraphe": "Ce poste me plaît."}']
+    texte, avertissement = generateur.rediger_paragraphe_verifie(OFFRE, PROFIL, lettre_type=LETTRE_TYPE)
+    assert (texte, avertissement) == ("Ce poste me plaît.", "") and len(ia.appels) == 2
+
+
+def test_encore_trop_long_garde_avec_avertissement(ia):
+    ia.reponse = '{"paragraphe": "%s"}' % LONG
+    texte, avertissement = generateur.rediger_paragraphe_verifie(OFFRE, PROFIL, lettre_type=LETTRE_TYPE)
+    assert texte == LONG and len(ia.appels) == 2
+    assert avertissement.startswith("Paragraphe long (85 mots, 80 au plus attendus)")
+
+
+def test_route_renvoie_l_avertissement(utilisateur, ia):
+    from database.candidatures_db import ajouter_candidature
+    client, uid = utilisateur("a@test.fr", prenom="Alice")
+    client.post("/api/profil", json={**PROFIL, "lettre_type": LETTRE_TYPE})
+    ajouter_candidature(uid, {"id": "R1", "titre": "Dev", "entreprise": "ACME"})
+    ia.reponse = '{"paragraphe": "%s"}' % LONG
+    r = client.post("/api/lettre/paragraphe", json={"id": "R1"}).json()
+    assert r["paragraphe"] == LONG and "85 mots" in r["avertissement"]
+    ia.reponse = '{"paragraphe": "Ce poste me plaît."}'
+    assert client.post("/api/lettre/paragraphe", json={"id": "R1"}).json()["avertissement"] == ""
 
 
 def test_assemblage_en_python():
@@ -255,8 +296,8 @@ def test_code_actif_sans_mention_d_un_utilisateur_reel():
 def test_consignes_de_la_lettre(ia):
     _paragraphe(PROFIL, "stage")
     texte = _prompts(ia)
-    assert "première personne" in texte and "jamais « vous » pour parler d'elle" in texte
-    assert "ne cite que des compétences et outils présents dans le profil ou l'offre" in texte
+    assert "première personne" in texte and "c'est elle qui parle" in texte
+    assert "aucun intérêt ni aucune compétence absents de son profil" in texte
     assert "« expertise »" in texte and "ni markdown" in texte
 
 

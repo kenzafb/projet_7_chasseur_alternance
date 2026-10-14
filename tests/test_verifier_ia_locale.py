@@ -200,3 +200,10 @@ def test_lettre_par_la_ligne_de_commande(profil_complet, ia):
     assert code == 0 and "Développeur 3" in sortie and "A = ministral-3:8b" in sortie
     code, sortie = lancer("--lettre", "--offre", "INCONNUE")
     assert code == 1 and "Offre introuvable : INCONNUE" in sortie
+
+
+
+def test_lettre_affiche_le_nombre_de_mots(profil_complet, ia):
+    ia.panne = _lettre
+    code, sortie = lancer("--lettre", "--modeles", "m1", "--offre", "R1")
+    assert code == 0 and "Texte de m1.\n(3 mots)" in sortie

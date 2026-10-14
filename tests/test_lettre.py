@@ -59,7 +59,7 @@ def test_lettre_type_valide_balises_avec_espaces(ada, ia):
     ada.post("/api/profil", json={**PROFIL_COMPLET,
                                   "lettre_type": "{ contact_entreprise }\nLe {date}\n{ paragraphe }"})
     r = ada.post("/api/lettre/paragraphe", json={"id": "OFFRE-1"})
-    assert r.status_code == 200 and r.json() == {"paragraphe": "ACME, votre contexte me parle."}
+    assert r.status_code == 200 and r.json() == {"paragraphe": "ACME, votre contexte me parle.", "avertissement": ""}
     assert len(ia.appels) == 1   # le faux client a bien servi
 
 

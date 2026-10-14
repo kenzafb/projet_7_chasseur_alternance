@@ -51,7 +51,7 @@ from database.dates import maintenant_utc
 # ─── Modules métier ───────────────────────────────────────────────
 from france_travail.main import lancer_recherche
 from france_travail.generateur import (A_COMPLETER, assembler_lettre, lettre_par_defaut, marqueurs_a_completer,
-                                      rediger_paragraphe)
+                                      rediger_paragraphe_verifie)
 from france_travail.analyseur import analyser_offre, marquer_non_analysee
 from france_travail.analyse_differee import analyser_en_attente, duree_lisible, enregistrer_analyse, estimation_file
 from shared.ia import ErreurIA, ErreurIABloquante
@@ -706,7 +706,8 @@ def api_lettre_paragraphe(body: OffreId, user: User = Depends(utilisateur_requis
         return JSONResponse({"erreur": "Rédaction du paragraphe indisponible : l'IA est désactivée "
                                        "(ANALYSE_IA=false). Écris le paragraphe toi-même, puis insère-le."},
                             status_code=503)
-    return {"paragraphe": rediger_paragraphe(offre, profil, mode=mode)}
+    paragraphe, avertissement = rediger_paragraphe_verifie(offre, profil, mode=mode)
+    return {"paragraphe": paragraphe, "avertissement": avertissement}
 
 @prive.post("/api/lettre/assembler")
 def api_lettre_assembler(body: Assembler, user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):

@@ -104,10 +104,12 @@ const modal = {
     tic();
     this.attendre(true);
     try {
-      const { paragraphe } = await api.paragrapheLettre(id);
+      const { paragraphe, avertissement } = await api.paragrapheLettre(id);
       if (this.id !== id) return;
       this.para().value = paragraphe;
-      this.etat().textContent = "Relis et modifie le paragraphe, puis insère-le dans ta lettre type.";
+      // Plus de 80 mots même après un second essai : gardé, avec un avertissement (D109)
+      this.etat().textContent = avertissement
+        ? "⚠️ " + avertissement : "Relis et modifie le paragraphe, puis insère-le dans ta lettre type.";
     } catch (e) {
       // Lettre type absente, sans {paragraphe}, IA indisponible : message, rien d'inventé
       this.etat().textContent = "";

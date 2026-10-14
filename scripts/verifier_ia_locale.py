@@ -26,8 +26,9 @@ par l'humain, Ollama démarré :
 
 --lettre : à la place, pour une offre (--offre <id>, sinon la plus récente
 des offres non analysées), rédige le paragraphe personnalisé de la lettre
-type (D106 : celle du profil, sinon l'exemple du mode) avec chaque
-modèle et affiche les textes sous des étiquettes A, B, C... tirées au
+type (D106, D109 : celle du profil, sinon l'exemple du mode ; 2 ou 3
+phrases, 60 mots visés, redemandé au-delà de 80) avec chaque modèle,
+avec son nombre de mots et affiche les textes sous des étiquettes A, B, C... tirées au
 hasard ; la correspondance étiquette-modèle n'est donnée qu'à la toute fin,
 pour une lecture à l'aveugle.
 
@@ -153,7 +154,7 @@ def comparer_lettres(o: dict, modeles: list[str], sortie=print, tirage=None) -> 
     import random
 
     from france_travail.generateur import (LettreTypeInvalide, exiger_lettre_type, lettre_par_defaut,
-                                           rediger_paragraphe)
+                                           nombre_de_mots, rediger_paragraphe_verifie)
     from shared import ia
     from shared.ia import ErreurIA, ErreurIABloquante
 
@@ -170,8 +171,11 @@ def comparer_lettres(o: dict, modeles: list[str], sortie=print, tirage=None) -> 
         try:
             ia.verifier_demarrage(modele)
             debut = time.monotonic()
-            textes[modele] = (rediger_paragraphe(o["offre"], o["profil"], o["mode"], modele, essais=1,
-                                                 lettre_type=lettre_type), _secondes(debut))
+            texte, avertissement = rediger_paragraphe_verifie(o["offre"], o["profil"], o["mode"], modele, essais=1,
+                                                              lettre_type=lettre_type)
+            # Nombre de mots et dépassement : visibles à l'aveugle, ils ne révèlent pas le modèle
+            note = f"({nombre_de_mots(texte)} mots{', trop long même après un second essai' if avertissement else ''})"
+            textes[modele] = (f"{texte}\n{note}", _secondes(debut))
         except ErreurIABloquante as e:
             sortie(f"  ❌ {modele} : {e}")
         except ErreurIA as e:
