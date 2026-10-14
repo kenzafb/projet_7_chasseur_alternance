@@ -73,36 +73,58 @@ def test_sans_ia_douteux_non_valides(ia):
     assert ia.appels == []
 
 
-def test_ia_seulement_pour_les_douteux(ia):
-    ia.file = ['{"valide": true}', '{"valide": false}']
+def test_un_appel_par_entreprise_pour_les_douteux(ia):
+    ia.reponse = '{"valides": ["gerant@gmail.com"], "meilleur_contact": "gerant@gmail.com"}'
     tri = ve.trier(["contact@acme.fr", "gerant@gmail.com", "contact@agence.fr"], "acme.fr", nom="ACME",
                    texte="Le gérant : gerant@gmail.com. Site réalisé par contact@agence.fr")
     assert tri["valides"] == ["contact@acme.fr", "gerant@gmail.com"] and tri["douteux"] == []
     assert tri["ecartes"] == [("contact@agence.fr", "écartée par l'IA (autre domaine que le site)")]
-    assert len(ia.appels) == 2 and ia.appels[0]["model"] == "ministral-3:3b"
+    assert tri["meilleur_contact"] == "gerant@gmail.com"
+    assert len(ia.appels) == 1 and ia.appels[0]["model"] == "ministral-3:3b"
     texte = ia.textes(0)
-    assert "Entreprise : ACME" in texte and "Adresse : gerant@gmail.com" in texte and "Le gérant" in texte
-    assert ia.appels[0]["format"]["title"] == "ValidationEmail"
+    assert "Entreprise : ACME" in texte and "- gerant@gmail.com : « Le gérant" in texte
+    assert "contact@acme.fr" in texte                      # proposée comme meilleur contact
+    corps = ia.appels[0]
+    assert corps["options"]["temperature"] == 0.1
+    proprietes = corps["format"]["properties"]
+    assert proprietes["valides"]["items"]["enum"] == ["gerant@gmail.com", "contact@agence.fr"]
+    assert proprietes["meilleur_contact"]["enum"] == ["contact@acme.fr", "gerant@gmail.com", "contact@agence.fr", None]
 
 
-def test_ia_bloquante_coupee_pour_la_suite(ia):
+def test_pas_d_appel_sans_douteuse(ia):
+    tri = ve.trier(["contact@acme.fr"], "acme.fr")
+    assert tri["valides"] == ["contact@acme.fr"] and ia.appels == [] and tri["meilleur_contact"] is None
+
+
+@pytest.mark.parametrize("reponse", [
+    '{"valides": ["inventee@x.fr"], "meilleur_contact": null}',     # adresse hors énumération
+    '{"valides": [], "meilleur_contact": "inventee@x.fr"}',
+    '{"valides": "a@gmail.com", "meilleur_contact": null}',
+])
+def test_adresse_inventee_refusee(ia, reponse):
+    ia.reponse = reponse
+    tri = ve.trier(["a@gmail.com"], "acme.fr")
+    assert tri["douteux"] == ["a@gmail.com"] and tri["valides"] == [] and len(ia.appels) == 2   # redemandée
+
+
+def test_meilleur_contact_ecarte_ignore(ia):
+    ia.reponse = '{"valides": [], "meilleur_contact": "a@gmail.com"}'
+    tri = ve.trier(["a@gmail.com"], "acme.fr")
+    assert tri["meilleur_contact"] is None and tri["ecartes"][0][0] == "a@gmail.com"
+
+
+def test_ia_bloquante_douteuses_gardees(ia):
     ia.panne = lambda corps: httpx.ConnectError("refused")
     tri = ve.trier(["a@gmail.com", "b@gmail.com"], "acme.fr")
     assert tri["douteux"] == ["a@gmail.com", "b@gmail.com"] and len(ia.demarrages) == 1 and ia.appels == []
     assert "IA locale injoignable" in tri["ia_bloquee"]
 
 
-def test_ia_passagere_adresse_seulement(ia):
-    ia.file = [erreur_http(503), erreur_http(503), '{"valide": true}']
+def test_ia_passagere_douteuses_gardees(ia):
+    ia.file = [erreur_http(503), erreur_http(503)]
     tri = ve.trier(["a@gmail.com", "b@gmail.com"], "acme.fr")
-    assert tri["douteux"] == ["a@gmail.com"] and tri["valides"] == ["b@gmail.com"]
-    assert "erreur_ia" in tri
-
-
-def test_reponse_invalide_reste_douteuse(ia):
-    ia.reponse = '{"valide": "peut-être"}'
-    tri = ve.trier(["a@gmail.com"], "acme.fr")
-    assert tri["douteux"] == ["a@gmail.com"] and len(ia.appels) == 2   # redemandée une fois
+    assert tri["douteux"] == ["a@gmail.com", "b@gmail.com"] and "erreur_ia" in tri
+    assert set(tri["contextes"]) == {"a@gmail.com", "b@gmail.com"}
 
 
 def test_entreprise_d_avant_la_phase_7():

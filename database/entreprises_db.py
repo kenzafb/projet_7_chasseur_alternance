@@ -236,7 +236,7 @@ _CHAMPS_EXTRA_REMONTES = ["nom", "url_scrapee", "source_recherche"]
 # page autour de chacune, pour la validation par l'IA plus tard
 # (shared/validation_emails.py)
 _CHAMPS_EXTRA_SCRAPER = ("telephone", "url_scrapee", "source_recherche", "tentatives_site",
-                         "emails_non_valides", "emails_douteux", "contextes_emails")
+                         "emails_non_valides", "emails_douteux", "contextes_emails", "meilleur_contact")
 
 
 def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
@@ -272,6 +272,7 @@ def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
     d["emails_non_valides"] = bool(extra.get("emails_non_valides"))
     d["emails_douteux"] = extra.get("emails_douteux")   # None : avant la phase 7
     d["contextes_emails"] = dict(extra.get("contextes_emails") or {})
+    d["meilleur_contact"] = extra.get("meilleur_contact")
     # On garde extra complet aussi, au cas où
     d["_extra"] = extra
     d["_id"] = e.id   # id technique en base, pour réécrire précisément

@@ -12,8 +12,10 @@ messageries grand public), en plus de la liste d'exclusion de D47
   - validée d'office : même domaine que le site de l'entreprise et préfixe
     de contact ou de recrutement (contact@, rh@, recrutement@...) ;
   - douteuse : tout le reste (autre domaine, messagerie grand public,
-    adresse nominative). L'IA (modèle d'extraction) tranche, à partir du
-    texte qui entoure l'adresse sur la page ; sans IA, l'adresse reste
+    adresse nominative). L'IA (modèle d'extraction) tranche en un appel par
+    entreprise, à partir du texte qui entoure chaque adresse sur la page, et
+    désigne le meilleur contact (énumérations construites à partir des
+    adresses trouvées, revérifiées en Python) ; sans IA, l'adresse reste
     « non validée » : jamais envoyée automatiquement (D15), à valider à la
     main ou à repasser à l'IA plus tard.
 
@@ -101,73 +103,93 @@ def contexte(email: str, texte: str, rayon: int = RAYON_CONTEXTE) -> str:
     return " ".join(extrait.split())
 
 
-def messages_validation(email: str, nom: str, domaine_site: str | None, extrait: str) -> list[dict]:
-    """Prompt court pour le modèle d'extraction (un petit modèle)."""
+def messages_avis(nom: str, domaine_site: str | None, douteuses: list[str], trouvees: list[str],
+                  extraits: dict) -> list[dict]:
+    """Prompt court pour le modèle d'extraction (un petit modèle) : toutes les
+    adresses douteuses d'une entreprise, avec le texte qui les entoure."""
+    lignes = "\n".join(f"- {a} : « {extraits.get(a) or 'texte autour non disponible'} »" for a in douteuses)
     prompt = (
-        "Une adresse email a été trouvée sur le site d'une entreprise. Peut-on s'en servir pour lui "
-        "envoyer une candidature spontanée ?\n\n"
+        "Des adresses email ont été trouvées sur le site d'une entreprise. Lesquelles peut-on utiliser pour "
+        "lui envoyer une candidature spontanée ?\n\n"
         f"Entreprise : {nom or 'inconnue'}\n"
         f"Site de l'entreprise : {domaine_site or 'inconnu'}\n"
-        f"Adresse : {email}\n"
-        f"Texte autour de l'adresse sur la page : « {extrait or 'non disponible'} »\n\n"
-        "valide = true si l'adresse appartient à cette entreprise (ou à son groupe) et permet de la "
-        "joindre : contact, accueil, recrutement, dirigeant ou responsable.\n"
-        "valide = false si elle appartient à un autre organisme (agence web, hébergeur, annuaire, "
-        "client, partenaire, fournisseur), si c'est une adresse technique ou d'exemple, ou en cas de doute.\n\n"
-        'Réponds uniquement avec cet objet JSON : {"valide": <true ou false>}'
+        f"Toutes les adresses trouvées : {', '.join(trouvees)}\n\n"
+        f"Adresses à juger, avec le texte qui les entoure sur la page :\n{lignes}\n\n"
+        "valides : les adresses à juger qui appartiennent à cette entreprise (ou à son groupe) et "
+        "permettent de la joindre (contact, accueil, recrutement, dirigeant ou responsable). Laisse de côté "
+        "celles d'un autre organisme (agence web, hébergeur, annuaire, client, partenaire, fournisseur), "
+        "les adresses techniques ou d'exemple, et celles qui laissent un doute.\n"
+        "meilleur_contact : parmi toutes les adresses trouvées, la meilleure pour candidater, ou null.\n\n"
+        'Réponds uniquement avec cet objet JSON : {"valides": [<adresses>], "meilleur_contact": <adresse ou null>}'
     )
     return [{"role": "system", "content": "Tu vérifies des adresses email. Tu réponds uniquement par un objet "
                                           "JSON valide, sans texte autour."},
             {"role": "user", "content": prompt}]
 
 
-def valider_par_ia(email: str, nom: str, domaine_site: str | None, extrait: str, modele=None,
-                   essais: int = 2) -> bool:
-    """Avis du modèle d'extraction sur une adresse douteuse. Les erreurs de
-    l'IA remontent (ErreurIABloquante, ErreurIAPassagere) : l'adresse reste
-    alors douteuse."""
+def avis_ia(nom: str, domaine_site: str | None, douteuses: list[str], trouvees: list[str],
+            extraits: dict | None = None, modele=None, essais: int = 2) -> tuple[list[str], str | None]:
+    """Avis du modèle d'extraction sur les adresses douteuses d'une entreprise,
+    en un appel : (douteuses retenues, meilleur contact parmi les adresses
+    trouvées ou None). Énumérations imposées par le schéma, revérifiées en
+    Python. Les erreurs de l'IA remontent (ErreurIABloquante,
+    ErreurIAPassagere) : les adresses restent alors douteuses."""
     from shared.ia import appeler_structure
-    from shared.schemas_ia import ValidationEmail
-    return appeler_structure(messages_validation(email, nom, domaine_site, extrait), ValidationEmail,
-                             usage="extraction", modele=modele, essais=essais, temperature=0.1).valide
+    from shared.schemas_ia import modele_avis_emails
+    trouvees = list(dict.fromkeys([*trouvees, *douteuses]))
+    avis = appeler_structure(messages_avis(nom, domaine_site, douteuses, trouvees, extraits or {}),
+                             modele_avis_emails(douteuses, trouvees), usage="extraction", modele=modele,
+                             essais=essais, temperature=0.1)
+    valides = [a for a in dict.fromkeys(avis.valides) if a in douteuses]
+    meilleur = avis.meilleur_contact if avis.meilleur_contact in trouvees else None
+    return valides, meilleur
 
 
 def trier(emails, domaine_site: str | None, nom: str = "", texte: str = "", ia: bool = True,
-          contextes: dict | None = None, log=None) -> dict:
-    """Trie des adresses : règles, puis IA pour les douteuses (ia=True).
+          contextes: dict | None = None, log=None, deja_valides=()) -> dict:
+    """Trie des adresses : règles, puis un appel à l'IA (ia=True) pour toutes
+    les douteuses de l'entreprise.
     texte : texte des pages lues (pour l'extrait autour de chaque adresse) ;
-    contextes : extraits déjà connus {adresse: texte} (validation ultérieure).
+    contextes : extraits déjà connus {adresse: texte} (validation ultérieure) ;
+    deja_valides : adresses déjà validées, proposées comme meilleur contact.
     Retourne {"valides", "douteux", "ecartes" [(adresse, raison)],
-    "contextes" (des douteuses restantes), "ia_bloquee" ou "erreur_ia"
-    (message) si l'IA a échoué}. Une erreur bloquante coupe l'IA pour les
-    adresses suivantes, une passagère seulement pour l'adresse en cours."""
+    "contextes" (des douteuses restantes), "meilleur_contact", "ia_bloquee"
+    ou "erreur_ia" (message) si l'IA a échoué : les douteuses le restent."""
     from shared.ia import ErreurIABloquante, ErreurIAPassagere
     contextes = dict(contextes or {})
-    resultat = {"valides": [], "douteux": [], "ecartes": [], "contextes": {}}
+    resultat = {"valides": [], "douteux": [], "ecartes": [], "contextes": {}, "meilleur_contact": None}
+    raisons = {}
     for email in dict.fromkeys(e.strip().lower() for e in emails or [] if e and e.strip()):
         decision, raison = classer(email, domaine_site)
         if decision == ECARTE:
             resultat["ecartes"].append((email, raison))
-            continue
-        if decision == VALIDE:
+        elif decision == VALIDE:
             resultat["valides"].append(email)
-            continue
-        extrait = contextes.get(email) or contexte(email, texte)
-        if ia and "ia_bloquee" not in resultat:
-            try:
-                if valider_par_ia(email, nom, domaine_site, extrait):
+        else:
+            raisons[email] = raison
+            resultat["contextes"][email] = contextes.get(email) or contexte(email, texte)
+    douteuses = list(raisons)
+    if ia and douteuses:
+        try:
+            retenues, meilleur = avis_ia(nom, domaine_site, douteuses, [*deja_valides, *resultat["valides"]],
+                                         resultat["contextes"])
+        except ErreurIABloquante as e:
+            resultat["ia_bloquee"] = str(e)
+        except ErreurIAPassagere as e:
+            resultat["erreur_ia"] = str(e)
+        else:
+            for email in douteuses:
+                if email in retenues:
                     resultat["valides"].append(email)
                     if log:
-                        log(f"    IA : {email} validée ({raison})")
+                        log(f"    IA : {email} validée ({raisons[email]})")
                 else:
-                    resultat["ecartes"].append((email, f"écartée par l'IA ({raison})"))
-                continue
-            except ErreurIABloquante as e:
-                resultat["ia_bloquee"] = str(e)
-            except ErreurIAPassagere as e:
-                resultat["erreur_ia"] = str(e)
-        resultat["douteux"].append(email)
-        resultat["contextes"][email] = extrait
+                    resultat["ecartes"].append((email, f"écartée par l'IA ({raisons[email]})"))
+            douteuses = []
+            if meilleur in [*deja_valides, *resultat["valides"]]:
+                resultat["meilleur_contact"] = meilleur
+    resultat["douteux"] = douteuses
+    resultat["contextes"] = {a: resultat["contextes"][a] for a in douteuses}
     return resultat
 
 

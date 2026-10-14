@@ -133,7 +133,7 @@ def main(argv=None, sortie=print) -> int:
     from france_travail.analyseur import analyser_offre
     from shared import ia
     from shared.ia import ErreurIA, ErreurIABloquante, ErreurIAPassagere, IAInjoignable, ReponseInvalide
-    from shared.validation_emails import valider_par_ia
+    from shared.validation_emails import avis_ia
 
     if not config.analyse_ia_active():
         sortie("ℹ️  ANALYSE_IA=false dans le .env : ignoré pour ce test (rien n'est écrit en base).")
@@ -220,9 +220,11 @@ def main(argv=None, sortie=print) -> int:
         if modele_email:
             debut = time.monotonic()
             try:
-                avis = valider_par_ia(cas["email"], cas["nom"], cas["domaine_site"], cas["contexte"],
-                                      modele=modele_email, essais=1)
-                ligne = [modele_email, cas["email"], _secondes(debut), "oui", "valide" if avis else "écartée"]
+                retenues, meilleur = avis_ia(cas["nom"], cas["domaine_site"], [cas["email"]], [],
+                                             {cas["email"]: cas["contexte"]}, modele=modele_email, essais=1)
+                avis = "valide" if retenues else "écartée"
+                ligne = [modele_email, cas["email"], _secondes(debut), "oui",
+                         avis + (", meilleur contact" if meilleur == cas["email"] else "")]
                 valides += 1
             except ReponseInvalide:
                 ligne = [modele_email, cas["email"], _secondes(debut), "non", "-"]

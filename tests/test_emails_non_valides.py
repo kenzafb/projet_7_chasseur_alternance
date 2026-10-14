@@ -97,7 +97,8 @@ def _revalider(client, user_id, pipelines, **corps):
 def test_relance_ia_valide_ou_ecarte_sans_relire_le_site(alice, ia, pipelines_neufs, monkeypatch):
     client, user_id, _ = alice
     monkeypatch.setattr(se, "get_page", lambda *a, **k: pytest.fail("le site ne doit pas être relu"))
-    ia.file = ['{"valide": true}', '{"valide": false}']
+    ia.file = ['{"valides": ["rh1@ent1.fr"], "meilleur_contact": "rh1@ent1.fr"}',
+               '{"valides": [], "meilleur_contact": null}']
     r = _revalider(client, user_id, pipelines_neufs)
     assert r.json()["max_revalidations"] == 2
     e1, e2 = lire_entreprises(user_id)[1:]
@@ -115,11 +116,12 @@ def test_relance_regles_d_abord(alice, ia, pipelines_neufs):
                     emails_douteux=["recrutement@acme1.fr", "x@agence.fr"],
                     contextes_emails={"x@agence.fr": "Site réalisé par l'agence"})
     sauvegarder_enrichissement(user_id, liste)
-    ia.reponse = '{"valide": false}'
+    ia.reponse = '{"valides": [], "meilleur_contact": "recrutement@acme1.fr"}'
     _revalider(client, user_id, pipelines_neufs, max_revalidations=1)
     assert len(ia.appels) == 1 and "Site réalisé par l'agence" in ia.textes(0)
     e = lire_entreprises(user_id)[1]
     assert e["emails_trouves"] == ["recrutement@acme1.fr"] and e["emails_non_valides"] is False
+    assert e["meilleur_contact"] == "recrutement@acme1.fr"     # adresse validée par les règles
 
 
 def test_relance_ia_en_echec_passager_reste_a_valider(alice, ia, pipelines_neufs):

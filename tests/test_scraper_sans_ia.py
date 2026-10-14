@@ -38,7 +38,7 @@ def sites(monkeypatch, ia):
         return None, None
 
     monkeypatch.setattr(se, "get_page", get_page)
-    ia.reponse = '{"valide": true}'
+    ia.reponse = '{"valides": ["contact@pixel-agence.fr", "acme.gerant@gmail.com"], "meilleur_contact": null}'
     return etat
 
 
@@ -69,12 +69,13 @@ def test_regles_valident_sans_ia(sites, user_id, ia):
 
 def test_douteux_tranches_par_l_ia(sites, user_id, ia):
     sites.douteux = {"acme1.fr"}
-    ia.panne = lambda corps: '{"valide": false}' if "Adresse : contact@pixel-agence.fr" in texte_envoye(corps) else None
+    ia.reponse = '{"valides": ["acme.gerant@gmail.com"], "meilleur_contact": "acme.gerant@gmail.com"}'
     entreprises, logs = _lancer(user_id, max_scrapees=1)
     e = entreprises["ACME 1"]
     assert e["emails_trouves"] == ["acme.gerant@gmail.com"] and e["emails_non_valides"] is False
-    assert len(ia.appels) == 2 and {a["model"] for a in ia.appels} == {"ministral-3:3b"}
-    assert "Pixel Agence" in texte_envoye(ia.appels[0]) or "Pixel Agence" in texte_envoye(ia.appels[1])
+    assert e["meilleur_contact"] == "acme.gerant@gmail.com"
+    assert len(ia.appels) == 1 and ia.appels[0]["model"] == "ministral-3:3b"   # un appel pour l'entreprise
+    assert "Pixel Agence" in texte_envoye(ia.appels[0])
     assert "contact@pixel-agence.fr (écartée par l'IA" in logs
 
 

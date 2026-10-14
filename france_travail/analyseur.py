@@ -15,7 +15,7 @@ LONGUEUR_CHAMP = 400   # caractères gardés d'un champ libre du profil
 
 FORMAT_REPONSE = (
     "Réponds uniquement avec cet objet JSON :\n"
-    '{"score": <entier de 1 à 10>, "eligible": <true ou false>, '
+    '{"score": <entier de 0 à 10>, "eligible": <true ou false>, '
     '"points_forts": [<3 phrases courtes au plus>], "points_faibles": [<2 phrases courtes au plus>], '
     '"domaine": "<catégorie métier en 2 à 4 mots>", "resume": "<12 mots au plus>"}'
 )
@@ -89,21 +89,25 @@ def contexte_stage(profil) -> str:
     ])
 
 
+# Ce que le code vérifie déjà n'est pas demandé au modèle : type ou nature
+# de contrat (filtres France Travail du mode, alternance écartée en job et en
+# stage, intitulés du stage), lieu (Île-de-France), niveau visé des offres
+# LBA. Les dates des offres ne sont que du texte libre : le modèle les juge.
 REGLES = {
     "alternance": (
         "Tu évalues une offre d'alternance pour ce candidat.",
         contexte_alternance,
-        "INÉLIGIBLE (eligible false, score 1 ou 2) si l'une de ces conditions est vraie :\n"
+        "INÉLIGIBLE (eligible false, score de 0 à 2) si l'une de ces conditions est vraie :\n"
         "- le poste réel est hors des domaines recherchés ;\n"
         "- l'offre exige un niveau d'études nettement supérieur au niveau visé (ex. Bac+5 pour un Bac+2) ;\n"
         "- l'offre exige 3 ans d'expérience ou plus ;\n"
         "- le poste est senior (ingénieur confirmé, architecte, senior), sauf offre d'une école ou d'un CFA.\n\n"
-        "NOTE de 1 à 10, d'après les missions réelles et non le seul titre :\n"
+        "NOTE de 0 à 10, d'après les missions réelles et non le seul titre :\n"
         "- 9-10 : domaine recherché, niveau cohérent avec le niveau visé, plusieurs compétences du candidat utiles ;\n"
         "- 7-8 : bon accord avec une ou deux réserves (niveau non précisé, compétences manquantes, lieu éloigné) ;\n"
         "- 5-6 : accord moyen (niveau un peu au-dessus, compétences importantes manquantes) ;\n"
         "- 3-4 : faible accord (domaine éloigné, prérequis incompatibles) ;\n"
-        "- 1-2 : inéligible.\n"
+        "- 0-2 : inéligible.\n"
         "Une compétence demandée que la formation va apporter n'est qu'un point faible mineur ; une compétence "
         "absente du profil et de la formation est un point faible important. Si le poste correspond à ce que "
         "le candidat préfère éviter, baisse la note. La date de début et la disponibilité ne comptent pas.\n\n"
@@ -114,19 +118,19 @@ REGLES = {
         "Tu évalues une offre de job court (mission, CDD, intérim, saisonnier) pour ce candidat : "
         "est-elle accessible et adaptée ?",
         contexte_job,
-        "INÉLIGIBLE (eligible false, score 1 ou 2) si l'une de ces conditions est vraie :\n"
+        "INÉLIGIBLE (eligible false, score de 0 à 2) si l'une de ces conditions est vraie :\n"
         "- l'offre exige un diplôme que le candidat n'a pas ;\n"
         "- l'offre exige plus d'expérience que la sienne (« souhaitée » ou « appréciée » n'élimine pas) ;\n"
         "- la durée minimale du contrat dépasse ce que le candidat peut faire (plus court : c'est bien) ;\n"
         "- le poste correspond clairement aux types de jobs à éviter.\n\n"
-        "NOTE de 1 à 10. Critère principal : l'accord avec les préférences écrites dans le profil (types de "
+        "NOTE de 0 à 10. Critère principal : l'accord avec les préférences écrites dans le profil (types de "
         "jobs, horaires, mobilité, durée, localisation, domaines). N'applique AUCUNE préférence que le profil "
         "n'exprime pas. Utilise toute l'échelle et départage nettement deux offres :\n"
         "- 9-10 : un type de job qui convient, rien ne contredit ses contraintes, proche de sa localisation préférée ;\n"
         "- 7-8 : accessible (débutant accepté) et compatible sans correspondre exactement, ou dans un domaine préféré ;\n"
         "- 5-6 : accessible avec un vrai bémol (horaires peu compatibles, loin, hors de ses types de jobs) ;\n"
         "- 3-4 : proche de ce qu'il veut éviter, ou plusieurs défauts ;\n"
-        "- 1-2 : inéligible.\n"
+        "- 0-2 : inéligible.\n"
         "Un job sans diplôme ni expérience exigés vaut environ 7 au départ. Une durée minimale nettement trop "
         "longue plafonne la note vers 4-5 ; des horaires incompatibles coûtent plusieurs points ; sans "
         "permis, préfère un lieu accessible en transports. Sans localisation préférée, la distance ne compte "
@@ -136,18 +140,18 @@ REGLES = {
     "stage": (
         "Tu évalues une offre de stage pour cet étudiant.",
         contexte_stage,
-        "INÉLIGIBLE (eligible false, score 1 ou 2) si l'une de ces conditions est vraie :\n"
-        "- ce n'est pas un stage pour un étudiant (emploi salarié, alternance, formation payante) ;\n"
+        "INÉLIGIBLE (eligible false, score de 0 à 2) si l'une de ces conditions est vraie :\n"
+        "- ce n'est pas un stage pour un étudiant (emploi salarié, formation payante) ;\n"
         "- le poste réel est hors des domaines recherchés ;\n"
         "- l'offre exige un niveau d'études nettement supérieur à la formation de l'étudiant ;\n"
         "- les dates sont incompatibles : durée minimale exigée nettement plus longue que sa période, ou "
         "début après la fin de sa période.\n\n"
-        "NOTE de 1 à 10, d'après les missions réelles et non le seul titre :\n"
+        "NOTE de 0 à 10, d'après les missions réelles et non le seul titre :\n"
         "- 9-10 : missions proches des missions visées, domaine recherché, niveau et dates compatibles ;\n"
         "- 7-8 : bon accord avec une ou deux réserves (missions un peu différentes, dates non précisées) ;\n"
         "- 5-6 : accord moyen (missions assez éloignées, niveau un peu au-dessus) ;\n"
         "- 3-4 : faible accord ;\n"
-        "- 1-2 : inéligible.\n"
+        "- 0-2 : inéligible.\n"
         "Des dates absentes de l'offre ne sont pas une pénalité.\n\n"
         "domaine : catégorie métier courte, ou exactement « Hors domaine » si le poste réel est hors des "
         "domaines recherchés.",
@@ -212,8 +216,8 @@ def est_ecole_cfa(offre) -> bool:
 
 
 def _valider_analyse(analyse: AnalyseOffre) -> dict:
-    """Analyse validée par son schéma (score entier de 1 à 10, tous les champs
-    présents), mise au format de l'application : verdict déduit du score,
+    """Analyse validée par son schéma (score entier ramené à 0..10 en Python,
+    tous les champs présents), mise au format de l'application : verdict déduit du score,
     score ramené à 2 pour une offre inéligible, listes raccourcies. Rien
     n'est complété par défaut, sauf un domaine vide (« Non classé »)."""
     result = analyse.model_dump()

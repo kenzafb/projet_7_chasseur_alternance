@@ -686,6 +686,7 @@ def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
         "douteux":    tri["douteux"],
         "contextes":  tri["contextes"],
         "ecartes":    tri["ecartes"],
+        "meilleur_contact": tri["meilleur_contact"],
         "telephones": [],
         "contact_rh": None,
         "url_finale": url_finale or url_racine,
@@ -853,6 +854,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
             e["emails_non_valides"] = bool(douteux)
             e["emails_douteux"]   = douteux
             e["contextes_emails"] = resultat.get("contextes", {})
+            e["meilleur_contact"] = resultat.get("meilleur_contact")
             e["url_scrapee"]      = resultat.get("url_finale") or url
             e["source_recherche"] = source_site
             e["traite"]           = True
@@ -902,11 +904,13 @@ def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=Non
             site = "https://" + site
         deja = emails_valides(e)
         tri = trier(emails_douteux(e), extraire_domaine(site) if site else None, nom, ia=True,
-                    contextes=e.get("contextes_emails"))
+                    contextes=e.get("contextes_emails"), deja_valides=deja)
         e["emails_trouves"]     = deja + tri["valides"] + tri["douteux"]
         e["emails_douteux"]     = tri["douteux"]
         e["contextes_emails"]   = tri["contextes"]
         e["emails_non_valides"] = bool(tri["douteux"])
+        if tri["meilleur_contact"]:
+            e["meilleur_contact"] = tri["meilleur_contact"]
         if tri["ecartes"]:
             _log(f"  🚫 {nom} : " + ", ".join(f"{a} ({r})" for a, r in tri["ecartes"]))
         if tri.get("ia_bloquee"):

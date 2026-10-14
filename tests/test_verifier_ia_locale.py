@@ -46,7 +46,8 @@ def donnees(utilisateur):
 
 
 def test_tableau_comparatif_sans_rien_ecrire(donnees, ia):
-    ia.panne = lambda corps: '{"valide": true}' if "Adresse :" in texte_envoye(corps) else None
+    ia.panne = lambda corps: ('{"valides": ["x@gmail.com"], "meilleur_contact": "x@gmail.com"}'
+                              if "Adresses à juger" in texte_envoye(corps) else None)
     ia.reponse = ANALYSE
     code, sortie = lancer("--modeles", "ministral-3:8b,qwen3.5:9b")
     assert code == 0
@@ -66,7 +67,7 @@ def test_tableau_comparatif_sans_rien_ecrire(donnees, ia):
 
 def test_modeles_par_defaut_et_json_invalide(donnees, ia):
     ia.panne = lambda corps: "pas du json" if "OFFRE" in texte_envoye(corps) else None
-    ia.reponse = '{"valide": false}'
+    ia.reponse = '{"valides": [], "meilleur_contact": null}'
     code, sortie = lancer("--offres", "1")
     assert code == 0                               # l'email a reçu une réponse valide
     modeles = [a["model"] for a in ia.appels]
@@ -93,7 +94,7 @@ def test_ia_desactivee_ignoree_pour_le_test(donnees, ia, monkeypatch):
 
 def test_sans_offre_ni_email_cas_fictif(utilisateur, ia):
     utilisateur("a@test.fr", prenom="Alice")
-    ia.reponse = '{"valide": false}'
+    ia.reponse = '{"valides": [], "meilleur_contact": null}'
     code, sortie = lancer()
     assert "Aucune offre « non analysée »" in sortie and "cas fictif" in sortie and code == 0
 

@@ -133,9 +133,9 @@ def test_chaque_usage_appelle_son_modele(ia, monkeypatch):
     analyser_offre({"titre": "Dev", "description": "..."}, profil)
     ia.reponse = '{"contact_entreprise": "ACME", "paragraphe_entreprise": "ACME me parle."}'
     generer_lettre({"titre": "Dev", "entreprise": "ACME"}, profil)
-    from shared.validation_emails import valider_par_ia
-    ia.reponse = '{"valide": true}'
-    valider_par_ia("x@gmail.com", "ACME", "acme.fr", "")
+    from shared.validation_emails import avis_ia
+    ia.reponse = '{"valides": ["x@gmail.com"], "meilleur_contact": null}'
+    avis_ia("ACME", "acme.fr", ["x@gmail.com"], [])
     assert [a["model"] for a in ia.appels] == ["modele-analyse", "modele-lettre", "modele-extraction"]
 
 
@@ -235,11 +235,12 @@ def test_reflexion_gardee_sur_demande(ia, monkeypatch):
     assert "think" not in ia.appels[-1]
 
 
-@pytest.mark.parametrize("texte", ['```json\n{"valide": true}\n```', 'Voici : {"valide": true} !'])
+@pytest.mark.parametrize("texte", ['```json\n{"contact_entreprise": "A", "paragraphe_entreprise": "p"}\n```',
+                                   'Voici : {"contact_entreprise": "A", "paragraphe_entreprise": "p"} !'])
 def test_json_entoure_accepte(ia, texte):
-    from shared.schemas_ia import ValidationEmail
+    from shared.schemas_ia import LettreIA
     ia.reponse = texte
-    assert appeler_structure(MESSAGE, ValidationEmail).valide is True
+    assert appeler_structure(MESSAGE, LettreIA).paragraphe_entreprise == "p"
 
 
 def test_reponse_invalide_retentee_une_fois(ia):
@@ -389,3 +390,12 @@ def test_lettre_en_echec_rien_d_enregistre(utilisateur, ia, monkeypatch):
     assert offre["lettre"] == "" and offre["statut"] == "nouveau"
 
 
+
+
+# ─── Contrôles en Python ─────────────────────────────────────────────────────
+@pytest.mark.parametrize("score, attendu, verdict", [(15, 10, "excellent"), (-3, 0, "ineligible"), (0, 0, "ineligible")])
+def test_score_borne_en_python(ia, score, attendu, verdict):
+    ia.reponse = ANALYSE.replace('"score": 8', f'"score": {score}')
+    analyse = analyser_offre({"titre": "Dev", "description": "..."}, {"prenom": "A"})
+    assert (analyse["score"], analyse["verdict"]) == (attendu, verdict)
+    assert "minimum" not in str(AnalyseOffre.model_json_schema()) and "maximum" not in str(AnalyseOffre.model_json_schema())
