@@ -445,3 +445,9 @@ Retour de l'humain après une recherche sur les modèles locaux et Ollama en oct
 - **Décision.** Les cartes « Compétences techniques » et « Projets » (même interface qu'en alternance) sont affichées dans les trois modes ; le stage a son champ « Expérience », le job gardait le sien. Le prompt d'analyse du stage cite niveau d'études, formation, missions visées, compétences, expérience et projets ; celui du job ajoute les projets ; la lettre cite les projets dans tous les modes. Si compétences, projets ou expérience sont vides, le profil l'indique : sans eux, l'IA juge à l'aveugle.
 - **Conséquence.** Compétences et projets restent propres à chaque mode (une ligne de profil par mode) : à saisir aussi dans le profil stage et le profil job.
 
+## Phase 7, résultats sur 8 offres de stage et test des lettres (14 octobre 2026)
+
+### D97. Lettre : ministral-3:8b, première personne, rien d'inventé, texte brut
+- **Constat.** Comparaison à l'aveugle (`--lettre`) : `ministral-3:8b` nettement le meilleur ; `qwen3.5:9b` écrit à la deuxième personne (« votre maîtrise de Linux vous permettrait »), `qwen3.5:4b` inverse les rôles (« Orange SA vous attire »), `ministral-3:3b` met des astérisques markdown et cite des outils absents de l'offre et du profil.
+- **Décision.** `IA_MODELE_LETTRE=ministral-3:8b` (défaut inchangé). Le prompt de lettre impose la première personne (la personne candidate parle au recruteur), aucune mise en forme markdown, seulement des compétences et outils présents dans le profil ou l'offre, et pas de mot comme « expertise » pour un profil en formation. En Python, toute mise en forme markdown résiduelle est retirée (`generateur.sans_markdown`).
+

@@ -178,7 +178,14 @@ def construire_messages_lettre(offre, profil, mode="alternance") -> list[dict]:
         "- ne commence pas par « Je » : commence par le nom de l'entreprise, « Votre » ou « C'est » ;\n"
         "- montre un intérêt précis pour cette entreprise ou ce poste (activité, missions, contexte) ;\n"
         f"{CONSIGNE_PAR_MODE.get(mode, CONSIGNE_PAR_MODE['alternance'])}"
-        "- N'invente AUCUNE compétence ni expérience absente du bagage ;\n"
+        "- écris à la première personne : c'est la personne candidate qui parle au recruteur (« j'ai », « mon », "
+        "« votre entreprise ») ; jamais « vous » pour parler d'elle, et l'entreprise n'est pas attirée par elle, "
+        "c'est elle qui s'intéresse à l'entreprise ;\n"
+        "- N'invente AUCUNE compétence ni expérience absente du bagage : ne cite que des compétences et des outils "
+        "écrits dans le bagage ou dans l'offre ;\n"
+        "- la personne est en formation ou débutante : pas de mot comme « expertise », « expert » ou « maîtrise "
+        "parfaite » ;\n"
+        "- texte brut : aucune mise en forme (ni astérisques, ni dièses, ni tirets de liste, ni gras) ;\n"
         "- écris de façon neutre : aucun adjectif ni participe accordé au genre de la personne candidate "
         "(« j'ai le sens de la rigueur » plutôt qu'un adjectif comme « je suis rigoureux ») ;\n"
         "- ton direct et sincère, sans superlatifs (« incroyable », « idéal », « parfait ») ;\n"
@@ -189,6 +196,21 @@ def construire_messages_lettre(offre, profil, mode="alternance") -> list[dict]:
     return [{"role": "system", "content": "Tu rédiges en français. Tu réponds uniquement par un objet JSON "
                                           "valide, sans texte autour."},
             {"role": "user", "content": prompt}]
+
+
+def sans_markdown(texte: str) -> str:
+    """Retire la mise en forme markdown qu'un modèle glisse parfois dans la
+    lettre : gras et italique (**, __, *, _), code (`), titres (#), puces en
+    début de ligne, liens [texte](url) -> texte."""
+    t = texte or ""
+    t = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", t)
+    t = re.sub(r"(\*\*|__)(.+?)\1", r"\2", t, flags=re.S)
+    t = re.sub(r"(?<![\w*])\*(?!\s)(.+?)(?<!\s)\*(?![\w*])", r"\1", t, flags=re.S)
+    t = re.sub(r"(?<!\w)_(?!\s)(.+?)(?<!\s)_(?!\w)", r"\1", t, flags=re.S)
+    t = re.sub(r"^\s{0,3}#{1,6}\s*", "", t, flags=re.M)
+    t = re.sub(r"^\s*(?:[-*+•]|\d+[.)])\s+", "", t, flags=re.M)
+    t = t.replace("`", "").replace("*", "")
+    return "\n".join(" ".join(l.split()) for l in t.splitlines()).strip()
 
 
 def rediger_elements(offre, profil, mode="alternance", modele=None, essais=2) -> LettreIA:
@@ -215,8 +237,8 @@ def generer_lettre(offre, profil, mode="alternance", modele=None):
     nom_entreprise = offre.get("entreprise", "")
 
     reponse = rediger_elements(offre, profil, mode, modele)
-    contact    = reponse.contact_entreprise or nom_entreprise
-    paragraphe = reponse.paragraphe_entreprise   # jamais vide (schéma)
+    contact    = sans_markdown(reponse.contact_entreprise) or nom_entreprise
+    paragraphe = sans_markdown(reponse.paragraphe_entreprise) or reponse.paragraphe_entreprise
 
     # ── Nettoyage défensif du bloc contact ────────────────────────────────
     contact = _nettoyer_contact(contact)

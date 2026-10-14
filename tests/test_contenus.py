@@ -222,3 +222,29 @@ def test_code_actif_sans_mention_d_un_utilisateur_reel():
         texte = chemin.read_text(encoding="utf-8").lower()
         for nom in noms:
             assert nom not in texte, f"{chemin.relative_to(racine)} : « {nom} »"
+
+
+# ─── Lettre : première personne, rien d'inventé, texte brut (après comparaison) ──
+def test_consignes_de_la_lettre(ia):
+    generateur.generer_lettre(OFFRE, PROFIL, mode="stage")
+    texte = _prompts(ia)
+    assert "première personne" in texte and "jamais « vous » pour parler d'elle" in texte
+    assert "ne cite que des compétences et des outils écrits dans le bagage ou dans l'offre" in texte
+    assert "« expertise »" in texte and "aucune mise en forme" in texte
+
+
+@pytest.mark.parametrize("brut, propre", [
+    ("**Orange SA**, votre projet *réseau* me parle.", "Orange SA, votre projet réseau me parle."),
+    ("## ACME\n- 75010 Paris", "ACME\n75010 Paris"),
+    ("Voir [le site](https://acme.fr) et `Python`.", "Voir le site et Python."),
+    ("__ACME__ recrute ; mon_projet reste tel quel.", "ACME recrute ; mon_projet reste tel quel."),
+    ("Un tiret-d'union, un 2 * 3 sans gras.", "Un tiret-d'union, un 2 3 sans gras."),
+])
+def test_markdown_retire(brut, propre):
+    assert generateur.sans_markdown(brut) == propre
+
+
+def test_lettre_sans_markdown(ia):
+    ia.reponse = '{"contact_entreprise": "**ACME**\\n75010 Paris", "paragraphe_entreprise": "**ACME**, *votre* projet me parle."}'
+    lettre = generateur.generer_lettre(OFFRE, PROFIL, mode="alternance")
+    assert "*" not in lettre and "ACME, votre projet me parle." in lettre
