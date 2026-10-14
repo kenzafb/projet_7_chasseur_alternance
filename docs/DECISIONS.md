@@ -440,3 +440,8 @@ Retour de l'humain après une recherche sur les modèles locaux et Ollama en oct
 ### D95. Offre inéligible archivée « inéligible » (remplace le point 1 des choix de D94)
 - **Décision.** Une offre inéligible (critère établi en Python ou jugement du modèle) est archivée avec la raison distincte `ineligible`, et non plus `note_basse` (gardée pour l'archivage à la main et les offres déjà archivées). Son motif est visible sur la carte de l'offre (« Inéligible : Bac+5 exigé, profil Bac+2 », ou « jugée inéligible par l'IA »), les archives ont un filtre « Inéligible », et un bouton « Remettre dans les offres actives » la désarchive.
 
+### D96. Compétences, projets et expérience dans les trois modes, avertissement s'ils manquent
+- **Constat.** Le profil du mode stage n'affichait ni compétences, ni projets, ni expérience, alors que les colonnes existent : l'IA jugeait les offres de stage sur la formation et les missions visées seulement.
+- **Décision.** Les cartes « Compétences techniques » et « Projets » (même interface qu'en alternance) sont affichées dans les trois modes ; le stage a son champ « Expérience », le job gardait le sien. Le prompt d'analyse du stage cite niveau d'études, formation, missions visées, compétences, expérience et projets ; celui du job ajoute les projets ; la lettre cite les projets dans tous les modes. Si compétences, projets ou expérience sont vides, le profil l'indique : sans eux, l'IA juge à l'aveugle.
+- **Conséquence.** Compétences et projets restent propres à chaque mode (une ligne de profil par mode) : à saisir aussi dans le profil stage et le profil job.
+

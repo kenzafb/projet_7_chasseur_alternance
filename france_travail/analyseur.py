@@ -57,9 +57,13 @@ def _domaines(profil) -> str:
     return ", ".join(libelles_domaines(domaines_du_profil(profil)))
 
 
+def _projets(profil) -> str:
+    return " | ".join(_court(f"{p.get('nom', '')} : {p.get('description', '')}", 150)
+                      for p in (profil.get("projets") or [])[:3] if p.get("nom") or p.get("description"))
+
+
 def contexte_alternance(profil) -> str:
-    projets = " | ".join(_court(f"{p.get('nom', '')} : {p.get('description', '')}", 150)
-                         for p in (profil.get("projets") or [])[:3])
+    projets = _projets(profil)
     return _lignes([
         ("Niveau visé (diplôme préparé par le contrat)", _court(profil.get("niveau_vise"))),
         ("Formation", _court(profil.get("formation"))),
@@ -78,6 +82,7 @@ def contexte_job(profil) -> str:
         ("Niveau d'études obtenu", _court(profil.get("niveau_etudes"), 150)),
         ("Expérience", _court(profil.get("experience"))),
         ("Compétences", _court(", ".join(profil.get("competences") or []))),
+        ("Projets", _projets(profil)),
         ("Atouts (langues, permis, savoir-être)", _court(profil.get("langues"), 200)),
         ("Durée de contrat souhaitée", _court(profil.get("duree_souhaitee"), 150)),
         ("Disponibilité (dates)", _court((profil.get("recherche") or {}).get("disponibilite"), 150)),
@@ -98,10 +103,16 @@ def contexte_stage(profil) -> str:
         periode = f"du {date_en_lettres(debut)} au {date_en_lettres(fin)}"
         if profil.get("duree_semaines"):
             periode += f" ({profil['duree_semaines']} semaines)"
+    from shared.eligibilite import niveau_du_profil
+    niveau = niveau_du_profil(profil)
     return _lignes([
+        ("Niveau d'études", _court(profil.get("niveau_etudes"), 150) or niveau["libelle"]),
         ("Formation", _court(profil.get("formation"), 200)),
         ("Établissement", _court(profil.get("etablissement"), 200)),
         ("Missions visées", _court(profil.get("missions"))),
+        ("Compétences", _court(", ".join(profil.get("competences") or []))),
+        ("Expérience", _court(profil.get("experience"))),
+        ("Projets", _projets(profil)),
         ("Période du stage", periode or "non précisée"),
         ("Domaines recherchés", _domaines(profil) or "ceux qui correspondent aux missions visées"),
     ])

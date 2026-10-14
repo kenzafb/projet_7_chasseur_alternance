@@ -29,7 +29,17 @@ def profil_vers_dict(p: Profil) -> dict:
     from shared.eligibilite import niveau_du_profil
     d = _profil_vers_dict(p)
     d["niveau_profil"] = niveau_du_profil(d)
+    d["manques_ia"] = manques_ia(d)
     return d
+
+
+def manques_ia(profil: dict) -> list[str]:
+    """Champs vides dont l'IA a besoin pour juger les offres et écrire les
+    lettres, dans tous les modes (avertissement du profil)."""
+    champs = (("compétences", bool(profil.get("competences"))),
+              ("projets", any((x.get("nom") or x.get("description")) for x in profil.get("projets") or [])),
+              ("expérience", bool((profil.get("experience") or "").strip())))
+    return [libelle for libelle, rempli in champs if not rempli]
 
 
 def _profil_vers_dict(p: Profil) -> dict:

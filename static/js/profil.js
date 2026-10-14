@@ -431,14 +431,24 @@ function afficherNiveau(niveau) {
   });
 }
 
+/* Compétences, projets, expérience : sans eux, l'IA juge à l'aveugle */
+function afficherManquesIA(manques) {
+  const el = document.querySelector("[data-ia-avert]");
+  if (!el) return;
+  el.hidden = !(manques || []).length;
+  el.textContent = el.hidden ? "" : `À remplir : ${manques.join(", ")}. Sans ces informations, l'IA juge `
+    + "les offres et écrit les lettres à l'aveugle.";
+}
+
 /* ── Affichage des sections selon le mode (alternance/job/stage) ────────── */
 async function appliquerModeProfil() {
   let mode = "alternance";
   try { mode = (await api.mode()).mode || "alternance"; } catch (_) {}
   _modeProfilCourant = mode;
   document.querySelectorAll("[data-mode-section]").forEach(sec => {
-    const m = sec.dataset.modeSection;
-    sec.style.display = (m === "commun" || m === mode) ? "" : "none";
+    // « commun », un mode, ou plusieurs modes séparés par des espaces
+    const modes = sec.dataset.modeSection.split(" ");
+    sec.style.display = (modes.includes("commun") || modes.includes(mode)) ? "" : "none";
   });
   return mode;
 }
@@ -464,6 +474,7 @@ export const Profil = {
     });
     document.querySelectorAll("[data-profil-case]").forEach(el => { el.checked = p[el.dataset.profilCase] === true; });
     afficherNiveau(p.niveau_profil);
+    afficherManquesIA(p.manques_ia);
 
     _tags["competences"] = Array.isArray(p.competences) ? [...p.competences] : [];
     rendreTags("competences");
@@ -533,7 +544,7 @@ export const Profil = {
 
     try {
       const ok = (await api.sauverProfil(data)).ok === true;
-      if (ok) api.profil().then(p => afficherNiveau(p.niveau_profil), () => {});
+      if (ok) api.profil().then(p => { afficherNiveau(p.niveau_profil); afficherManquesIA(p.manques_ia); }, () => {});
       return ok;
     } catch (e) {
       // Refus du serveur (date illisible, balise inconnue...) : message lisible

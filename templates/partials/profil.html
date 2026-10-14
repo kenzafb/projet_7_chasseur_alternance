@@ -10,6 +10,9 @@
     </div>
   </div>
 
+  <!-- Champs dont l'IA a besoin pour juger : avertissement s'ils sont vides -->
+  <p class="domaines-vide" data-ia-avert hidden></p>
+
   <!-- ─── Section 1 : Identité (commun) ─── -->
   <div class="card profil-card" data-mode-section="commun">
     <div class="profil-card__head">
@@ -109,7 +112,7 @@
   </div>
 
   <!-- ─── Section 3 : Compétences (alternance) ─── -->
-  <div class="card profil-card" data-mode-section="alternance">
+  <div class="card profil-card" data-mode-section="alternance stage job">
     <div class="profil-card__head">
       <span class="profil-card__num">03</span>
       <div>
@@ -124,12 +127,12 @@
   </div>
 
   <!-- ─── Section 4 : Projets (alternance) ─── -->
-  <div class="card profil-card" data-mode-section="alternance">
+  <div class="card profil-card" data-mode-section="alternance stage job">
     <div class="profil-card__head">
       <span class="profil-card__num">04</span>
       <div>
         <h3 class="profil-card__title">Projets</h3>
-        <p class="profil-card__sub">Tes projets techniques. Cités dans l'analyse et valorisés auprès des recruteurs.</p>
+        <p class="profil-card__sub">Tes projets (cours, perso, associatifs). Cités dans l'analyse et la lettre.</p>
       </div>
     </div>
 
@@ -506,6 +509,12 @@
         <span class="field__label">Missions visées</span>
         <textarea class="field__area" data-profil="missions" rows="3"
           placeholder="Ce que tu aimerais faire pendant le stage"></textarea>
+      </label>
+      <label class="field field--full">
+        <span class="field__label">Expérience</span>
+        <textarea class="field__area" data-profil="experience" rows="4"
+          placeholder="- Stage, job ou projet encadré (entreprise, année) : tâches principales&#10;..."></textarea>
+        <span class="field__hint">Stages, jobs, missions. Utilisée pour noter les offres et écrire la lettre.</span>
       </label>
       <label class="field field--full">
         <span class="field__label">Portfolio <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>

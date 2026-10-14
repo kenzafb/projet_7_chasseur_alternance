@@ -153,6 +153,9 @@ def bagage_candidat(profil, mode="alternance") -> str:
     if mode != "stage":
         lignes.append(("Formation", court(profil.get("formation"))))
     lignes.append(("Expérience", court(profil.get("experience"))))
+    projets = [court(f"{p.get('nom', '')} : {p.get('description', '')}", 150)
+               for p in (profil.get("projets") or [])[:2] if p.get("nom") or p.get("description")]
+    lignes.append(("Projets", " | ".join(projets)))
     texte = "\n".join(f"- {libelle} : {valeur}" for libelle, valeur in lignes if valeur)
     return texte or "- Rien de renseigné : reste sur l'intérêt pour l'entreprise, sans inventer de compétence."
 
