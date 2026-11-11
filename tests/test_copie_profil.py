@@ -1,11 +1,14 @@
-"""Copie de sections du profil entre modes (phase 9, D117) :
+"""Copie de sections du profil entre modes (phase 9, D117 et D118) :
 sections copiables, aperçu, confirmation avant écrasement, isolation entre
-utilisateurs."""
+utilisateurs, pièces jointes partagées par référence."""
 
 import pytest
 
-from database.profil_db import lire_profil, sauvegarder_profil
+from database.profil_db import ajouter_piece_jointe, lire_profil, sauvegarder_profil
+from shared import config
 from shared.copie_profil import MODES_DU_CHAMP, SECTIONS, sections_copiables
+
+PDF = b"%PDF-1.4 contenu de test"
 
 
 def _cles(source, cible):
@@ -32,7 +35,8 @@ def _client(c, mode):
 
 # ─── Sections copiables ───────────────────────────────────────────────────────
 def test_sections_copiables_selon_les_modes():
-    tout = ["identite", "liens", "formation", "experience", "competences", "projets", "lettre_type", "email"]
+    tout = ["identite", "liens", "formation", "experience", "competences", "projets", "lettre_type", "email",
+            "pieces_jointes"]
     assert _cles("stage", "alternance") == tout
     assert _cles("alternance", "stage") == tout
     # Formation et niveau d'études « actuel » : pas en job (niveau « obtenu »)
@@ -154,3 +158,56 @@ def test_routes_protegees():
     r = anonyme.post("/api/profil/copie?mode=job", json={"source": "stage", "sections": ["competences"]},
                      follow_redirects=False)
     assert r.status_code in (302, 303, 401)
+
+
+# ─── Pièces jointes : références partagées (D118) ─────────────────────────────
+def _envoyer(client, nom):
+    r = client.post("/api/profil/upload", data={"nom": nom}, files={"fichier": (f"{nom}.pdf", PDF, "application/pdf")})
+    assert r.status_code == 200, r.text
+
+
+def _fichiers(uid):
+    dossier = config.UPLOADS_DIR / f"user_{uid}"
+    return sorted(p.name for p in dossier.iterdir()) if dossier.exists() else []
+
+
+def test_pieces_jointes_partagees_par_reference(utilisateur):
+    client, uid = utilisateur("a@test.fr", prenom="Ada")
+    _stage(uid)
+    _envoyer(_client(client, "stage"), "CV")
+    assert len(_fichiers(uid)) == 1
+    _envoyer(_client(client, "job"), "Ancien CV")
+    r = client.post("/api/profil/copie", json={"source": "stage", "sections": ["pieces_jointes"],
+                                               "ecraser": ["pieces_jointes"]})
+    assert r.status_code == 200
+    stage, job = lire_profil(uid, mode="stage"), lire_profil(uid, mode="job")
+    assert job["pieces_jointes"] == stage["pieces_jointes"]               # même référence, pas de copie
+    assert len(_fichiers(uid)) == 1                                        # ancien CV du job effacé (orphelin)
+    assert client.get("/api/profil/piece", params={"nom": "CV"}).content == PDF
+    # Supprimée en job : le fichier reste pour le stage
+    assert client.post("/api/profil/piece/supprimer", json={"nom": "CV"}).status_code == 200
+    assert len(_fichiers(uid)) == 1
+    assert _client(client, "stage").get("/api/profil/piece", params={"nom": "CV"}).content == PDF
+    # Supprimée aussi en stage : plus personne ne la référence, fichier effacé
+    client.post("/api/profil/piece/supprimer", json={"nom": "CV"})
+    assert _fichiers(uid) == []
+
+
+def test_piece_remplacee_dans_un_mode_ne_change_pas_l_autre(utilisateur):
+    client, uid = utilisateur("a@test.fr", prenom="Ada")
+    _stage(uid)
+    _envoyer(_client(client, "stage"), "CV")
+    _client(client, "alternance").post("/api/profil/copie", json={"source": "stage", "sections": ["pieces_jointes"]})
+    avant = lire_profil(uid, mode="stage")["pieces_jointes"]
+    r = client.post("/api/profil/upload", data={"nom": "CV"},
+                    files={"fichier": ("CV.pdf", b"%PDF nouvelle version", "application/pdf")})
+    assert r.status_code == 200
+    assert lire_profil(uid, mode="stage")["pieces_jointes"] == avant      # le stage garde l'ancien fichier
+    assert client.get("/api/profil/piece", params={"nom": "CV"}).content == b"%PDF nouvelle version"
+    assert len(_fichiers(uid)) == 2
+
+
+def test_ajouter_piece_jointe_reste_par_mode(utilisateur):
+    _, uid = utilisateur("a@test.fr", prenom="Ada")
+    ajouter_piece_jointe(uid, "CV", f"user_{uid}/cv.pdf", mode="stage")
+    assert lire_profil(uid, mode="job") == {}

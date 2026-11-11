@@ -477,6 +477,9 @@ def api_profil_copie(body: dict = Body(...), user: User = Depends(utilisateur_re
     source = str(body.get("source") or "")
     verifier_modes(source, mode)
     res = copier_sections(user.id, source, mode, body.get("sections") or [], body.get("ecraser") or [])
+    # Fichiers que le mode cible ne référence plus : effacés seulement si
+    # aucun autre mode ne s'en sert (D118)
+    _supprimer_si_orpheline(user.id, res["fichiers_retires"])
     return {"ok": True, "copiees": res["copiees"]}
 
 

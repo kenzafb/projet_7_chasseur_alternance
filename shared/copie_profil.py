@@ -15,6 +15,9 @@ automatique. Non copiés parce que leur sens change selon le mode :
 « langues » (« Atouts / compétences » en job, absente en stage) et le
 niveau d'études en job (« obtenu », « actuel » ailleurs). Le portfolio
 n'est affiché qu'en stage : rien à copier ailleurs.
+
+Pièces jointes (D118) : la copie partage la référence au fichier (même
+chemin dans les deux modes), sans dupliquer le fichier sur le disque.
 """
 
 from shared.balises_mail import verifier_balises
@@ -33,6 +36,7 @@ MODES_DU_CHAMP = {
     "competences": TOUS, "projets": TOUS,
     "lettre_type": TOUS,
     "email_objet": TOUS, "email_type": TOUS,
+    "pieces_jointes": TOUS,
 }
 
 # (clé, libellé, champs), dans l'ordre de la page Profil
@@ -45,13 +49,14 @@ SECTIONS = (
     ("projets", "Projets", ("projets",)),
     ("lettre_type", "Lettre de motivation type", ("lettre_type",)),
     ("email", "Email de candidature spontanée (objet et message)", ("email_objet", "email_type")),
+    ("pieces_jointes", "Pièces jointes", ("pieces_jointes",)),
 )
 
 LIBELLES_CHAMPS = {
     "prenom": "Prénom", "nom": "Nom", "email": "Email", "telephone": "Téléphone", "ville": "Ville",
     "linkedin": "LinkedIn", "github": "GitHub", "formation": "Formation", "niveau_etudes": "Niveau d'études",
     "experience": "Expérience", "competences": "Compétences", "projets": "Projets", "lettre_type": "Lettre type",
-    "email_objet": "Objet du mail", "email_type": "Message du mail",
+    "email_objet": "Objet du mail", "email_type": "Message du mail", "pieces_jointes": "Pièces jointes",
 }
 
 
@@ -67,7 +72,7 @@ def _valeur(profil: dict, champ: str):
     v = profil.get(champ)
     if champ == "projets":
         return [p for p in (v or []) if _rempli(p)]
-    if champ == "competences":
+    if champ in ("competences", "pieces_jointes"):
         return list(v or [])
     return v or ""
 

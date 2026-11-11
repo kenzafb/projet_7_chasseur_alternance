@@ -200,7 +200,10 @@ def copier_sections(user_id: int, source: str, cible: str, sections, ecraser=())
     même utilisateur (shared.copie_profil), en une transaction. Refus
     (ErreurUtilisateur, rien n'est écrit) : section non copiable, copie
     impossible (balise de l'email), section remplie et différente dans le
-    mode cible sans être dans ecraser. Retourne {copiees, fichiers_retires}."""
+    mode cible sans être dans ecraser. Pièces jointes : les références aux
+    fichiers sont partagées, pas les fichiers dupliqués (D118). Retourne
+    {copiees, fichiers_retires} : fichiers que le mode cible ne référence
+    plus (à supprimer du disque s'ils ne servent plus à aucun mode)."""
     import copy
     from shared.copie_profil import apercu
     sections = list(dict.fromkeys(sections or []))
@@ -227,6 +230,9 @@ def copier_sections(user_id: int, source: str, cible: str, sections, ecraser=())
         for s in plan:
             for ligne in s["champs"]:
                 champ = ligne["champ"]
+                if champ == "pieces_jointes":
+                    gardes = {pj.get("fichier") for pj in ligne["copie"]}
+                    retires += [pj.get("fichier", "") for pj in ligne["actuel"] if pj.get("fichier") not in gardes]
                 setattr(p_cible, _COLONNE.get(champ, champ), copy.deepcopy(ligne["copie"]))
         db.commit()
         return {"copiees": [s["cle"] for s in plan], "fichiers_retires": [f for f in retires if f]}
