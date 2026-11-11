@@ -241,6 +241,19 @@ _CHAMPS_EXTRA_SCRAPER = ("telephone", "url_scrapee", "source_recherche", "tentat
                          "validation_emails", "emails_ecartes_ia")
 
 
+def _codes_naf(d: dict) -> dict:
+    """{naf_rev2, naf_2025} d'une entreprise reçue (Sirene ou LBA, D112)."""
+    from shared.naf import deux_codes
+    return deux_codes(d.get("naf_rev2"), d.get("naf_2025"), d.get("code_naf"))
+
+
+def _completer_naf(e, d: dict):
+    """Entreprise déjà en base retrouvée : codes NAF manquants complétés."""
+    for champ, code in _codes_naf(d).items():
+        if code and not getattr(e, champ):
+            setattr(e, champ, code)
+
+
 def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
     """Une entreprise et son état dans un mode → dict au format attendu par
     l'envoyeur et le scraper (comme l'ancien JSON)."""
@@ -253,6 +266,8 @@ def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
         "siren":          e.siren,
         "site_web":       e.site_web,
         "secteur":        e.secteur,
+        "naf_rev2":       e.naf_rev2 or "",
+        "naf_2025":       e.naf_2025 or "",
         "emails_trouves": e.emails_trouves or [],
         "telephones":     e.telephones or [],
         "contact_rh":     normaliser_contact_rh(e.contact_rh),
@@ -522,6 +537,7 @@ def ajouter_entreprises(user_id: int, liste: list[dict], mode: str = MODE_DEFAUT
             siren = d.get("siren") or siret[:9]
             e = (par_siret.get(siret) if siret else None) or (par_siren.get(siren) if siren else None)
             if e is not None:
+                _completer_naf(e, d)
                 if _dans_le_mode(e, mode):
                     continue  # déjà dans le mode (la source est notée par noter_source)
                 _avec_source(e, SOURCE_SIRENE)
@@ -547,6 +563,7 @@ def ajouter_entreprises(user_id: int, liste: list[dict], mode: str = MODE_DEFAUT
                 siren          = d.get("siren", ""),
                 site_web       = d.get("site_web") or "",
                 secteur        = d.get("code_naf", ""),
+                **_codes_naf(d),
                 sources        = [SOURCE_SIRENE],
                 extra          = extra,
             )
@@ -594,6 +611,28 @@ def noter_source(user_id: int, sirets, source: str, sirens=()) -> int:
         db.close()
 
 
+def completer_codes_naf(user_id: int, par_siret: dict) -> int:
+    """Codes NAF manquants des entreprises déjà en base que Sirene a
+    retrouvées (SIRET -> infos Sirene), D112. Retourne le nombre
+    d'entreprises complétées."""
+    par_siret = {s: d for s, d in par_siret.items() if s}
+    if not par_siret:
+        return 0
+    db = SessionLocal()
+    try:
+        n = 0
+        for e in db.query(Entreprise).filter_by(user_id=user_id):
+            d = par_siret.get((e.extra or {}).get("siret"))
+            if d is not None:
+                avant = (e.naf_rev2, e.naf_2025)
+                _completer_naf(e, d)
+                n += (e.naf_rev2, e.naf_2025) != avant
+        db.commit()
+        return n
+    finally:
+        db.close()
+
+
 def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None = None,
                             mode: str = MODE_DEFAUT) -> dict:
     """Entreprises à fort potentiel de La Bonne Alternance (normalisées par
@@ -622,6 +661,7 @@ def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None
                  or (par_siren.get(d["siren"]) if d.get("siren") else None)
                  or (par_identifiant.get(infos_lba["identifiant"]) if infos_lba["identifiant"] else None))
             if e is not None:
+                _completer_naf(e, d)
                 if not _dans_le_mode(e, mode):
                     if maximum is not None and bilan["ajoutees"] >= maximum:
                         bilan["non_ajoutees"] += 1
@@ -665,6 +705,7 @@ def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None
                 siren          = d.get("siren", ""),
                 site_web       = d.get("site_web") or "",
                 secteur        = d.get("code_naf", ""),
+                **_codes_naf(d),
                 emails_trouves = [email] if email else [],
                 telephones     = [d["telephone"]] if d.get("telephone") else [],
                 extra          = extra,

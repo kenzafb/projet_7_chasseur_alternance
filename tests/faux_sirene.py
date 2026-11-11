@@ -131,11 +131,15 @@ class FausseSirene:
               "nomenclatureActivitePrincipaleUniteLegale": "NAFRev2"}
         if self.variable_naf25:
             ul[self.variable_naf25] = e["naf25"]
-        return {"siret": e["siret"], "trancheEffectifsEtablissement": e["tranche_etab"], "uniteLegale": ul,
+        etab = {"siret": e["siret"], "trancheEffectifsEtablissement": e["tranche_etab"], "uniteLegale": ul,
                 "adresseEtablissement": {"codePostalEtablissement": e["cp"], "libelleCommuneEtablissement": "PARIS",
                                          "numeroVoieEtablissement": "1", "typeVoieEtablissement": "RUE",
                                          "libelleVoieEtablissement": "TEST"},
-                "periodesEtablissement": [{"dateFin": None, "activitePrincipaleEtablissement": e["naf"]}]}
+                "periodesEtablissement": [{"dateFin": None, "activitePrincipaleEtablissement": e["naf"],
+                                           "nomenclatureActivitePrincipaleEtablissement": "NAFRev2"}]}
+        if self.variable_naf25:
+            etab["activitePrincipaleNAF25Etablissement"] = e["naf25"]
+        return etab
 
     def get(self, url, params=None, headers=None, timeout=None, **_):
         params = dict(params or {})

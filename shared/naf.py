@@ -54,6 +54,45 @@ def table_insee() -> dict[str, tuple[str, ...]]:
     return {k: tuple(v) for k, v in table.items()}
 
 
+@lru_cache(maxsize=1)
+def table_inverse() -> dict[str, tuple[str, ...]]:
+    """Code NAF 2025 -> codes NAF rév. 2 dont il est une cible."""
+    inverse = {}
+    for rev2, cibles in table_insee().items():
+        for c in cibles:
+            inverse.setdefault(c, [])
+            if rev2 not in inverse[c]:
+                inverse[c].append(rev2)
+    return {k: tuple(v) for k, v in inverse.items()}
+
+
+def normaliser_code(code) -> str:
+    """« 6201Z » (La Bonne Alternance) ou « 62.01z » -> « 62.01Z »."""
+    code = str(code or "").strip().upper().replace(" ", "")
+    if len(code) == 5 and "." not in code:
+        code = f"{code[:2]}.{code[2:]}"
+    return code
+
+
+def deux_codes(*codes) -> dict:
+    """{naf_rev2, naf_2025} d'une entreprise d'après les codes connus, quelle
+    que soit leur nomenclature : les deux nomenclatures n'ont aucun code en
+    commun, un code se classe donc par la table de l'INSEE. Un code absent
+    est déduit de l'autre seulement si la table n'en donne qu'un ; sinon il
+    reste vide (correspondance multiple : seule l'API sait)."""
+    rev2 = naf2025 = ""
+    for code in map(normaliser_code, codes):
+        if code in table_insee() and not rev2:
+            rev2 = code
+        elif code in table_inverse() and not naf2025:
+            naf2025 = code
+    if rev2 and not naf2025 and len(table_insee()[rev2]) == 1:
+        naf2025 = table_insee()[rev2][0]
+    if naf2025 and not rev2 and len(table_inverse()[naf2025]) == 1:
+        rev2 = table_inverse()[naf2025][0]
+    return {"naf_rev2": rev2, "naf_2025": naf2025}
+
+
 def _codes(entree: dict, nomenclature: str) -> list[str]:
     return [entree["naf_rev2"]] if nomenclature == "NAFRev2" else list(entree["retenus_2025"])
 

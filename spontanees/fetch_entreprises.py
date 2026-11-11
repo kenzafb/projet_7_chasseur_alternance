@@ -36,12 +36,12 @@ import time
 
 import requests
 
-from database.entreprises_db import ajouter_entreprises, noter_source
+from database.entreprises_db import ajouter_entreprises, completer_codes_naf, noter_source
 from shared.config import DEPTS_IDF
 from shared.criteres import normaliser_recherche
 from shared.domaines import domaines_du_profil
 from shared.modes import MODE_DEFAUT
-from shared.naf import avertissement_sirene, exclusions, secteurs_sirene
+from shared.naf import avertissement_sirene, deux_codes, exclusions, secteurs_sirene
 from shared.tailles import TAILLES_250_PLUS, tranches_insee
 from spontanees import parametres_sirene as P
 
@@ -222,6 +222,7 @@ class Collecte:
                 siret = infos["siret"]
                 if siret and (entreprises.get(siret) or {}).get("_deja_en_base"):
                     entreprises[siret]["_vue_par_sirene"] = True
+                    entreprises[siret]["_naf"] = {k: infos[k] for k in ("naf_rev2", "naf_2025")}
                 elif infos["siren"] and infos["siren"] in self.sirens_connus:
                     self.sirens_vus.add(infos["siren"])     # autre établissement déjà en base (D59)
                 elif siret and siret not in entreprises:
@@ -271,8 +272,12 @@ def extraire_infos(etab):
     )
     taille = TRANCHES_EFFECTIF.get(code_effectif, code_effectif)
 
-    # NAF de la période courante
-    code_naf = periode.get("activitePrincipaleEtablissement", "")
+    # NAF de la période courante, et les deux nomenclatures (D112) : le code
+    # de la période est en NAF rév. 2 jusqu'à la bascule, en NAF 2025 après
+    # (nomenclatureActivitePrincipaleEtablissement) ; deux_codes les classe.
+    code_naf = periode.get("activitePrincipaleEtablissement", "") or ""
+    naf = deux_codes(code_naf, etab.get("activitePrincipaleNAF25Etablissement"),
+                     ul.get("activitePrincipaleUniteLegale"), ul.get("activitePrincipaleNAF25UniteLegale"))
 
     # Identifiants
     siret = etab.get("siret", "")
@@ -284,6 +289,8 @@ def extraire_infos(etab):
         "siret":          siret,
         "siren":          siren,
         "code_naf":       code_naf,
+        "naf_rev2":       naf["naf_rev2"],
+        "naf_2025":       naf["naf_2025"],
         "adresse":        adresse_str,
         "ville":          ville,
         "code_postal":    code_postal,
@@ -307,6 +314,7 @@ def enregistrer(user_id, entreprises: dict, sirens_vus=(), mode=MODE_DEFAUT) -> 
     Sirene a retrouvées, par SIRET ou par SIREN."""
     noter_source(user_id, [s for s, e in entreprises.items() if e.get("_vue_par_sirene")], "sirene",
                  sirens=sirens_vus)
+    completer_codes_naf(user_id, {s: e["_naf"] for s, e in entreprises.items() if e.get("_naf")})
     return ajouter_entreprises(user_id, [e for e in entreprises.values() if not e.get("_deja_en_base")], mode)
 
 

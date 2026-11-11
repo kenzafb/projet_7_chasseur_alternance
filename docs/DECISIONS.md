@@ -517,3 +517,10 @@ Sur les 8 offres de stage : O1, O2 et O8 inéligibles pour de bonnes raisons, O3
 ### D111. Couleur du statut sur le menu fermé seulement
 - **Décision.** Dans le tableau Candidatures, la couleur du statut (fond, bordure, texte) ne s'applique qu'au menu fermé ; les options de la liste déroulante gardent le texte et le fond neutres de l'application. L'application n'a pas de thème sombre : rien d'autre à vérifier.
 
+
+## Phase 8, bascule NAF 2025 (12 novembre 2026)
+
+### D112. Code NAF des entreprises dans les deux nomenclatures (complète D49 et D50)
+- **Constat.** Seul le code de la période de l'établissement (`activitePrincipaleEtablissement`, en NAF rév. 2) était enregistré, même pour une recherche en NAF 2025 ; une entreprise trouvée avant le 1er janvier 2027 n'aurait eu aucun code NAF 2025.
+- **Décision.** Deux colonnes `entreprises.naf_rev2` et `entreprises.naf_2025` (migration 0014), remplies quelle que soit la nomenclature active. Sirene : code de la période et `activitePrincipaleNAF25Etablissement`, à défaut ceux de l'unité légale. Les deux nomenclatures n'ont aucun code en commun : chaque code se classe par la table de l'INSEE, ce qui marche aussi quand la période passera en NAF 2025. Un code manquant est déduit de l'autre seulement quand la table n'en donne qu'un ; sinon il reste vide. LBA : « 6201Z » lu comme 62.01Z. Une entreprise déjà en base que Sirene ou LBA retrouve voit ses codes manquants complétés. `secteur` et `extra.code_naf` gardent le code brut de la source.
+- **Entreprises existantes.** Migration 0014 : `naf_rev2` tiré de `secteur` ou de `extra.code_naf`, `naf_2025` de la table quand la cible est unique ; vide pour une correspondance multiple, jusqu'à ce que Sirene retrouve l'entreprise. Migration lancée par l'humain après sauvegarde de la base.

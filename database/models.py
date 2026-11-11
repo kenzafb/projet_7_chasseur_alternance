@@ -198,6 +198,11 @@ class Entreprise(Base):
     siren          = Column(String(20),  index=True, default="")
     site_web       = Column(Text, default="")
     secteur        = Column(String(200), default="")
+    # Code NAF dans les deux nomenclatures (D112) : NAF rév. 2 jusqu'au
+    # 31 décembre 2026, NAF 2025 ensuite ; vide si inconnu (correspondance
+    # multiple de l'INSEE sans code donné par la source)
+    naf_rev2       = Column(String(10), nullable=False, default="", server_default="")
+    naf_2025       = Column(String(10), nullable=False, default="", server_default="")
     # Sources qui ont trouvé l'entreprise : ["sirene"], ["lba"] (entreprise à
     # fort potentiel de La Bonne Alternance) ou les deux, dans l'ordre où
     # elles l'ont trouvée. Aucune priorité de l'une sur l'autre (D44).
