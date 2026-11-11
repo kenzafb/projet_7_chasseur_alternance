@@ -27,6 +27,14 @@ VARIABLE_NAF = {
     "NAFRev2": "activitePrincipaleUniteLegale",
     "NAF2025": "activitePrincipaleNAF25UniteLegale",
 }
+# Repli si l'API refuse la variable d'une nomenclature (400, D113) : après
+# la bascule du 1er janvier 2027, activitePrincipaleUniteLegale portera
+# sans doute les codes NAF 2025 et la variable NAF25 pourrait disparaître.
+# Même requête, mêmes codes NAF 2025, autre variable ; à confirmer par
+# scripts/verifier_sirene.py (section « bascule ») après le 1er janvier.
+VARIABLE_NAF_REPLI = {
+    "NAF2025": "activitePrincipaleUniteLegale",
+}
 # Tranche d'effectif et catégorie d'entreprise, lues sur l'unité légale
 # (SPEC_SOURCES 4.1 : la taille d'une agence se lit sur son groupe)
 VARIABLE_TRANCHE = "trancheEffectifsUniteLegale"

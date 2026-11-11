@@ -153,7 +153,7 @@ def plan_sirene(profil: dict, log=print) -> list[tuple[str, str]]:
         plan += [("tous secteurs", construire_query(None, depts, variable, filtre, exclus))
                  for filtre in [filtre_tailles(tailles)] + ([inconnus] if inconnus else [])
                  for depts in _paquets(departements, P.DEPARTEMENTS_PAR_REQUETE)]
-    log(f"  Sirene ({codes['nomenclature']}) : "
+    log(f"  Sirene ({codes['nomenclature']}, variable {variable}) : "
         f"{len(codes['coeurs'])} codes cœurs, {len(codes['secteurs'])} codes de secteurs choisis, "
         f"{len(codes['transverses'])} codes transverses{', tous les secteurs' if tous else ''} ; "
         f"départements {', '.join(departements)} ; "
@@ -164,7 +164,25 @@ def plan_sirene(profil: dict, log=print) -> list[tuple[str, str]]:
 
 # ─── Pagination ───────────────────────────────────────────────────────────────
 class ErreurSirene(Exception):
-    pass
+    def __init__(self, message, statut=None):
+        super().__init__(message)
+        self.statut = statut
+
+
+def variable_naf_de(q: str) -> str | None:
+    """Variable du code NAF employée dans une requête (None : aucune)."""
+    variables = list(P.VARIABLE_NAF.values()) + list(P.VARIABLE_NAF_REPLI.values())
+    return next((v for v in variables if v and f"{v}:" in q), None)
+
+
+def avec_repli(q: str) -> tuple[str, str] | None:
+    """(requête, variable) de repli pour une requête dont la variable NAF a
+    été refusée (D113), None s'il n'y en a pas."""
+    for nomenclature, variable in P.VARIABLE_NAF.items():
+        repli = P.VARIABLE_NAF_REPLI.get(nomenclature)
+        if variable and repli and repli != variable and f"{variable}:" in q:
+            return q.replace(f"{variable}:", f"{repli}:"), repli
+    return None
 
 
 class Collecte:
@@ -196,7 +214,7 @@ class Collecte:
         if r.status_code in (401, 403):
             raise ErreurSirene(f"clé refusée ({r.status_code}), vérifier INSEE_API_KEY dans .env")
         if r.status_code != 200:
-            raise ErreurSirene(f"Sirene {r.status_code} : {r.text[:200]}")
+            raise ErreurSirene(f"Sirene {r.status_code} : {r.text[:200]}", r.status_code)
         try:
             return r.json()
         except ValueError:
@@ -394,6 +412,7 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
     collecte, debut = Collecte(cle, _log, sirens), time.monotonic()
     # Tous les groupes du plan, dans l'ordre, même ceux qui ne donnent rien
     par_groupe = dict.fromkeys((g for g, _ in plan), 0)
+    repli, variables = None, set()     # variable NAF de repli (D113), variables employées
     _log(f"🔍 Sirene : {len(plan)} recherches, cœurs d'abord, transverses pour compléter"
          + (", tous les secteurs en dernier" if "tous secteurs" in par_groupe else ""))
     for i, (groupe, q) in enumerate(plan, 1):
@@ -403,8 +422,23 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
         if plafond is not None and len(entreprises) >= plafond:
             _log(f"⏹️  Limite de {max_entreprises} nouvelles entreprises atteinte.")
             break
+        if repli:
+            q = (avec_repli(q) or (q,))[0]
         try:
-            n = collecte.recuperer(q, entreprises, plafond)
+            try:
+                n = collecte.recuperer(q, entreprises, plafond)
+            except ErreurSirene as e:
+                # Variable NAF refusée (400) : même recherche avec la variable
+                # de repli, gardée pour les suivantes (D113)
+                if e.statut != 400 or repli or not (alternative := avec_repli(q)):
+                    raise
+                _log(f"  ⚠️  Sirene refuse {variable_naf_de(q)} ({e}) : nouvel essai avec "
+                     f"{alternative[1]} et les mêmes codes")
+                q = alternative[0]
+                n = collecte.recuperer(q, entreprises, plafond)    # refusée aussi : recherche abandonnée
+                repli = alternative[1]
+                _log(f"  Sirene : variable {repli} acceptée, employée pour les recherches suivantes")
+            variables.add(variable_naf_de(q))
             par_groupe[groupe] += n
             inconnus = " (effectif inconnu)" if P.ABSENTS_PAR and P.ABSENTS_PAR in q else ""
             _log(f"  Sirene, {groupe}{inconnus} : {collecte.annonce or 0} établissements annoncés, {n} nouvelles")
@@ -423,7 +457,8 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
          + ", ".join(f"{n} {g}" for g, n in par_groupe.items()) + ")"
          + (f", {deja} déjà en base retrouvées" if deja else "")
          + f" ; {collecte.requetes} requêtes en {int(duree) // 60} min {int(duree) % 60:02d} s"
-         + (f", {collecte.erreurs} en erreur" if collecte.erreurs else ""))
+         + (f", {collecte.erreurs} en erreur" if collecte.erreurs else "")
+         + (f" ; variable NAF : {', '.join(sorted(v for v in variables if v))}" if variables - {None} else ""))
 
 
 if __name__ == "__main__":

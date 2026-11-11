@@ -104,3 +104,25 @@ def test_volume_tous_secteurs(cle, tmp_path):
                       "requete_reelle_hors_sans_salarie": 24}
     assert len(api.recherches) == 4 and CLE not in texte
     assert "VOLUME_TOUS_SECTEURS" in "\n".join(sorties)
+
+
+# ─── Bascule NAF 2025 (phase 8, D113) ─────────────────────────────────────────
+def test_bascule_avant_le_1er_janvier(cle, tmp_path):
+    _, sortie, res, _ = lancer(jeu(), tmp_path)
+    b = res["bascule"]
+    assert b["champs"]["uniteLegale.nomenclatureActivitePrincipaleUniteLegale"] == {"NAFRev2": 16}
+    assert b["contenu_activite_unite_legale"] == "NAFRev2"
+    assert b["champs"]["periode.activitePrincipaleEtablissement"] == {"NAFRev2": 16}
+    assert not b["repli_filtre"]                                 # 62.10Y absent de activitePrincipaleUniteLegale
+    assert "Bascule : activitePrincipaleUniteLegale en NAFRev2" in sortie and "ne filtre pas" in sortie
+
+
+def test_bascule_apres_le_1er_janvier(cle, tmp_path):
+    # Codes NAF 2025 dans activitePrincipaleUniteLegale, variable NAF25 disparue
+    etabs = [etablissement(n, naf="62.10Y", cp="75011") for n in range(3)]
+    _, sortie, res, _ = lancer(FausseSirene(etabs, variable_naf25=None, nomenclature="NAF2025"), tmp_path)
+    b = res["bascule"]
+    assert b["champs"]["uniteLegale.nomenclatureActivitePrincipaleUniteLegale"] == {"NAF2025": 3}
+    assert b["contenu_activite_unite_legale"] == "NAF2025" and b["repli_filtre"]
+    assert res["propositions"]["VARIABLE_NAF"]["NAF2025"] == "activitePrincipaleUniteLegale"
+    assert "repli activitePrincipaleUniteLegale avec un code NAF 2025 : filtre" in sortie

@@ -115,3 +115,64 @@ def test_migration_0014_remplit_les_deux_codes(tmp_path):
     cx = sqlite3.connect(chemin)
     assert not {r[1] for r in cx.execute("PRAGMA table_info(entreprises)")} & {"naf_rev2", "naf_2025"}
     cx.close()
+
+
+# ─── Repli de la variable NAF 2025 (D113) ─────────────────────────────────────
+class Journal(list):
+    def __call__(self, msg):
+        self.append(msg)
+
+    def texte(self):
+        return "\n".join(self)
+
+
+def test_avec_repli():
+    q = ("etablissementSiege:true AND activitePrincipaleNAF25UniteLegale:(62.10Y OR 62.20G) "
+         "AND -activitePrincipaleNAF25UniteLegale:68.32G")
+    assert fetch.avec_repli(q) == (q.replace("activitePrincipaleNAF25UniteLegale:", "activitePrincipaleUniteLegale:"),
+                                   "activitePrincipaleUniteLegale")
+    assert fetch.avec_repli("activitePrincipaleUniteLegale:62.01Z") is None    # NAF rév. 2 : pas de repli
+    assert fetch.variable_naf_de(q) == "activitePrincipaleNAF25UniteLegale"
+
+
+def test_variable_naf25_refusee_repli_sur_activite_principale(utilisateur, sirene, monkeypatch):
+    monkeypatch.setenv("NOMENCLATURE_NAF", "NAF2025")
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    # Après la bascule : activitePrincipaleUniteLegale porte les codes NAF 2025, NAF25 refusée (400)
+    api = sirene(FausseSirene([etablissement(1, naf="62.10Y"), etablissement(2, naf="64.19Y", tranche="42",
+                                                                             categorie="ETI")],
+                              variable_naf25=None, nomenclature="NAF2025"))
+    sauvegarder_profil(uid, {"recherche": {**_profil()["recherche"], "tailles_spontanees": ["10_49", "250_4999"]}})
+    log = Journal()
+    fetch.main(uid, log_fn=log)
+    assert sorted(_par_siret(uid)) == [siret_sirene(1), siret_sirene(2)]          # cœur et transverse
+    texte = log.texte()
+    assert "variable activitePrincipaleNAF25UniteLegale" in texte                 # plan
+    assert texte.count("Sirene refuse activitePrincipaleNAF25UniteLegale") == 1   # un seul essai refusé
+    assert "variable activitePrincipaleUniteLegale acceptée" in texte
+    assert "variable NAF : activitePrincipaleUniteLegale" in texte                # bilan
+    assert "recherche abandonnée" not in texte
+    refusees = [r["q"] for r in api.recherches if "NAF25" in r["q"]]
+    assert len(refusees) == 1
+    e = _par_siret(uid)[siret_sirene(1)]
+    assert (e["naf_rev2"], e["naf_2025"]) == ("62.01Z", "62.10Y")                 # code de la période en NAF 2025
+
+
+def test_repli_refuse_aussi_recherche_abandonnee(utilisateur, sirene, monkeypatch):
+    monkeypatch.setenv("NOMENCLATURE_NAF", "NAF2025")
+    monkeypatch.setitem(P.VARIABLE_NAF_REPLI, "NAF2025", "activiteInexistante")
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    sirene(FausseSirene([etablissement(1, naf="62.10Y")], variable_naf25=None))
+    sauvegarder_profil(uid, _profil())
+    log = Journal()
+    fetch.main(uid, log_fn=log)
+    assert lire_entreprises(uid) == [] and "recherche abandonnée" in log.texte()
+
+
+def test_naf_rev2_sans_repli(utilisateur, sirene):
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    sirene(FausseSirene([etablissement(1)]))
+    sauvegarder_profil(uid, _profil())
+    log = Journal()
+    fetch.main(uid, log_fn=log)
+    assert "refuse" not in log.texte() and "variable NAF : activitePrincipaleUniteLegale" in log.texte()

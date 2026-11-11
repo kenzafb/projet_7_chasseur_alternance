@@ -3,7 +3,8 @@ filtré par une requête dans le sous-ensemble de la syntaxe Lucene qu'emploie
 le code (ET, OU, valeurs entre parenthèses, préfixe « 75* », existence
 « -variable:* », exclusive dans un OU comme en Lucene), pagination par curseur.
 
-Réglable : nom de la variable NAF 2025, nombre maximal de valeurs par OU
+Réglable : nom de la variable NAF 2025 (None : refusée, comme après la
+bascule si elle disparaît), nomenclature annoncée, nombre maximal de valeurs par OU
 (au-delà : 414), syntaxe d'absence acceptée ou non.
 """
 
@@ -61,8 +62,9 @@ class ErreurRequete(Exception):
 
 class FausseSirene:
     def __init__(self, etablissements=(), variable_naf25="activitePrincipaleNAF25UniteLegale", max_ou=None,
-                 absents_ok=True):
+                 absents_ok=True, nomenclature="NAFRev2"):
         self.etablissements = list(etablissements)
+        self.nomenclature = nomenclature   # annoncée dans les réponses (NAF2025 après la bascule)
         self.variable_naf25 = variable_naf25
         self.max_ou = max_ou
         self.absents_ok = absents_ok
@@ -128,7 +130,7 @@ class FausseSirene:
     def _json(self, e):
         ul = {"siren": e["siret"][:9], "denominationUniteLegale": e["nom"], "categorieEntreprise": e["categorie"],
               "trancheEffectifsUniteLegale": e["tranche"], "activitePrincipaleUniteLegale": e["naf"],
-              "nomenclatureActivitePrincipaleUniteLegale": "NAFRev2"}
+              "nomenclatureActivitePrincipaleUniteLegale": self.nomenclature}
         if self.variable_naf25:
             ul[self.variable_naf25] = e["naf25"]
         etab = {"siret": e["siret"], "trancheEffectifsEtablissement": e["tranche_etab"], "uniteLegale": ul,
@@ -136,7 +138,7 @@ class FausseSirene:
                                          "numeroVoieEtablissement": "1", "typeVoieEtablissement": "RUE",
                                          "libelleVoieEtablissement": "TEST"},
                 "periodesEtablissement": [{"dateFin": None, "activitePrincipaleEtablissement": e["naf"],
-                                           "nomenclatureActivitePrincipaleEtablissement": "NAFRev2"}]}
+                                           "nomenclatureActivitePrincipaleEtablissement": self.nomenclature}]}
         if self.variable_naf25:
             etab["activitePrincipaleNAF25Etablissement"] = e["naf25"]
         return etab

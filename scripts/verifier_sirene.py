@@ -24,6 +24,12 @@ Requête de référence : sièges actifs à Paris (codes postaux 75), NAF 62.01Z
    leur présence réelle.
 6. Pagination : nombre=1000 et 1001, début 1000 et 20000, trois pages par
    curseur.
+7. Bascule NAF 2025 (phase 8) : sur 100 sièges de Paris sans filtre
+   d'activité, valeurs de nomenclatureActivitePrincipaleUniteLegale et
+   nomenclature réelle des codes de activitePrincipaleUniteLegale et de la
+   période (classés par la table de l'INSEE) ; puis la variable de repli
+   (VARIABLE_NAF_REPLI) avec le code NAF 2025 62.10Y. À relancer après le
+   1er janvier 2027.
 
 --tous-secteurs (phase 6b) : seulement le volume de la case « tous les
 secteurs » des candidatures spontanées, sièges actifs des 8 départements
@@ -77,6 +83,19 @@ SYNTAXES_ABSENTS = [
     "-{v}:*", "NOT {v}:*", "-{v}:[* TO *]",
 ]
 MOTS_NOMENCLATURE = ("naf", "nomenclature", "2025", "25")
+
+
+def codes_naf_2025() -> set[str]:
+    with open(CORRESPONDANCE, encoding="utf-8") as f:
+        return {ligne["naf_2025"] for ligne in csv.DictReader(f)}
+
+
+def classer(code) -> str:
+    """« NAFRev2 », « NAF2025 » ou « inconnu » d'après la table de l'INSEE
+    (les deux nomenclatures n'ont aucun code en commun)."""
+    if code in set(codes_naf_rev2()):
+        return "NAFRev2"
+    return "NAF2025" if code in codes_naf_2025() else "inconnu"
 
 
 class ErreurCle(Exception):
@@ -294,6 +313,50 @@ class Verificateur:
         return {"champs": champs, "essais": essais, "variable_qui_filtre": trouve,
                 "variable_vue_dans_les_reponses": vue}
 
+    # ── 7. Bascule : nomenclature et contenu des codes (D113) ──
+    def bascule(self) -> dict:
+        """Sièges actifs de Paris sans filtre d'activité : nomenclature
+        annoncée et nomenclature réelle des codes de l'unité légale et de la
+        période, puis la variable de repli avec un code NAF 2025."""
+        e = self.appeler(requete(f"{P.VARIABLE_CODE_POSTAL}:{DEPT}*"), nombre=100)
+        etabs = (e.get("_corps") or {}).get("etablissements") or []
+        champs = {
+            "uniteLegale.nomenclatureActivitePrincipaleUniteLegale": Counter(),
+            "uniteLegale.activitePrincipaleUniteLegale": Counter(),
+            "periode.nomenclatureActivitePrincipaleEtablissement": Counter(),
+            "periode.activitePrincipaleEtablissement": Counter(),
+        }
+        exemples = {c: Counter() for c in champs}
+        for x in etabs:
+            ul = x.get("uniteLegale") or {}
+            periodes = x.get("periodesEtablissement") or [{}]
+            periode = next((p for p in periodes if p.get("dateFin") is None), periodes[0])
+            valeurs = {
+                "uniteLegale.nomenclatureActivitePrincipaleUniteLegale": ul.get("nomenclatureActivitePrincipaleUniteLegale"),
+                "uniteLegale.activitePrincipaleUniteLegale": ul.get("activitePrincipaleUniteLegale"),
+                "periode.nomenclatureActivitePrincipaleEtablissement": periode.get("nomenclatureActivitePrincipaleEtablissement"),
+                "periode.activitePrincipaleEtablissement": periode.get("activitePrincipaleEtablissement"),
+            }
+            for c, v in valeurs.items():
+                if "nomenclature" in c:
+                    champs[c][str(v)] += 1
+                else:
+                    champs[c][classer(v)] += 1
+                    exemples[c][str(v)] += 1
+        res = {"sur": len(etabs), "champs": {c: dict(n) for c, n in champs.items()},
+               "exemples": {c: dict(n.most_common(5)) for c, n in exemples.items() if n}}
+        for c, n in res["champs"].items():
+            self.afficher(f"  {c} : {n}")
+        contenu = res["champs"]["uniteLegale.activitePrincipaleUniteLegale"]
+        res["contenu_activite_unite_legale"] = (
+            "aucun" if not contenu else next(iter(contenu)) if len(contenu) == 1 else "mélange")
+        repli = P.VARIABLE_NAF_REPLI.get("NAF2025")
+        essai = self.compter(f"{P.VARIABLE_CODE_POSTAL}:{DEPT}*", f"{repli}:62.10Y")
+        res["repli"] = {"variable": repli, **self.sans_corps(essai)}
+        res["repli_filtre"] = bool(essai["total"])
+        self.afficher(f"  {repli}:62.10Y (repli) : {self._court(essai)}")
+        return res
+
     # ── 6. Pagination ──
     def pagination(self) -> dict:
         q = requete(f"{P.VARIABLE_CODE_POSTAL}:{DEPT}*", f"activitePrincipaleUniteLegale:{NAF}")
@@ -326,6 +389,9 @@ def propositions(res: dict) -> dict:
     prop["NAF_PAR_REQUETE"] = nafs["max_accepte"] if nafs["dix"]["ou_exact"] else P.NAF_PAR_REQUETE
     prop["DEPARTEMENTS_PAR_REQUETE"] = 8 if res["departements"]["ou_exact"] else P.DEPARTEMENTS_PAR_REQUETE
     variable = res["naf2025"]["variable_qui_filtre"]
+    bascule = res.get("bascule") or {}
+    if not variable and bascule.get("repli_filtre"):
+        variable = bascule["repli"]["variable"]      # variable NAF25 refusée, repli qui filtre (D113)
     prop["VARIABLE_NAF"] = {**P.VARIABLE_NAF, "NAF2025": variable or P.VARIABLE_NAF["NAF2025"]}
     absents = res["tranches"]["trancheEffectifsUniteLegale"]["absents"]
     # Syntaxe acceptée : des résultats, ou aucun (404) sans erreur de syntaxe
@@ -348,6 +414,14 @@ def resume(res: dict, afficher=print):
                  + (f" ; vue dans les réponses : {n25['variable_vue_dans_les_reponses']}"
                     if n25["variable_vue_dans_les_reponses"] else "")
                  + ". Voir « naf2025 » dans le fichier.")
+    b = res.get("bascule")
+    if b:
+        afficher(f"Bascule : activitePrincipaleUniteLegale en {b['contenu_activite_unite_legale']} "
+                 f"(nomenclature annoncée {b['champs']['uniteLegale.nomenclatureActivitePrincipaleUniteLegale']}) ; "
+                 f"repli {b['repli']['variable']} avec un code NAF 2025 : "
+                 + ("filtre" if b["repli_filtre"] else "ne filtre pas"))
+        if not n25["variable_qui_filtre"] and not b["repli_filtre"]:
+            afficher("⚠️  Ni la variable NAF 2025 ni le repli ne filtrent : recherche NAF 2025 impossible.")
     if not res["tranches"]["trancheEffectifsUniteLegale"]["ou_exact"]:
         afficher("⚠️  La liste de tranches par OU ne donne pas la somme des tranches seules.")
 
@@ -409,13 +483,15 @@ def main(session=None, sortie=DOSSIER_SORTIE, pause=PAUSE_S, afficher=print, seu
         naf2025 = v.naf2025()
         afficher("6. Pagination :")
         pagination = v.pagination()
+        afficher("7. Bascule NAF 2025 (nomenclature et contenu des codes) :")
+        bascule = v.bascule()
     except ErreurCle as e:
         afficher(f"❌ {e}")
         return 1
     res = {"verifie_le": datetime.now(timezone.utc).isoformat(timespec="seconds"), "requetes": v.requetes,
            "reference": reference, "tranches": tranches, "categories": categories,
            "naf_multiples": naf_multiples, "departements": departements, "naf2025": naf2025,
-           "pagination": pagination}
+           "pagination": pagination, "bascule": bascule}
     res["propositions"] = propositions(res)
     chemin = ecrire(v, sortie, "verification_api", res)
     afficher(f"Détail écrit dans {chemin} ({v.requetes} requêtes)")
