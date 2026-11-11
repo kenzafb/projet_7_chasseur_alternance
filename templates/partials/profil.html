@@ -10,6 +10,12 @@
     </div>
     <!-- Copie de sections depuis le profil d'un autre mode (D117 à D119) -->
     <button class="btn btn--sm profil-intro__copie" type="button" data-copie-ouvrir>Copier depuis un autre mode</button>
+    <!-- Modifications non enregistrées : la copie attend l'enregistrement (D121) -->
+    <div class="copie__garde" data-copie-garde role="alert" hidden>
+      <span data-copie-garde-texte>Enregistre d'abord tes modifications : la copie recharge le profil enregistré.</span>
+      <button class="btn btn--sm btn--signal" type="button" data-copie-enregistrer>Enregistrer puis copier</button>
+      <button class="btn btn--sm btn--ghost" type="button" data-copie-garde-annuler>Annuler</button>
+    </div>
   </div>
 
   <!-- Champs dont l'IA a besoin pour juger : avertissement s'ils sont vides -->
@@ -564,8 +570,7 @@
       </div>
       <div class="modal__body">
         <p class="copie__note">Seules les sections qui ne dépendent pas du mode sont proposées : jamais les critères
-          de recherche, les réglages des candidatures spontanées ni ce qui est propre au stage ou au job.
-          Les modifications pas encore enregistrées sur cette page seront remplacées par le profil enregistré.</p>
+          de recherche, les réglages des candidatures spontanées ni ce qui est propre au stage ou au job.</p>
         <div class="copie__etape">
           <span class="field__label">1. Mode source</span>
           <div class="copie__sources" data-copie-sources></div>

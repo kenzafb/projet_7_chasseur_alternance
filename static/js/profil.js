@@ -13,6 +13,7 @@ import { CopieProfil } from "./copie_profil.js";
 const _tags = {};
 let _modeProfilCourant = "alternance";   // mode du profil actuellement affiché
 let _projets = [];
+let _reference = null;   // formulaire tel que chargé ou enregistré en dernier (JSON), D121
 
 /* ── Tags ──────────────────────────────────────────────────────────────── */
 function rendreTags(champ) {
@@ -502,11 +503,17 @@ export const Profil = {
 
     rendrePiecesJointes(p.pieces_jointes || []);
     CompteEnvoi.charger();
-    // Après une copie depuis un autre mode : profil rechargé depuis la base
-    CopieProfil.brancher(mode, async libelles => {
-      await this.charger();
-      const statut = document.querySelector("[data-profil-status]");
-      if (statut) statut.textContent = `✓ Copié : ${libelles.join(", ")}`;
+    // Copie depuis un autre mode : refusée tant que le formulaire a des
+    // modifications non enregistrées (D121) ; après la copie, profil
+    // rechargé depuis la base
+    CopieProfil.brancher(mode, {
+      aDesModifications: () => this.aDesModifications(),
+      enregistrer: () => this.sauvegarder(),
+      apresCopie: async libelles => {
+        await this.charger();
+        const statut = document.querySelector("[data-profil-status]");
+        if (statut) statut.textContent = `✓ Copié : ${libelles.join(", ")}`;
+      },
     });
 
     if (!this._charge) {
@@ -526,25 +533,22 @@ export const Profil = {
       brancherPiecesJointes();
       this._charge = true;
     }
+    // Référence des modifications non enregistrées : le formulaire tel que chargé
+    _reference = JSON.stringify(this.collecter());
+    CopieProfil.masquerGarde();
   },
 
-  async sauvegarder() {
+  /* Ce que « Enregistrer » envoie : tout le formulaire du mode */
+  collecter() {
     const data = {};
     document.querySelectorAll("[data-profil]").forEach(el => {
       if (!_champVisible(el)) return;        // ignore les doublons masqués (évite d'écraser)
       data[el.dataset.profil] = el.value;
     });
     document.querySelectorAll("[data-profil-case]").forEach(el => { data[el.dataset.profilCase] = el.checked; });
-
-    // Validation de la lettre type : placeholders autorisés uniquement
-    const lettre = data.lettre_type || "";
-    if (lettre.trim()) {
-      const erreur = validerLettre(lettre);
-      if (erreur) { alert("Lettre type : " + erreur); return false; }
-    }
-    data.competences = _tags["competences"] || [];
+    data.competences = [...(_tags["competences"] || [])];
     lireProjetsDepuisDOM();
-    data.projets = _projets.filter(p => p.nom || p.url || p.description);
+    data.projets = _projets.filter(p => p.nom || p.url || p.description).map(p => ({ ...p }));
 
     // Reconstruire l'objet recherche
     const rech = {};
@@ -555,10 +559,30 @@ export const Profil = {
     rech.domaines = lireDomainesCoches(DOMAINES_DU_MODE[_modeProfilCourant] || DOMAINES_DU_MODE.alternance);
     Object.assign(rech, lireOptions(_modeProfilCourant));
     data.recherche = rech;
+    return data;
+  },
+
+  /* Formulaire différent de ce qui a été chargé ou enregistré en dernier (D121) */
+  aDesModifications() {
+    return _reference !== null && JSON.stringify(this.collecter()) !== _reference;
+  },
+
+  async sauvegarder() {
+    const data = this.collecter();
+    // Validation de la lettre type : placeholders autorisés uniquement
+    const lettre = data.lettre_type || "";
+    if (lettre.trim()) {
+      const erreur = validerLettre(lettre);
+      if (erreur) { alert("Lettre type : " + erreur); return false; }
+    }
 
     try {
       const ok = (await api.sauverProfil(data)).ok === true;
-      if (ok) api.profil().then(p => { afficherNiveau(p.niveau_profil); afficherManquesIA(p.manques_ia); }, () => {});
+      if (ok) {
+        _reference = JSON.stringify(data);
+        CopieProfil.masquerGarde();
+        api.profil().then(p => { afficherNiveau(p.niveau_profil); afficherManquesIA(p.manques_ia); }, () => {});
+      }
       return ok;
     } catch (e) {
       // Refus du serveur (date illisible, balise inconnue...) : message lisible

@@ -220,9 +220,10 @@ def test_bouton_et_fenetre_sur_la_page_profil_de_chaque_mode(utilisateur, mode):
     client, _ = utilisateur("a@test.fr", prenom="Ada")
     page = client.get(f"/{mode}").text
     for attribut in ("data-copie-ouvrir", "data-copie-modal", "data-copie-sources", "data-copie-apercu-liste",
-                     "data-copie-valider"):
+                     "data-copie-valider", "data-copie-garde", "data-copie-enregistrer"):   # garde : D121
         assert attribut in page, attribut
     assert "Copier depuis un autre mode" in page
+    assert "Enregistre d'abord tes modifications" in page and "Enregistrer puis copier" in page
 
 
 # ─── Portfolio dans la carte Identité (D120) ──────────────────────────────────

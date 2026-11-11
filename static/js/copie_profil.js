@@ -3,7 +3,8 @@
    1. mode source  2. sections copiables  3. aperçu actuel / copié, avec une
    confirmation explicite pour chaque section déjà remplie ici  4. copie.
    Le serveur refait toutes les vérifications (D117) : la fenêtre ne fait que
-   les montrer.
+   les montrer. Formulaire modifié et pas enregistré : la fenêtre ne s'ouvre
+   pas, « Enregistrer puis copier » est proposé (D121).
    ============================================================================ */
 
 import { api, MODE } from "./api.js";
@@ -30,6 +31,8 @@ function cellule(champ, v, titre) {
 }
 
 const etat = { source: null, apercu: [], modeCible: MODE };
+// Fournis par profil.js : modifications non enregistrées, enregistrement, suite de la copie
+const deps = { aDesModifications: () => false, enregistrer: async () => true, apresCopie: async () => {} };
 
 function erreur(msg) {
   const el = $("[data-copie-erreur]");
@@ -108,7 +111,8 @@ async function voirApercu() {
   rendreApercu();
 }
 
-async function valider(apresCopie) {
+async function valider() {
+  const apresCopie = deps.apresCopie;
   const sections = etat.apercu.filter(s => !s.erreur).map(s => s.cle);
   const ecraser = [...document.querySelectorAll("[data-copie-ecraser]:checked")].map(el => el.dataset.copieEcraser);
   $("[data-copie-valider]").disabled = true;
@@ -139,14 +143,46 @@ function fermer() {
   $("[data-copie-modal]").classList.remove("is-open");
 }
 
+/* Modifications non enregistrées : la fenêtre ne s'ouvre pas (D121), un
+   message le dit et propose « Enregistrer puis copier » */
+function garde(afficher, message = "") {
+  const el = $("[data-copie-garde]");
+  if (!el) return;
+  el.hidden = !afficher;
+  const texte = $("[data-copie-garde-texte]");
+  if (texte) texte.textContent = message || "Enregistre d'abord tes modifications : la copie recharge le profil enregistré.";
+}
+
+function demanderOuverture() {
+  if (deps.aDesModifications()) { garde(true); return; }
+  garde(false);
+  ouvrir();
+}
+
+async function enregistrerPuisCopier() {
+  const bouton = $("[data-copie-enregistrer]");
+  bouton.disabled = true;
+  let ok = false;
+  try { ok = await deps.enregistrer(); } finally { bouton.disabled = false; }
+  if (!ok || deps.aDesModifications()) {
+    garde(true, "Enregistrement impossible : corrige le profil puis réessaie.");
+    return;
+  }
+  garde(false);
+  ouvrir();
+}
+
 export const CopieProfil = {
   _branche: false,
-  /* apresCopie(libelles) : recharge le profil et affiche ce qui a été copié */
-  brancher(modeCible, apresCopie) {
+  /* fonctions : {aDesModifications(), enregistrer() -> ok, apresCopie(libelles)} */
+  brancher(modeCible, fonctions) {
     etat.modeCible = modeCible || MODE;
+    Object.assign(deps, fonctions || {});
     if (this._branche) return;
     this._branche = true;
-    $("[data-copie-ouvrir]")?.addEventListener("click", ouvrir);
+    $("[data-copie-ouvrir]")?.addEventListener("click", demanderOuverture);
+    $("[data-copie-enregistrer]")?.addEventListener("click", enregistrerPuisCopier);
+    $("[data-copie-garde-annuler]")?.addEventListener("click", () => garde(false));
     $("[data-copie-fermer]")?.addEventListener("click", fermer);
     const modal = $("[data-copie-modal]");
     modal?.addEventListener("change", e => {
@@ -157,6 +193,7 @@ export const CopieProfil = {
       } else if (e.target.matches("[data-copie-ecraser]")) majValider();
     });
     $("[data-copie-apercu]")?.addEventListener("click", voirApercu);
-    $("[data-copie-valider]")?.addEventListener("click", () => valider(apresCopie));
+    $("[data-copie-valider]")?.addEventListener("click", valider);
   },
+  masquerGarde() { garde(false); },
 };
