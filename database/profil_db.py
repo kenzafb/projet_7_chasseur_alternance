@@ -10,6 +10,7 @@ quel utilisateur.
 from database.connexion import SessionLocal
 from database.models import Profil
 from shared.criteres import normaliser_recherche
+from shared.erreurs import ErreurUtilisateur
 from shared.stage import duree_semaines, lire_date, verifier_periode
 
 
@@ -186,5 +187,48 @@ def fichiers_references(user_id: int) -> set[str]:
     try:
         profils = db.query(Profil).filter_by(user_id=user_id).all()
         return {pj.get("fichier", "") for p in profils for pj in (p.pieces_jointes or [])} - {""}
+    finally:
+        db.close()
+
+
+# Clé de lire_profil -> colonne de profils (copie entre modes, D117)
+_COLONNE = {"email": "email_contact"}
+
+
+def copier_sections(user_id: int, source: str, cible: str, sections, ecraser=()) -> dict:
+    """Copie des sections du profil du mode source vers le mode cible du
+    même utilisateur (shared.copie_profil), en une transaction. Refus
+    (ErreurUtilisateur, rien n'est écrit) : section non copiable, copie
+    impossible (balise de l'email), section remplie et différente dans le
+    mode cible sans être dans ecraser. Retourne {copiees, fichiers_retires}."""
+    import copy
+    from shared.copie_profil import apercu
+    sections = list(dict.fromkeys(sections or []))
+    if not sections:
+        raise ErreurUtilisateur("Coche au moins une section à copier.")
+    db = SessionLocal()
+    try:
+        # Les deux profils lus par user_id : jamais celui d'un autre utilisateur
+        p_source = db.query(Profil).filter_by(user_id=user_id, mode=source).first()
+        if not p_source:
+            raise ErreurUtilisateur(f"Aucun profil enregistré en mode {source}.")
+        p_cible = db.query(Profil).filter_by(user_id=user_id, mode=cible).first()
+        d_cible = _profil_vers_dict(p_cible) if p_cible else {}
+        plan = apercu(_profil_vers_dict(p_source), d_cible, sections, source, cible)
+        if erreurs := [s for s in plan if s["erreur"]]:
+            raise ErreurUtilisateur(f"{erreurs[0]['libelle']} : {erreurs[0]['erreur']}")
+        a_confirmer = [s["libelle"] for s in plan if s["a_confirmer"] and s["cle"] not in set(ecraser or ())]
+        if a_confirmer:
+            raise ErreurUtilisateur("Déjà rempli dans ce mode, confirme l'écrasement : " + ", ".join(a_confirmer) + ".")
+        if not p_cible:
+            p_cible = Profil(user_id=user_id, mode=cible)
+            db.add(p_cible)
+        retires = []
+        for s in plan:
+            for ligne in s["champs"]:
+                champ = ligne["champ"]
+                setattr(p_cible, _COLONNE.get(champ, champ), copy.deepcopy(ligne["copie"]))
+        db.commit()
+        return {"copiees": [s["cle"] for s in plan], "fichiers_retires": [f for f in retires if f]}
     finally:
         db.close()

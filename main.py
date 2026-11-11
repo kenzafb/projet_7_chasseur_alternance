@@ -449,6 +449,37 @@ def api_profil_piece_get(request: Request, nom: str, user: User = Depends(utilis
     return JSONResponse({"erreur": "Pièce introuvable"}, status_code=404)
 
 
+# ─── Copie de sections du profil depuis un autre mode (phase 9, D117) ─────────
+# Le mode de la page (paramètre « mode ») est la cible ; la source est un
+# autre mode du même utilisateur, jamais celui d'un autre (user.id de la session).
+@prive.get("/api/profil/copie/sections")
+def api_profil_copie_sections(source: str, user: User = Depends(utilisateur_requis),
+                              mode: str = Depends(mode_requis)):
+    from shared.copie_profil import sections_copiables
+    return {"sections": sections_copiables(source, mode),
+            "source_existe": bool(lire_profil(user.id, mode=source))}
+
+
+@prive.post("/api/profil/copie/apercu")
+def api_profil_copie_apercu(body: dict = Body(...), user: User = Depends(utilisateur_requis),
+                            mode: str = Depends(mode_requis)):
+    from shared.copie_profil import apercu
+    source = str(body.get("source") or "")
+    return {"sections": apercu(lire_profil(user.id, mode=source) if source != mode else {},
+                               lire_profil(user.id, mode=mode), body.get("sections") or [], source, mode)}
+
+
+@prive.post("/api/profil/copie")
+def api_profil_copie(body: dict = Body(...), user: User = Depends(utilisateur_requis),
+                     mode: str = Depends(mode_requis)):
+    from database.profil_db import copier_sections
+    from shared.copie_profil import verifier_modes
+    source = str(body.get("source") or "")
+    verifier_modes(source, mode)
+    res = copier_sections(user.id, source, mode, body.get("sections") or [], body.get("ecraser") or [])
+    return {"ok": True, "copiees": res["copiees"]}
+
+
 # ─── Compte d'envoi (SMTP de l'utilisateur) ───────────────────────────────────
 # Le mot de passe n'est jamais renvoyé : le front ne reçoit que
 # mot_de_passe_configure et verifie_le.
