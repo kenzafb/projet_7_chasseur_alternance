@@ -169,6 +169,17 @@ class ErreurSirene(Exception):
         self.statut = statut
 
 
+def _essayer_repli(collecte, q: str, entreprises: dict, plafond, log) -> int:
+    """Recherche de repli après un total nul (D116) : nouvelles entreprises,
+    0 si elle échoue (le résultat nul de départ est gardé, sans erreur)."""
+    try:
+        return collecte.recuperer(q, entreprises, plafond)
+    except ErreurSirene as e:
+        collecte.annonce = 0
+        log(f"  Sirene : repli refusé ({e}), résultat nul gardé")
+        return 0
+
+
 def variable_naf_de(q: str) -> str | None:
     """Variable du code NAF employée dans une requête (None : aucune)."""
     variables = list(P.VARIABLE_NAF.values()) + list(P.VARIABLE_NAF_REPLI.values())
@@ -413,6 +424,7 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
     # Tous les groupes du plan, dans l'ordre, même ceux qui ne donnent rien
     par_groupe = dict.fromkeys((g for g, _ in plan), 0)
     repli, variables = None, set()     # variable NAF de repli (D113), variables employées
+    naf_remplie = False                # la variable NAF 2025 a déjà donné des résultats (D116)
     _log(f"🔍 Sirene : {len(plan)} recherches, cœurs d'abord, transverses pour compléter"
          + (", tous les secteurs en dernier" if "tous secteurs" in par_groupe else ""))
     for i, (groupe, q) in enumerate(plan, 1):
@@ -438,6 +450,21 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
                 n = collecte.recuperer(q, entreprises, plafond)    # refusée aussi : recherche abandonnée
                 repli = alternative[1]
                 _log(f"  Sirene : variable {repli} acceptée, employée pour les recherches suivantes")
+            # Variable acceptée mais aucun résultat au total : peut-être vide
+            # après la bascule ; même recherche avec la variable de repli,
+            # sauf si elle a déjà donné des résultats dans ce lancement (D116)
+            if not repli and not collecte.annonce and not naf_remplie and (alternative := avec_repli(q)):
+                origine = variable_naf_de(q)
+                n_repli = _essayer_repli(collecte, alternative[0], entreprises, plafond, _log)
+                if collecte.annonce:
+                    _log(f"  ⚠️  Sirene : variable NAF25 vide, repli utilisé : 0 établissement avec {origine}, "
+                         f"{collecte.annonce} avec {alternative[1]} et les mêmes codes ; "
+                         f"{alternative[1]} employée pour les recherches suivantes")
+                    q, repli, n = alternative[0], alternative[1], n_repli
+                else:
+                    _log(f"  Sirene : 0 établissement avec {origine} ni avec {alternative[1]} (repli essayé)")
+            elif not repli and collecte.annonce and avec_repli(q):
+                naf_remplie = True
             variables.add(variable_naf_de(q))
             par_groupe[groupe] += n
             inconnus = " (effectif inconnu)" if P.ABSENTS_PAR and P.ABSENTS_PAR in q else ""

@@ -4,7 +4,8 @@ le code (ET, OU, valeurs entre parenthèses, préfixe « 75* », existence
 « -variable:* », exclusive dans un OU comme en Lucene), pagination par curseur.
 
 Réglable : nom de la variable NAF 2025 (None : refusée, comme après la
-bascule si elle disparaît), nomenclature annoncée, nombre maximal de valeurs par OU
+bascule si elle disparaît), variable acceptée mais vide, nomenclature
+annoncée, nombre maximal de valeurs par OU
 (au-delà : 414), syntaxe d'absence acceptée ou non.
 """
 
@@ -62,9 +63,10 @@ class ErreurRequete(Exception):
 
 class FausseSirene:
     def __init__(self, etablissements=(), variable_naf25="activitePrincipaleNAF25UniteLegale", max_ou=None,
-                 absents_ok=True, nomenclature="NAFRev2"):
+                 absents_ok=True, nomenclature="NAFRev2", naf25_vide=False):
         self.etablissements = list(etablissements)
         self.nomenclature = nomenclature   # annoncée dans les réponses (NAF2025 après la bascule)
+        self.naf25_vide = naf25_vide       # variable NAF 2025 acceptée mais vide partout (D116)
         self.variable_naf25 = variable_naf25
         self.max_ou = max_ou
         self.absents_ok = absents_ok
@@ -82,7 +84,7 @@ class FausseSirene:
             "categorieEntreprise": e["categorie"],
         }
         if self.variable_naf25:
-            table[self.variable_naf25] = e["naf25"]
+            table[self.variable_naf25] = "" if self.naf25_vide else e["naf25"]
         if variable not in table:
             raise ErreurRequete(f"Variable inconnue : {variable}")
         return table[variable]
@@ -132,7 +134,7 @@ class FausseSirene:
               "trancheEffectifsUniteLegale": e["tranche"], "activitePrincipaleUniteLegale": e["naf"],
               "nomenclatureActivitePrincipaleUniteLegale": self.nomenclature}
         if self.variable_naf25:
-            ul[self.variable_naf25] = e["naf25"]
+            ul[self.variable_naf25] = "" if self.naf25_vide else e["naf25"]
         etab = {"siret": e["siret"], "trancheEffectifsEtablissement": e["tranche_etab"], "uniteLegale": ul,
                 "adresseEtablissement": {"codePostalEtablissement": e["cp"], "libelleCommuneEtablissement": "PARIS",
                                          "numeroVoieEtablissement": "1", "typeVoieEtablissement": "RUE",
@@ -140,7 +142,7 @@ class FausseSirene:
                 "periodesEtablissement": [{"dateFin": None, "activitePrincipaleEtablissement": e["naf"],
                                            "nomenclatureActivitePrincipaleEtablissement": self.nomenclature}]}
         if self.variable_naf25:
-            etab["activitePrincipaleNAF25Etablissement"] = e["naf25"]
+            etab["activitePrincipaleNAF25Etablissement"] = "" if self.naf25_vide else e["naf25"]
         return etab
 
     def get(self, url, params=None, headers=None, timeout=None, **_):

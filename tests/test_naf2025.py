@@ -176,3 +176,54 @@ def test_naf_rev2_sans_repli(utilisateur, sirene):
     log = Journal()
     fetch.main(uid, log_fn=log)
     assert "refuse" not in log.texte() and "variable NAF : activitePrincipaleUniteLegale" in log.texte()
+
+
+# ─── Variable NAF 2025 acceptée mais vide (D116) ──────────────────────────────
+def _grandes():
+    return {"recherche": {**_profil()["recherche"], "tailles_spontanees": ["10_49", "250_4999"]}}
+
+
+def test_variable_naf25_vide_repli_utilise(utilisateur, sirene, monkeypatch):
+    monkeypatch.setenv("NOMENCLATURE_NAF", "NAF2025")
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    api = sirene(FausseSirene([etablissement(1, naf="62.10Y"),
+                               etablissement(2, naf="64.19Y", tranche="42", categorie="ETI")],
+                              naf25_vide=True, nomenclature="NAF2025"))
+    sauvegarder_profil(uid, _grandes())
+    log = Journal()
+    fetch.main(uid, log_fn=log)
+    assert sorted(_par_siret(uid)) == [siret_sirene(1), siret_sirene(2)]
+    texte = log.texte()
+    assert texte.count("variable NAF25 vide, repli utilisé") == 1
+    assert "variable NAF : activitePrincipaleUniteLegale" in texte and "abandonnée" not in texte
+    assert len([r for r in api.recherches if "NAF25" in r["q"]]) == 1           # essayée une fois
+
+
+def test_variable_naf25_vide_et_repli_vide_zero_sans_erreur(utilisateur, sirene, monkeypatch):
+    monkeypatch.setenv("NOMENCLATURE_NAF", "NAF2025")
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    # Aucune entreprise du domaine : 0 avec les deux variables
+    api = sirene(FausseSirene([etablissement(1, naf="01.11Y")], naf25_vide=True))
+    sauvegarder_profil(uid, _profil())
+    log = Journal()
+    fetch.main(uid, log_fn=log)
+    texte = log.texte()
+    assert lire_entreprises(uid) == [] and "en erreur" not in texte and "abandonnée" not in texte
+    assert "ni avec activitePrincipaleUniteLegale (repli essayé)" in texte
+    assert "repli utilisé" not in texte
+    naf25 = [r for r in api.recherches if "NAF25" in r["q"]]
+    repli = [r for r in api.recherches if "activitePrincipaleUniteLegale:" in r["q"]]
+    assert len(naf25) == len(repli) >= 1                                       # un repli par recherche nulle
+
+
+def test_variable_naf25_remplie_pas_de_repli_sur_un_zero(utilisateur, sirene, monkeypatch):
+    monkeypatch.setenv("NOMENCLATURE_NAF", "NAF2025")
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    # Cœurs trouvés (variable remplie), transverses à 0 : pas de repli
+    api = sirene(FausseSirene([etablissement(1, naf="62.01Z", naf25="62.10Y")]))
+    sauvegarder_profil(uid, _grandes())
+    log = Journal()
+    fetch.main(uid, log_fn=log)
+    assert sorted(_par_siret(uid)) == [siret_sirene(1)]
+    assert not [r for r in api.recherches if "activitePrincipaleUniteLegale:" in r["q"]]
+    assert "repli" not in log.texte()
