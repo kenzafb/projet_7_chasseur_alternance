@@ -8,6 +8,7 @@
 
 import { api, avecMode } from "./api.js";
 import { CompteEnvoi } from "./compte_envoi.js";
+import { CopieProfil } from "./copie_profil.js";
 
 const _tags = {};
 let _modeProfilCourant = "alternance";   // mode du profil actuellement affiché
@@ -501,6 +502,12 @@ export const Profil = {
 
     rendrePiecesJointes(p.pieces_jointes || []);
     CompteEnvoi.charger();
+    // Après une copie depuis un autre mode : profil rechargé depuis la base
+    CopieProfil.brancher(mode, async libelles => {
+      await this.charger();
+      const statut = document.querySelector("[data-profil-status]");
+      if (statut) statut.textContent = `✓ Copié : ${libelles.join(", ")}`;
+    });
 
     if (!this._charge) {
       document.querySelectorAll("[data-stage-date]").forEach(el => el.addEventListener("input", majDureeStage));

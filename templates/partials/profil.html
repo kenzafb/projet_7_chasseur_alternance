@@ -8,6 +8,8 @@
       Plus il est complet, meilleures sont les analyses d'offres et les lettres générées.
       Compte une dizaine de minutes pour tout remplir — tu pourras modifier à tout moment.
     </div>
+    <!-- Copie de sections depuis le profil d'un autre mode (D117 à D119) -->
+    <button class="btn btn--sm profil-intro__copie" type="button" data-copie-ouvrir>Copier depuis un autre mode</button>
   </div>
 
   <!-- Champs dont l'IA a besoin pour juger : avertissement s'ils sont vides -->
@@ -550,6 +552,40 @@
   <div class="profil-save">
     <span class="profil-save__status" data-profil-status></span>
     <button class="btn btn--signal" data-profil-save>Enregistrer mon profil</button>
+  </div>
+
+  <!-- Fenêtre « Copier depuis un autre mode » : source, sections, aperçu, confirmation -->
+  <div class="modal-bg" data-copie-modal>
+    <div class="modal modal--large">
+      <div class="modal__head">
+        <span class="modal__title">Copier depuis un autre mode</span>
+        <button class="btn btn--ghost btn--sm" type="button" data-copie-fermer>Fermer</button>
+      </div>
+      <div class="modal__body">
+        <p class="copie__note">Seules les sections qui ne dépendent pas du mode sont proposées : jamais les critères
+          de recherche, les réglages des candidatures spontanées ni ce qui est propre au stage ou au job.
+          Les modifications pas encore enregistrées sur cette page seront remplacées par le profil enregistré.</p>
+        <div class="copie__etape">
+          <span class="field__label">1. Mode source</span>
+          <div class="copie__sources" data-copie-sources></div>
+        </div>
+        <div class="copie__etape" data-copie-etape-sections hidden>
+          <span class="field__label">2. Sections à copier</span>
+          <p class="copie__vide" data-copie-source-vide hidden>Aucun profil enregistré dans ce mode : rien à copier.</p>
+          <div class="copie__sections" data-copie-sections></div>
+          <button class="btn btn--sm" type="button" data-copie-apercu disabled>Voir l'aperçu</button>
+        </div>
+        <div class="copie__etape" data-copie-etape-apercu hidden>
+          <span class="field__label">3. Aperçu : valeur actuelle et valeur copiée</span>
+          <div data-copie-apercu-liste></div>
+        </div>
+        <p class="copie__erreur" data-copie-erreur hidden></p>
+      </div>
+      <div class="modal__foot">
+        <span class="copie__etat" data-copie-etat></span>
+        <button class="btn btn--signal" type="button" data-copie-valider disabled>Copier</button>
+      </div>
+    </div>
   </div>
 
 </section>

@@ -211,3 +211,14 @@ def test_ajouter_piece_jointe_reste_par_mode(utilisateur):
     _, uid = utilisateur("a@test.fr", prenom="Ada")
     ajouter_piece_jointe(uid, "CV", f"user_{uid}/cv.pdf", mode="stage")
     assert lire_profil(uid, mode="job") == {}
+
+
+# ─── Interface (D119) ─────────────────────────────────────────────────────────
+@pytest.mark.parametrize("mode", ["alternance", "job", "stage"])
+def test_bouton_et_fenetre_sur_la_page_profil_de_chaque_mode(utilisateur, mode):
+    client, _ = utilisateur("a@test.fr", prenom="Ada")
+    page = client.get(f"/{mode}").text
+    for attribut in ("data-copie-ouvrir", "data-copie-modal", "data-copie-sources", "data-copie-apercu-liste",
+                     "data-copie-valider"):
+        assert attribut in page, attribut
+    assert "Copier depuis un autre mode" in page

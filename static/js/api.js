@@ -148,6 +148,10 @@ export const api = {
   criteresOptions: ()        => get("/api/criteres_options"),
   envoyerPiece:    (fd)      => postForm("/api/profil/upload", fd),
   supprimerPiece:  (nom)     => post("/api/profil/piece/supprimer", { nom }),
+  // Copie de sections depuis le profil d'un autre mode (cible : mode de la page)
+  copieSections:   (source)  => get(`/api/profil/copie/sections?source=${encodeURIComponent(source)}`),
+  copieApercu:     (source, sections) => post("/api/profil/copie/apercu", { source, sections }),
+  copierProfil:    (source, sections, ecraser) => post("/api/profil/copie", { source, sections, ecraser }),
 
   // Compte d'envoi (le mot de passe part au serveur, il n'en revient jamais)
   compteEnvoi:          ()      => get("/api/compte_envoi"),

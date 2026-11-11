@@ -550,3 +550,39 @@
 
 /* Date de candidature modifiable dans le tableau (D110) */
 .cand-date { font: inherit; font-size: 12.5px; padding: 3px 4px; border: 1px solid var(--hair-strong); border-radius: var(--r-sm); }
+
+/* ── Copie de profil depuis un autre mode (D119) ─────────────────────────── */
+.profil-intro { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.profil-intro__txt { flex: 1 1 320px; }
+.profil-intro__copie { flex: 0 0 auto; }
+.modal--large { max-width: 920px; }
+.copie__note { font-size: 13px; color: var(--txt-muted); margin: 0 0 14px; line-height: 1.5; }
+.copie__etape { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+.copie__etape > .btn { align-self: flex-start; }
+.copie__sources, .copie__sections { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 13.5px; }
+.copie__sources label, .copie__sections label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.copie__vide, .copie__erreur { font-size: 13px; color: var(--rouge); margin: 0; }
+.copie__etat { font-size: 13px; color: var(--txt-muted); margin-right: auto; }
+.copie__section { border: 1px solid var(--hair); border-radius: var(--r-md); margin-bottom: 12px; overflow: hidden; }
+.copie__section--confirmer { border-color: var(--ambre); }
+.copie__section--erreur { border-color: var(--rouge); }
+.copie__titre { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  padding: 8px 12px; background: var(--surface-2); font-weight: 600; font-size: 13.5px; }
+.copie__badge { font-size: 12px; font-weight: 500; color: var(--txt-muted); }
+.copie__badge--confirmer { color: #8a5a00; }
+.copie__badge--erreur { color: var(--rouge); }
+.copie__grille { display: grid; grid-template-columns: 140px 1fr 1fr; font-size: 13px; }
+.copie__grille > div { padding: 6px 12px; border-top: 1px solid var(--hair); white-space: pre-wrap;
+  overflow-wrap: anywhere; max-height: 180px; overflow-y: auto; }
+.copie__entete { font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--txt-faint); }
+.copie__champ { color: var(--txt-muted); }
+.copie__neant { color: var(--txt-faint); font-style: italic; }
+.copie__confirmer { display: flex; align-items: center; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--hair);
+  background: var(--ambre-soft); font-size: 13px; }
+.copie__mobile { display: none; }
+.copie__message { padding: 8px 12px; border-top: 1px solid var(--hair); font-size: 13px; }
+@media (max-width: 720px) {
+  .copie__grille { grid-template-columns: 1fr; }
+  .copie__grille .copie__entete { display: none; }
+  .copie__mobile { display: block; font-size: 11.5px; color: var(--txt-faint); }
+}
