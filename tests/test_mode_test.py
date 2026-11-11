@@ -190,7 +190,8 @@ def test_envoi_reel_par_la_route_sans_mode_test(alice, smtp_simule, pipelines_ne
 
 def test_interface_affiche_le_mode_test():
     from shared import config
-    profil = (config.TEMPLATES_DIR / "partials" / "profil.html").read_text(encoding="utf-8")
+    # Compte d'envoi : page Paramètres depuis D122
+    parametres = (config.TEMPLATES_DIR / "partials" / "parametres.html").read_text(encoding="utf-8")
     spontanees = (config.TEMPLATES_DIR / "partials" / "spontanees.html").read_text(encoding="utf-8")
-    assert "data-ce-mode-test" in profil and "Mode test" in profil
+    assert "data-ce-mode-test" in parametres and "Mode test" in parametres
     assert "data-sp-mode-test" in spontanees and "Mode test actif" in spontanees

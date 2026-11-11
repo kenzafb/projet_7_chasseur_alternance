@@ -8,6 +8,7 @@ import { Offres }        from "./offres.js";
 import { Candidatures }  from "./candidatures.js";
 import { Spontanees }    from "./spontanees.js";
 import { Profil }        from "./profil.js";
+import { Parametres }    from "./parametres.js";
 
 /* Contenu contextuel de la topbar selon la page */
 const TOPBAR = {
@@ -18,6 +19,7 @@ const TOPBAR = {
   candidatures: { title: "Suivi des candidatures", action: "Actualiser",         run: () => Candidatures.charger() },
   spontanees:   { title: "Candidatures spontanées", action: "Récupérer",         run: () => Spontanees.action("fetch") },
   profil:       { title: "Mon profil",            action: "Enregistrer",         run: () => sauvegarderProfil() },
+  parametres:   { title: "Paramètres",            action: null },   // chaque carte a ses boutons
 };
 
 let pageCourante = "offres";
@@ -36,13 +38,15 @@ function aller(page) {
 
   if (page === "profil" && !Profil._charge) Profil.charger();
   if (page === "candidatures") Candidatures.charger();
+  if (page === "parametres") Parametres.charger();
   const t = TOPBAR[page];
   let titre = t.title;
   // Le titre de la page Offres s'adapte au mode (alternance / job / stage)
   if (page === "offres" && MODE === "job") titre = "Offres de jobs";
   if (page === "offres" && MODE === "stage") titre = "Offres de stage";
   document.querySelector('[data-topbar="title"]').textContent = titre;
-  document.querySelector('[data-topbar="action-label"]').textContent = t.action;
+  document.querySelector('[data-topbar="action-label"]').textContent = t.action || "";
+  document.querySelector('[data-topbar="action"]').style.display = t.action ? "" : "none";
   majBadge();
 }
 
@@ -52,7 +56,7 @@ function majBadge() {
   const compteur = document.querySelector(`[data-count="${pageCourante}"]`);
   const n = compteur ? compteur.textContent : "0";
   const mots = { offres: "offres", candidatures: "candidatures", spontanees: "entreprises", profil: "" };
-  if (pageCourante === "profil") { badge.textContent = ""; return; }
+  if (pageCourante === "profil" || pageCourante === "parametres") { badge.textContent = ""; return; }
   badge.textContent = `${n} ${mots[pageCourante]}`;
 }
 
@@ -440,7 +444,7 @@ recharger();
     history.replaceState(null, "", location.pathname);
   } else {
     // Reprendre la page mémorisée dans l'URL (#candidatures, etc.), sinon Offres
-    const PAGES_VALIDES = ["offres", "candidatures", "spontanees", "profil"];
+    const PAGES_VALIDES = ["offres", "candidatures", "spontanees", "profil", "parametres"];
     // Ancienne page « Spontanées envoyées » : fondue dans le suivi unique (D107)
     const hash = location.hash.replace("#", "") === "spontanees-suivi" ? "candidatures" : location.hash.replace("#", "");
     aller(PAGES_VALIDES.includes(hash) ? hash : "offres");

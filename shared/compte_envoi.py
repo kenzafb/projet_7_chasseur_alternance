@@ -83,7 +83,7 @@ def _compte_complet(user_id: int) -> dict:
     compte = compte_envoi_db.compte_pour_envoi(user_id)
     if not compte:
         raise CompteEnvoiRequis(
-            "Aucun compte d'envoi configuré : renseigne-le dans Profil, section "
+            "Aucun compte d'envoi configuré : renseigne-le dans Paramètres, section "
             "Compte d'envoi, puis teste la connexion.")
     return compte
 
@@ -94,7 +94,7 @@ def exiger_compte_verifie(user_id: int) -> dict:
     compte = _compte_complet(user_id)
     if not compte["verifie"]:
         raise CompteEnvoiRequis(
-            "Compte d'envoi non vérifié : lance « Tester la connexion » dans Profil, "
+            "Compte d'envoi non vérifié : lance « Tester la connexion » dans Paramètres, "
             "section Compte d'envoi, avant d'envoyer.")
     return compte
 

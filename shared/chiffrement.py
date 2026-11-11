@@ -30,7 +30,7 @@ class SecretIllisible(ErreurUtilisateur):
     def __init__(self):
         super().__init__(
             "Le mot de passe du compte d'envoi ne peut plus être relu (la clé de "
-            "chiffrement du serveur a changé) : saisis-le à nouveau dans Profil, "
+            "chiffrement du serveur a changé) : saisis-le à nouveau dans Paramètres, "
             "section Compte d'envoi.")
 
 

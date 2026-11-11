@@ -7,7 +7,6 @@
    ============================================================================ */
 
 import { api, avecMode } from "./api.js";
-import { CompteEnvoi } from "./compte_envoi.js";
 import { CopieProfil } from "./copie_profil.js";
 
 const _tags = {};
@@ -502,7 +501,6 @@ export const Profil = {
     majDureeStage();
 
     rendrePiecesJointes(p.pieces_jointes || []);
-    CompteEnvoi.charger();
     // Copie depuis un autre mode : refusée tant que le formulaire a des
     // modifications non enregistrées (D121) ; après la copie, profil
     // rechargé depuis la base

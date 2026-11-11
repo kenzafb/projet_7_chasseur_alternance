@@ -591,3 +591,11 @@
   .copie__grille .copie__entete { display: none; }
   .copie__mobile { display: block; font-size: 11.5px; color: var(--txt-faint); }
 }
+
+/* ── Page Paramètres (D122) ──────────────────────────────────────────────── */
+.parametres-intro { font-size: 13.5px; color: var(--txt-muted); margin: 0 0 18px; }
+.parametres-actuel { font-size: 13.5px; margin: 0 0 12px; }
+.parametres-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.parametres-alerte { margin: 0 0 12px; padding: 8px 12px; border-radius: var(--r-sm); font-size: 13px;
+  background: var(--ambre-soft); border: 1px solid var(--ambre); }
+.parametres-alerte[hidden] { display: none; }

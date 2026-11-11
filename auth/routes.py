@@ -21,7 +21,8 @@ from fastapi.templating import Jinja2Templates
 from shared.config import TEMPLATES_DIR, code_invitation
 from database.connexion import SessionLocal
 from database.models import User, Profil
-from auth.securite import authentifier, hacher_mot_de_passe, LONGUEUR_MIN_MOT_DE_PASSE
+from auth.securite import (authentifier, hacher_mot_de_passe, LONGUEUR_MIN_MOT_DE_PASSE, ouvrir_session,
+                           verifier_nouveau_mot_de_passe)
 
 router = APIRouter()
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -41,8 +42,9 @@ def traiter_login(request: Request, email: str = Form(...), mot_de_passe: str = 
             request, "login.html",
             {"erreur": "Email ou mot de passe incorrect."},
         )
-    # Ouvre la session : on ne stocke que l'id, jamais le mot de passe
-    request.session["user_id"] = user.id
+    # Ouvre la session : l'id et l'empreinte du mot de passe, jamais le mot de passe
+    request.session.clear()
+    ouvrir_session(request, user)
     return RedirectResponse(url="/", status_code=303)
 
 
@@ -81,10 +83,8 @@ def traiter_register(request: Request,
     # Comparaison à temps constant (pas d'indice sur le code par le chronométrage)
     if not hmac.compare_digest(code_invitation_saisi.strip().encode(), code_attendu.encode()):
         return _page_register(request, "Code d'invitation invalide.", status_code=403)
-    if len(mot_de_passe) < LONGUEUR_MIN_MOT_DE_PASSE:
-        return _page_register(
-            request, f"Mot de passe trop court ({LONGUEUR_MIN_MOT_DE_PASSE} caractères minimum).",
-            status_code=400)
+    if erreur := verifier_nouveau_mot_de_passe(mot_de_passe):
+        return _page_register(request, erreur, status_code=400)
     email = email.lower().strip()
     db = SessionLocal()
     try:
@@ -99,7 +99,8 @@ def traiter_register(request: Request,
         db.add(Profil(user_id=user.id, prenom=prenom, nom=nom, email_contact=email))
         db.commit()
         # Connecte directement
-        request.session["user_id"] = user.id
+        request.session.clear()
+        ouvrir_session(request, user)
         return RedirectResponse(url="/alternance?bienvenue=1", status_code=303)
     finally:
         db.close()

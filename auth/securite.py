@@ -11,11 +11,15 @@ On réutilise le PasswordHelper de fastapi-users (déjà utilisé à la migratio
 donc les hashs créés hier restent valides.
 """
 
+import hashlib
+import hmac
+
 from fastapi import Request
 from fastapi_users.password import PasswordHelper
 
 from database.connexion import SessionLocal
 from database.models import User
+from shared.config import secret_key
 
 _pwd = PasswordHelper()
 
@@ -49,20 +53,49 @@ def authentifier(email: str, mot_de_passe: str):
         db.close()
 
 
+def verifier_nouveau_mot_de_passe(mot_de_passe: str) -> str | None:
+    """Règles d'un nouveau mot de passe (inscription, changement) : message
+    d'erreur, ou None s'il est accepté."""
+    if len(mot_de_passe or "") < LONGUEUR_MIN_MOT_DE_PASSE:
+        return f"Mot de passe trop court ({LONGUEUR_MIN_MOT_DE_PASSE} caractères minimum)."
+    return None
+
+
+def empreinte_session(hash_mot_de_passe: str) -> str:
+    """Empreinte du mot de passe gardée dans le cookie de session (D122) :
+    HMAC du hash par SECRET_KEY, jamais le hash lui-même (le cookie est signé,
+    pas chiffré). Un changement de mot de passe change l'empreinte : toutes
+    les sessions ouvertes avant deviennent invalides."""
+    return hmac.new(secret_key().encode(), (hash_mot_de_passe or "").encode(), hashlib.sha256).hexdigest()[:32]
+
+
+def ouvrir_session(request: Request, user: User):
+    """Connecte user dans ce navigateur : son id et l'empreinte de son mot de passe."""
+    request.session["user_id"] = user.id
+    request.session["empreinte"] = empreinte_session(user.mot_de_passe_hash)
+
+
 def utilisateur_courant(request: Request):
     """
     Récupère l'utilisateur connecté à partir de la session.
     Retourne l'objet User, ou None si personne n'est connecté.
     À utiliser dans les routes pour savoir qui fait la requête.
+    Une session dont l'empreinte ne correspond plus au mot de passe (changé
+    depuis, ou session ouverte avant D122) est fermée.
     """
     user_id = request.session.get("user_id")
     if not user_id:
         return None
     db = SessionLocal()
     try:
-        return db.query(User).filter_by(id=user_id).first()
+        user = db.query(User).filter_by(id=user_id).first()
     finally:
         db.close()
+    empreinte = request.session.get("empreinte") or ""
+    if not user or not hmac.compare_digest(empreinte, empreinte_session(user.mot_de_passe_hash)):
+        request.session.clear()
+        return None
+    return user
 
 
 class NonConnecte(Exception):

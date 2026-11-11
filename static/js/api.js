@@ -153,6 +153,11 @@ export const api = {
   copieApercu:     (source, sections) => post("/api/profil/copie/apercu", { source, sections }),
   copierProfil:    (source, sections, ecraser) => post("/api/profil/copie", { source, sections, ecraser }),
 
+  // Compte de connexion (page Paramètres)
+  compte:            ()      => get("/api/compte"),
+  changerMotDePasse: (ancien, nouveau, confirmation) => post("/api/compte/mot_de_passe", { ancien, nouveau, confirmation }),
+  changerEmail:      (email, mot_de_passe) => post("/api/compte/email", { email, mot_de_passe }),
+
   // Compte d'envoi (le mot de passe part au serveur, il n'en revient jamais)
   compteEnvoi:          ()      => get("/api/compte_envoi"),
   enregistrerCompte:    (corps) => post("/api/compte_envoi", corps),

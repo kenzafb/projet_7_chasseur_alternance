@@ -1,5 +1,5 @@
 /* ============================================================================
-   compte_envoi.js — section « Compte d'envoi » du profil
+   compte_envoi.js — section « Compte d'envoi » de la page Paramètres (D122)
    Le mot de passe est en écriture seule : jamais prérempli, jamais relu.
    Le serveur ne renvoie que « configuré » et la date de dernière vérification.
    ============================================================================ */

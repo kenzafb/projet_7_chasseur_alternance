@@ -1,0 +1,139 @@
+<!-- ════════════ PAGE PARAMÈTRES (compte, commune aux trois modes, D122) ════════════ -->
+<section class="page" data-page-content="parametres">
+
+  <p class="parametres-intro">Réglages de ton compte, les mêmes dans les trois modes (alternance, job, stage).</p>
+
+  <!-- ─── Email de connexion ─── -->
+  <div class="card profil-card">
+    <div class="profil-card__head">
+      <span class="profil-card__num">01</span>
+      <div>
+        <h3 class="profil-card__title">Email de connexion</h3>
+        <p class="profil-card__sub">L'adresse avec laquelle tu te connectes. Elle ne change ni l'email de contact de tes profils, ni le compte d'envoi.</p>
+      </div>
+    </div>
+    <p class="parametres-actuel">Email actuel : <strong data-compte-email>…</strong></p>
+    <form class="profil-grid" data-compte-form="email" autocomplete="off">
+      <label class="field">
+        <span class="field__label">Nouvel email</span>
+        <input class="field__input" type="email" name="email" required autocomplete="email">
+      </label>
+      <label class="field">
+        <span class="field__label">Mot de passe actuel</span>
+        <input class="field__input" type="password" name="mot_de_passe" required autocomplete="current-password">
+      </label>
+      <div class="parametres-actions">
+        <button class="btn btn--signal" type="submit">Changer l'email</button>
+        <span class="ce-message" data-compte-message="email" role="status"></span>
+      </div>
+    </form>
+  </div>
+
+  <!-- ─── Mot de passe ─── -->
+  <div class="card profil-card">
+    <div class="profil-card__head">
+      <span class="profil-card__num">02</span>
+      <div>
+        <h3 class="profil-card__title">Mot de passe</h3>
+        <p class="profil-card__sub">{{ longueur_min_mot_de_passe }} caractères minimum. Tes autres sessions (autres navigateurs, autres appareils) seront déconnectées ; celle-ci reste ouverte.</p>
+      </div>
+    </div>
+    <p class="parametres-alerte" data-compte-temporaire hidden>Ton mot de passe a été réinitialisé : choisis-en un nouveau pour continuer.</p>
+    <form class="profil-grid" data-compte-form="mot_de_passe" autocomplete="off">
+      <label class="field">
+        <span class="field__label">Mot de passe actuel</span>
+        <input class="field__input" type="password" name="ancien" required autocomplete="current-password">
+      </label>
+      <span></span>
+      <label class="field">
+        <span class="field__label">Nouveau mot de passe</span>
+        <input class="field__input" type="password" name="nouveau" required minlength="{{ longueur_min_mot_de_passe }}" autocomplete="new-password">
+      </label>
+      <label class="field">
+        <span class="field__label">Confirmation</span>
+        <input class="field__input" type="password" name="confirmation" required minlength="{{ longueur_min_mot_de_passe }}" autocomplete="new-password">
+      </label>
+      <div class="parametres-actions">
+        <button class="btn btn--signal" type="submit">Changer le mot de passe</button>
+        <span class="ce-message" data-compte-message="mot_de_passe" role="status"></span>
+      </div>
+    </form>
+  </div>
+
+  <!-- ─── Compte d'envoi (un seul par utilisateur, D122 : venu du Profil) ─── -->
+  <!-- Champs data-ce : hors du profil, enregistrés par leurs propres boutons -->
+  <div class="card profil-card" data-ce-carte>
+    <div class="profil-card__head">
+      <span class="profil-card__num">03</span>
+      <div>
+        <h3 class="profil-card__title">Compte d'envoi</h3>
+        <p class="profil-card__sub">L'adresse depuis laquelle partent tes candidatures spontanées. Le même compte sert aux trois modes.</p>
+      </div>
+    </div>
+
+    <div class="ce-etat" data-ce-etat>Chargement…</div>
+
+    <div data-ce-formulaire>
+      <div class="profil-aide">
+        <strong>Gmail :</strong> ton mot de passe habituel ne fonctionne pas ici. Il faut un
+        <em>mot de passe d'application</em> : active d'abord la validation en deux étapes sur ton
+        compte Google, puis crée un mot de passe d'application (Compte Google, Sécurité,
+        Mots de passe des applications) et colle ici les 16 caractères. Il est chiffré sur le
+        serveur et ne sera plus jamais affiché.
+      </div>
+
+      <div class="ce-presets">
+        <label class="ce-preset"><input type="radio" name="ce-preset" value="gmail" data-ce-preset checked> Gmail</label>
+        <label class="ce-preset"><input type="radio" name="ce-preset" value="autre" data-ce-preset> Autre serveur</label>
+      </div>
+
+      <div class="profil-grid">
+        <label class="field">
+          <span class="field__label">Adresse d'expédition</span>
+          <input class="field__input" type="email" data-ce="adresse" placeholder="prenom.nom@gmail.com" autocomplete="off">
+        </label>
+        <label class="field">
+          <span class="field__label">Nom affiché <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
+          <input class="field__input" type="text" data-ce="nom_affiche" placeholder="Prénom Nom" autocomplete="off">
+        </label>
+        <label class="field" data-ce-autre>
+          <span class="field__label">Serveur SMTP</span>
+          <input class="field__input" type="text" data-ce="serveur" placeholder="smtp.exemple.fr" autocomplete="off">
+        </label>
+        <label class="field" data-ce-autre>
+          <span class="field__label">Port et chiffrement</span>
+          <select class="field__input" data-ce="port">
+            <option value="465">465 (SSL)</option>
+            <option value="587">587 (STARTTLS)</option>
+          </select>
+        </label>
+        <label class="field" data-ce-autre>
+          <span class="field__label">Identifiant <span style="opacity:.6;font-weight:400;">(vide : l'adresse d'expédition)</span></span>
+          <input class="field__input" type="text" data-ce="identifiant" autocomplete="off">
+        </label>
+        <label class="field">
+          <span class="field__label">Mot de passe <span data-ce-mdp-aide style="opacity:.6;font-weight:400;"></span></span>
+          <input class="field__input" type="password" data-ce="mot_de_passe" autocomplete="new-password">
+        </label>
+      </div>
+
+      <div class="ce-actions">
+        <button class="btn btn--signal" type="button" data-ce-action="enregistrer">Enregistrer et tester</button>
+        <button class="btn" type="button" data-ce-action="tester">Tester la connexion</button>
+        <button class="btn" type="button" data-ce-action="mail_test">M'envoyer un mail de test</button>
+        <button class="btn btn--ghost" type="button" data-ce-action="supprimer">Supprimer le compte</button>
+      </div>
+      <div class="ce-message" data-ce-message></div>
+
+      <label class="ce-mode-test" data-ce-mode-test-bloc>
+        <input type="checkbox" data-ce-mode-test>
+        <span><strong>Mode test</strong> : chaque candidature spontanée part vers ton adresse
+        d'expédition au lieu de l'entreprise, avec le vrai destinataire dans l'objet. Rien n'est
+        enregistré comme contacté et aucune entreprise n'est marquée comme envoyée. Les mails de
+        test comptent dans le plafond du jour.</span>
+      </label>
+    </div>
+  </div>
+
+
+</section>

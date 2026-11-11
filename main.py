@@ -28,7 +28,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from auth.routes import router as auth_router
-from auth.securite import NonConnecte, utilisateur_requis
+from auth.securite import LONGUEUR_MIN_MOT_DE_PASSE, NonConnecte, utilisateur_requis
 from database.models import User
 from shared.erreurs import CHAMPS_IDENTITE, ErreurUtilisateur, exiger_profil
 from database.candidatures_db import (lire_candidatures, lire_candidature, modifier_candidature, ajouter_candidature,
@@ -306,7 +306,8 @@ def _page_du_mode(request: Request, mode: str):
                                                              "limites": config.LIMITES_LANCEMENT,
                                                              "analyse_ia": config.analyse_ia_active(),
                                                              "modele_analyse": config.modele_ia("analyse"),
-                                                             "exemple_lettre": lettre_par_defaut(mode)})
+                                                             "exemple_lettre": lettre_par_defaut(mode),
+                                                             "longueur_min_mot_de_passe": LONGUEUR_MIN_MOT_DE_PASSE})
 
 @prive.get("/alternance")
 def page_alternance(request: Request):
@@ -481,6 +482,31 @@ def api_profil_copie(body: dict = Body(...), user: User = Depends(utilisateur_re
     # aucun autre mode ne s'en sert (D118)
     _supprimer_si_orpheline(user.id, res["fichiers_retires"])
     return {"ok": True, "copiees": res["copiees"]}
+
+
+# ─── Compte de connexion (page Paramètres, D122) ──────────────────────────────
+# Communs aux trois modes : aucun paramètre « mode » n'est lu.
+@prive.get("/api/compte")
+def api_compte(user: User = Depends(utilisateur_requis)):
+    return {"email": user.email}
+
+
+@prive.post("/api/compte/mot_de_passe")
+def api_compte_mot_de_passe(request: Request, body: dict = Body(...), user: User = Depends(utilisateur_requis)):
+    from auth.compte import changer_mot_de_passe
+    from auth.securite import ouvrir_session
+    a_jour = changer_mot_de_passe(user.id, str(body.get("ancien") or ""), str(body.get("nouveau") or ""),
+                                  str(body.get("confirmation") or ""))
+    # Cette session reste ouverte (nouvelle empreinte) ; les autres sont fermées
+    ouvrir_session(request, a_jour)
+    return {"ok": True}
+
+
+@prive.post("/api/compte/email")
+def api_compte_email(body: dict = Body(...), user: User = Depends(utilisateur_requis)):
+    from auth.compte import changer_email
+    return {"ok": True, "email": changer_email(user.id, str(body.get("email") or ""),
+                                               str(body.get("mot_de_passe") or ""))}
 
 
 # ─── Compte d'envoi (SMTP de l'utilisateur) ───────────────────────────────────
