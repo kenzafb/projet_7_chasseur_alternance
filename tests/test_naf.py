@@ -94,3 +94,11 @@ def test_bascule_naf_2025(monkeypatch):
     assert config.nomenclature_naf(date(2027, 6, 1)) == "NAFRev2"
     monkeypatch.setenv("NOMENCLATURE_NAF", "autre")
     assert config.nomenclature_naf(date(2027, 6, 1)) == "NAF2025"
+    monkeypatch.setenv("NOMENCLATURE_NAF", "")                  # vide, comme dans .env.example : selon la date
+    assert config.nomenclature_naf(date(2026, 12, 31)) == "NAFRev2"
+    assert config.nomenclature_naf(date(2027, 1, 1)) == "NAF2025"
+
+
+def test_nomenclature_naf_documentee_dans_env_example():
+    texte = (config.BASE_DIR / ".env.example").read_text(encoding="utf-8")
+    assert "\nNOMENCLATURE_NAF=\n" in texte and "1er janvier 2027" in texte
