@@ -46,7 +46,7 @@ def test_sections_copiables_selon_les_modes():
     champs = {c for _, _, cs in SECTIONS for c in cs}
     for propre in ("recherche", "date_debut", "date_fin", "missions", "etablissement", "duree_souhaitee",
                    "types_jobs_ok", "niveau_vise", "formation_apporte", "criteres_eviter", "analyse_auto",
-                   "langues", "portfolio", "dispo_horaires", "mobilite", "localisation_pref"):
+                   "langues", "dispo_horaires", "mobilite", "localisation_pref"):
         assert propre not in champs and propre not in MODES_DU_CHAMP
 
 
@@ -75,7 +75,8 @@ def test_apercu_puis_copie_vers_un_mode_vide(utilisateur):
     assert job["competences"] == ["Python", "Linux"] and job["github"] == "github.com/ada"
     assert job["projets"][0]["nom"] == "Chasseur"
     # Rien d'autre : ni les champs propres au stage, ni la recherche
-    assert job["missions"] == "" and job["portfolio"] == "" and job["recherche"] == {} and job["langues"] == ""
+    assert job["portfolio"] == "https://ada.fr"                          # avec les liens (D120)
+    assert job["missions"] == "" and job["recherche"] == {} and job["langues"] == ""
     # La source n'est pas touchée
     assert lire_profil(uid, mode="stage")["missions"] == "Développement"
 
@@ -222,3 +223,26 @@ def test_bouton_et_fenetre_sur_la_page_profil_de_chaque_mode(utilisateur, mode):
                      "data-copie-valider"):
         assert attribut in page, attribut
     assert "Copier depuis un autre mode" in page
+
+
+# ─── Portfolio dans la carte Identité (D120) ──────────────────────────────────
+@pytest.mark.parametrize("mode", ["alternance", "job", "stage"])
+def test_portfolio_dans_la_carte_identite_de_chaque_mode(utilisateur, mode):
+    client, uid = utilisateur("a@test.fr", prenom="Ada")
+    _stage(uid)
+    page = client.get(f"/{mode}").text
+    assert page.count('data-profil="portfolio"') == 1
+    debut = page.index('<h3 class="profil-card__title">Identité</h3>')
+    identite = page[debut:page.index("data-mode-section=", debut)]          # jusqu'à la carte suivante
+    assert 'data-profil="portfolio"' in identite
+    assert page[:debut].rsplit("data-mode-section=", 1)[1].startswith('"commun"')
+
+
+def test_portfolio_du_stage_conserve_et_copiable(utilisateur):
+    client, uid = utilisateur("a@test.fr", prenom="Ada")
+    _stage(uid)
+    assert lire_profil(uid, mode="stage")["portfolio"] == "https://ada.fr"
+    assert "portfolio" in next(s for s in sections_copiables("stage", "alternance") if s["cle"] == "liens")["champs"]
+    r = _client(client, "alternance").post("/api/profil/copie", json={"source": "stage", "sections": ["liens"]})
+    assert r.status_code == 200 and lire_profil(uid, mode="alternance")["portfolio"] == "https://ada.fr"
+    assert lire_profil(uid, mode="stage")["portfolio"] == "https://ada.fr"

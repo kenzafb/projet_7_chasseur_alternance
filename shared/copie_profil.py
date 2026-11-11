@@ -13,8 +13,8 @@ spontanées), dates, établissement et missions du stage, niveau visé, ce
 que la formation apporte, critères à éviter, champs du job, analyse
 automatique. Non copiés parce que leur sens change selon le mode :
 « langues » (« Atouts / compétences » en job, absente en stage) et le
-niveau d'études en job (« obtenu », « actuel » ailleurs). Le portfolio
-n'est affiché qu'en stage : rien à copier ailleurs.
+niveau d'études en job (« obtenu », « actuel » ailleurs). Le portfolio est
+dans la carte Identité, commune aux trois modes (D120) : copié avec les liens.
 
 Pièces jointes (D118) : la copie partage la référence au fichier (même
 chemin dans les deux modes), sans dupliquer le fichier sur le disque.
@@ -29,7 +29,7 @@ TOUS = frozenset(MODES)
 # Champ (clé de lire_profil) -> modes où il est affiché avec ce sens
 MODES_DU_CHAMP = {
     "prenom": TOUS, "nom": TOUS, "email": TOUS, "telephone": TOUS, "ville": TOUS,
-    "linkedin": TOUS, "github": TOUS,
+    "linkedin": TOUS, "github": TOUS, "portfolio": TOUS,   # portfolio : carte Identité depuis D120
     "formation": frozenset({"alternance", "stage"}),
     "niveau_etudes": frozenset({"alternance", "stage"}),   # « actuel » ; « obtenu » en job
     "experience": TOUS,
@@ -42,7 +42,7 @@ MODES_DU_CHAMP = {
 # (clé, libellé, champs), dans l'ordre de la page Profil
 SECTIONS = (
     ("identite", "Identité (prénom, nom, email, téléphone, ville)", ("prenom", "nom", "email", "telephone", "ville")),
-    ("liens", "Liens (LinkedIn, GitHub)", ("linkedin", "github")),
+    ("liens", "Liens (LinkedIn, GitHub, portfolio)", ("linkedin", "github", "portfolio")),
     ("formation", "Formation et niveau d'études actuel", ("formation", "niveau_etudes")),
     ("experience", "Expérience professionnelle", ("experience",)),
     ("competences", "Compétences techniques", ("competences",)),
@@ -54,7 +54,7 @@ SECTIONS = (
 
 LIBELLES_CHAMPS = {
     "prenom": "Prénom", "nom": "Nom", "email": "Email", "telephone": "Téléphone", "ville": "Ville",
-    "linkedin": "LinkedIn", "github": "GitHub", "formation": "Formation", "niveau_etudes": "Niveau d'études",
+    "linkedin": "LinkedIn", "github": "GitHub", "portfolio": "Portfolio", "formation": "Formation", "niveau_etudes": "Niveau d'études",
     "experience": "Expérience", "competences": "Compétences", "projets": "Projets", "lettre_type": "Lettre type",
     "email_objet": "Objet du mail", "email_type": "Message du mail", "pieces_jointes": "Pièces jointes",
 }
