@@ -1,6 +1,6 @@
 {
  "description": "Correspondance domaine France Travail vers codes NAF de Sirene (SPEC_SOURCES section 4.1). Cœurs : le métier est l'activité de l'entreprise, toutes tailles. Transverses : le métier existe comme service interne, seulement pour les unités légales de 250 salariés et plus (tranche 32 et au-delà, ou catégorie ETI ou GE). Codes NAF 2025 tirés de la table officielle de l'INSEE ; pour une correspondance multiple, retenus_2025 donne les cibles gardées pour le domaine (a_valider) et note la raison.",
- "source_naf_2025": "INSEE, Correspondances_NAFrev2-NAF2025.xlsx (édition janvier 2026), insee.fr/fr/information/8181066, téléchargé le 9 octobre 2026 ; copie : docs/referentiels/insee/correspondance_naf_rev2_naf2025.csv",
+ "source_naf_2025": "INSEE, Correspondances_NAFrev2-NAF2025.xlsx (édition octobre 2026, « TABLE COMPLETE - octobre 2026 », modifiée le 27 octobre 2026), insee.fr/fr/information/8181066, remplace l'édition de janvier 2026 (D115) ; copie : docs/referentiels/insee/correspondance_naf_rev2_naf2025.csv",
  "exclusions": [
   {
    "naf_rev2": "68.32B",
@@ -8,7 +8,7 @@
    "naf_2025": [
     {
      "code": "68.32G",
-     "intitule": "Activités des unités non productives détentrices de patrimoine immobilier",
+     "intitule": "Activités des unités non productives support de patrimoine immobilier",
      "type": "unique",
      "contenu": "tout le contenu de la sous-classe NAF rév. 2"
     }
@@ -23,7 +23,7 @@
    "naf_2025": [
     {
      "code": "68.32G",
-     "intitule": "Activités des unités non productives détentrices de patrimoine immobilier",
+     "intitule": "Activités des unités non productives support de patrimoine immobilier",
      "type": "unique",
      "contenu": "tout le contenu de la sous-classe NAF rév. 2"
     }
@@ -38,7 +38,7 @@
    "naf_2025": [
     {
      "code": "66.19G",
-     "intitule": "Activités des unités non productives détentrices de patrimoine mobilier",
+     "intitule": "Activités des unités non productives support de patrimoine mobilier",
      "type": "unique",
      "contenu": "tout le contenu de la sous-classe NAF rév. 2"
     }
@@ -316,7 +316,7 @@
       "61.90Y"
      ],
      "a_valider": true,
-     "note": "61.20Y reçoit aussi une partie de 82.99Z ; gardée, l'essentiel est la revente de télécommunications."
+     "note": "61.20Y reçoit aussi une partie de 82.99Z ; gardée, l'essentiel est la revente de télécommunications. Édition d'octobre 2026 (D115) : la fourniture d'un accès téléphonique et internet dans des installations ouvertes au public passe de 61.90Y à 61.20Y ; les deux cibles restent retenues."
     },
     {
      "naf_rev2": "26.20Z",
