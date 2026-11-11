@@ -96,7 +96,7 @@ function brancherProjets() {
 /* ── Validation de la lettre type ──────────────────────────────────────── */
 function validerLettre(txt) {
   // Balises autorisées (D106) ; {paragraphe_entreprise} : ancien nom de {paragraphe}
-  const autorises = ["entreprise", "poste", "date", "contact_entreprise", "paragraphe", "paragraphe_entreprise"];
+  const autorises = ["entreprise", "poste", "date", "contact_entreprise", "paragraphe", "portfolio", "paragraphe_entreprise"];
   // Trouve tous les {...}
   const trouves = [...txt.matchAll(/\{([^}]*)\}/g)].map(m => m[1].trim());
   // Accolades non fermées / vides
@@ -105,7 +105,7 @@ function validerLettre(txt) {
   if (ouvrantes !== fermantes) return "accolade non fermée détectée. Vérifie les { et }.";
   for (const t of trouves) {
     if (!autorises.includes(t)) {
-      return `accolade non autorisée : {${t}}. Seuls {paragraphe}, {entreprise}, {poste}, {date} et {contact_entreprise} sont permis.`;
+      return `accolade non autorisée : {${t}}. Seuls {paragraphe}, {entreprise}, {poste}, {date}, {contact_entreprise} et {portfolio} sont permis.`;
     }
   }
   if (!trouves.includes("paragraphe") && !trouves.includes("paragraphe_entreprise")) {

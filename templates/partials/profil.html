@@ -165,7 +165,8 @@
     <div class="profil-aide">
       <strong>Balises :</strong> <code>{paragraphe}</code> (obligatoire) à l'endroit du paragraphe personnalisé ;
       <code>{entreprise}</code> et <code>{poste}</code>, remplacés par ceux de l'offre ; <code>{date}</code> ;
-      <code>{contact_entreprise}</code> (bloc destinataire : entreprise puis lieu). N'utilise pas d'autres accolades.
+      <code>{contact_entreprise}</code> (bloc destinataire : entreprise puis lieu) ; <code>{portfolio}</code>, le lien
+      de la carte Identité (vide : la balise reste dans la lettre, à compléter). N'utilise pas d'autres accolades.
     </div>
     <label class="field field--full">
       <textarea class="field__area" data-profil="lettre_type" rows="14"
@@ -198,9 +199,9 @@
     <div class="profil-aide" data-balises-mail>
       <strong>Balises</strong>, dans l'objet comme dans le message, remplacées à l'envoi par ton profil :
       <code>{prenom}</code> <code>{nom}</code> <code>{telephone}</code> <code>{email}</code>
-      <code>{date}</code> (date du jour){% if mode == "stage" %}, et pour le stage <code>{date_debut}</code>
+      <code>{date}</code> (date du jour) <code>{portfolio}</code>{% if mode == "stage" %}, et pour le stage <code>{date_debut}</code>
       <code>{date_fin}</code> <code>{duree_semaines}</code> <code>{etablissement}</code> <code>{formation}</code>
-      <code>{missions}</code> <code>{portfolio}</code>. Le message par défaut annonce un stage conventionné
+      <code>{missions}</code>. Le message par défaut annonce un stage conventionné
       avec ses dates et sa durée : remplis les dates du stage avant d'envoyer{% endif %}.
       N'utilise pas d'autres accolades. Une balise vide dans ton profil bloque l'envoi.
     </div>

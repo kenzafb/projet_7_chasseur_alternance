@@ -63,7 +63,8 @@ function majBadge() {
 /* ── Modale lettre ───────────────────────────────────────────────────────── */
 /* Balises restées dans la lettre (entreprise inconnue, D108) : aperçu surligné */
 const A_COMPLETER = { "{entreprise}": "Nom de l'entreprise inconnu, à compléter",
-                      "{contact_entreprise}": "Nom de l'entreprise inconnu, à compléter" };
+                      "{contact_entreprise}": "Nom de l'entreprise inconnu, à compléter",
+                      "{portfolio}": "Portfolio vide dans le profil (carte Identité), à compléter" };
 function apercuLettre() {
   const texte = document.querySelector("[data-modal-letter]").value;
   const restes = Object.keys(A_COMPLETER).filter(b => texte.includes(b));

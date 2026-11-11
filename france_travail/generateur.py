@@ -93,7 +93,8 @@ def lettre_par_defaut(mode: str) -> str:
     return LETTRES_PAR_DEFAUT.get(mode, LETTRES_PAR_DEFAUT["alternance"])
 
 
-BALISES_LETTRE = ("entreprise", "poste", "date", "contact_entreprise", "paragraphe", "paragraphe_entreprise")
+BALISES_LETTRE = ("entreprise", "poste", "date", "contact_entreprise", "paragraphe", "portfolio",
+                  "paragraphe_entreprise")   # portfolio : profil, tous les modes (D125)
 BALISES_PARAGRAPHE = ("paragraphe", "paragraphe_entreprise")
 ALLER_AU_PROFIL = "Profil, section « Lettre de motivation type »"
 
@@ -110,7 +111,7 @@ def preparer_lettre_type(modele):
     modèle normalisé.
     """
     modele = re.sub(r"\{\s*(" + "|".join(BALISES_LETTRE) + r")\s*\}", r"{\1}", modele)
-    permises = ", ".join("{" + b + "}" for b in BALISES_LETTRE[:5])
+    permises = ", ".join("{" + b + "}" for b in BALISES_LETTRE if b != "paragraphe_entreprise")
     try:
         champs = [(champ, spec, conv) for _, champ, spec, conv in string.Formatter().parse(modele)
                   if champ is not None]
@@ -167,11 +168,12 @@ def contact_entreprise(offre) -> str:
 
 # Balises laissées dans la lettre quand l'information manque (D108)
 A_COMPLETER = {"entreprise": "Nom de l'entreprise inconnu, à compléter",
-               "contact_entreprise": "Nom de l'entreprise inconnu, à compléter"}
+               "contact_entreprise": "Nom de l'entreprise inconnu, à compléter",
+               "portfolio": "Portfolio vide dans le profil (carte Identité), à compléter"}
 
 
 def marqueurs_a_completer(lettre: str) -> list[str]:
-    """Balises restées dans la lettre assemblée (entreprise inconnue)."""
+    """Balises restées dans la lettre assemblée (entreprise inconnue, portfolio vide)."""
     return [b for b in A_COMPLETER if "{" + b + "}" in (lettre or "")]
 
 
@@ -327,4 +329,6 @@ def assembler_lettre(offre, profil, paragraphe: str) -> str:
                          else "{entreprise}",
                          poste=(offre.get("titre") or "").strip() or "le poste proposé",
                          date=_date_du_jour(), contact_entreprise=contact_entreprise(offre),
-                         paragraphe=paragraphe, paragraphe_entreprise=paragraphe)
+                         paragraphe=paragraphe, paragraphe_entreprise=paragraphe,
+                         # Portfolio vide : la balise reste visible, à compléter (D125, comme D108)
+                         portfolio=(profil.get("portfolio") or "").strip() or "{portfolio}")

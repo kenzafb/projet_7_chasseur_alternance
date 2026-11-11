@@ -593,3 +593,8 @@ Sur les 8 offres de stage : O1, O2 et O8 inéligibles pour de bonnes raisons, O3
 - **Réinitialisation.** Le lien ouvre une page qui demande le nouveau mot de passe (règles de l'inscription) ; à l'enregistrement : hash mis à jour, jeton consommé, toutes les sessions fermées (empreinte, D122), `mot_de_passe_temporaire` à faux. Mail de notification « ton mot de passe a été changé » à l'adresse du compte.
 - **Journaux.** Ni jeton, ni lien, ni mot de passe dans les logs ; seulement « demande pour le compte n », « réinitialisation faite pour le compte n ».
 - **Le script de D123 reste** comme recours de l'administratrice.
+
+### D125. Balise {portfolio} dans les emails et les lettres des trois modes (complète D120)
+- **Emails.** `{portfolio}` passe des balises du stage aux balises communes : objet et message du mail de candidature spontanée, dans les trois modes. Comme toute balise du mail, vide dans le profil, elle bloque l'envoi avant le premier mail, avec le message qui renvoie au profil. Les autres balises du stage (dates, durée, établissement, formation, missions) restent propres au stage.
+- **Lettres.** `{portfolio}` rejoint les balises de la lettre type (contrôle côté serveur et côté page), remplacée par le portfolio de la carte Identité. Vide : la balise reste dans la lettre assemblée, surlignée avec « Portfolio vide dans le profil (carte Identité), à compléter », comme l'entreprise inconnue (D108) ; la lettre n'est pas bloquée, la personne la complète avant le PDF.
+- **Aides du profil** (lettre type, email) mises à jour.

@@ -5,8 +5,9 @@ Balises de l'objet et de la trame du mail de candidature spontanée
 (phase 6b), remplacées à l'envoi par les valeurs du profil du mode :
 
   tous les modes : {prenom} {nom} {telephone} {email} {date} (date du jour)
+                   {portfolio} (carte Identité, commune aux trois modes, D125)
   mode stage     : {date_debut} {date_fin} {duree_semaines} {etablissement}
-                   {formation} {missions} {portfolio}
+                   {formation} {missions}
 
 Comme pour la lettre type, les espaces dans une balise sont tolérés
 (« { date } ») et toute autre accolade est refusée avec un message lisible :
@@ -22,9 +23,8 @@ from database.dates import maintenant_affichage
 from shared.erreurs import ErreurUtilisateur
 from shared.stage import date_en_lettres, duree_semaines, lire_date
 
-BALISES_COMMUNES = ("prenom", "nom", "telephone", "email", "date")
-BALISES_STAGE = ("date_debut", "date_fin", "duree_semaines", "etablissement", "formation", "missions",
-                 "portfolio")
+BALISES_COMMUNES = ("prenom", "nom", "telephone", "email", "date", "portfolio")
+BALISES_STAGE = ("date_debut", "date_fin", "duree_semaines", "etablissement", "formation", "missions")
 BALISES_PAR_MODE = {"stage": BALISES_COMMUNES + BALISES_STAGE}
 
 _BALISE = re.compile(r"\{\s*([A-Za-z_]*)\s*\}")
@@ -69,6 +69,7 @@ def valeurs(profil: dict, mode: str) -> dict[str, str]:
         "telephone": profil.get("telephone") or "",
         "email": profil.get("email") or "",
         "date": _date_du_jour(),
+        "portfolio": profil.get("portfolio") or "",
     }
     if "date_debut" in balises_du_mode(mode):
         debut, fin = lire_date(profil.get("date_debut")), lire_date(profil.get("date_fin"))
@@ -80,7 +81,6 @@ def valeurs(profil: dict, mode: str) -> dict[str, str]:
             "etablissement": profil.get("etablissement") or "",
             "formation": profil.get("formation") or "",
             "missions": profil.get("missions") or "",
-            "portfolio": profil.get("portfolio") or "",
         })
     return {k: str(v).strip() for k, v in out.items()}
 
