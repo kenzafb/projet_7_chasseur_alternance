@@ -21,8 +21,6 @@ async function afficherCompte() {
   try {
     const c = await api.compte();
     $("[data-compte-email]").textContent = c.email;
-    const alerte = $("[data-compte-temporaire]");
-    if (alerte) alerte.hidden = !c.mot_de_passe_temporaire;
   } catch (_) {}
 }
 

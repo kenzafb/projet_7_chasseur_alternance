@@ -28,7 +28,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from auth.routes import router as auth_router
-from auth.securite import LONGUEUR_MIN_MOT_DE_PASSE, NonConnecte, utilisateur_requis
+from auth.securite import LONGUEUR_MIN_MOT_DE_PASSE, MotDePasseTemporaire, NonConnecte, utilisateur_requis
 from database.models import User
 from shared.erreurs import CHAMPS_IDENTITE, ErreurUtilisateur, exiger_profil
 from database.candidatures_db import (lire_candidatures, lire_candidature, modifier_candidature, ajouter_candidature,
@@ -90,6 +90,15 @@ def non_connecte(request: Request, exc: NonConnecte):
     if request.url.path.startswith("/api/"):
         return JSONResponse({"erreur": "Non connecté"}, status_code=401)
     return RedirectResponse(url="/login", status_code=303)
+
+
+@app.exception_handler(MotDePasseTemporaire)
+def mot_de_passe_temporaire(request: Request, exc: MotDePasseTemporaire):
+    """Mot de passe temporaire à changer d'abord (D123) : 403 JSON pour
+    l'API, redirection vers la page de changement pour les pages."""
+    if request.url.path.startswith("/api/"):
+        return JSONResponse({"erreur": "Change d'abord ton mot de passe temporaire."}, status_code=403)
+    return RedirectResponse(url="/mot-de-passe-temporaire", status_code=303)
 
 
 @app.exception_handler(RequestValidationError)

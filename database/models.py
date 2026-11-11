@@ -61,6 +61,9 @@ class User(Base):
     email             = Column(String(255), unique=True, nullable=False, index=True)
     mot_de_passe_hash = Column(String(255), nullable=False)
     cree_le           = Column(DateTime(timezone=True), default=maintenant_utc)
+    # Mot de passe temporaire donné par l'administratrice
+    # (scripts/reinitialiser_mot_de_passe.py, D123) : à changer avant tout le reste
+    mot_de_passe_temporaire = Column(Boolean, nullable=False, default=False, server_default=false())
 
     # Liens vers les données de l'utilisateur (un profil par mode)
     profils          = _relation_depuis_user("Profil")

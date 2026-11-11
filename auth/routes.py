@@ -7,6 +7,9 @@ Routes d'authentification : affichage des pages + traitement des formulaires.
   GET  /logout    → ferme la session
   GET  /register  → page d'inscription
   POST /register  → crée le compte + son profil vide, connecte, redirige
+  GET/POST /mot-de-passe-temporaire → changement obligatoire du mot de passe
+                    temporaire donné par l'administratrice (D123)
+  GET  /mot-de-passe-oublie → contacter l'administratrice (version locale)
 
 Inscription sur invitation : le formulaire exige un code égal à la variable
 CODE_INVITATION. Si elle est absente ou vide, l'inscription est fermée.
@@ -22,7 +25,7 @@ from shared.config import TEMPLATES_DIR, code_invitation
 from database.connexion import SessionLocal
 from database.models import User, Profil
 from auth.securite import (authentifier, hacher_mot_de_passe, LONGUEUR_MIN_MOT_DE_PASSE, ouvrir_session,
-                           verifier_nouveau_mot_de_passe)
+                           utilisateur_courant, verifier_nouveau_mot_de_passe)
 
 router = APIRouter()
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -45,7 +48,51 @@ def traiter_login(request: Request, email: str = Form(...), mot_de_passe: str = 
     # Ouvre la session : l'id et l'empreinte du mot de passe, jamais le mot de passe
     request.session.clear()
     ouvrir_session(request, user)
+    if user.mot_de_passe_temporaire:          # D123 : à changer avant tout le reste
+        return RedirectResponse(url="/mot-de-passe-temporaire", status_code=303)
     return RedirectResponse(url="/", status_code=303)
+
+
+# ─── Mot de passe temporaire (D123) ───────────────────────────────────────────
+def _page_temporaire(request, erreur=None, status_code=200):
+    return templates.TemplateResponse(
+        request, "mot_de_passe_temporaire.html",
+        {"erreur": erreur, "longueur_min": LONGUEUR_MIN_MOT_DE_PASSE}, status_code=status_code)
+
+
+@router.get("/mot-de-passe-temporaire")
+def page_mot_de_passe_temporaire(request: Request):
+    user = utilisateur_courant(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    if not user.mot_de_passe_temporaire:
+        return RedirectResponse(url="/", status_code=303)
+    return _page_temporaire(request)
+
+
+@router.post("/mot-de-passe-temporaire")
+def traiter_mot_de_passe_temporaire(request: Request, ancien: str = Form(""), nouveau: str = Form(""),
+                                    confirmation: str = Form("")):
+    from auth.compte import changer_mot_de_passe
+    from shared.erreurs import ErreurUtilisateur
+    user = utilisateur_courant(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=303)
+    if not user.mot_de_passe_temporaire:
+        return RedirectResponse(url="/", status_code=303)
+    try:
+        a_jour = changer_mot_de_passe(user.id, ancien, nouveau, confirmation)
+    except ErreurUtilisateur as e:
+        return _page_temporaire(request, str(e).replace("Mot de passe actuel", "Mot de passe temporaire"),
+                                status_code=400)
+    ouvrir_session(request, a_jour)
+    return RedirectResponse(url="/", status_code=303)
+
+
+# ─── Mot de passe oublié (version locale, D123) ───────────────────────────────
+@router.get("/mot-de-passe-oublie")
+def page_mot_de_passe_oublie(request: Request):
+    return templates.TemplateResponse(request, "mot_de_passe_oublie.html", {})
 
 
 # ─── Déconnexion ───────────────────────────────────────────────────────────────

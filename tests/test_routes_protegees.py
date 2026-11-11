@@ -9,7 +9,8 @@ from fastapi.routing import APIRoute
 
 import main
 
-ROUTES_PUBLIQUES = {"/login", "/register", "/logout"}
+# /mot-de-passe-temporaire vérifie elle-même la session (D123) ; /mot-de-passe-oublie n'affiche qu'un texte
+ROUTES_PUBLIQUES = {"/login", "/register", "/logout", "/mot-de-passe-temporaire", "/mot-de-passe-oublie"}
 
 
 def _toutes_les_routes(routes):
@@ -74,7 +75,7 @@ def test_session_falsifiee_refusee(client):
     assert client.get("/api/profil").status_code == 401
 
 
-@pytest.mark.parametrize("chemin", ["/login", "/register"])
+@pytest.mark.parametrize("chemin", ["/login", "/register", "/mot-de-passe-oublie"])
 def test_pages_publiques_accessibles(client, chemin):
     assert client.get(chemin).status_code == 200
 

@@ -103,6 +103,12 @@ class NonConnecte(Exception):
     ou en redirection vers /login (pages)."""
 
 
+class MotDePasseTemporaire(Exception):
+    """Levée par utilisateur_requis tant que le mot de passe temporaire
+    (D123) n'est pas changé ; main.py la traduit en 403 JSON (/api) ou en
+    redirection vers /mot-de-passe-temporaire (pages)."""
+
+
 def utilisateur_requis(request: Request) -> User:
     """
     Dépendance FastAPI unique pour les routes privées : renvoie l'utilisateur
@@ -113,5 +119,7 @@ def utilisateur_requis(request: Request) -> User:
     user = utilisateur_courant(request)
     if not user:
         raise NonConnecte()
+    if user.mot_de_passe_temporaire:
+        raise MotDePasseTemporaire()
     return user
 

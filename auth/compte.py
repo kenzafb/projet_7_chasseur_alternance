@@ -40,6 +40,7 @@ def changer_mot_de_passe(user_id: int, ancien: str, nouveau: str, confirmation: 
         if nouveau == ancien:
             raise ErreurUtilisateur("Le nouveau mot de passe doit être différent de l'actuel.")
         user.mot_de_passe_hash = hacher_mot_de_passe(nouveau)
+        user.mot_de_passe_temporaire = False      # D123 : le temporaire est remplacé
         db.commit()
         db.refresh(user)
         db.expunge(user)
