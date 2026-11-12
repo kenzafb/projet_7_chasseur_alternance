@@ -182,8 +182,9 @@ function rendreKpis() {
   set("score-moyen", moy ? moy.toFixed(1) : "—");
   set("a-postuler", actives.filter(o => (o.score ?? 0) >= SEUIL).length);
   set("lettres", actives.filter(o => o.lettre).length);
+  // Compteur du menu : offres à traiter, masqué à zéro (« non vues » au lot 3)
   const c = document.querySelector('[data-count="offres"]');
-  if (c) c.textContent = actives.length;
+  if (c) { c.textContent = actives.length; c.hidden = !actives.length; }
   rendreAttente(actives);
 }
 

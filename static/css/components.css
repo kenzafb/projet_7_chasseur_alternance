@@ -4,50 +4,46 @@
    ============================================================================ */
 
 /* ── Boutons ─────────────────────────────────────────────────────────────── */
+/* Secondaire par défaut (blanc, bordure) ; une seule action principale
+   (verte, .btn--primary) par écran. .btn--signal : ancien nom du vert. */
 .btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 13px;
-  border-radius: var(--r-sm);
-  font-size: 13px; font-weight: 500;
-  border: 1px solid var(--hair-strong);
-  background: var(--surface); color: var(--txt);
-  transition: background .14s, border-color .14s, transform .05s;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 40px; padding: 8px 14px;
+  border-radius: var(--r-champ);
+  font-size: 14px; font-weight: 700; line-height: 1.2; text-decoration: none;
+  border: 1px solid var(--bordure-champ);
+  background: var(--surface); color: var(--texte);
+  transition: background .14s, border-color .14s;
 }
-.btn svg { width: 15px; height: 15px; }
-.btn:hover { background: var(--surface-2); border-color: var(--txt-faint); }
-.btn:active { transform: translateY(1px); }
-.btn--primary { background: var(--encre); color: var(--txt-invert); border-color: var(--encre); }
-.btn--primary:hover { background: var(--encre-soft); border-color: var(--encre-soft); }
-.btn--signal  { background: var(--signal); color: #fff; border-color: var(--signal); }
-.btn--signal:hover { background: var(--signal-deep); border-color: var(--signal-deep); }
-.btn--ghost { border-color: transparent; background: transparent; color: var(--txt-muted); }
-.btn--ghost:hover { background: var(--surface-2); color: var(--txt); }
-.btn--sm { padding: 5px 10px; font-size: 12px; }
-.btn[disabled] { opacity: .5; pointer-events: none; }
+.btn svg { width: 16px; height: 16px; flex: none; }
+.btn:hover { background: var(--fond-neutre); color: var(--texte); }
+.btn--primary, .btn--signal { background: var(--accent); color: #FFFFFF; border-color: var(--accent); }
+.btn--primary:hover, .btn--signal:hover { background: var(--accent-survol); border-color: var(--accent-survol); color: #FFFFFF; }
+.btn--ghost { border-color: transparent; background: transparent; color: var(--texte-2); }
+.btn--ghost:hover { background: var(--fond-neutre); color: var(--texte); }
+.btn--sm { min-height: 34px; padding: 6px 12px; font-size: 13px; }
+.btn--grand { min-height: 44px; padding: 11px 18px; border-radius: 12px; font-size: 15px; }
+.btn[disabled] { opacity: .55; cursor: not-allowed; }
 
 /* ── Carte ───────────────────────────────────────────────────────────────── */
 .card {
   background: var(--surface);
-  border: 1px solid var(--hair);
-  border-radius: var(--r-lg);
-  box-shadow: var(--sh-1);
-  transition: border-color .15s, box-shadow .15s;
+  border: 1px solid var(--bordure);
+  border-radius: var(--r-carte);
 }
-.card:hover { border-color: var(--hair-strong); box-shadow: var(--sh-2); }
 
-/* ── Chips / badges ──────────────────────────────────────────────────────── */
+/* ── Pastilles ───────────────────────────────────────────────────────────── */
 .chip {
   display: inline-flex; align-items: center; gap: 4px;
-  font-size: 11px; font-weight: 600;
-  padding: 2px 8px; border-radius: var(--r-sm);
-  letter-spacing: .01em;
+  font-size: 12px; font-weight: 700;
+  padding: 2px 9px; border-radius: var(--r-pill);
 }
-.chip--ft    { background: var(--signal-soft); color: var(--signal-deep); }
-.chip--lba   { background: var(--violet-soft); color: #5B3FD6; }
-.chip--vert  { background: var(--vert-soft);  color: #0A7A54; }
-.chip--ambre { background: var(--ambre-soft); color: #9A6406; }
-.chip--rouge { background: var(--rouge-soft); color: #C0353A; }
-.chip--gris  { background: #F0F1F3; color: var(--txt-muted); }
+.chip--ft    { background: var(--accent-doux);    color: var(--accent-survol); }
+.chip--lba   { background: var(--fond-neutre);    color: var(--texte-3); }
+.chip--vert  { background: var(--accent-doux);    color: var(--accent-survol); }
+.chip--ambre { background: var(--attention-fond); color: var(--attention); }
+.chip--rouge { background: var(--refus-fond);     color: var(--refus); }
+.chip--gris  { background: var(--neutre-fond);    color: var(--neutre); }
 
 /* ── Le viseur de score (élément signature) ──────────────────────────────── */
 /* Une jauge horizontale graduée avec un repère au seuil 7.0 = "à postuler".
@@ -63,20 +59,20 @@
 .viseur__track {
   position: relative;
   flex: 1; min-width: 90px; height: 7px;
-  background: #EDEFF2; border-radius: var(--r-pill);
+  background: var(--fond-neutre); border-radius: var(--r-pill);
   overflow: visible;
 }
 .viseur__fill { position: absolute; inset: 0 auto 0 0; height: 100%; border-radius: var(--r-pill); transition: width .5s cubic-bezier(.2,.7,.3,1); }
 .viseur__tick {                      /* repère du seuil 7.0 */
   position: absolute; top: -3px; bottom: -3px; left: 70%;
-  width: 2px; background: var(--encre); border-radius: 2px; opacity: .35;
+  width: 2px; background: var(--texte); border-radius: 2px; opacity: .35;
 }
-.viseur--vert  .viseur__fill { background: var(--vert); }
+.viseur--vert  .viseur__fill { background: var(--accent); }
 .viseur--vert  .viseur__val  { color: var(--vert); }
-.viseur--ambre .viseur__fill { background: var(--ambre); }
+.viseur--ambre .viseur__fill { background: #B7791F; }
 .viseur--ambre .viseur__val  { color: var(--ambre); }
-.viseur--rouge .viseur__fill { background: var(--rouge); }
-.viseur--rouge .viseur__val  { color: var(--rouge); }
+.viseur--rouge .viseur__fill { background: #8C9693; }
+.viseur--rouge .viseur__val  { color: var(--neutre); }
 
 /* ── Bandeau KPI ─────────────────────────────────────────────────────────── */
 .kpis { display: grid; gap: 10px; margin-bottom: 18px; }
@@ -88,8 +84,8 @@
   border-radius: var(--r-md);
   padding: 13px 15px;
 }
-.kpi__label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--txt-faint); margin-bottom: 5px; }
-.kpi__val   { font-family: var(--f-display); font-size: 25px; font-weight: 600; line-height: 1; letter-spacing: -.02em; }
+.kpi__label { font-size: 13px; font-weight: 600; color: var(--texte-2); margin-bottom: 5px; }
+.kpi__val   { font-size: 26px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
 .kpi__val--vert   { color: var(--vert); }
 .kpi__val--signal { color: var(--signal); }
 .kpi__note  { font-size: 11px; color: var(--txt-muted); margin-top: 4px; }
@@ -99,13 +95,12 @@
 /* ── Filtres en pilule ───────────────────────────────────────────────────── */
 .filters { display: flex; gap: 6px; flex-wrap: wrap; }
 .filter {
-  font-size: 12.5px; padding: 5px 12px;
+  font-size: 13px; font-weight: 600; padding: 7px 13px; min-height: 36px;
   border-radius: var(--r-pill);
-  border: 1px solid var(--hair-strong); background: var(--surface); color: var(--txt-muted);
-  transition: all .12s;
+  border: 1px solid var(--bordure-champ); background: var(--surface); color: var(--texte-3);
 }
-.filter:hover { border-color: var(--txt-faint); color: var(--txt); }
-.filter.is-active { border-color: var(--signal); background: var(--signal-soft); color: var(--signal-deep); font-weight: 600; }
+.filter:hover { border-color: var(--texte-2); color: var(--texte); }
+.filter.is-active { border-color: var(--texte); background: var(--texte); color: #FFFFFF; }
 
 /* ── Table (spontanées) ──────────────────────────────────────────────────── */
 .table { background: var(--surface); border: 1px solid var(--hair); border-radius: var(--r-lg); overflow: hidden; }
@@ -117,7 +112,7 @@
 .trow + .trow { border-top: 1px solid var(--hair); }
 .trow:nth-child(even of .trow) { background: var(--surface-2); }
 .thead { background: var(--surface-2); border-bottom: 1px solid var(--hair); }
-.thead span { font-size: 10.5px; text-transform: uppercase; letter-spacing: .07em; color: var(--txt-faint); font-weight: 600; }
+.thead span { font-size: 12px; font-weight: 700; color: var(--texte-2); }
 .trow__name { font-size: 13.5px; font-weight: 500; }
 .trow__sub  { font-size: 11px; color: var(--txt-faint); font-family: var(--f-mono); margin-top: 1px; }
 .trow__mail { font-size: 12.5px; color: var(--txt-muted); font-family: var(--f-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -135,11 +130,11 @@
 .empty {
   display: grid; place-items: center; gap: 10px;
   padding: 60px 20px; text-align: center;
-  color: var(--txt-faint);
+  color: var(--texte-2);
 }
 .empty svg { width: 34px; height: 34px; opacity: .5; }
-.empty__title { font-family: var(--f-display); font-size: 15px; color: var(--txt-muted); font-weight: 500; }
-.empty__hint  { font-size: 13px; max-width: 320px; }
+.empty__title { font-size: 16px; color: var(--texte); font-weight: 700; }
+.empty__hint  { font-size: 14px; max-width: 360px; color: var(--texte-2); }
 
 /* ── Apparition échelonnée des cartes au chargement ──────────────────────── */
 .stagger > * { opacity: 0; transform: translateY(6px); animation: rise .45s ease forwards; }
@@ -156,22 +151,21 @@
 .runbar.is-on .runbar__progress { display: flex; }
 .runbar__progress-track {
   flex: 1; height: 6px; border-radius: var(--r-pill);
-  background: rgba(255,255,255,.18); overflow: hidden;
+  background: #C6E2DE; overflow: hidden;
 }
 .runbar__progress-bar {
   height: 100%; width: 0%;
-  background: #fff; border-radius: var(--r-pill);
+  background: var(--accent); border-radius: var(--r-pill);
   transition: width .4s ease;
 }
 .runbar__progress-pct {
-  font-family: var(--f-mono); font-size: 11px; font-weight: 600;
-  color: #fff; min-width: 34px; text-align: right;
+  font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--accent-survol); min-width: 38px; text-align: right;
 }
 
 /* Candidature sur La Bonne Alternance (D129) : couleur de la pastille LBA */
-.btn--lba { background: var(--violet-soft); color: #5B3FD6; border-color: #C9BCF7; text-decoration: none; }
-.btn--lba:hover { background: #E3DCFD; border-color: #5B3FD6; }
+.btn--lba { text-decoration: none; }
 .trow__lba { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.trow__lien { font-size: 12px; color: #5B3FD6; }
+.trow__lien { font-size: 13px; color: var(--accent); }
 .trow__date { font: inherit; font-size: 12px; padding: 3px 5px; }
-.trow__mail--lba { font-family: var(--f-body); color: #5B3FD6; font-size: 12.5px; }
+.trow__mail--lba { color: var(--texte-3); font-size: 13px; }

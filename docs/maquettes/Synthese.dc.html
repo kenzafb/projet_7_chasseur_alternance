@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Chasseur, synthèse : accueil et tableau</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F7F8F7}
+a{color:#0F766E}a:hover{color:#0B5A54}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F7F8F7; color: #17201F; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 15px; line-height: 1.5">
+
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E2E6E5">
+    <div style="max-width: 1360px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px">
+      <a href="#" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #17201F">
+        <span style="width: 34px; height: 34px; border-radius: 10px; background: #0F766E; display: flex; align-items: center; justify-content: center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="1.5" fill="#FFFFFF"></circle></svg>
+        </span>
+        <span style="font-weight: 700; font-size: 20px; letter-spacing: -0.02em">Chasseur</span>
+      </a>
+      <nav aria-label="Ce que je cherche" style="display: flex; background: #EEF1F0; border-radius: 999px; padding: 4px; gap: 2px">
+        <a href="#" style="padding: 7px 14px; border-radius: 999px; color: #56625F; text-decoration: none; font-weight: 600; font-size: 14px">Alternance</a>
+        <a href="#" style="padding: 7px 14px; border-radius: 999px; color: #56625F; text-decoration: none; font-weight: 600; font-size: 14px">Job</a>
+        <a href="#" aria-current="true" style="padding: 7px 14px; border-radius: 999px; background: #FFFFFF; color: #17201F; text-decoration: none; font-weight: 700; font-size: 14px; box-shadow: 0 1px 2px rgba(23,32,31,.12); display: flex; align-items: center; gap: 7px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #0F766E"></span>Stage</a>
+      </nav>
+      <nav aria-label="Menu principal" style="display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto">
+        <a href="#" aria-current="page" style="padding: 8px 12px; color: #17201F; text-decoration: none; font-weight: 700; border-bottom: 2px solid #0F766E">Mes offres</a>
+        <a href="#" style="padding: 8px 12px; color: #56625F; text-decoration: none; font-weight: 600">Entreprises à contacter</a>
+        <a href="#" style="padding: 8px 12px; color: #56625F; text-decoration: none; font-weight: 600">Mon profil</a>
+      </nav>
+      <button aria-label="Mon compte" style="width: 40px; height: 40px; border-radius: 50%; border: none; background: #E3F1EF; color: #0B5A54; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer">KF</button>
+    </div>
+  </header>
+
+  <main style="max-width: 1360px; margin: 0 auto; padding: 40px 24px 72px; display: flex; flex-direction: column; gap: 32px">
+
+    <section style="display: flex; flex-direction: column; gap: 8px">
+      <h1 style="margin: 0; font-weight: 700; font-size: 38px; line-height: 1.1; letter-spacing: -0.025em">Bonsoir Kenza</h1>
+      <p style="margin: 0; color: #56625F; font-size: 17px">Ton stage : du 8 février au 18 avril 2027. Voici ce qui t'attend.</p>
+    </section>
+
+    <section aria-label="À faire" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px">
+      <div style="background: #FFFFFF; border: 1px solid #E2E6E5; border-radius: 16px; padding: 18px; display: flex; align-items: center; gap: 14px">
+        <span style="flex: none; width: 40px; height: 40px; border-radius: 12px; background: #E3F1EF; color: #0B5A54; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 17px">1</span>
+        <span style="flex: 1; min-width: 0"><strong>offre te correspond bien</strong><br><span style="font-size: 14px; color: #56625F">Elle t'attend dans « Ça m'intéresse »</span></span>
+      </div>
+      <div style="background: #FFFFFF; border: 1px solid #E2E6E5; border-radius: 16px; padding: 18px; display: flex; align-items: center; gap: 14px">
+        <span style="flex: none; width: 40px; height: 40px; border-radius: 12px; background: #FCEFD8; color: #7A4A00; display: flex; align-items: center; justify-content: center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+        </span>
+        <span style="flex: 1; min-width: 0"><strong>Relance OHana Entreprise</strong><br><span style="font-size: 14px; color: #56625F">Postulé le 14 octobre, sans réponse</span></span>
+      </div>
+      <div style="background: #FFFFFF; border: 1px solid #E2E6E5; border-radius: 16px; padding: 18px; display: flex; align-items: center; gap: 14px">
+        <span style="flex: none; width: 40px; height: 40px; border-radius: 12px; background: #EEF1F0; color: #46504E; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 17px">3</span>
+        <span style="flex: 1; min-width: 0"><strong>nouvelles offres à noter</strong><br><span style="font-size: 14px; color: #56625F">Environ 1 minute</span></span>
+        <button style="flex: none; padding: 9px 14px; border-radius: 10px; border: none; background: #0F766E; color: #FFFFFF; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer">Noter</button>
+      </div>
+    </section>
+
+    <section aria-labelledby="titre-tableau" style="display: flex; flex-direction: column; gap: 16px">
+      <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px">
+        <div>
+          <h2 id="titre-tableau" style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.015em">Tes offres de stage</h2>
+          <p style="margin: 4px 0 0; color: #56625F; font-size: 14px">Clique sur une offre pour la lire. Fais-la glisser pour la changer de colonne.</p>
+        </div>
+        <button style="padding: 11px 16px; border-radius: 12px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #17201F; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+          Chercher de nouvelles offres</button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; align-items: start">
+
+        <div role="group" aria-labelledby="c1" style="background: #EEF1F0; border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 10px">
+          <h3 id="c1" style="margin: 0; padding: 4px 6px; font-size: 15px; font-weight: 700; display: flex; justify-content: space-between">À trier <span style="color: #56625F; font-weight: 600">3</span></h3>
+          <sc-for list="{{atrier}}" as="o" hint-placeholder-count="3">
+            <article style="background: #FFFFFF; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 2px rgba(23,32,31,.07)">
+              <span style="align-self: flex-start; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: {{o.fond}}; color: {{o.encre}}">{{o.note}}/10 · {{o.libelle}}</span>
+              <h4 style="margin: 0; font-size: 15px; font-weight: 700; line-height: 1.3">{{o.titre}}</h4>
+              <p style="margin: 0; font-size: 13px; color: #56625F">{{o.lieu}}</p>
+              <div style="display: flex; gap: 6px; margin-top: 4px">
+                <button style="flex: 1; padding: 8px; border-radius: 10px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #17201F; font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer">Ça m'intéresse</button>
+                <button style="padding: 8px 10px; border-radius: 10px; border: none; background: none; color: #56625F; font-family: inherit; font-weight: 600; font-size: 13px; cursor: pointer">Écarter</button>
+              </div>
+            </article>
+          </sc-for>
+        </div>
+
+        <div role="group" aria-labelledby="c2" style="background: #EEF1F0; border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 10px">
+          <h3 id="c2" style="margin: 0; padding: 4px 6px; font-size: 15px; font-weight: 700; display: flex; justify-content: space-between">Ça m'intéresse <span style="color: #56625F; font-weight: 600">1</span></h3>
+          <article style="background: #FFFFFF; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 2px rgba(23,32,31,.07); border: 2px solid #0F766E">
+            <span style="align-self: flex-start; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #E3F1EF; color: #0B5A54">6/10 · Bien</span>
+            <h4 style="margin: 0; font-size: 15px; font-weight: 700; line-height: 1.3">Ingénieur(e) plateforme IPv6, Défense et Sécurité</h4>
+            <p style="margin: 0; font-size: 13px; color: #56625F">Le Plessis-Robinson (92)</p>
+            <p style="margin: 0; display: flex; gap: 6px; font-size: 13px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex: none; margin-top: 2px" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>Conteneurisation et Linux, au cœur de ce que tu vises.</p>
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px">
+              <button style="padding: 9px; border-radius: 10px; border: none; background: #0F766E; color: #FFFFFF; font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer">Préparer ma lettre</button>
+              <button style="padding: 9px; border-radius: 10px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #17201F; font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer">J'ai postulé</button>
+            </div>
+          </article>
+        </div>
+
+        <div role="group" aria-labelledby="c3" style="background: #EEF1F0; border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 10px">
+          <h3 id="c3" style="margin: 0; padding: 4px 6px; font-size: 15px; font-weight: 700; display: flex; justify-content: space-between">J'ai postulé <span style="color: #56625F; font-weight: 600">1</span></h3>
+          <article style="background: #FFFFFF; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 2px rgba(23,32,31,.07)">
+            <span style="align-self: flex-start; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #FCEFD8; color: #7A4A00">À relancer</span>
+            <h4 style="margin: 0; font-size: 15px; font-weight: 700; line-height: 1.3">Stage Développeur Logiciel</h4>
+            <p style="margin: 0; font-size: 13px; color: #56625F">OHana Entreprise, Paris · postulé le 14 oct.</p>
+            <button style="margin-top: 4px; padding: 9px; border-radius: 10px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #17201F; font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer">J'ai relancé</button>
+          </article>
+        </div>
+
+        <div role="group" aria-labelledby="c4" style="background: #EEF1F0; border-radius: 18px; padding: 12px; display: flex; flex-direction: column; gap: 10px">
+          <h3 id="c4" style="margin: 0; padding: 4px 6px; font-size: 15px; font-weight: 700; display: flex; justify-content: space-between">Réponse reçue <span style="color: #56625F; font-weight: 600">0</span></h3>
+          <div style="border: 2px dashed #CBD2D0; border-radius: 14px; padding: 22px 14px; text-align: center; color: #56625F; font-size: 14px">Quand une entreprise te répond, glisse sa carte ici : entretien, refus ou acceptation.</div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1240}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ton = (n) => n >= 6
+      ? { fond: '#E3F1EF', encre: '#0B5A54', libelle: 'Bien' }
+      : n >= 4
+        ? { fond: '#FCEFD8', encre: '#7A4A00', libelle: 'Moyen' }
+        : { fond: '#EEF1F0', encre: '#46504E', libelle: 'Faible' };
+    const atrier = [
+      { note: 4, titre: 'Ingénieur(e) sécurisation de la téléphonie', lieu: 'Le Plessis-Robinson (92)' },
+      { note: 3, titre: 'Ingénieur(e) système, Défense et Sécurité', lieu: 'Le Plessis-Robinson (92)' },
+      { note: 3, titre: 'Ingénieur(e) développement logiciel C++', lieu: 'Le Plessis-Robinson (92)' }
+    ].map((o) => Object.assign({}, o, ton(o.note)));
+    return { atrier };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,9 +1,5 @@
 <!-- ════════════ PAGE SPONTANÉES ════════════ -->
 <section class="page" data-page-content="spontanees">
-  <div class="guide" data-guide="spontanees">
-    <span class="guide__txt">Le Chasseur trouve des entreprises de tes domaines en Île-de-France, récupère leurs emails, et envoie des candidatures spontanées depuis ton compte d'envoi (Paramètres), avec tes pièces jointes. Lance les étapes dans l'ordre : <strong>Récupérer</strong>, <strong>Scraper</strong>, <strong>Envoyer</strong>.</span>
-    <span class="guide__x" data-guide-close="spontanees">×</span>
-  </div>
 
   <div class="bandeau-test" data-sp-mode-test hidden>
     🧪 Mode test actif : les mails partiront vers <span data-sp-mode-test-adresse></span>, pas vers les entreprises.
@@ -30,6 +26,14 @@
       <div class="kpi__note">candidatures spontanées</div>
     </div>
   </div>
+
+  <!-- Taux d'envoi (ancien pied de la barre latérale, D143) -->
+  <p class="sp-taux">
+    <span><span data-stat="avec_email">—</span> emails trouvés</span> ·
+    <span><span data-stat="envoyes">—</span> envoyés</span> ·
+    <span data-stat="taux">— de taux d'envoi</span>
+    <span class="sp-taux__barre" aria-hidden="true"><span class="sp-taux__rempli" data-stat="taux-bar" style="width:0%"></span></span>
+  </p>
 
   <!-- Pipeline : fetch → scrape → envoi (cartes interactives avec état) -->
   <div class="pipe" data-pipe>

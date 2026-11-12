@@ -1,9 +1,5 @@
 <!-- ════════════ PAGE OFFRES ════════════ -->
 <section class="page is-active" data-page-content="offres">
-  <div class="guide" data-guide="offres">
-    <span class="guide__txt">Clique sur <strong>Lancer la recherche</strong> : le Chasseur récupère les offres, puis <strong>Analyser les offres en attente</strong> les fait noter par l'IA selon ton profil. Les meilleures remontent en haut. Clique sur une offre pour l'analyser en détail et générer une lettre.</span>
-    <span class="guide__x" data-guide-close="offres">×</span>
-  </div>
 
   <label class="limite-lancement">
     {% set limite_offres = limites.offres if analyse_ia|default(true) else limites.offres_sans_ia %}

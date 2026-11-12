@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Chasseur, piste C : tableau de tri</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F3F4F1}
+a{color:#14213D}a:hover{color:#2B3A5E}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F3F4F1; color: #14213D; font-family: 'Figtree', system-ui, sans-serif; font-size: 15px; line-height: 1.5">
+
+  <header style="max-width: 1360px; margin: 0 auto; padding: 22px 24px 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px">
+    <a href="#" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #14213D">
+      <span style="width: 34px; height: 34px; border-radius: 10px; background: #14213D; display: flex; align-items: center; justify-content: center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFC53D" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="1.5" fill="#FFC53D"></circle></svg>
+      </span>
+      <span style="font-weight: 800; font-size: 20px; letter-spacing: -0.02em">Chasseur</span>
+    </a>
+    <nav aria-label="Menu principal" style="display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto">
+      <a href="#" aria-current="page" style="padding: 8px 14px; border-radius: 999px; background: #14213D; color: #FFFFFF; text-decoration: none; font-weight: 700; font-size: 14px">Offres</a>
+      <a href="#" style="padding: 8px 14px; border-radius: 999px; color: #3B4763; text-decoration: none; font-weight: 600; font-size: 14px">Entreprises à contacter</a>
+      <a href="#" style="padding: 8px 14px; border-radius: 999px; color: #3B4763; text-decoration: none; font-weight: 600; font-size: 14px">Mon profil</a>
+    </nav>
+    <label style="display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #3B4763">
+      Je cherche
+      <select style="padding: 8px 12px; border-radius: 10px; border: 1px solid #CFD3DC; background: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 700; color: #14213D">
+        <option>un stage</option>
+        <option>une alternance</option>
+        <option>un job</option>
+      </select>
+    </label>
+    <button aria-label="Mon compte" style="width: 40px; height: 40px; border-radius: 50%; border: none; background: #FFC53D; color: #14213D; font-family: inherit; font-weight: 800; font-size: 14px; cursor: pointer">KF</button>
+  </header>
+
+  <main style="max-width: 1360px; margin: 0 auto; padding: 16px 24px 64px; display: flex; flex-direction: column; gap: 22px">
+
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px">
+      <div>
+        <h1 style="margin: 0; font-size: 34px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.1">Tes offres de stage</h1>
+        <p style="margin: 6px 0 0; color: #4A5571">Fais glisser une offre d'une colonne à l'autre, ou utilise ses boutons.</p>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px">
+        <button style="padding: 11px 16px; border-radius: 12px; border: 1px solid #CFD3DC; background: #FFFFFF; color: #14213D; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer">Noter 3 nouvelles offres</button>
+        <button style="padding: 11px 16px; border-radius: 12px; border: none; background: #14213D; color: #FFFFFF; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer">Chercher des offres</button>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; align-items: start">
+
+      <section aria-labelledby="col-trier" style="background: #E9EBE6; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <h2 id="col-trier" style="margin: 0; padding: 2px 6px; font-size: 15px; font-weight: 800; display: flex; justify-content: space-between">À trier <span style="color: #4A5571">3</span></h2>
+        <sc-for list="{{atrier}}" as="o" hint-placeholder-count="3">
+          <article style="background: #FFFFFF; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 2px rgba(20,33,61,.08)">
+            <span style="align-self: flex-start; font-size: 12px; font-weight: 800; padding: 3px 9px; border-radius: 999px; background: {{o.fond}}; color: {{o.encre}}">{{o.note}}/10 · {{o.libelle}}</span>
+            <h3 style="margin: 0; font-size: 15px; font-weight: 700; line-height: 1.3">{{o.titre}}</h3>
+            <p style="margin: 0; font-size: 13px; color: #4A5571">{{o.lieu}}</p>
+            <div style="display: flex; gap: 6px; margin-top: 4px">
+              <button style="flex: 1; padding: 8px; border-radius: 10px; border: 1px solid #CFD3DC; background: #FFFFFF; color: #14213D; font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer">Ça m'intéresse</button>
+              <button style="padding: 8px 10px; border-radius: 10px; border: none; background: none; color: #4A5571; font-family: inherit; font-weight: 600; font-size: 13px; cursor: pointer">Écarter</button>
+            </div>
+          </article>
+        </sc-for>
+      </section>
+
+      <section aria-labelledby="col-interet" style="background: #E9EBE6; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <h2 id="col-interet" style="margin: 0; padding: 2px 6px; font-size: 15px; font-weight: 800; display: flex; justify-content: space-between">Ça m'intéresse <span style="color: #4A5571">1</span></h2>
+        <article style="background: #FFFFFF; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 2px rgba(20,33,61,.08); outline: 2px solid #FFC53D">
+          <span style="align-self: flex-start; font-size: 12px; font-weight: 800; padding: 3px 9px; border-radius: 999px; background: #DDF2E4; color: #155C34">6/10 · Bien</span>
+          <h3 style="margin: 0; font-size: 15px; font-weight: 700; line-height: 1.3">Ingénieur(e) plateforme IPv6, Défense et Sécurité</h3>
+          <p style="margin: 0; font-size: 13px; color: #4A5571">Le Plessis-Robinson (92)</p>
+          <p style="margin: 0; font-size: 13px">Conteneurisation et Linux, au cœur de ce que tu vises.</p>
+          <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px">
+            <button style="padding: 9px; border-radius: 10px; border: none; background: #14213D; color: #FFFFFF; font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer">Préparer ma lettre</button>
+            <button style="padding: 9px; border-radius: 10px; border: 1px solid #CFD3DC; background: #FFFFFF; color: #14213D; font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer">J'ai postulé</button>
+          </div>
+        </article>
+      </section>
+
+      <section aria-labelledby="col-postule" style="background: #E9EBE6; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <h2 id="col-postule" style="margin: 0; padding: 2px 6px; font-size: 15px; font-weight: 800; display: flex; justify-content: space-between">J'ai postulé <span style="color: #4A5571">1</span></h2>
+        <article style="background: #FFFFFF; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 1px 2px rgba(20,33,61,.08)">
+          <span style="align-self: flex-start; font-size: 12px; font-weight: 800; padding: 3px 9px; border-radius: 999px; background: #FFF0C7; color: #6E4B00">À relancer</span>
+          <h3 style="margin: 0; font-size: 15px; font-weight: 700; line-height: 1.3">Stage Développeur Logiciel</h3>
+          <p style="margin: 0; font-size: 13px; color: #4A5571">OHana Entreprise, Paris · postulé le 14 oct.</p>
+          <button style="margin-top: 4px; padding: 9px; border-radius: 10px; border: 1px solid #CFD3DC; background: #FFFFFF; color: #14213D; font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer">J'ai relancé</button>
+        </article>
+      </section>
+
+      <section aria-labelledby="col-reponse" style="background: #E9EBE6; border-radius: 18px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <h2 id="col-reponse" style="margin: 0; padding: 2px 6px; font-size: 15px; font-weight: 800; display: flex; justify-content: space-between">Réponse reçue <span style="color: #4A5571">0</span></h2>
+        <div style="border: 2px dashed #C9CDC4; border-radius: 14px; padding: 22px 14px; text-align: center; color: #4A5571; font-size: 14px">Quand une entreprise te répond, glisse sa carte ici : entretien, refus ou acceptation.</div>
+      </section>
+
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ton = (n) => n >= 6
+      ? { fond: '#DDF2E4', encre: '#155C34', libelle: 'Bien' }
+      : n >= 4
+        ? { fond: '#FFF0C7', encre: '#6E4B00', libelle: 'Moyen' }
+        : { fond: '#ECEEF2', encre: '#3B4763', libelle: 'Faible' };
+    const atrier = [
+      { note: 4, titre: 'Ingénieur(e) sécurisation de la téléphonie', lieu: 'Le Plessis-Robinson (92)' },
+      { note: 3, titre: 'Ingénieur(e) système, Défense et Sécurité', lieu: 'Le Plessis-Robinson (92)' },
+      { note: 3, titre: 'Ingénieur(e) développement logiciel C++', lieu: 'Le Plessis-Robinson (92)' }
+    ].map((o) => Object.assign({}, o, ton(o.note)));
+    return { atrier };
+  }
+}
+</script>
+</body>
+</html>

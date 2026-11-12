@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Chasseur sur téléphone : offres</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0F766E}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #F7F8F7; color: #17201F; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 15px; line-height: 1.5; display: flex; flex-direction: column; overflow: hidden">
+
+  <sc-if value="{{enListe}}" hint-placeholder-val="{{ true }}">
+    <header style="background: #FFFFFF; border-bottom: 1px solid #E2E6E5; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; align-items: center; gap: 10px">
+        <h1 style="margin: 0; font-size: 24px; font-weight: 700; flex: 1">Offres</h1>
+        <button aria-label="Chercher de nouvelles offres" style="width: 40px; height: 40px; border-radius: 12px; border: none; background: #0F766E; color: #FFFFFF; display: flex; align-items: center; justify-content: center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+        </button>
+      </div>
+      <div role="tablist" aria-label="Classer les offres" style="display: flex; gap: 6px">
+        <button role="tab" aria-selected="true" style="padding: 6px 12px; border-radius: 999px; border: 1px solid #17201F; background: #17201F; color: #FFFFFF; font-family: inherit; font-weight: 600; font-size: 13px">À voir · 4</button>
+        <button role="tab" aria-selected="false" style="padding: 6px 12px; border-radius: 999px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #3E4846; font-family: inherit; font-weight: 600; font-size: 13px">Gardées · 0</button>
+        <button role="tab" aria-selected="false" style="padding: 6px 12px; border-radius: 999px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #3E4846; font-family: inherit; font-weight: 600; font-size: 13px">Écartées</button>
+      </div>
+    </header>
+    <main style="flex: 1; overflow: auto; padding: 8px 8px 16px">
+      <sc-for list="{{liste}}" as="o" hint-placeholder-count="4">
+        <button onClick="{{o.ouvrir}}" style="display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 14px 10px; border: none; border-bottom: 1px solid #EEF1F0; background: none; font-family: inherit; color: #17201F; text-align: left">
+          <span style="flex: none; width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; background: {{o.fond}}; color: {{o.encre}}">{{o.note}}</span>
+          <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px">
+            <span style="font-size: 15px; line-height: 1.3; font-weight: {{o.poids}}">{{o.titre}}</span>
+            <span style="font-size: 13px; color: #56625F">{{o.lieu}}</span>
+          </span>
+          <sc-if value="{{o.nonLue}}" hint-placeholder-val="{{ true }}">
+            <span aria-label="Pas encore vue" style="flex: none; width: 9px; height: 9px; border-radius: 50%; background: #0F766E; margin-top: 6px"></span>
+          </sc-if>
+        </button>
+      </sc-for>
+    </main>
+    <nav aria-label="Menu principal" style="background: #FFFFFF; border-top: 1px solid #E2E6E5; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 6px 4px 10px">
+      <a href="TelAccueil.dc.html" style="display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; color: #56625F; text-decoration: none; font-size: 12px; font-weight: 600">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v9H4z"></path></svg>Accueil</a>
+      <a href="#" aria-current="page" style="display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; color: #0F766E; text-decoration: none; font-size: 12px; font-weight: 700">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"></rect><path d="M9 7V5h6v2"></path></svg>Offres</a>
+      <a href="#" style="display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; color: #56625F; text-decoration: none; font-size: 12px; font-weight: 600">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h12"></path><path d="M12 6l6 6-6 6"></path></svg>Candidatures</a>
+      <a href="#" style="display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; color: #56625F; text-decoration: none; font-size: 12px; font-weight: 600">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="12" r="1.5"></circle><circle cx="12" cy="12" r="1.5"></circle><circle cx="19" cy="12" r="1.5"></circle></svg>Plus</a>
+    </nav>
+  </sc-if>
+
+  <sc-if value="{{enDetail}}" hint-placeholder-val="{{ false }}">
+    <header style="background: #FFFFFF; border-bottom: 1px solid #E2E6E5; padding: 10px 8px; display: flex; align-items: center; gap: 4px">
+      <button onClick="{{retour}}" style="display: flex; align-items: center; gap: 4px; padding: 8px; border: none; background: none; font-family: inherit; font-weight: 600; font-size: 15px; color: #17201F">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>Offres</button>
+    </header>
+    <main style="flex: 1; overflow: auto; padding: 20px 16px; display: flex; flex-direction: column; gap: 18px">
+      <div>
+        <p style="margin: 0; font-size: 13px; color: #56625F">{{ouverte.lieu}}</p>
+        <h1 style="margin: 4px 0 0; font-size: 23px; line-height: 1.2; font-weight: 700; letter-spacing: -0.015em">{{ouverte.titre}}</h1>
+      </div>
+      <div style="display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 16px; background: {{ouverte.fond}}; color: {{ouverte.encre}}">
+        <span style="font-size: 32px; font-weight: 700; line-height: 1">{{ouverte.note}}<span style="font-size: 15px">/10</span></span>
+        <strong style="font-size: 15px">{{ouverte.verdict}}</strong>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <h2 style="margin: 0; font-size: 15px">Ce qui colle</h2>
+        <p style="margin: 0; display: flex; gap: 8px; font-size: 14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex: none; margin-top: 2px" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg><span>{{ouverte.colle}}</span></p>
+        <h2 style="margin: 8px 0 0; font-size: 15px">Ce qui coince</h2>
+        <p style="margin: 0; display: flex; gap: 8px; font-size: 14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A5300" stroke-width="2.4" stroke-linecap="round" style="flex: none; margin-top: 2px" aria-hidden="true"><path d="M6 12h12"></path></svg><span>{{ouverte.coince}}</span></p>
+      </div>
+      <a href="#" style="font-weight: 600; font-size: 14px">Lire l'annonce complète</a>
+    </main>
+    <div style="background: #FFFFFF; border-top: 1px solid #E2E6E5; padding: 12px 16px 16px; display: flex; flex-direction: column; gap: 8px">
+      <button style="padding: 13px; border-radius: 12px; border: none; background: #0F766E; color: #FFFFFF; font-family: inherit; font-weight: 700; font-size: 15px">Préparer ma lettre</button>
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px">
+        <button style="padding: 10px 4px; border-radius: 12px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #17201F; font-family: inherit; font-weight: 700; font-size: 13px">J'ai postulé</button>
+        <button onClick="{{retour}}" style="padding: 10px 4px; border-radius: 12px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #17201F; font-family: inherit; font-weight: 700; font-size: 13px">Garder</button>
+        <button onClick="{{retour}}" style="padding: 10px 4px; border-radius: 12px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #56625F; font-family: inherit; font-weight: 600; font-size: 13px">Pas pour moi</button>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { ouverte: null, lues: { cpp: true } };
+  }
+  renderVals() {
+    const s = this.state;
+    const ton = (n) => n >= 6
+      ? { fond: '#E3F1EF', encre: '#0B5A54', verdict: 'Correspond assez bien' }
+      : n >= 4
+        ? { fond: '#FCEFD8', encre: '#7A4A00', verdict: 'Correspond en partie' }
+        : { fond: '#EEF1F0', encre: '#46504E', verdict: 'Correspond peu' };
+    const offres = [
+      { id: 'ipv6', note: 6, titre: 'Ingénieur(e) plateforme IPv6', lieu: 'Le Plessis-Robinson (92)', colle: 'Conteneurisation et Linux, au cœur de ce que tu vises.', coince: 'Vocabulaire réseau pointu : IPv6, VoIP.' },
+      { id: 'tel', note: 4, titre: 'Sécurisation de la téléphonie', lieu: 'Le Plessis-Robinson (92)', colle: 'Réseaux et sécurité, une de tes pistes.', coince: 'Très spécialisé : téléphonie et contrôle aérien.' },
+      { id: 'sys', note: 3, titre: 'Ingénieur(e) système', lieu: 'Le Plessis-Robinson (92)', colle: 'Intégration de systèmes complexes.', coince: 'Ingénierie système, pas administration système.' },
+      { id: 'cpp', note: 3, titre: 'Développement logiciel C++', lieu: 'Le Plessis-Robinson (92)', colle: 'Environnement Linux et réseaux.', coince: 'C++ et Qt demandés, absents de ton profil.' }
+    ].map((o) => Object.assign({}, o, ton(o.note)));
+    const liste = offres.map((o) => Object.assign({}, o, {
+      nonLue: !s.lues[o.id],
+      poids: s.lues[o.id] ? '500' : '700',
+      ouvrir: () => this.setState({ ouverte: o.id, lues: Object.assign({}, s.lues, { [o.id]: true }) })
+    }));
+    const ouverte = offres.find((o) => o.id === s.ouverte) || offres[0];
+    return {
+      liste, ouverte,
+      enListe: !s.ouverte,
+      enDetail: !!s.ouverte,
+      retour: () => this.setState({ ouverte: null })
+    };
+  }
+}
+</script>
+</body>
+</html>

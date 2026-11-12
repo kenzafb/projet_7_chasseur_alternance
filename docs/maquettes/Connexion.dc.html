@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Chasseur : connexion</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F7F8F7}
+a{color:#0F766E}a:hover{color:#0B5A54}
+input{font-family:inherit}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F7F8F7; color: #17201F; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 15px; line-height: 1.5; display: flex; flex-wrap: wrap">
+
+  <section aria-hidden="false" style="flex: 1 1 420px; min-width: 0; background: #0F766E; color: #FFFFFF; padding: 48px; display: flex; flex-direction: column; justify-content: space-between; gap: 40px">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <span style="width: 38px; height: 38px; border-radius: 11px; background: #FFFFFF; display: flex; align-items: center; justify-content: center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="1.5" fill="#0F766E"></circle></svg>
+      </span>
+      <span style="font-weight: 700; font-size: 22px; letter-spacing: -0.02em">Chasseur</span>
+    </div>
+    <div style="max-width: 460px; display: flex; flex-direction: column; gap: 18px">
+      <p style="margin: 0; font-size: 38px; line-height: 1.12; font-weight: 700; letter-spacing: -0.025em">Ton stage, ton alternance ou ton job, sans y passer tes soirées.</p>
+      <p style="margin: 0; font-size: 17px; color: #D3ECE8">Le Chasseur trouve les offres, te dit lesquelles valent le coup et t'aide à écrire tes lettres.</p>
+    </div>
+    <p style="margin: 0; font-size: 14px; color: #BFE3DE">Sur invitation, pour un petit groupe d'utilisatrices.</p>
+  </section>
+
+  <section style="flex: 1 1 420px; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 48px 24px">
+    <form style="width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 18px">
+      <div>
+        <h1 style="margin: 0; font-size: 30px; font-weight: 700; letter-spacing: -0.02em">Bon retour</h1>
+        <p style="margin: 4px 0 0; color: #56625F">Connecte-toi pour retrouver ta recherche.</p>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px">Email
+        <input type="email" autocomplete="email" placeholder="prenom@exemple.fr" style="padding: 12px 14px; border-radius: 12px; border: 1px solid #D7DDDB; background: #FFFFFF; font-size: 15px; font-weight: 400"></label>
+      <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px">
+        <span style="display: flex; justify-content: space-between"><span>Mot de passe</span><a href="#" style="font-weight: 600">Oublié ?</a></span>
+        <input type="password" autocomplete="current-password" style="padding: 12px 14px; border-radius: 12px; border: 1px solid #D7DDDB; background: #FFFFFF; font-size: 15px; font-weight: 400"></label>
+      <a href="Accueil.dc.html" style="padding: 13px; border-radius: 12px; background: #0F766E; color: #FFFFFF; text-decoration: none; font-weight: 700; font-size: 16px; text-align: center">Se connecter</a>
+      <p style="margin: 6px 0 0; font-size: 14px; color: #56625F; text-align: center">Pas encore de compte ? <a href="#" style="font-weight: 700">Créer un compte avec un code d'invitation</a></p>
+    </form>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":820}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{{ label_mode|default("Chasseur d'Alternance") }}</title>
 
-  <!-- Polices -->
+  <!-- Police : Instrument Sans (D143) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <!-- Styles (servis par FastAPI depuis /static, version = empreinte du contenu) -->
   <link rel="stylesheet" href="{{ statique('css/base.css') }}">
@@ -18,111 +18,75 @@
   <script type="importmap">
 {{ importmap()|safe }}
   </script>
-  <script>
-    // Applique l'état replié de la sidebar avant le rendu (évite le flash)
-    try {
-      if (localStorage.getItem("sidebar_repliee") === "1") {
-        document.documentElement.classList.add("sidebar-pre-collapsed");
-      }
-    } catch (_) {}
-  </script>
 </head>
 <body>
-<div class="app">
+<a class="evitement" href="#contenu">Aller au contenu</a>
 
-  <!-- ════════════ SIDEBAR ════════════ -->
-  <aside class="sidebar" data-sidebar>
-    <button class="sidebar__toggle" data-sidebar-toggle title="Replier / déplier le menu">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
-    </button>
-    <div class="brand">
-      <div class="brand__mark">
-        <!-- viseur : rappel du "chasseur" -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round">
-          <circle cx="12" cy="12" r="7"/><line x1="12" y1="1" x2="12" y2="4"/>
-          <line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/>
-          <line x1="20" y1="12" x2="23" y2="12"/><circle cx="12" cy="12" r="1.5" fill="#fff"/>
-        </svg>
-      </div>
-      <div>
-        <div class="brand__name">Chasseur</div>
-        <div class="brand__sub" data-brand-sub>alternance</div>
-      </div>
-    </div>
+<!-- ════════════ EN-TÊTE (D143) ════════════ -->
+<header class="entete">
+  <div class="entete__int">
+    <a class="marque" href="#offres" data-nav="offres">
+      <span class="marque__logo" aria-hidden="true">
+        <!-- cible : rappel du « chasseur » -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.5" fill="#FFFFFF"/></svg>
+      </span>
+      <span class="marque__nom">Chasseur</span>
+    </a>
+
     <!-- Un mode par URL : chaque lien ouvre l'autre mode (même page), un
          onglet par mode si on le souhaite -->
-    <nav class="mode-switch" data-mode-switch>
-      <a class="mode-switch__btn{% if mode == 'alternance' %} is-active{% endif %}" href="/alternance" data-mode-btn="alternance">Alternance</a>
-      <a class="mode-switch__btn{% if mode == 'job' %} is-active{% endif %}" href="/job" data-mode-btn="job">Job</a>
-      <a class="mode-switch__btn{% if mode == 'stage' %} is-active{% endif %}" href="/stage" data-mode-btn="stage">Stage</a>
+    <nav class="modes" aria-label="Ce que je cherche">
+      {% for cle, nom in (("alternance", "Alternance"), ("job", "Job"), ("stage", "Stage")) %}
+      <a class="modes__lien" href="/{{ cle }}" data-mode-btn="{{ cle }}"{% if mode == cle %} aria-current="true"{% endif %}>{{ nom }}</a>
+      {% endfor %}
     </nav>
 
-    <nav class="nav">
-      <p class="nav__label">Recherche</p>
-      <button class="nav__item is-active" data-page="offres">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
-        <span>Offres</span><span class="nav__count" data-count="offres">0</span>
-      </button>
-      <button class="nav__item" data-page="spontanees">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14"/><path d="M9 9h.01M9 13h.01M9 17h.01"/></svg>
-        <span>Spontanées</span><span class="nav__count" data-count="spontanees">0</span>
-      </button>
-
-      <p class="nav__label">Suivi</p>
-      <button class="nav__item" data-page="candidatures">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        <span>Candidatures</span><span class="nav__count" data-count="candidatures">0</span>
-      </button>
-
-      <p class="nav__label">Mon compte</p>
-      <button class="nav__item" data-page="profil">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <span>Profil</span>
-      </button>
-      <button class="nav__item" data-page="parametres">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-        <span>Paramètres</span>
-      </button>
+    <nav class="menu" aria-label="Menu principal">
+      <a class="menu__lien" href="#offres" data-page="offres">Offres <span class="compteur" data-count="offres" hidden>0</span></a>
+      <a class="menu__lien" href="#candidatures" data-page="candidatures">Candidatures <span class="compteur compteur--attention" data-count="candidatures" hidden>0</span></a>
+      <a class="menu__lien" href="#spontanees" data-page="spontanees">Entreprises à contacter <span class="compteur" data-count="spontanees" hidden>0</span></a>
+      <a class="menu__lien" href="#profil" data-page="profil">Mon profil</a>
     </nav>
 
-    <div class="sidefoot">
-      <div class="sidefoot__row"><span>Emails trouvés</span><span data-stat="avec_email">—</span></div>
-      <div class="sidefoot__row"><span>Envoyés</span><span data-stat="envoyes">—</span></div>
-      <div class="sidefoot__bar"><div class="sidefoot__fill" data-stat="taux-bar" style="width:0%"></div></div>
-      <p class="sidefoot__pct" data-stat="taux">— de taux d'envoi</p>
-      <!-- Déconnexion en POST (D134) : un lien ou une image d'une autre page ne peut pas la déclencher -->
-      <form method="post" action="/logout" class="sidefoot__deconnexion">
-        <button type="submit" class="sidefoot__logout">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
-          Déconnexion
-        </button>
-      </form>
-    </div>
-  </aside>
-
-  <!-- ════════════ MAIN ════════════ -->
-  <main class="main">
-    <div class="topbar">
-      <h1 class="topbar__title" data-topbar="title">Offres d'alternance</h1>
-      <span class="topbar__badge" data-topbar="badge">—</span>
-      <div class="topbar__actions">
-        <label class="search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="search" placeholder="Rechercher…" data-search>
-        </label>
-        <button class="btn btn--primary" data-topbar="action">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M13 6l6 6-6 6"/></svg>
-          <span data-topbar="action-label">Lancer la recherche</span>
-        </button>
+    <!-- Mon compte : Paramètres et déconnexion -->
+    <div class="compte">
+      <button type="button" class="compte__rond" data-compte-bouton aria-expanded="false" aria-controls="menu-compte"
+              aria-label="Mon compte et paramètres">{{ initiales }}</button>
+      <div class="compte__menu" id="menu-compte" data-compte-menu hidden>
+        <p class="compte__qui">{{ email_utilisateur }}</p>
+        <a class="compte__lien" href="#parametres" data-page="parametres">Paramètres</a>
+        <!-- Déconnexion en POST (D134) : un lien ou une image d'une autre page ne peut pas la déclencher -->
+        <form method="post" action="/logout">
+          <button type="submit" class="compte__lien">Se déconnecter</button>
+        </form>
       </div>
     </div>
+  </div>
+</header>
+
+<main class="main" id="contenu" tabindex="-1">
+  <!-- Titre de la page, phrase courte et action principale -->
+  <div class="page-tete">
+    <div class="page-tete__txt">
+      <h1 class="page-tete__titre" data-topbar="title">Offres</h1>
+      <p class="page-tete__phrase" data-topbar="phrase"></p>
+    </div>
+    <div class="page-tete__actions">
+      <label class="search" data-search-zone>
+        <span class="visuellement-cache">Rechercher dans la page</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="search" placeholder="Rechercher…" data-search>
+      </label>
+      <button type="button" class="btn btn--primary btn--grand" data-topbar="action">
+        <span data-topbar="action-label">Chercher de nouvelles offres</span>
+      </button>
+    </div>
+  </div>
 
     <div class="content">
       <!-- bandeau d'état des pipelines en cours -->
-      <div class="runbar" data-runbar>
-        <span class="runbar__dot"></span>
+      <div class="runbar" data-runbar role="status">
+        <span class="runbar__dot" aria-hidden="true"></span>
         <span class="runbar__msg" data-runbar-msg>Traitement en cours — cela peut prendre du temps, y compris l'arrêt. Garde cet onglet ouvert et l'ordinateur allumé.</span>
         <div class="runbar__progress" data-runbar-progress>
           <div class="runbar__progress-track"><div class="runbar__progress-bar" data-runbar-bar></div></div>
@@ -145,8 +109,7 @@
       {% include "partials/profil.html" %}
       {% include "partials/parametres.html" %}
     </div>
-  </main>
-</div>
+</main>
 
 <!-- Modale lettre -->
 <div class="modal-bg" data-modal>
@@ -193,8 +156,6 @@
         lien.href = "/" + lien.dataset.modeBtn + location.hash;
       });
     });
-    const sub = document.querySelector("[data-brand-sub]");
-    if (sub) sub.textContent = htmlMode;
   })();
 </script>
 

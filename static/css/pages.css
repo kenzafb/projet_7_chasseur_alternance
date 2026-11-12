@@ -247,21 +247,6 @@
 .pj-add { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .pj-add__fname { font-size: 12.5px; color: var(--txt-muted); }
 
-/* Encart guide (discret, refermable) */
-.guide {
-  display: flex; align-items: flex-start; gap: 12px;
-  background: var(--surface-2); border: 1px solid var(--hair);
-  border-left: 3px solid var(--signal);
-  border-radius: var(--r-sm); padding: 11px 14px; margin-bottom: 16px;
-}
-.guide__txt { font-size: 13px; color: var(--txt-muted); line-height: 1.55; }
-.guide__txt strong { color: var(--txt); font-weight: 600; }
-.guide__x {
-  margin-left: auto; cursor: pointer; color: var(--txt-faint);
-  font-size: 18px; line-height: 1; flex-shrink: 0;
-}
-.guide__x:hover { color: var(--txt); }
-.guide.is-hidden { display: none; }
 
 /* ════════════ TABLEAU DE SUIVI (spontanées envoyées) ════════════ */
 .suivi-table {
@@ -588,3 +573,8 @@
 .parametres-intro { font-size: 13.5px; color: var(--txt-muted); margin: 0 0 18px; }
 .parametres-actuel { font-size: 13.5px; margin: 0 0 12px; }
 .parametres-actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+
+/* Taux d'envoi des entreprises à contacter (ancien pied de barre latérale, D143) */
+.sp-taux { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: -6px 0 16px; font-size: 14px; color: var(--texte-2); }
+.sp-taux__barre { flex: 0 0 120px; height: 6px; border-radius: var(--r-pill); background: var(--fond-neutre); overflow: hidden; }
+.sp-taux__rempli { display: block; height: 100%; background: var(--accent); }

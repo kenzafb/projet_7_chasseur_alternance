@@ -65,8 +65,10 @@ export const Candidatures = {
   async charger() {
     try { _data = await api.suivi(); } catch (_) { return; }
     rendre();
+    // Compteur du menu : ce qui attend, les candidatures à relancer
     const c = document.querySelector('[data-count="candidatures"]');
-    if (c) c.textContent = _data.length;
+    const aRelancer = _data.filter(x => x.statut === "a_relancer").length;
+    if (c) { c.textContent = aRelancer; c.hidden = !aRelancer; }
     if (this._branche) return;
     const liste = document.querySelector('[data-list="candidatures"]');
     // Changement de statut, écrit là où vit la candidature (offre ou spontanée)
