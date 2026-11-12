@@ -77,10 +77,24 @@ function majBadge() {
 }
 
 /* ── Modale lettre ───────────────────────────────────────────────────────── */
-/* Balises restées dans la lettre (entreprise inconnue, D108) : aperçu surligné */
-const A_COMPLETER = { "{entreprise}": "Nom de l'entreprise inconnu, à compléter",
-                      "{contact_entreprise}": "Nom de l'entreprise inconnu, à compléter",
-                      "{portfolio}": "Portfolio vide dans le profil (carte Identité), à compléter" };
+/* Balise restée dans la lettre (portfolio vide, D125) : aperçu surligné */
+const A_COMPLETER = { "{portfolio}": "Portfolio vide dans le profil (carte Identité), à compléter" };
+/* Entreprise inconnue (D138) : formulations neutres déjà dans la lettre, et
+   une simple information (mêmes textes que shared/offres.py) */
+const INFO_DESTINATAIRE = "Contact de l'entreprise inconnu : la lettre est adressée au service recrutement. "
+  + "Tu peux modifier cette ligne.";
+const INFO_ENTREPRISE = "Nom de l'entreprise inconnu : la lettre parle de « votre entreprise ». Tu peux modifier ce passage.";
+function infosLettre(infos) {
+  const el = document.querySelector("[data-modal-info]");
+  el.textContent = (infos || []).join(" ");
+  el.hidden = !(infos || []).length;
+}
+/* Lettre déjà enregistrée : informations d'après l'offre et le texte */
+function infosDeLaLettre(offre, texte) {
+  if (!offre || offre.entreprise_connue !== false || !texte) return [];
+  return [texte.includes("À l'attention du service recrutement") ? INFO_DESTINATAIRE : null,
+          texte.includes("votre entreprise") ? INFO_ENTREPRISE : null].filter(Boolean);
+}
 function apercuLettre() {
   const texte = document.querySelector("[data-modal-letter]").value;
   const restes = Object.keys(A_COMPLETER).filter(b => texte.includes(b));
@@ -106,6 +120,7 @@ const modal = {
     const offre = Offres.data().find(o => o.id === id);
     this.area().value = offre?.lettre || "";
     apercuLettre();
+    infosLettre(infosDeLaLettre(offre, offre?.lettre));
     this.para().value = "";
     this.etat().textContent = "";
     this.el().classList.add("is-open");
@@ -143,8 +158,10 @@ const modal = {
   async assembler() {
     if (!this.id) return;
     try {
-      this.area().value = (await api.assemblerLettre(this.id, this.para().value)).lettre;
+      const r = await api.assemblerLettre(this.id, this.para().value);
+      this.area().value = r.lettre;
       apercuLettre();
+      infosLettre(r.infos);
       this.etat().textContent = "Paragraphe inséré : la lettre est enregistrée, modifiable ci-dessous.";
       Offres.charger();
     } catch (e) { alert(e.message); }

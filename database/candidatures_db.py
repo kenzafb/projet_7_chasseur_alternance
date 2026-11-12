@@ -17,6 +17,7 @@ from database.insertion import inserer_ou_ignorer
 from database.models import Candidature
 from shared.lba import lien_invente, page_offre
 from shared.liens import lien_http
+from shared.offres import entreprise_connue
 
 
 # Colonnes simples de la table (hors id technique, user_id, et ref_offre)
@@ -47,6 +48,8 @@ def candidature_vers_dict(c: Candidature) -> dict:
         d["lien"] = ""
     # Page de candidature sur La Bonne Alternance, ou "" (D129)
     d["page_lba"] = page_offre(d)
+    # Entreprise inconnue : la lettre l'adresse au service recrutement (D138)
+    d["entreprise_connue"] = entreprise_connue(d)
     return d
 
 

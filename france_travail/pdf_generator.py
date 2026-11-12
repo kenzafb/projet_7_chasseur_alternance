@@ -8,7 +8,11 @@ Sécurité :
     est échappé avant d'entrer dans le HTML : une balise tapée dans la lettre
     s'imprime comme du texte, elle n'est jamais interprétée ;
   - le gabarit n'a besoin d'aucune ressource (styles en ligne, polices du
-    système) : le url_fetcher refuse tout, fichier local comme réseau.
+    système, Inter de préférence : README) : le url_fetcher refuse tout,
+    fichier local comme réseau.
+
+Mise en page (D138) : celle d'une lettre Word, et le texte même de la
+lettre affichée dans la page (decouper_lettre).
 
 Rangement : un fichier au nom unique par génération, dans le dossier de
 l'utilisateur (LETTRES_PDF_DIR/user_<id>/), donc aucun écrasement entre
@@ -26,8 +30,9 @@ from pathlib import Path
 
 from weasyprint import HTML as WeasyHTML
 
-from database.dates import maintenant_affichage
+from france_travail.generateur import contact_entreprise, date_du_jour
 from shared import config
+from shared.offres import entreprise_connue
 from shared.erreurs import exiger_profil, CHAMPS_IDENTITE
 
 MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
@@ -55,84 +60,113 @@ def _e(valeur) -> str:
     return html.escape(str(valeur or ""), quote=True)
 
 
-def _corps(lettre: str) -> str:
-    """Ne garde que le corps de la lettre (à partir de "Madame, Monsieur") :
-    l'en-tête (contact entreprise, date, objet) est déjà dans le gabarit,
-    l'inclure créerait un doublon."""
-    for marqueur in ["Madame, Monsieur", "Madame,\nMonsieur", "Madame"]:
-        if marqueur in lettre:
-            return lettre[lettre.index(marqueur):]
-    # Pas de formule d'appel : on saute les 3 premiers blocs (contact, date, objet)
-    return "\n\n".join(lettre.strip().split("\n\n")[3:])
+# Rôles des paragraphes de l'en-tête d'une lettre (avant la formule d'appel)
+_APPEL = re.compile(r"^(madame|monsieur|mesdames|bonjour|à qui de droit)\b", re.IGNORECASE)
+_OBJET = re.compile(r"^objet\s*:", re.IGNORECASE)
+_DATE = re.compile(r"\b\d{1,2}(er)?\s+(" + "|".join(MOIS) + r")\s+\d{4}\b", re.IGNORECASE)
+
+# Police libre proche d'Aptos (Word) : Inter, paquet Fedora rsms-inter-fonts,
+# installée sur le système et trouvée par fontconfig (aucun fichier chargé
+# par le PDF lui-même) ; Carlito, puis Liberation Sans, à défaut (D138)
+POLICES = "'Inter', 'Carlito', 'Liberation Sans', sans-serif"
+
+
+def _paragraphes(texte: str) -> list[str]:
+    return [p.strip() for p in re.split(r"\n\s*\n", (texte or "").strip()) if p.strip()]
+
+
+def _role(paragraphe: str, destinataire: str) -> str | None:
+    """destinataire, date ou objet pour un paragraphe d'en-tête, sinon None."""
+    if paragraphe == destinataire:
+        return "destinataire"
+    if _OBJET.match(paragraphe):
+        return "objet"
+    if "\n" not in paragraphe and len(paragraphe) <= 80 and _DATE.search(paragraphe):
+        return "date"
+    return None
+
+
+def decouper_lettre(offre: dict, lettre: str, profil: dict) -> dict:
+    """La lettre telle que la page l'affiche, rangée pour la mise en page :
+    {destinataire, autres, date, objet, corps}. Ce que la lettre contient
+    est repris tel quel ; ce qui lui manque (lettre type commençant à
+    « Madame, Monsieur ») est ajouté avec les mêmes règles que la page :
+    destinataire de contact_entreprise (« À l'attention du service
+    recrutement » si l'entreprise est inconnue), date du jour, objet
+    « Candidature : <intitulé> », en gras (D138)."""
+    destinataire = contact_entreprise(offre)
+    paras = _paragraphes(lettre)
+    fin = next((i for i, p in enumerate(paras) if _APPEL.match(p)), None)
+    if fin is None:   # sans formule d'appel : l'en-tête s'arrête au premier paragraphe sans rôle
+        fin = next((i for i, p in enumerate(paras) if _role(p, destinataire) is None), len(paras))
+    tete, corps = paras[:fin], paras[fin:]
+    parties = {"destinataire": None, "date": None, "objet": None, "autres": [], "corps": corps}
+    for p in tete:
+        role = _role(p, destinataire)
+        if role and parties[role] is None:
+            parties[role] = p
+        else:
+            parties["autres"].append(p)
+    ville = (profil.get("ville") or "").strip()
+    titre = (offre.get("titre") or "").strip()
+    parties["destinataire"] = parties["destinataire"] or destinataire
+    parties["date"] = parties["date"] or (f"{ville}, le {date_du_jour()}" if ville else f"Le {date_du_jour()}")
+    parties["objet"] = parties["objet"] or (f"Candidature : {titre}" if titre else "Candidature")
+    return parties
+
+
+def _bloc(texte: str, classe: str = "") -> str:
+    attribut = f' class="{classe}"' if classe else ""
+    return f"<p{attribut}>{_e(texte).replace(chr(10), '<br>')}</p>\n"
 
 
 def construire_html(offre: dict, lettre: str, profil: dict) -> str:
-    """HTML de la lettre, chaque valeur variable échappée."""
-    p = {c: _e(profil.get(c)) for c in ("prenom", "nom", "ville", "telephone", "email", "github")}
-    now = maintenant_affichage()
-    date_str = f"{now.day} {MOIS[now.month - 1]} {now.year}"
-    # Lieu : la ville du profil (rien de codé en dur) ; objet : le titre de l'offre
-    lieu_date = f"{p['ville']}, le {date_str}" if p["ville"] else f"Le {date_str}"
-    titre = (offre.get("titre") or "").strip()
-    objet = f"Candidature — {_e(titre)}" if titre else "Candidature"
-
-    entreprise_brute = offre.get("entreprise", "") or ""
-    if entreprise_brute.lower() in ["inconnue", "inconnu", "", "none"]:
-        entreprise_affichee = "À l'attention du service recrutement"
-    else:
-        entreprise_affichee = entreprise_brute
-
-    paragraphes = "".join(
-        f"<p>{_e(para.strip()).replace(chr(10), '<br>')}</p>\n"
-        for para in _corps(lettre).strip().split("\n\n") if para.strip())
-
+    """HTML de la lettre, mise en page d'une lettre Word (D138) : coordonnées
+    en haut à gauche, destinataire en dessous à droite, date puis objet en
+    gras, corps aligné à gauche, police proche d'Aptos en 11 pt. Chaque
+    valeur variable est échappée."""
+    parties = decouper_lettre(offre, lettre, profil)
+    nom = " ".join(x for x in ((profil.get("prenom") or "").strip(), (profil.get("nom") or "").strip()) if x)
+    coordonnees = [(profil.get(c) or "").strip() for c in ("ville", "telephone", "email", "linkedin", "github",
+                                                            "portfolio")]
+    lignes = "".join(f"<div>{_e(c)}</div>" for c in coordonnees if c)
+    corps = "".join(_bloc(p) for p in parties["autres"] + parties["corps"])
     return f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8"/>
 <style>
-  @page {{ size: A4; margin: 2cm 2cm 2cm 2cm; }}
+  @page {{ size: A4; margin: 2.5cm; }}
   * {{ box-sizing: border-box; margin: 0; padding: 0; }}
-  body {{ font-family: 'Helvetica', 'Arial', sans-serif; font-size: 10.5pt; line-height: 1.55; color: #1a1a1a; }}
-  .entete {{ display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; padding-bottom: 14px; border-bottom: 1px solid #ccc; }}
-  .expediteur .nom {{ font-size: 12pt; font-weight: bold; margin-bottom: 4px; }}
-  .expediteur .info {{ font-size: 8.5pt; color: #444; line-height: 1.6; }}
-  .destinataire {{ text-align: right; }}
-  .destinataire .entreprise {{ font-size: 10.5pt; font-weight: bold; margin-bottom: 4px; }}
-  .destinataire .info {{ font-size: 8.5pt; color: #444; line-height: 1.6; }}
-  .date-lieu {{ text-align: right; font-size: 9.5pt; color: #555; margin-bottom: 16px; }}
-  .objet {{ font-size: 10pt; margin-bottom: 20px; }}
-  .corps p {{ margin-bottom: 11px; text-align: justify; font-size: 10.5pt; }}
+  body {{ font-family: {POLICES}; font-size: 11pt; line-height: 1.3; color: #000; text-align: left; }}
+  p {{ margin-bottom: 8pt; }}
+  .coordonnees {{ margin-bottom: 18pt; }}
+  .coordonnees .nom {{ font-weight: bold; }}
+  .destinataire {{ margin-left: 55%; margin-bottom: 18pt; }}
+  .objet {{ font-weight: bold; margin-bottom: 14pt; }}
 </style>
 </head>
 <body>
-<div class="entete">
-  <div class="expediteur">
-    <div class="nom">{p['prenom']} {p['nom']}</div>
-    <div class="info">{p['ville']}<br>{p['telephone']}<br>{p['email']}<br>{p['github']}</div>
-  </div>
-  <div class="destinataire">
-    <div class="entreprise">{_e(entreprise_affichee)}</div>
-    <div class="info">{_e(offre.get("lieu"))}</div>
-  </div>
-</div>
-<div class="date-lieu">{lieu_date}</div>
-<div class="objet"><strong>Objet :</strong> {objet}</div>
-<div class="corps">{paragraphes}</div>
+<div class="coordonnees"><div class="nom">{_e(nom)}</div>{lignes}</div>
+{_bloc(parties["destinataire"], "destinataire")}{_bloc(parties["date"], "date")}{_bloc(parties["objet"], "objet")}<div class="corps">
+{corps}</div>
 </body>
 </html>"""
 
 
-def _ascii(texte: str) -> str:
-    texte = unicodedata.normalize("NFKD", texte or "").encode("ascii", "ignore").decode()
-    return re.sub(r"[^A-Za-z0-9-]+", "_", texte).strip("_")
+def _pour_nom_de_fichier(texte: str) -> str:
+    """Lettres (accents compris), chiffres et tirets ; le reste devient « _ »."""
+    texte = unicodedata.normalize("NFC", str(texte or "")).strip()
+    return re.sub(r"[^\w-]+", "_", texte).strip("_")
 
 
 def nom_telechargement(offre: dict, profil: dict) -> str:
-    """Nom proposé au navigateur : Lettre_Prenom_Nom_Entreprise.pdf (ASCII)."""
-    parties = [_ascii(profil.get("prenom")), _ascii(profil.get("nom")),
-               _ascii(offre.get("entreprise"))[:40]]
-    return "_".join(["Lettre", *[x for x in parties if x]]) + ".pdf"
+    """Lettre_de_motivation_<Prénom>_<Nom>.pdf, suivi de _<Entreprise> si son
+    nom est connu (jamais « Inconnue », D138)."""
+    parties = [_pour_nom_de_fichier(profil.get("prenom")), _pour_nom_de_fichier(profil.get("nom"))]
+    if entreprise_connue(offre):
+        parties.append(_pour_nom_de_fichier(offre.get("entreprise"))[:40].strip("_"))
+    return "_".join(["Lettre_de_motivation", *[x for x in parties if x]]) + ".pdf"
 
 
 def generer_pdf_lettre(offre, lettre, profil, user_id: int, dossier_output=None) -> str:

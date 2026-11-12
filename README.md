@@ -74,10 +74,10 @@ docs/                décisions, spécification des sources, rapports de phase
 
 ## Installation de zéro (Fedora)
 
-Prérequis : Python 3.13, les bibliothèques Pango et Cairo (WeasyPrint, pour les PDF), Git ; Ollama pour l'IA (facultatif). Clés d'API à demander : France Travail (francetravail.io, application avec l'API « Offres d'emploi v2 »), La Bonne Alternance (api.apprentissage.beta.gouv.fr), INSEE Sirene (portail-api.insee.fr, API Sirene 3.11).
+Prérequis : Python 3.13, les bibliothèques Pango et Cairo (WeasyPrint, pour les PDF), la police Inter (lettres en PDF), Git ; Ollama pour l'IA (facultatif). Clés d'API à demander : France Travail (francetravail.io, application avec l'API « Offres d'emploi v2 »), La Bonne Alternance (api.apprentissage.beta.gouv.fr), INSEE Sirene (portail-api.insee.fr, API Sirene 3.11).
 
 ```bash
-sudo dnf install -y python3.13 pango cairo git
+sudo dnf install -y python3.13 pango cairo git rsms-inter-fonts
 git clone <url-du-depot> chasseur_alternance
 cd chasseur_alternance
 python3.13 -m venv venv
@@ -102,6 +102,8 @@ Toutes sont décrites dans `.env.example`, qui est complet. L'essentiel :
 | `NOMENCLATURE_NAF` | vide (bascule NAF 2025 automatique le 1er janvier 2027) |
 | `PLAFOND_ENVOIS_JOUR` | mails par utilisateur et par jour (50) |
 | `FUSEAU_AFFICHAGE` | fuseau d'affichage des dates (`Europe/Paris`) |
+
+**Police des lettres en PDF.** Inter (paquet `rsms-inter-fonts`), libre et proche d'Aptos, la police par défaut de Word, en 11 pt. Elle est prise sur le système par WeasyPrint et embarquée dans chaque PDF ; à défaut, Carlito (`google-carlito-fonts`) puis Liberation Sans. Aucun fichier de police n'est chargé par le PDF lui-même.
 
 ### IA locale (Ollama)
 

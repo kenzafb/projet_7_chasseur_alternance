@@ -6,10 +6,12 @@ profil, avec des balises ; l'IA (IA_MODELE_LETTRE) n'écrit que le
 paragraphe personnalisé, affiché et modifiable avant d'être inséré.
 
 Balises de la lettre type, remplacées en Python sauf {paragraphe} :
-  {entreprise}          nom de l'entreprise de l'offre
+  {entreprise}          nom de l'entreprise de l'offre (inconnue : « votre entreprise »)
   {poste}               intitulé du poste
   {date}                date du jour, en toutes lettres
-  {contact_entreprise}  bloc destinataire (nom de l'entreprise, puis lieu)
+  {contact_entreprise}  bloc destinataire (nom de l'entreprise, puis lieu ;
+                        inconnue : « À l'attention du service recrutement »)
+  {portfolio}           lien du portfolio (carte Identité du profil)
   {paragraphe}          paragraphe rédigé par l'IA (ou à la main)
   {paragraphe_entreprise}  ancien nom de {paragraphe}, toujours accepté
 Sans lettre type, ou sans {paragraphe} : message qui renvoie au profil,
@@ -22,6 +24,8 @@ import string
 from database.dates import maintenant_affichage
 from shared.erreurs import CHAMPS_IDENTITE, ErreurUtilisateur, exiger_profil
 from shared.ia import appeler_structure
+from shared.offres import DESTINATAIRE_INCONNU, ENTREPRISE_INCONNUE, INFO_DESTINATAIRE_INCONNU, \
+    INFO_ENTREPRISE_INCONNUE, entreprise_connue
 from shared.schemas_ia import ParagrapheIA
 
 # Exemples de lettre type par mode, proposés dans le profil (bouton « Partir
@@ -143,37 +147,38 @@ def exiger_lettre_type(profil: dict) -> str:
     return modele
 
 
-def _date_du_jour():
+def date_du_jour():
     mois = ["janvier", "février", "mars", "avril", "mai", "juin",
             "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
     today = maintenant_affichage()
     return f"{today.day} {mois[today.month - 1]} {today.year}"
 
 
-# Entreprise masquée par France Travail (environ une offre sur deux)
-NOMS_VIDES = {"", "inconnue", "inconnu", "non précisé", "non precise", "non renseigné", "non renseigne", "n/a", "na"}
-
-
-def entreprise_connue(offre) -> bool:
-    return (offre.get("entreprise") or "").strip().lower() not in NOMS_VIDES
-
-
 def contact_entreprise(offre) -> str:
-    """Bloc destinataire écrit en Python : nom de l'entreprise puis lieu.
-    Nom inconnu : la balise reste telle quelle, à compléter (D108)."""
+    """Bloc destinataire écrit en Python, le même dans la lettre et dans son
+    PDF : nom de l'entreprise puis lieu ; entreprise inconnue : « À
+    l'attention du service recrutement » (D138, remplace D108)."""
     if not entreprise_connue(offre):
-        return "{contact_entreprise}"
+        return DESTINATAIRE_INCONNU
     return "\n".join(x for x in ((offre.get("entreprise") or "").strip(), (offre.get("lieu") or "").strip()) if x)
 
 
-# Balises laissées dans la lettre quand l'information manque (D108)
-A_COMPLETER = {"entreprise": "Nom de l'entreprise inconnu, à compléter",
-               "contact_entreprise": "Nom de l'entreprise inconnu, à compléter",
-               "portfolio": "Portfolio vide dans le profil (carte Identité), à compléter"}
+def infos_lettre(offre, modele: str) -> list[str]:
+    """Informations neutres à montrer avec la lettre d'une offre dont
+    l'entreprise est inconnue, selon les balises de la lettre type (D138)."""
+    if entreprise_connue(offre):
+        return []
+    infos = [INFO_DESTINATAIRE_INCONNU] if "{contact_entreprise}" in modele else []
+    return infos + ([INFO_ENTREPRISE_INCONNUE] if "{entreprise}" in modele else [])
+
+
+# Balises laissées dans la lettre quand l'information manque : le portfolio
+# vide seulement (D125) ; l'entreprise inconnue a une formulation neutre (D138)
+A_COMPLETER = {"portfolio": "Portfolio vide dans le profil (carte Identité), à compléter"}
 
 
 def marqueurs_a_completer(lettre: str) -> list[str]:
-    """Balises restées dans la lettre assemblée (entreprise inconnue, portfolio vide)."""
+    """Balises restées dans la lettre assemblée (portfolio vide)."""
     return [b for b in A_COMPLETER if "{" + b + "}" in (lettre or "")]
 
 
@@ -319,11 +324,11 @@ def assembler_lettre(offre, profil, paragraphe: str) -> str:
     if not paragraphe:
         raise ErreurUtilisateur("Le paragraphe personnalisé est vide : écris-le ou fais-le rédiger avant de "
                                 "l'insérer dans la lettre.")
-    # Nom inconnu (« Inconnue », vide) : {entreprise} et {contact_entreprise} restent visibles (D108)
+    # Nom inconnu (« Inconnue », vide) : formulations neutres (D138)
     return modele.format(entreprise=(offre.get("entreprise") or "").strip() if entreprise_connue(offre)
-                         else "{entreprise}",
+                         else ENTREPRISE_INCONNUE,
                          poste=(offre.get("titre") or "").strip() or "le poste proposé",
-                         date=_date_du_jour(), contact_entreprise=contact_entreprise(offre),
+                         date=date_du_jour(), contact_entreprise=contact_entreprise(offre),
                          paragraphe=paragraphe, paragraphe_entreprise=paragraphe,
                          # Portfolio vide : la balise reste visible, à compléter (D125, comme D108)
                          portfolio=(profil.get("portfolio") or "").strip() or "{portfolio}")

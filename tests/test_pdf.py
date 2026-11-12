@@ -103,7 +103,7 @@ def test_telechargement_par_le_proprietaire(homonymes):
     r = client_a.get(reponse["url"])
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/pdf"
-    assert r.headers["content-disposition"] == 'attachment; filename="Lettre_Ada_Lovelace_ACME.pdf"'
+    assert r.headers["content-disposition"] == 'attachment; filename="Lettre_de_motivation_Ada_Lovelace_ACME.pdf"'
     assert r.content.startswith(b"%PDF")
     assert "chemin" not in reponse   # plus de chemin serveur renvoyé au navigateur
 

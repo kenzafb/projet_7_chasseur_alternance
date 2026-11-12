@@ -274,7 +274,7 @@ def test_pdf_sans_lieu_ni_objet_en_dur():
     assert "Lyon, le" in html and "Paris" not in html
     assert "Alternance" not in html
     html = construire_html(OFFRE, "Madame, Monsieur,", {**PROFIL, "ville": ""})
-    assert '<div class="date-lieu">Le ' in html
+    assert '<p class="date">Le ' in html
 
 
 # ─── Code actif ───────────────────────────────────────────────────────────────
@@ -326,23 +326,28 @@ def test_points_forts_tires_du_profil_seulement(mode):
     assert "Aucune compétence du profil ne correspond à l'offre" in texte
 
 
-# ─── D108 : entreprise inconnue, balises laissées à compléter ────────────────
-@pytest.mark.parametrize("nom", ["Inconnue", "", "  ", "non renseigné"])
-def test_entreprise_inconnue_balises_laissees(nom):
+# ─── D138 (remplace D108) : entreprise inconnue, formulations neutres ────────
+@pytest.mark.parametrize("nom", ["Inconnue", "", "  ", "non renseigné", "None"])
+def test_entreprise_inconnue_formulations_neutres(nom):
     profil = {**PROFIL, "lettre_type": LETTRE_TYPE}
     lettre = generateur.assembler_lettre({**OFFRE, "entreprise": nom, "lieu": "Lyon"}, profil, "P.")
-    assert lettre.startswith("{contact_entreprise}\nObjet : Vendeur") and "J'aime {entreprise}." in lettre
-    assert generateur.marqueurs_a_completer(lettre) == ["entreprise", "contact_entreprise"]
-    assert generateur.marqueurs_a_completer(generateur.assembler_lettre(OFFRE, profil, "P.")) == []
+    assert lettre.startswith("À l'attention du service recrutement\nObjet : Vendeur")
+    assert "J'aime votre entreprise." in lettre and "{" not in lettre
+    assert generateur.marqueurs_a_completer(lettre) == []
+    assert generateur.infos_lettre({"entreprise": nom}, LETTRE_TYPE) == [
+        "Contact de l'entreprise inconnu : la lettre est adressée au service recrutement. Tu peux modifier cette ligne.",
+        "Nom de l'entreprise inconnu : la lettre parle de « votre entreprise ». Tu peux modifier ce passage."]
+    assert generateur.infos_lettre(OFFRE, LETTRE_TYPE) == []
 
 
-def test_route_signale_les_balises_a_completer(utilisateur, ia):
+def test_route_donne_l_information_neutre(utilisateur, ia):
     from database.candidatures_db import ajouter_candidature
     client, uid = utilisateur("a@test.fr", prenom="Alice")
     client.post("/api/profil", json={**PROFIL, "lettre_type": LETTRE_TYPE})
     ajouter_candidature(uid, {"id": "R1", "titre": "Dev", "entreprise": "Inconnue", "lieu": "Paris"})
     r = client.post("/api/lettre/assembler", json={"id": "R1", "paragraphe": "P."}).json()
-    assert r["a_completer"] == ["entreprise", "contact_entreprise"]
-    assert r["message"] == "Nom de l'entreprise inconnu, à compléter"
+    assert r["a_completer"] == [] and r["message"] == ""
+    assert r["infos"][0].startswith("Contact de l'entreprise inconnu")
+    assert client.get("/api/candidatures").json()[0]["entreprise_connue"] is False
     js = (config.STATIC_DIR / "js" / "app.js").read_text(encoding="utf-8")
-    assert "<mark>" in js and "Nom de l'entreprise inconnu, à compléter" in js
+    assert "la lettre est adressée au service recrutement" in js and "à compléter" not in js.split("A_COMPLETER")[0]

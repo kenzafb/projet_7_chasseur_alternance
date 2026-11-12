@@ -51,8 +51,8 @@ from database.dates import maintenant_utc
 
 # ─── Modules métier ───────────────────────────────────────────────
 from france_travail.main import lancer_recherche
-from france_travail.generateur import (A_COMPLETER, assembler_lettre, lettre_par_defaut, marqueurs_a_completer,
-                                      rediger_paragraphe_verifie)
+from france_travail.generateur import (A_COMPLETER, assembler_lettre, exiger_lettre_type, infos_lettre,
+                                      lettre_par_defaut, marqueurs_a_completer, rediger_paragraphe_verifie)
 from france_travail.analyseur import analyser_offre, marquer_non_analysee
 from france_travail.analyse_differee import analyser_en_attente, duree_lisible, enregistrer_analyse, estimation_file
 from shared.ia import ErreurIA, ErreurIABloquante
@@ -788,14 +788,17 @@ def api_lettre_assembler(body: Assembler, user: User = Depends(utilisateur_requi
     offre = lire_candidature(user.id, body.id, mode=mode)
     if not offre:
         return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
-    lettre = assembler_lettre(offre, lire_profil(user.id, mode=mode), body.paragraphe)
+    profil = lire_profil(user.id, mode=mode)
+    lettre = assembler_lettre(offre, profil, body.paragraphe)
     modifs = {"lettre": lettre}
     if offre.get("statut") in (None, "", "nouveau"):
         modifs["statut"] = "en_cours"
     modifier_candidature(user.id, body.id, modifs, mode=mode)
     a_completer = marqueurs_a_completer(lettre)
+    # Entreprise inconnue : informations neutres (D138) ; portfolio vide : à compléter (D125)
     return {"lettre": lettre, "a_completer": a_completer,
-            "message": " ; ".join(dict.fromkeys(A_COMPLETER[b] for b in a_completer))}
+            "message": " ; ".join(dict.fromkeys(A_COMPLETER[b] for b in a_completer)),
+            "infos": infos_lettre(offre, exiger_lettre_type(profil))}
 
 @prive.post("/api/analyser")
 def api_analyser(body: OffreId, request: Request, user: User = Depends(utilisateur_requis),
