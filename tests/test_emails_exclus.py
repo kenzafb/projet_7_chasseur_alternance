@@ -4,7 +4,6 @@ données, scraper, enregistrement en base."""
 import pytest
 
 import offres.la_bonne_alternance as lba
-import main
 from database.entreprises_db import ajouter_entreprises, lire_entreprises, sauvegarder_enrichissement
 from shared import emails_exclus
 from spontanees.recherche_emails import est_email_valide, meilleurs_emails

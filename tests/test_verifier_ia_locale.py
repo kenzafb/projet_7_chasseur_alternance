@@ -175,7 +175,8 @@ def test_lettre_a_l_aveugle(profil_complet, ia):
     ia.panne = _lettre
     lignes = []
     s = script()
-    tirage = lambda etiquettes: etiquettes.reverse()        # m1 -> C, m2 -> B, m3 -> A
+    def tirage(etiquettes):                                  # m1 -> C, m2 -> B, m3 -> A
+        etiquettes.reverse()
     import shared.config as c
     o = s.lire_offre(c.DATABASE_URL, "R0")
     assert o["offre"]["titre"] == "Développeur 0"

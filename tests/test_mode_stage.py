@@ -288,7 +288,6 @@ def test_recherche_d_offres_de_stage(api, stagiaire):
 
 def test_recherche_par_la_route_en_stage(stagiaire, monkeypatch, pipelines_neufs):
     """La page Offres du mode stage se remplit comme les autres : offres « non analysées »."""
-    import main
     from database.candidatures_db import lire_candidatures
     monkeypatch.setenv("ANALYSE_IA", "false")
     client, uid = stagiaire

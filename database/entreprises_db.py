@@ -16,17 +16,17 @@ demandé ; un contact dans un autre mode est signalé, jamais bloquant.
 import json
 from datetime import datetime, timedelta, timezone
 
-from database.connexion import SessionLocal
-from database.dates import JOUR, JOUR_HEURE, depuis_base, en_texte, maintenant_utc, vers_utc
-
-_TRES_ANCIEN = datetime.min.replace(tzinfo=timezone.utc)
 from sqlalchemy.orm import selectinload
 
+from database.connexion import SessionLocal
+from database.dates import JOUR, JOUR_HEURE, depuis_base, en_texte, maintenant_utc, vers_utc
 from database.models import EmailContacte, Entreprise, EntrepriseMode
 from offres.pages_lba import page_entreprise
-from shared.modes import MODE_DEFAUT
 from shared.emails_exclus import email_exclu, filtrer as filtrer_emails_exclus
+from shared.modes import MODE_DEFAUT
 from shared.validation_emails import MANUELLE
+
+_TRES_ANCIEN = datetime.min.replace(tzinfo=timezone.utc)
 
 
 LONGUEUR_CONTACT_RH = 200   # taille de la colonne entreprises.contact_rh

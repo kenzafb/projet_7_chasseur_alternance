@@ -49,7 +49,7 @@ def _compter(chemin) -> dict:
         cx.close()
 
 
-@pytest.mark.parametrize("precedente,revision", list(zip(REVISIONS, REVISIONS[1:])))
+@pytest.mark.parametrize("precedente,revision", list(zip(REVISIONS, REVISIONS[1:], strict=False)))
 def test_montee_et_descente_sans_perte(tmp_path, precedente, revision):
     chemin = tmp_path / "t.db"
     cfg = config_alembic(f"sqlite:///{chemin}")

@@ -32,6 +32,7 @@ from shared.chiffrement import ChiffrementIndisponible, raison_indisponible
 from shared.config import COOKIE_SECURE, STATIC_DIR, secret_key
 from shared.erreurs import ErreurUtilisateur
 from shared.ia import ErreurIA, ErreurIABloquante
+from shared.journal import journaliser
 
 # Documentation automatique désactivée ici : elle est servie par des routes
 # privées (/docs, /openapi.json, routes/documentation.py), réservées aux
@@ -113,7 +114,7 @@ def erreur_ia(request: Request, exc: ErreurIA):
 
 
 if raison_indisponible():
-    print(f"⚠️  {raison_indisponible()}")
+    journaliser(f"⚠️  {raison_indisponible()}")
 
 
 # ─── Journal d'accès : sans les requêtes de statut ───────────────────────────
@@ -141,5 +142,5 @@ logging.getLogger("uvicorn.access").addFilter(FILTRE_STATUT)
 
 if __name__ == "__main__":
     import uvicorn
-    print("\n🚀 Chasseur Alternance (FastAPI) sur http://localhost:5002\n")
+    journaliser("\n🚀 Chasseur Alternance (FastAPI) sur http://localhost:5002\n")
     uvicorn.run("main:app", host="0.0.0.0", port=5002, reload=True)

@@ -105,7 +105,7 @@ def _ids_par_nom(uid):
 
 
 def test_j_ai_postule_sur_lba_entre_dans_le_suivi(utilisateur):
-    from datetime import date, timedelta
+    from datetime import timedelta
     from database.entreprises_db import ajouter_entreprises_lba
     from database.dates import maintenant_affichage
     from tests.faux_lba import siret_lba

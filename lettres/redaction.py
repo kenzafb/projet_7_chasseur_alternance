@@ -122,7 +122,7 @@ def preparer_lettre_type(modele):
     except ValueError:
         raise LettreTypeInvalide(
             "Ta lettre type contient une accolade { ou } isolée. "
-            f"Seules les balises {permises} sont permises : corrige-la dans {ALLER_AU_PROFIL}.")
+            f"Seules les balises {permises} sont permises : corrige-la dans {ALLER_AU_PROFIL}.") from None
     for champ, spec, conv in champs:
         if champ not in BALISES_LETTRE or spec or conv:
             raise LettreTypeInvalide(

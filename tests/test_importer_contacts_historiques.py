@@ -77,7 +77,7 @@ def test_import_groupe_a_par_defaut(ancienne_base, historique, utilisateur, smtp
     ajouter_entreprises(uid, [{"siret": "11111111100099", "siren": "111111111", "nom": "ACME"},
                               {"siret": "22222222200012", "nom": "Beta"}, {"siret": "S3", "nom": "Perso"}])
     liste = lire_entreprises(uid)
-    for e, emails in zip(liste, (["rh@acme.fr"], ["contact@beta.fr"], ["maman@perso.fr"])):
+    for e, emails in zip(liste, (["rh@acme.fr"], ["contact@beta.fr"], ["maman@perso.fr"]), strict=True):
         e["emails_trouves"] = emails
     sauvegarder_enrichissement(uid, liste)
     ajouter_entreprises(uid, [{"siret": "11111111100099", "siren": "111111111"}], mode="job")

@@ -54,6 +54,8 @@ from shared.erreurs import ErreurUtilisateur
 from shared.validation_emails import emails_douteux, emails_valides
 from database.compte_envoi_db import liberer_envoi, marquer_verification, reserver_envoi
 from database.dedup_db import ajouter_emails_contactes, lire_emails_contactes, normaliser_email
+from database.entreprises_db import lire_entreprises, sauvegarder_entreprises
+from shared.journal import journaliser
 
 LIMITE_PAR_RUN    = config.LIMITE_ENVOIS_PAR_LANCEMENT
 PAUSE_ENTRE_MAILS = (30, 90)
@@ -132,8 +134,6 @@ def objet_et_corps(profil: dict, mode: str) -> tuple[str, str]:
 
 # ─── Chargement / sauvegarde des entreprises (base) ───────────────────────────
 
-from database.entreprises_db import lire_entreprises, sauvegarder_entreprises
-
 # Utilisateur pour lequel l'envoyeur travaille : passé par l'appelant
 # (user_id de la session côté web, --user obligatoire en CLI).
 def charger_json(user_id, mode="alternance"):
@@ -190,7 +190,7 @@ class EnvoiInterrompu(Exception):
     serveur injoignable) : message sûr, sans mot de passe."""
 
 
-def charger_pieces_jointes(pieces_jointes, log_fn=print) -> list[tuple[str, bytes]]:
+def charger_pieces_jointes(pieces_jointes, log_fn=journaliser) -> list[tuple[str, bytes]]:
     """Pièces jointes du profil lues une fois : [(nom affiché, octets)]."""
     pieces = []
     for pj in (pieces_jointes or []):
@@ -217,7 +217,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
     Retourne {"envoyes", "echecs", "arret"} ; arret vaut None (file vidée),
     "limite", "plafond" ou "stop". Lève EnvoiInterrompu sur un problème
     de compte, ErreurUtilisateur ou ChiffrementIndisponible avant tout envoi."""
-    _log = log_fn or print
+    _log = log_fn or journaliser
     plafond = config.PLAFOND_ENVOIS_JOUR
 
     # Compte d'envoi de CET utilisateur, configuré et vérifié (sinon : erreur)
@@ -365,7 +365,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
                 _pct = round(envoyes / _total_envoi * 100)
                 on_progress(min(_pct, 100), f"{envoyes}/{_total_envoi} mails envoyés")
         else:
-            _log(f"  ❌ Échec envoi")
+            _log("  ❌ Échec envoi")
             echecs += 1
 
         traites += 1
@@ -400,4 +400,4 @@ if __name__ == "__main__":
     try:
         main(limite=args.limite, test=args.test, user_id=args.user, mode=args.mode)
     except (ErreurUtilisateur, ChiffrementIndisponible, EnvoiInterrompu) as e:
-        raise SystemExit(f"❌ {e}")
+        raise SystemExit(f"❌ {e}") from e

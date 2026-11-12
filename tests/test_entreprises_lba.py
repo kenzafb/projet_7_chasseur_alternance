@@ -9,7 +9,6 @@ import sqlite3
 from alembic import command
 
 import offres.la_bonne_alternance as lba
-import main
 from database.entreprises_db import (ajouter_entreprises, ajouter_entreprises_lba, calculer_stats,
                                      cles_connues, lire_entreprises, noter_source)
 from database.schema import config_alembic

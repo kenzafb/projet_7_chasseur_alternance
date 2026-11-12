@@ -3,7 +3,6 @@ insertions idempotentes."""
 
 import pytest
 
-import offres.analyse
 import offres.france_travail as scraper
 import spontanees.envoi as envoyeur
 from database.candidatures_db import ajouter_candidature, lire_candidatures

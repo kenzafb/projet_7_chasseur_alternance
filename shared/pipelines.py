@@ -20,6 +20,7 @@ import threading
 
 from database.dates import maintenant_affichage
 from shared.config import LOGS_MAX_PAR_UTILISATEUR
+from shared.journal import journaliser
 
 RECHERCHE = "recherche"
 ANALYSE = "analyse"
@@ -99,7 +100,7 @@ class Pipelines:
         with self._verrou:
             journal = self._logs.setdefault(user_id, collections.deque(maxlen=self._logs_max))
             journal.append(ligne)
-        print(f"[user {user_id}] {msg}")
+        journaliser(f"[user {user_id}] {msg}")
 
     def logs(self, user_id: int) -> list[dict]:
         with self._verrou:

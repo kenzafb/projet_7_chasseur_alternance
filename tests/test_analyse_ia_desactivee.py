@@ -4,7 +4,6 @@ lettre, réanalyse et revalidation refusées ; scraper en lecture directe."""
 
 import pytest
 
-import main
 from database.candidatures_db import ajouter_candidature, lire_candidature, lire_candidatures
 from database.dedup_db import lire_offres_vues
 from database.entreprises_db import lire_entreprises, sauvegarder_enrichissement

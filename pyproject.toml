@@ -1,0 +1,26 @@
+# Configuration des outils de développement (ruff). L'application elle-même
+# n'est pas un paquet installable : elle se lance par uvicorn main:app.
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+extend-exclude = ["venv", "data", "lettres_pdf"]
+
+[tool.ruff.lint]
+# Erreurs (E, W), pyflakes (F), bugbear (B)
+select = ["E", "F", "W", "B"]
+ignore = [
+    "E501",   # lignes longues : pas de formateur imposé, le projet n'est pas réécrit pour elles
+    "E741",   # noms d'une lettre (« l » pour ligne) : style, sans risque ici
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# Idiome de FastAPI : Depends(), Query(), Body()... en valeur par défaut des routes
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Body", "fastapi.File",
+                          "fastapi.Form"]
+
+[tool.ruff.lint.per-file-ignores]
+# Fixtures pytest importées puis reçues en paramètre : signalées à tort
+"tests/*" = ["F811"]
+# Scripts : sys.path complété avant d'importer le projet
+"scripts/*" = ["E402"]

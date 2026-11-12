@@ -24,6 +24,7 @@ import time
 from database.candidatures_db import lire_candidature, lire_en_attente, modifier_candidature
 from offres.analyse import analyser_offre, appliquer_analyse, archivage_mots_cles
 from shared.ia import ErreurIAPassagere, verifier_demarrage
+from shared.journal import journaliser
 
 # Champs de l'offre écrits après une analyse réussie
 CHAMPS_ANALYSE = ("score", "verdict", "eligible", "points_forts", "points_faibles", "domaine",
@@ -85,7 +86,7 @@ def duree_lisible(secondes: float | None) -> str:
 
 
 def analyser_en_attente(user_id: int, mode: str, profil: dict, maximum: int, stop_event=None,
-                        log=print, on_progress=None, horloge=time.monotonic) -> dict:
+                        log=journaliser, on_progress=None, horloge=time.monotonic) -> dict:
     """Analyse au plus `maximum` offres en attente, les plus récentes d'abord.
     on_progress(faites, total, restant_s) après chaque offre (restant_s :
     durée moyenne d'une offre traitée fois le nombre restant).

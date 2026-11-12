@@ -7,7 +7,6 @@ import time
 
 import pytest
 
-import main
 import spontanees.recherche_emails
 from shared.pipelines import Pipelines, RECHERCHE
 from tests.conftest import en_parallele

@@ -7,7 +7,6 @@ import sqlite3
 import pytest
 from alembic import command
 
-import main
 from database.profil_db import lire_profil, sauvegarder_profil
 from database.schema import config_alembic
 from offres.analyse import contexte_job

@@ -47,6 +47,7 @@ from shared.domaines import codes_metiers, domaines_du_profil
 from shared.niveaux import NIVEAUX, niveau_europeen
 from shared.offres import detecter_zone, generer_id
 from shared.tailles import SANS_SALARIE, garder_selon_taille, taille_depuis_tranche
+from shared.journal import journaliser
 
 PAUSE_S = 0.5           # entre deux requêtes
 DELAI_S = 20
@@ -206,7 +207,7 @@ class CollecteLBA:
     LBA_RAYON_MIN_KM, puis en deux moitiés du lot de codes ; ce qui reste au
     plafond est noté (self.au_plafond)."""
 
-    def __init__(self, cle: str, log=print, avec_entreprises=True, redecouper_entreprises=False,
+    def __init__(self, cle: str, log=journaliser, avec_entreprises=True, redecouper_entreprises=False,
                  garder_entreprise=None, objectif_entreprises=None, connus=frozenset()):
         self.cle = cle
         self.log = log
@@ -333,7 +334,7 @@ class CollecteLBA:
         return par_source, len(offres), len(bruts)
 
 
-def chercher_lba(codes: list[str], log=print, stop_event=None, **options) -> dict | None:
+def chercher_lba(codes: list[str], log=journaliser, stop_event=None, **options) -> dict | None:
     """Offres et entreprises à fort potentiel pour des codes métiers ([] :
     recherche sans code). options : celles de CollecteLBA
     (redecouper_entreprises, garder_entreprise, objectif_entreprises,
@@ -377,7 +378,7 @@ def chercher_lba(codes: list[str], log=print, stop_event=None, **options) -> dic
 
 
 # ─── Profil ───────────────────────────────────────────────────────────────────
-def niveau_du_profil(profil: dict, log=print) -> int | None:
+def niveau_du_profil(profil: dict, log=journaliser) -> int | None:
     """Niveau européen (3 à 7) du niveau visé du profil, None : aucun filtre."""
     texte = str((profil or {}).get("niveau_vise") or "").strip()
     if not texte:
@@ -434,7 +435,7 @@ def ignoree_pour_profil(profil: dict) -> str:
     return ""
 
 
-def rechercher_pour_profil(profil: dict, log=print, stop_event=None, **options) -> dict | None:
+def rechercher_pour_profil(profil: dict, log=journaliser, stop_event=None, **options) -> dict | None:
     """chercher_lba avec les domaines du profil (indifférent : sans code),
     puis offres filtrées par le niveau visé et entreprises par la taille.
     None si LBA est ignorée (raison écrite dans les logs)."""
@@ -454,7 +455,7 @@ def rechercher_pour_profil(profil: dict, log=print, stop_event=None, **options) 
     return resultat
 
 
-def rechercher_offres_pour_profil(profil: dict, log=print) -> dict | None:
+def rechercher_offres_pour_profil(profil: dict, log=journaliser) -> dict | None:
     """Recherche d'offres : les entreprises à fort potentiel sont ignorées,
     seule l'étape « Récupérer » des spontanées en ajoute (D46)."""
     return rechercher_pour_profil(profil, log, avec_entreprises=False)

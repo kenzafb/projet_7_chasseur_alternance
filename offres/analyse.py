@@ -3,6 +3,7 @@ from shared.ia import appeler_structure
 from shared.schemas_ia import AnalyseOffre
 from shared.config import ia_longueur_description
 from shared.erreurs import exiger_profil
+from shared.journal import journaliser
 
 
 # ─── Prompts d'analyse, un par mode ──────────────────────────────────────────
@@ -299,9 +300,12 @@ def _valider_analyse(analyse: AnalyseOffre) -> dict:
 def score_to_verdict(score):
     """Verdict d'un score : « ineligible » n'en sort jamais, il ne vient que
     des règles Python (shared/eligibilite.py, D99)."""
-    if score >= 9: return "excellent"
-    if score >= 7: return "bon"
-    if score >= 5: return "moyen"
+    if score >= 9:
+        return "excellent"
+    if score >= 7:
+        return "bon"
+    if score >= 5:
+        return "moyen"
     return "faible"
 
 # ─── Offres réservées à un public spécifique (BOETH, RQTH) ────────────────────
@@ -318,7 +322,7 @@ _RESERVATIONS = [re.compile(motif) for motif in (
     # « offre destinée aux travailleurs handicapés »
     rf"destin[eé]e?s?\s+(?:exclusivement\s+|uniquement\s+)?(?:aux?|à des)\s+[^.;:!?\n]{{0,40}}?{_PUBLIC}",
     # « offre / poste / recrutement BOETH » ou « offre réservée BOETH »
-    rf"(?:offre|poste|recrutement|emploi)s?\s+(?:r[eé]serv[eé]e?s?\s+)?(?:aux?\s+)?(?:boeth|rqth)\b",
+    r"(?:offre|poste|recrutement|emploi)s?\s+(?:r[eé]serv[eé]e?s?\s+)?(?:aux?\s+)?(?:boeth|rqth)\b",
     # « RQTH obligatoire / exigée / requise / indispensable / impérative »
     rf"{_PUBLIC}[^.;:!?\n]{{0,40}}?\b(?:obligatoire|exig[eé]e?s?|requise?s?|indispensable|imp[eé]rati(?:f|ve|vement))",
     # « vous devez être bénéficiaire de l'obligation d'emploi / titulaire d'une RQTH »
@@ -345,7 +349,7 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
     réservé, école ou CFA, stage).
     verbeux : affiche la raison de l'archivage dans la console.
     """
-    _log = print if verbeux else (lambda *a, **k: None)
+    _log = journaliser if verbeux else (lambda *a, **k: None)
     titre_lower = offre.get("titre", "").lower()
     desc_lower  = offre.get("description", "").lower()
 
@@ -361,14 +365,14 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
         if reserve_public_specifique(desc_lower) or reserve_public_specifique(titre_lower):
             offre["statut"] = "archive"
             offre["raison_archivage"] = "public_specifique"
-            _log(f"     -> Archivée automatiquement (réservé public spécifique / BOETH)")
+            _log("     -> Archivée automatiquement (réservé public spécifique / BOETH)")
         elif analyse.get("statut_auto") == "archive":
             offre["statut"] = "archive"
             offre["raison_archivage"] = "ecole_cfa"
         elif "stage" in titre_lower and mode != "stage":
             offre["statut"] = "archive"
             offre["raison_archivage"] = "stage"
-            _log(f"     -> Archivée automatiquement (stage détecté)")
+            _log("     -> Archivée automatiquement (stage détecté)")
         elif not offre.get("eligible", True):
             offre["statut"] = "archive"
             offre["raison_archivage"] = "ineligible"
@@ -439,5 +443,5 @@ def marquer_non_analysee(offre, mode="alternance", verbeux=True):
     if raison:
         offre["statut"], offre["raison_archivage"] = "archive", raison
         if verbeux:
-            print(f"     -> Archivée automatiquement ({MESSAGES_ARCHIVAGE[raison]})")
+            journaliser(f"     -> Archivée automatiquement ({MESSAGES_ARCHIVAGE[raison]})")
     return offre

@@ -4,7 +4,6 @@ sélection, envoi, date et suivi sont propres à chaque mode. Un contact
 dans un autre mode est signalé, jamais bloquant."""
 
 import sqlite3
-from datetime import datetime, timezone
 
 import pytest
 from alembic import command

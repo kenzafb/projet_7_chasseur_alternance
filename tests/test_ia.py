@@ -10,7 +10,6 @@ import httpx
 import pytest
 
 import offres.france_travail as scraper
-import main
 import shared.ia
 from database.candidatures_db import ajouter_candidature, lire_candidature, lire_candidatures
 from database.dedup_db import lire_offres_vues

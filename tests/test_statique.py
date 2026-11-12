@@ -5,7 +5,6 @@ import hashlib
 import json
 import re
 
-import pytest
 
 import shared.statique as statique
 from shared import config

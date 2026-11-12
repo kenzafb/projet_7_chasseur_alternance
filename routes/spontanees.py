@@ -72,7 +72,7 @@ def api_spontanees_postule_lba(body: dict = Body(...), user: User = Depends(util
     try:
         ident = int(body.get("id"))
     except (TypeError, ValueError):
-        raise ErreurUtilisateur("Entreprise introuvable.")
+        raise ErreurUtilisateur("Entreprise introuvable.") from None
     instant = datetime.combine(jour, time(12), tzinfo=fuseau_affichage())
     if not marquer_postule_lba(user.id, ident, instant, mode=mode):
         return JSONResponse({"erreur": "Entreprise introuvable, déjà envoyée ou sans candidature La Bonne Alternance."},

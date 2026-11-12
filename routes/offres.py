@@ -273,8 +273,8 @@ def api_offre_archivage(body: Archivage, request: Request, user: User = Depends(
 def api_sauvegarder(body: Sauvegarde, request: Request, user: User = Depends(utilisateur_requis),
                     mode: str = Depends(mode_requis)):
     modifs = {}
-    if body.lettre is not None:            modifs["lettre"] = body.lettre
-    if body.email_candidature is not None: modifs["email_candidature"] = body.email_candidature
-    if body.objet_email is not None:       modifs["objet_email"] = body.objet_email
+    for champ in ("lettre", "email_candidature", "objet_email"):
+        if getattr(body, champ) is not None:
+            modifs[champ] = getattr(body, champ)
     modifier_candidature(user.id, body.id, modifs, mode=mode)
     return {"ok": True}

@@ -31,6 +31,9 @@ from ddgs import DDGS
 from ddgs.exceptions import RatelimitException
 from shared.config import MESSAGE_IA_DESACTIVEE, analyse_ia_active, modele_ia
 from shared.validation_emails import emails_douteux, emails_valides, trier
+from database.entreprises_db import a_scraper, lire_entreprises, sauvegarder_enrichissement
+from shared.journal import journaliser
+from shared.modes import MODE_DEFAUT
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 
@@ -187,14 +190,14 @@ _compteur_ddg = 0
 
 def dbg(msg):
     if DEBUG:
-        print(f"    [dbg] {msg}")
+        journaliser(f"    [dbg] {msg}")
 
 
 def pause_ddg():
     global _compteur_ddg
     _compteur_ddg += 1
     if _compteur_ddg % PAUSE_LONGUE_N == 0:
-        print(f"\n  [⏸️  Pause {PAUSE_LONGUE}s — {_compteur_ddg} recherches DDG]")
+        journaliser(f"\n  [⏸️  Pause {PAUSE_LONGUE}s — {_compteur_ddg} recherches DDG]")
         time.sleep(PAUSE_LONGUE)
     else:
         time.sleep(random.uniform(*PAUSE_DDG))
@@ -445,9 +448,9 @@ def chercher_site_duckduckgo(entreprise, url_exclue=None):
     requetes = construire_requetes(entreprise, analyse)
 
     if DEBUG:
-        print(f"    🔎 Analyse nom : mots={analyse['mots']} | acronyme={analyse['acronyme']} | ambigu={'oui' if (len(analyse['mots']) <= 1 or all(len(m) < 5 for m in analyse['mots'])) else 'non'}")
+        journaliser(f"    🔎 Analyse nom : mots={analyse['mots']} | acronyme={analyse['acronyme']} | ambigu={'oui' if (len(analyse['mots']) <= 1 or all(len(m) < 5 for m in analyse['mots'])) else 'non'}")
         if url_exclue:
-            print(f"    🚫 URL exclue (déjà non fiable) : {url_exclue}")
+            journaliser(f"    🚫 URL exclue (déjà non fiable) : {url_exclue}")
 
     for i, requete in enumerate(requetes, 1):
         dbg(f"┌─ Requête DDG [{i}/{len(requetes)}] : {requete}")
@@ -457,7 +460,7 @@ def chercher_site_duckduckgo(entreprise, url_exclue=None):
                 resultats = list(ddg.text(requete, max_results=10))
 
             if not resultats:
-                dbg(f"│  (aucun résultat DDG)")
+                dbg("│  (aucun résultat DDG)")
                 continue
 
             for r in resultats:
@@ -471,13 +474,13 @@ def chercher_site_duckduckgo(entreprise, url_exclue=None):
                 valide, raison = est_url_valide(url, nom, analyse, strict=True)
                 dbg(f"│  {'✅' if valide else '✗ '} {url[:80]}  [{raison}]")
                 if valide:
-                    dbg(f"└─ → SÉLECTIONNÉ")
+                    dbg("└─ → SÉLECTIONNÉ")
                     return url
 
-            dbg(f"└─ (aucune URL valide)")
+            dbg("└─ (aucune URL valide)")
 
         except RatelimitException:
-            print(f"  [⚠️  Rate limit DDG — attente {PAUSE_RATELIMIT}s...]")
+            journaliser(f"  [⚠️  Rate limit DDG — attente {PAUSE_RATELIMIT}s...]")
             time.sleep(PAUSE_RATELIMIT)
             try:
                 with DDGS() as ddg:
@@ -701,15 +704,22 @@ def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
 
 # ─── Chargement / sauvegarde ──────────────────────────────────────────────────
 
-from database.entreprises_db import a_scraper, lire_entreprises, sauvegarder_enrichissement
-from shared.modes import MODE_DEFAUT
+def _sans_resultat(e: dict):
+    """Entreprise dont aucun site fiable n'a été trouvé : rien de gardé,
+    traitée (le scraper n'y revient pas)."""
+    e["emails_trouves"] = []
+    e["telephones"] = []
+    e["telephone"] = None
+    e["contact_rh"] = None
+    e["traite"] = True
+
 
 def charger_entreprises(user_id, mode=MODE_DEFAUT):
     """Lit les entreprises sélectionnées dans le mode depuis la BASE. Leurs
     données (site, emails, contact) sont communes à tous les modes : une
     entreprise déjà scrapée pour un autre mode ne l'est pas deux fois."""
     data = lire_entreprises(user_id, mode)
-    print(f"[Chargement] base → {len(data)} entreprises")
+    journaliser(f"[Chargement] base → {len(data)} entreprises")
     return data
 
 
@@ -723,7 +733,7 @@ def sauvegarder(user_id, entreprises):
 def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=None, mode=MODE_DEFAUT):
     """Cherche site, emails et contact des entreprises pas encore traitées,
     au plus max_scrapees par lancement (None : toutes)."""
-    _log = log_fn or print
+    _log = log_fn or journaliser
     ia_configuree = analyse_ia_active()   # ANALYSE_IA=false : lecture directe seulement
     modele = modele_ia("extraction") if ia_configuree else "désactivée"
     _log(f"Scraper Emails v15 | IA pour les emails douteux = {modele} | Moteur = DDG")
@@ -794,7 +804,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
                     e["site_web"] = url
                     _log(f"  🌐 {url} [{source_site}]")
                 else:
-                    _log(f"  ❌ Site introuvable")
+                    _log("  ❌ Site introuvable")
                     e["emails_trouves"] = []
                     e["telephones"]     = []
                     e["telephone"]      = None
@@ -818,20 +828,20 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
                         e["site_web"] = url
                         resultat = extraire(url, nom, dirigeant)
                         if not resultat.get("fiable", True):
-                            _log(f"  ❌ Toujours non fiable")
-                            e["emails_trouves"] = []; e["telephones"] = []
-                            e["telephone"] = None; e["contact_rh"] = None
-                            e["traite"] = True; traites_ce_run += 1; continue
+                            _log("  ❌ Toujours non fiable")
+                            _sans_resultat(e)
+                            traites_ce_run += 1
+                            continue
                     else:
-                        _log(f"  ❌ Aucune nouvelle URL")
-                        e["emails_trouves"] = []; e["telephones"] = []
-                        e["telephone"] = None; e["contact_rh"] = None
-                        e["traite"] = True; traites_ce_run += 1; continue
+                        _log("  ❌ Aucune nouvelle URL")
+                        _sans_resultat(e)
+                        traites_ce_run += 1
+                        continue
                 else:
                     _log(f"  ❌ Non fiable après {tentatives} tentatives")
-                    e["emails_trouves"] = []; e["telephones"] = []
-                    e["telephone"] = None; e["contact_rh"] = None
-                    e["traite"] = True; traites_ce_run += 1; continue
+                    _sans_resultat(e)
+                    traites_ce_run += 1
+                    continue
 
             emails     = resultat["emails"]
             douteux    = resultat.get("douteux", [])
@@ -846,7 +856,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
             if resultat.get("ecartes"):
                 _log("  🚫 Écartés : " + ", ".join(f"{a} ({r})" for a, r in resultat["ecartes"]))
             if not emails:
-                _log(f"  ⚠️  Aucun email")
+                _log("  ⚠️  Aucun email")
 
             e["emails_trouves"]   = emails
             e["telephones"]       = telephones
@@ -885,7 +895,7 @@ def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=Non
     adresse sert à l'IA. Une adresse validée part avec les autres, une
     adresse écartée est retirée ; un échec passager la laisse à valider.
     Erreur bloquante : arrêt du lancement, un seul message."""
-    _log = log_fn or print
+    _log = log_fn or journaliser
     if not analyse_ia_active():
         _log(f"❌ {MESSAGE_IA_DESACTIVEE} Validation non lancée.")
         return

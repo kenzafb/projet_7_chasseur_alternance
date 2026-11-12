@@ -185,7 +185,7 @@ def comparer_lettres(o: dict, modeles: list[str], sortie=print, tirage=None) -> 
         return 1
     etiquettes = list(ETIQUETTES[:len(textes)])
     (tirage or random.shuffle)(etiquettes)
-    correspondance = dict(zip(etiquettes, textes))          # étiquette -> modèle
+    correspondance = dict(zip(etiquettes, textes, strict=True))          # étiquette -> modèle
     sortie("\nParagraphes, à lire à l'aveugle :")
     for etiquette in sorted(correspondance):
         sortie(f"\n── {etiquette} ──\n{textes[correspondance[etiquette]][0]}")
@@ -211,7 +211,7 @@ def _secondes(debut: float) -> str:
 def _tableau(entetes: list[str], lignes: list[list[str]]) -> list[str]:
     largeurs = [max(len(str(x)) for x in [h] + [l[i] for l in lignes]) for i, h in enumerate(entetes)]
     def ligne(valeurs):
-        return "  ".join(str(v).ljust(n) for v, n in zip(valeurs, largeurs)).rstrip()
+        return "  ".join(str(v).ljust(n) for v, n in zip(valeurs, largeurs, strict=False)).rstrip()
     return [ligne(entetes), ligne(["-" * n for n in largeurs])] + [ligne(l) for l in lignes]
 
 

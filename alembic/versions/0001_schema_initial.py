@@ -2,7 +2,7 @@
 emails_contactes, tel que décrit par database/models.py (phase 2a).
 
 Revision ID: 0001
-Revises: 
+Revises:
 Create Date: 2026-10-08 00:34:09.527234
 
 """

@@ -61,6 +61,7 @@ from pydantic import BaseModel, ValidationError
 from shared.config import (IA_DELAI_CONNEXION_S, MESSAGE_IA_DESACTIVEE, analyse_ia_active, ia_api, ia_api_key,
                            ia_base_url, ia_delai_s, ia_keep_alive, ia_num_ctx, ia_reflexion,
                            modele_ia)
+from shared.journal import journaliser
 
 CODES_BLOQUANTS = {400, 401, 403, 404, 422}
 
@@ -393,7 +394,7 @@ def appeler_structure(messages, schema: type[BaseModel], *, usage="analyse", mod
         except ReponseInvalide as err:
             if essai >= essais:
                 raise
-            print(f"  ⚠️  {err} : nouvel essai.")
+            journaliser(f"  ⚠️  {err} : nouvel essai.")
 
 
 def lister_modeles() -> list[str]:

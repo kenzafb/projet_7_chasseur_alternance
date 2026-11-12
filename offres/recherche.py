@@ -11,6 +11,7 @@ base par utilisateur et par mode (database/dedup_db.py).
 from offres.france_travail import chercher_offres
 from offres.analyse import marquer_non_analysee
 from database.dedup_db import marquer_offres_vues
+from shared.journal import journaliser
 
 
 def lancer_recherche(user_id, profil, max_offres=999, on_offre=None, mode="alternance", log_fn=None):
@@ -18,17 +19,17 @@ def lancer_recherche(user_id, profil, max_offres=999, on_offre=None, mode="alter
     offre est écrite « non analysée » (archivage par mots-clés seulement)
     puis marquée vue ; celles au-delà de la limite reviendront au lancement
     suivant. Retourne les offres écrites."""
-    print("\nRecherche des offres...")
+    journaliser("\nRecherche des offres...")
     from shared.criteres import criteres_france_travail
     from shared.modes import get_mode
     cfg = get_mode(mode)
     lot = min(cfg.get("limite_lot") or max_offres, max_offres)
     nouvelles_offres = chercher_offres(
         user_id, criteres_france_travail(profil, mode), mode=mode, limite_lot=lot, marquer=False,
-        log=log_fn or print)
+        log=log_fn or journaliser)
 
     if not nouvelles_offres:
-        print("Aucune nouvelle offre.")
+        journaliser("Aucune nouvelle offre.")
         return []
 
     for offre in nouvelles_offres:

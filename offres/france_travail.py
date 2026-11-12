@@ -34,6 +34,7 @@ from shared.domaines import domaines_du_grand_domaine, est_grand_domaine
 from shared.intitules_stage import designe_un_stage
 from shared.offres import detecter_zone, generer_id
 from shared.tailles import garder_selon_taille, taille_depuis_tranche
+from shared.journal import journaliser
 
 URL_RECHERCHE = "https://api.francetravail.io/partenaire/offresdemploi/v2/offres/search"
 TAILLE_PAGE = 150
@@ -57,7 +58,7 @@ def _code_erreur_oauth(r) -> str:
     return re.sub(r"[^a-z_]", "", str(code).lower())[:40]
 
 
-def get_token(log=print):
+def get_token(log=journaliser):
     if time.time() < _token_cache["expire"]:
         return _token_cache["token"]
     r = requests.post(
@@ -155,7 +156,7 @@ class Collecte:
     dates la plus récente est lue d'abord : les offres obtenues sont les plus
     récentes de la requête."""
 
-    def __init__(self, token: str, log=print, retenir=None, objectif: int | None = None):
+    def __init__(self, token: str, log=journaliser, retenir=None, objectif: int | None = None):
         self.token = token
         self.log = log
         self.offres = {}          # identifiant -> offre brute
@@ -218,7 +219,7 @@ class Collecte:
                 # dates ignorées par l'API ; continuer multiplierait les requêtes
                 if not all(p and p[0] == total for p in pages):
                     # Tranche la plus récente d'abord, pour pouvoir s'arrêter tôt
-                    for s, p in reversed(list(zip(sous, pages))):
+                    for s, p in reversed(list(zip(sous, pages, strict=False))):
                         if p and not self.complet:
                             self._recuperer(s, p, ids)
                     return
@@ -282,7 +283,7 @@ def requetes_initiales(filtres: dict, domaines: list[str]) -> list[dict]:
     return requetes
 
 
-def recuperer_offres(criteres: dict, log=print, retenir=None, objectif: int | None = None) -> list:
+def recuperer_offres(criteres: dict, log=journaliser, retenir=None, objectif: int | None = None) -> list:
     """Offres brutes de France Travail pour des critères, dédoublonnées.
     retenir, objectif : arrêt dès qu'objectif offres satisfont retenir
     (voir Collecte) ; sans objectif, tout est récupéré."""
@@ -305,7 +306,7 @@ def recuperer_offres(criteres: dict, log=print, retenir=None, objectif: int | No
     return list(collecte.offres.values())
 
 
-def _normaliser(bruts: list, log=print) -> list:
+def _normaliser(bruts: list, log=journaliser) -> list:
     offres = [o for o in map(_normaliser_une, bruts) if o is not None]
     if len(offres) < len(bruts):
         log(f"  {len(bruts) - len(offres)} offres hors IDF écartées")
@@ -339,11 +340,10 @@ def _normaliser_une(offre: dict) -> dict | None:
     qualif  = offre.get("qualificationLibelle", "")
     secteur = offre.get("secteurActiviteLibelle", "")
 
-    if exp:     desc += f"\nExpérience : {exp}"
-    if duree:   desc += f"\nDurée : {duree}"
-    if salaire: desc += f"\nSalaire : {salaire}"
-    if qualif:  desc += f"\nQualification : {qualif}"
-    if secteur: desc += f"\nSecteur : {secteur}"
+    for libelle, valeur in (("Expérience", exp), ("Durée", duree), ("Salaire", salaire),
+                            ("Qualification", qualif), ("Secteur", secteur)):
+        if valeur:
+            desc += f"\n{libelle} : {valeur}"
 
     # Formations (~10% des offres mais critique pour détecter Bac+5)
     for f in offre.get("formations", []):
@@ -351,19 +351,22 @@ def _normaliser_une(offre: dict) -> dict | None:
         domaine_f = f.get("domaineLibelle", "")
         exige     = "indispensable" if f.get("exigence") == "E" else "souhaitée"
         label     = " - ".join(filter(None, [domaine_f, niv]))
-        if label: desc += f"\nFormation : {label} ({exige})"
+        if label:
+            desc += f"\nFormation : {label} ({exige})"
 
     # Compétences (~10% des offres)
     for c in offre.get("competences", []):
         lib   = c.get("libelle", "")
         exige = "indispensable" if c.get("exigence") == "E" else "souhaitée"
-        if lib: desc += f"\nCompétence : {lib} ({exige})"
+        if lib:
+            desc += f"\nCompétence : {lib} ({exige})"
 
     # Langues (rare mais utile)
     for l in offre.get("langues", []):
         lib   = l.get("libelle", "")
         exige = "indispensable" if l.get("exigence") == "E" else "souhaitée"
-        if lib: desc += f"\nLangue : {lib} ({exige})"
+        if lib:
+            desc += f"\nLangue : {lib} ({exige})"
 
     return {
         "id":           generer_id(offre.get("id", lien)),
@@ -385,7 +388,7 @@ def _normaliser_une(offre: dict) -> dict | None:
 
 
 def chercher_offres(user_id, criteres=None, mode="alternance", limite_lot=None, marquer=True,
-                    log=print) -> list:
+                    log=journaliser) -> list:
     """Offres FT pas encore vues par cet utilisateur dans ce mode, les plus
     récentes d'abord. Avec limite_lot, la recherche s'arrête de télécharger
     dès limite_lot offres retenues (nouvelles, de la bonne taille...). criteres : shared.criteres.criteres_france_travail
@@ -462,8 +465,8 @@ if __name__ == "__main__":
     parser.add_argument("--mode", default="alternance")
     args = parser.parse_args()
     offres = chercher_offres(args.user, mode=args.mode)
-    print("\n-- Aperçu des 5 premières --")
+    journaliser("\n-- Aperçu des 5 premières --")
     for o in offres[:5]:
-        print(f"\n[{o['source']}] {o['titre']}")
-        print(f"  Zone : {o['zone']} | {o['lieu']}")
-        print(f"  Lien : {o['lien']}")
+        journaliser(f"\n[{o['source']}] {o['titre']}")
+        journaliser(f"  Zone : {o['zone']} | {o['lieu']}")
+        journaliser(f"  Lien : {o['lien']}")

@@ -44,6 +44,7 @@ from shared.modes import MODE_DEFAUT
 from shared.naf import avertissement_sirene, deux_codes, exclusions, secteurs_sirene
 from shared.tailles import TAILLES_250_PLUS, tranches_insee
 from spontanees import parametres_sirene as P
+from shared.journal import journaliser
 
 # Catégorie d'entreprise de chaque taille de 250 salariés et plus
 CATEGORIES_PAR_TAILLE = {"250_4999": "ETI", "5000_plus": "GE"}
@@ -109,7 +110,7 @@ def construire_query(codes, departements, variable_naf: str, filtre: str | None 
     return " AND ".join([c for c in clauses if c] + ([filtre] if filtre else []))
 
 
-def plan_sirene(profil: dict, log=print) -> list[tuple[str, str]]:
+def plan_sirene(profil: dict, log=journaliser) -> list[tuple[str, str]]:
     """(groupe, requête) à faire pour un profil : groupes « cœurs »,
     « secteurs », « transverses », « tous secteurs ». Vide si rien n'est à
     chercher (raison écrite dans les logs)."""
@@ -197,7 +198,7 @@ def avec_repli(q: str) -> tuple[str, str] | None:
 
 
 class Collecte:
-    def __init__(self, cle: str, log=print, sirens_connus=frozenset()):
+    def __init__(self, cle: str, log=journaliser, sirens_connus=frozenset()):
         self.cle, self.log = cle, log
         self.requetes = 0
         self.erreurs = 0
@@ -347,7 +348,7 @@ def enregistrer(user_id, entreprises: dict, sirens_vus=(), mode=MODE_DEFAUT) -> 
     return ajouter_entreprises(user_id, [e for e in entreprises.values() if not e.get("_deja_en_base")], mode)
 
 
-def entreprises_lba(user_id, profil, max_entreprises=None, stop_event=None, log_fn=print,
+def entreprises_lba(user_id, profil, max_entreprises=None, stop_event=None, log_fn=journaliser,
                     mode=MODE_DEFAUT) -> int:
     """Entreprises à fort potentiel de La Bonne Alternance (SPEC_SOURCES
     section 3). Retourne le nombre de nouvelles entreprises ajoutées (au
@@ -385,7 +386,7 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
     moitié de la limite, Sirene au reste (plus ce que LBA n'a pas utilisé).
     Une entreprise déjà connue dans un autre mode compte comme nouvelle
     pour ce mode ; ses données déjà scrapées sont reprises."""
-    _log = log_fn if log_fn is not None else print
+    _log = log_fn if log_fn is not None else journaliser
     from database.profil_db import lire_profil
     from shared.modes import get_mode
     profil = lire_profil(user_id, mode=mode)

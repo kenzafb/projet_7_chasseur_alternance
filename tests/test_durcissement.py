@@ -96,7 +96,6 @@ def test_email_inconnu_verifie_un_hash(monkeypatch):
 
 # ─── Téléversement ────────────────────────────────────────────────────────────
 def test_televersement_nom_et_taille(utilisateur):
-    import main
     client, _ = utilisateur("a@test.fr")
     r = client.post("/api/profil/upload", data={"nom": "x" * 101}, files={"fichier": ("cv.pdf", b"%PDF", "application/pdf")})
     assert r.status_code == 400 and "Nom trop long" in r.json()["erreur"]

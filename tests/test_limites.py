@@ -7,7 +7,6 @@ from types import SimpleNamespace
 import pytest
 
 import offres.france_travail as scraper
-import main
 import spontanees.envoi as envoyeur
 import spontanees.recuperation as fetch
 import spontanees.recherche_emails as scraper_emails

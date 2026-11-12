@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
-import main
 from database.candidatures_db import ajouter_candidature, compter_en_attente, lire_candidature, lire_en_attente
 from offres.analyse_differee import analyser_en_attente, duree_lisible
 from offres.analyse import marquer_non_analysee
