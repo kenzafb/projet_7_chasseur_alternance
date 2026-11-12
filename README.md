@@ -59,13 +59,18 @@ Un tableau Candidatures par mode : offres postulées et entreprises contactées,
 - **Tests** : près de 1 200 tests automatisés (pytest), APIs externes et IA simulées, aucun appel réseau ni à Ollama, base temporaire migrée par Alembic ; chaque route de l'API essayée par un autre utilisateur (isolation) et avec des données limites.
 
 ```
-main.py              application FastAPI : pages, routes /api, lancement des traitements
+main.py              création de l'application : middlewares, gestion des erreurs, inclusion des routeurs
+routes/              routeurs FastAPI par domaine : pages, profil, parametres, offres, analyse, lettre,
+                     candidatures, spontanees, documentation ; commun.py (mode, limites, pipelines)
 auth/                connexion, inscription, session, compte (Paramètres), contrôle de l'origine
+offres/              recherche France Travail (france_travail.py) et La Bonne Alternance
+                     (la_bonne_alternance.py), paramètres de chaque API, pipeline de recherche,
+                     analyse par l'IA (analyse.py, analyse_differee.py), pages de candidature LBA
+lettres/             lettre de motivation : rédaction (lettre type et paragraphe de l'IA), PDF
+spontanees/          candidatures spontanées : récupération (Sirene, LBA), recherche des emails, envoi
+shared/              configuration, journal, client d'IA, modes, domaines, NAF, référentiels et règles
 database/            modèles SQLAlchemy et accès aux données
 alembic/             migrations du schéma
-france_travail/      offres : France Travail, La Bonne Alternance, analyse (en différé), lettre, PDF
-spontanees/          candidatures spontanées : Sirene, scraper d'emails, envoi
-shared/              configuration, client d'IA, modes, domaines, NAF, référentiels et règles
 scripts/             vérification des API et de l'IA locale, imports et nettoyage, lancés à la main
 templates/, static/  interface
 tests/               suite pytest
@@ -143,8 +148,8 @@ Les pipelines existent aussi en ligne de commande, pour un utilisateur donné pa
 ```bash
 venv/bin/pip install -r requirements-dev.txt
 systemd-run --user --scope -p MemoryMax=2G venv/bin/python -m pytest -q   # seul pytest est tué en cas d'emballement
-venv/bin/ruff check .
-venv/bin/vulture main.py auth database france_travail shared spontanees scripts
+venv/bin/ruff check .                     # configuration : pyproject.toml
+venv/bin/vulture main.py routes auth database offres lettres shared spontanees scripts
 ```
 
 Chaque test est limité à 30 s. Sur une installation neuve, un test est sauté : il a besoin de l'ancienne base de la version mono-utilisateur, absente.
