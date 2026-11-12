@@ -58,6 +58,21 @@ class _ReseauInterdit(Exception):
 
 
 @pytest.fixture(autouse=True)
+def pipelines_termines(monkeypatch):
+    """Les pipelines lancés pendant un test (threads « lancer » de main.py)
+    finissent avant la fin du test, donc avant que monkeypatch ne retire les
+    API simulées et la barrière réseau : sans cela, un thread pouvait
+    continuer et tenter un vrai accès réseau (audit phase 12, D135).
+    Dépend de monkeypatch pour être défaite avant lui."""
+    avant = set(threading.enumerate())
+    yield
+    for t in threading.enumerate():
+        if t not in avant and t.name.endswith("(lancer)"):
+            t.join(timeout=20)
+            assert not t.is_alive(), f"pipeline {t.name} encore en cours 20 s après la fin du test"
+
+
+@pytest.fixture(autouse=True)
 def echecs_de_connexion_effaces():
     """Compteurs d'échecs de connexion (D134) remis à zéro : les tests
     réutilisent les mêmes emails."""
