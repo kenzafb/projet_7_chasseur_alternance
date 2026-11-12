@@ -35,21 +35,6 @@
   --ombre-menu:   0 8px 28px rgba(23,32,31,.14);
 
   --police: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
-
-  /* ── Anciens noms, gardés pour les pages pas encore refaites : ils pointent
-     vers les nouveaux jetons (chaque lot de la refonte les fait disparaître) */
-  --encre: var(--texte);  --encre-soft: var(--texte-3);
-  --papier: var(--fond);  --surface-2: #FAFBFB;
-  --txt: var(--texte);  --txt-muted: var(--texte-2);  --txt-faint: var(--texte-2);  --txt-invert: #FFFFFF;
-  --hair: var(--bordure);  --hair-strong: var(--bordure-champ);
-  --signal: var(--accent);  --signal-soft: var(--accent-doux);  --signal-deep: var(--accent-survol);
-  --vert: var(--accent-survol);  --vert-soft: var(--accent-doux);
-  --ambre: var(--attention);     --ambre-soft: var(--attention-fond);
-  --rouge: var(--refus);         --rouge-soft: var(--refus-fond);
-  --violet: var(--texte-3);      --violet-soft: var(--fond-neutre);
-  --r-sm: var(--r-champ);  --r-md: var(--r-liste);  --r-lg: var(--r-carte);
-  --sh-1: none;  --sh-2: var(--ombre-legere);  --sh-pop: var(--ombre-menu);
-  --f-display: var(--police);  --f-body: var(--police);  --f-mono: var(--police);
 }
 
 /* ── Reset ───────────────────────────────────────────────────────────────── */
@@ -197,24 +182,72 @@ ul { list-style: none; }
 .runbar__msg { flex: 1 1 260px; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
 
-/* ── Téléphone (provisoire jusqu'au lot 8 : barre d'onglets en bas) ─────── */
+/* ── Téléphone (D150) : en-tête court, barre d'onglets en bas ───────────── */
+.modes-tel, .onglets-tel, .plus-tel { display: none; }
+
 @media (max-width: 720px) {
-  .entete__int { padding: 10px 16px; gap: 10px 12px; }
+  .entete { position: sticky; top: 0; z-index: 20; }
+  .entete__int { flex-wrap: nowrap; padding: 12px 16px; gap: 10px; }
+  .marque { flex: 1; }
+  .marque__logo { width: 32px; height: 32px; border-radius: 9px; }
   .marque__nom { font-size: 18px; }
-  .modes { order: 2; margin-left: auto; }
-  .modes__lien { padding: 8px 10px; font-size: 13px; }
-  .compte { order: 3; }
-  .menu { order: 4; flex: 0 0 100%; flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 0 8px; }
-  .menu__lien { white-space: nowrap; min-height: 44px; }
-  .main { padding: 24px 16px 48px; }
-}
-@media (max-width: 480px) {
-  /* Le logo seul : le nom reste lu par les lecteurs d'écran */
-  .marque__nom { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-  .entete__int { flex-wrap: wrap; }
-  .page-tete__titre { font-size: 26px; }
+  .modes, .menu, .compte { display: none; }
+
+  /* Sélecteur de mode en haut à droite */
+  .modes-tel { display: block; position: relative; }
+  .modes-tel__bouton {
+    display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 7px 12px;
+    border-radius: var(--r-pill); border: 1px solid var(--bordure-champ); background: var(--surface);
+    font-weight: 700; font-size: 14px; cursor: pointer; list-style: none;
+  }
+  .modes-tel__bouton::-webkit-details-marker { display: none; }
+  .modes-tel__bouton::after { content: ""; width: 7px; height: 7px; margin: -3px 2px 0 4px;
+    border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); }
+  .modes-tel__point { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+  .modes-tel__liste {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; min-width: 180px; padding: 6px;
+    display: flex; flex-direction: column; background: var(--surface);
+    border: 1px solid var(--bordure); border-radius: var(--r-carte); box-shadow: var(--ombre-menu);
+  }
+  .modes-tel__lien { display: block; min-height: 44px; padding: 11px 12px; border-radius: var(--r-champ);
+    color: var(--texte); font-weight: 600; text-decoration: none; }
+  .modes-tel__lien[aria-current] { background: var(--accent-doux); color: var(--accent-survol); }
+
+  /* Barre d'onglets en bas */
+  body { padding-bottom: calc(72px + env(safe-area-inset-bottom)); }
+  .onglets-tel {
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 25;
+    padding: 6px 4px calc(8px + env(safe-area-inset-bottom));
+    background: var(--surface); border-top: 1px solid var(--bordure);
+  }
+  .onglet-tel {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-height: 52px; padding: 6px 0; color: var(--texte-2); text-decoration: none;
+    font-size: 12px; font-weight: 600;
+  }
+  .onglet-tel svg { width: 22px; height: 22px; }
+  .onglet-tel[aria-current="page"], .onglet-tel.is-courant { color: var(--accent); font-weight: 700; }
+  .compteur--tel { position: absolute; top: 0; left: calc(50% + 6px); font-size: 11px; }
+  .plus-tel {
+    position: fixed; left: 8px; right: 8px; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 26;
+    display: flex; flex-direction: column; padding: 8px;
+    background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--r-panneau); box-shadow: var(--ombre-menu);
+  }
+  .plus-tel[hidden] { display: none !important; }
+  .plus-tel form { margin: 0; }
+  .plus-tel__lien { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px; padding: 12px 14px;
+    border-radius: var(--r-champ); color: var(--texte); font-weight: 600; text-decoration: none; text-align: left; }
+  .plus-tel__lien:hover, .plus-tel__lien[aria-current="page"] { background: var(--fond-neutre); color: var(--texte); }
+  .plus-tel__qui { padding: 8px 14px 4px; font-size: 13px; color: var(--texte-2); overflow-wrap: anywhere; }
+
+  .main { padding: 24px 16px 32px; }
+  .page-tete__titre { font-size: 28px; }
   .page-tete__actions, .search { width: 100%; }
+  .page-tete__actions .btn { flex: 1 1 100%; }
   .search { min-width: 0; }
+  /* Détail d'une offre ouvert : il prend tout l'écran */
+  .main.detail-ouvert .page-tete, .main.detail-ouvert [data-analyse-attente] { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

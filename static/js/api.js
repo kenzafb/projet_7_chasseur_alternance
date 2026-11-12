@@ -16,6 +16,16 @@ export function lienSur(url) {
   return /^https?:\/\/[^\s<>"'`]+$/i.test(texte) ? texte : "";
 }
 
+/* Compteur de ce qui attend (menu et barre d'onglets du téléphone) : masqué
+   à zéro, nommé pour les lecteurs d'écran */
+export function majCompteur(cle, n, libelle) {
+  document.querySelectorAll(`[data-count="${cle}"]`).forEach(c => {
+    c.textContent = Number(n || 0).toLocaleString("fr-FR");
+    c.hidden = !n;
+    c.setAttribute("aria-label", libelle);
+  });
+}
+
 /* Texte sûr dans du HTML construit par les modules */
 export function esc(texte) {
   return String(texte ?? "").replace(/[&<>"']/g, c =>

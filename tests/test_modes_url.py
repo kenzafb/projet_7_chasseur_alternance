@@ -26,6 +26,8 @@ def test_page_de_chaque_mode(utilisateur):
         # Sélecteur de mode de l'en-tête : le mode ouvert est marqué (D143)
         assert f'href="/{mode}" data-mode-btn="{mode}" aria-current="true"' in page
         assert page.count('aria-current="true"') == 1
+        # Sélecteur du téléphone (D150) : le même mode marqué
+        assert f'href="/{mode}" data-mode-btn="{mode}" aria-current="page"' in page
 
 
 def test_initiales_du_rond_mon_compte(utilisateur):

@@ -4,7 +4,7 @@
    avec un point vert, et devient « vue » à l'ouverture. Sur téléphone, la
    liste puis le détail en plein écran.
    ============================================================================ */
-import { api, esc, lienSur } from "./api.js";
+import { api, esc, lienSur, majCompteur } from "./api.js";
 
 // ANALYSE_IA=false (attribut posé par le serveur) : ni notation ni lettre automatique
 const IA_ACTIVE = document.documentElement.dataset.analyseIa !== "non";
@@ -154,6 +154,7 @@ function rendreVolet() {
   document.querySelector("[data-offres-liste]").classList.toggle("is-cachee-mobile", !!o);
   document.querySelector("[data-volet]").classList.toggle("is-ouvert-mobile", !!o);
   document.querySelector("[data-volet-retour]").hidden = !o;
+  document.getElementById("contenu")?.classList.toggle("detail-ouvert", !!o);
   if (!o) {
     contenu.innerHTML = `<p class="volet__vide">${messageVolet ? `${esc(messageVolet)} ` : ""}Choisis une offre dans la liste pour la lire ici.</p>`;
     return;
@@ -218,12 +219,7 @@ function rendre() {
    à noter */
 function rendreCompteurs() {
   const nonVues = cache.filter(o => ongletDe(o) === "avoir" && !o.vue).length;
-  const c = document.querySelector('[data-count="offres"]');
-  if (c) {
-    c.textContent = nonVues;
-    c.hidden = !nonVues;
-    c.setAttribute("aria-label", `${nonVues} pas encore vue${nonVues > 1 ? "s" : ""}`);
-  }
+  majCompteur("offres", nonVues, `${nonVues} pas encore vue${nonVues > 1 ? "s" : ""}`);
   rendreAttente();
 }
 

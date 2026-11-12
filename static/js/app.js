@@ -69,7 +69,7 @@ function aller(page, { focus = false } = {}) {
   // Lien de la page ouverte : aria-current (menu principal et menu du compte) ;
   // la lettre fait partie des offres
   const courante = page === "lettre" ? "offres" : page;
-  document.querySelectorAll(".menu__lien[data-page], .compte__lien[data-page]").forEach(n => {
+  document.querySelectorAll(".menu__lien[data-page], .compte__lien[data-page], .onglet-tel[data-page], .plus-tel__lien[data-page]").forEach(n => {
     if (n.dataset.page === courante) n.setAttribute("aria-current", "page");
     else n.removeAttribute("aria-current");
   });
@@ -80,6 +80,10 @@ function aller(page, { focus = false } = {}) {
   if (page === "accueil") Accueil.charger();
   // L'Accueil a sa propre tête (salutation) : pas de titre de page en plus
   document.querySelector("[data-page-tete]").hidden = page === "accueil" || page === "lettre";
+  // Téléphone : « Plus » marqué quand la page ouverte est dans son menu
+  const dansPlus = ["spontanees", "profil", "parametres"].includes(page);
+  document.querySelector("[data-plus-bouton]")?.classList.toggle("is-courant", dansPlus);
+  document.getElementById("contenu").classList.remove("detail-ouvert");
   // Pages au contenu étroit (1120 px, comme leurs maquettes) : la tête s'aligne dessus
   document.getElementById("contenu").classList.toggle("main--etroit", ["profil", "spontanees"].includes(page));
   const t = TOPBAR[page];
@@ -95,10 +99,16 @@ function aller(page, { focus = false } = {}) {
     : document.getElementById("contenu")).focus({ preventScroll: true });
 }
 
-/* ── Mon compte : menu du rond aux initiales ─────────────────────────────── */
+/* ── Menus repliables : Mon compte (rond aux initiales), Plus (téléphone) ── */
 function brancherCompte() {
-  const bouton = document.querySelector("[data-compte-bouton]");
-  const menu = document.querySelector("[data-compte-menu]");
+  brancherMenu("[data-compte-bouton]", "[data-compte-menu]", ".compte");
+  brancherMenu("[data-plus-bouton]", "[data-plus-menu]", ".plus-tel, [data-plus-bouton]");
+}
+
+function brancherMenu(selBouton, selMenu, dedans) {
+  const bouton = document.querySelector(selBouton);
+  const menu = document.querySelector(selMenu);
+  if (!bouton || !menu) return;
   const ouvrir = oui => {
     menu.hidden = !oui;
     bouton.setAttribute("aria-expanded", String(oui));
@@ -112,10 +122,10 @@ function brancherCompte() {
   });
   // Clic ailleurs ou focus sorti du menu : refermé
   document.addEventListener("click", e => {
-    if (!menu.hidden && !e.target.closest(".compte")) ouvrir(false);
+    if (!menu.hidden && !e.target.closest(dedans)) ouvrir(false);
   });
   menu.addEventListener("focusout", e => {
-    if (!menu.hidden && !e.relatedTarget?.closest?.(".compte")) ouvrir(false);
+    if (!menu.hidden && e.relatedTarget && !e.relatedTarget.closest?.(dedans)) ouvrir(false);
   });
   menu.querySelectorAll("a").forEach(a => a.addEventListener("click", () => ouvrir(false)));
 }

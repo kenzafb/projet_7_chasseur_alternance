@@ -1,0 +1,78 @@
+/* ============================================================================
+   auth.css — pages hors de l'application (D150) : connexion, inscription,
+   mot de passe oublié ou temporaire, choix du mode. Panneau vert à gauche,
+   formulaire à droite ; les deux s'empilent sur téléphone.
+   ============================================================================ */
+:root {
+  --fond: #F7F8F7; --surface: #FFFFFF; --bordure-champ: #D7DDDB;
+  --texte: #17201F; --texte-2: #56625F;
+  --accent: #0F766E; --accent-survol: #0B5A54; --accent-doux: #E3F1EF;
+  --clair-sur-vert: #EEF8F6;   /* 5,0:1 sur l'accent (les verts pâles de la maquette sont sous 4,5:1) */
+  --refus: #8A2E2E; --refus-fond: #F3E8E8;
+  --attention: #7A4A00; --attention-fond: #FCEFD8;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { min-height: 100vh; background: var(--fond); color: var(--texte);
+  font-family: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px; line-height: 1.5; }
+a { color: var(--accent); font-weight: 600; }
+a:hover { color: var(--accent-survol); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.visuellement-cache { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.auth { min-height: 100vh; display: flex; flex-wrap: wrap; }
+.auth__panneau {
+  flex: 1 1 420px; min-width: 0; padding: 48px;
+  display: flex; flex-direction: column; justify-content: space-between; gap: 40px;
+  background: var(--accent); color: #FFFFFF;
+}
+.auth__panneau :focus-visible { outline-color: #FFFFFF; }
+.auth__marque { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 22px; letter-spacing: -0.02em; }
+.auth__logo { width: 38px; height: 38px; border-radius: 11px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; }
+.auth__logo svg { width: 20px; height: 20px; }
+.auth__accroche { max-width: 460px; display: flex; flex-direction: column; gap: 18px; font-size: 17px; color: var(--clair-sur-vert); }
+.auth__phrase { font-size: 38px; line-height: 1.12; font-weight: 700; letter-spacing: -0.025em; color: #FFFFFF; }
+.auth__invitation { font-size: 14px; color: var(--clair-sur-vert); }
+
+.auth__formulaire { flex: 1 1 420px; min-width: 0; display: flex; align-items: center; justify-content: center; padding: 48px 24px; }
+.auth__boite { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 18px; }
+.auth__boite h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; }
+.auth__sous { margin-top: -12px; color: var(--texte-2); }
+.auth__boite form:not(.auth__alt) { display: flex; flex-direction: column; gap: 14px; }
+.auth__champ { display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px; }
+.auth__ligne { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.auth__ligne a { font-size: 14px; }
+.auth__aide { font-weight: 400; color: var(--texte-2); }
+.auth__champ input {
+  min-height: 46px; padding: 11px 13px; border: 1px solid var(--bordure-champ); border-radius: 10px;
+  font: inherit; font-weight: 400; font-size: 15px; color: var(--texte); background: var(--surface);
+}
+.auth__champ input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-doux); }
+.auth__deux { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.auth__bouton {
+  min-height: 48px; margin-top: 4px; padding: 12px; border: 0; border-radius: 10px; cursor: pointer;
+  background: var(--accent); color: #FFFFFF; font: inherit; font-weight: 700; font-size: 15px;
+}
+.auth__bouton:hover { background: var(--accent-survol); }
+.auth__erreur { padding: 10px 14px; border-radius: 10px; background: var(--refus-fond); color: var(--refus); font-size: 14px; }
+.auth__info { font-size: 15px; }
+.auth__alt { text-align: center; font-size: 14px; color: var(--texte-2); }
+.auth__lien-bouton { background: none; border: 0; padding: 8px; font: inherit; font-weight: 600; color: var(--accent); cursor: pointer; text-decoration: underline; }
+
+.auth__modes { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.auth__mode {
+  display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border-radius: 14px;
+  border: 1px solid var(--bordure-champ); background: var(--surface); color: var(--texte); text-decoration: none; font-weight: 400;
+}
+.auth__mode strong { font-size: 17px; }
+.auth__mode span { font-size: 14px; color: var(--texte-2); }
+.auth__mode:hover { border-color: var(--accent); color: var(--texte); }
+.auth__badge { align-self: flex-start; margin-top: 4px; padding: 1px 8px; border-radius: 999px;
+  background: var(--attention-fond); color: var(--attention) !important; font-weight: 700; }
+
+@media (max-width: 720px) {
+  .auth__panneau { flex-basis: 100%; padding: 28px 20px; gap: 18px; }
+  .auth__phrase { font-size: 26px; }
+  .auth__accroche { font-size: 15px; gap: 10px; }
+  .auth__accroche p:not(.auth__phrase), .auth__invitation { display: none; }
+  .auth__formulaire { flex-basis: 100%; padding: 28px 20px 40px; align-items: flex-start; }
+}

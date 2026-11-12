@@ -35,6 +35,16 @@
 
     <!-- Un mode par URL : chaque lien ouvre l'autre mode (même page), un
          onglet par mode si on le souhaite -->
+    <!-- Téléphone : le mode ouvert, qui déplie les trois modes (D150) -->
+    <details class="modes-tel">
+      <summary class="modes-tel__bouton"><span class="modes-tel__point" aria-hidden="true"></span>{{ {"alternance": "Alternance", "job": "Job", "stage": "Stage"}[mode] }}<span class="visuellement-cache"> : changer ce que je cherche</span></summary>
+      <nav class="modes-tel__liste" aria-label="Ce que je cherche (téléphone)">
+        {% for cle, nom in (("alternance", "Alternance"), ("job", "Job"), ("stage", "Stage")) %}
+        <a class="modes-tel__lien" href="/{{ cle }}" data-mode-btn="{{ cle }}"{% if mode == cle %} aria-current="page"{% endif %}>{{ nom }}</a>
+        {% endfor %}
+      </nav>
+    </details>
+
     <nav class="modes" aria-label="Ce que je cherche">
       {% for cle, nom in (("alternance", "Alternance"), ("job", "Job"), ("stage", "Stage")) %}
       <a class="modes__lien" href="/{{ cle }}" data-mode-btn="{{ cle }}"{% if mode == cle %} aria-current="true"{% endif %}>{{ nom }}</a>
@@ -113,6 +123,25 @@
       {% include "partials/lettre.html" %}
     </div>
 </main>
+
+<!-- ════════════ TÉLÉPHONE : barre d'onglets en bas (D150) ════════════ -->
+<nav class="onglets-tel" aria-label="Menu principal (téléphone)">
+  <a class="onglet-tel" href="#accueil" data-page="accueil">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7v9H4z"/></svg>Accueil</a>
+  <a class="onglet-tel" href="#offres" data-page="offres">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5h6v2"/></svg>Offres <span class="compteur compteur--tel" data-count="offres" hidden>0</span></a>
+  <a class="onglet-tel" href="#candidatures" data-page="candidatures">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 12h12"/><path d="M12 6l6 6-6 6"/></svg>Candidatures <span class="compteur compteur--tel compteur--attention" data-count="candidatures" hidden>0</span></a>
+  <button type="button" class="onglet-tel" data-plus-bouton aria-expanded="false" aria-controls="plus-tel">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>Plus</button>
+</nav>
+<div class="plus-tel" id="plus-tel" data-plus-menu hidden>
+  <a class="plus-tel__lien" href="#spontanees" data-page="spontanees">Entreprises à contacter <span class="compteur" data-count="spontanees" hidden>0</span></a>
+  <a class="plus-tel__lien" href="#profil" data-page="profil">Mon profil</a>
+  <a class="plus-tel__lien" href="#parametres" data-page="parametres">Paramètres</a>
+  <form method="post" action="/logout"><button type="submit" class="plus-tel__lien">Se déconnecter</button></form>
+  <p class="plus-tel__qui">{{ email_utilisateur }}</p>
+</div>
 
 <!-- Liens de mode : la page courante (#offres, #profil...) est gardée -->
 <script>

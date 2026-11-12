@@ -11,6 +11,8 @@ Application web multi-utilisateurs qui automatise la recherche d'une alternance,
 
 Trois modes, chacun à son URL (`/alternance`, `/job`, `/stage`) avec son profil, ses offres, ses candidatures spontanées et son suivi. Deux onglets ouverts dans deux modes ne se gênent pas.
 
+Chaque mode s'ouvre sur un **Accueil** : ce qui attend (offre bien notée, candidatures à relancer, offres à noter), la recherche en bref et l'avancement du profil. Menu : Accueil, Offres, Candidatures, Entreprises à contacter, Mon profil, avec un compteur sur ce qui attend ; Paramètres et déconnexion sous le rond aux initiales ; sur téléphone, une barre d'onglets en bas. Références de l'interface : `docs/maquettes/DESIGN.md` (décisions D143 à D150).
+
 ### Offres
 
 | Mode | France Travail | La Bonne Alternance |
@@ -22,8 +24,9 @@ Trois modes, chacun à son URL (`/alternance`, `/job`, `/stage`) avec son profil
 - Domaines du profil en codes de la nomenclature France Travail (14 grands domaines, 110 domaines), secteur de l'employeur et taille d'entreprise en option. Toutes les listes viennent des référentiels officiels, versionnés dans `docs/referentiels/`.
 - Rien n'est tronqué en silence : au-delà du plafond de l'API France Travail (3150 offres par requête), la recherche est redécoupée par date de création ; La Bonne Alternance est interrogée autour de 19 centres d'Île-de-France, chaque cercle saturé étant redécoupé. Les logs donnent ce qui a été annoncé, récupéré et écarté.
 - Offres dédoublonnées par utilisateur et par mode, archivage automatique par mots-clés (offres réservées à un public, écoles et CFA en alternance).
-- **Analyse par l'IA locale, en différé.** La recherche ajoute les offres « non analysées » (30 par défaut), sans attendre l'IA. « Analyser les offres en attente » les fait noter une à une (note sur 10, éligibilité, points forts et faibles, catégorie métier), des plus récentes aux plus anciennes, 30 par lancement ou toute la file pour un lancement de nuit, avec la taille de la file et le temps pour la vider, la progression et le temps restant dans le bandeau, et un bouton d'arrêt. Les règles d'archivage par mots-clés passent avant l'IA. Une option du profil la lance après chaque recherche. Un prompt par mode (alternance, job, stage) ; une analyse archive les offres hors domaine ou inéligibles. Une réponse invalide est redemandée une fois, puis l'offre reste en attente : aucune note n'est jamais inventée.
-- **Lettre de motivation** : la lettre type écrite dans le profil, avec des balises (`{entreprise}`, `{poste}`, `{date}`, `{contact_entreprise}`, `{portfolio}` remplacées en Python, `{paragraphe}` obligatoire). L'IA ne rédige que le paragraphe personnalisé, affiché et modifiable, régénérable, avant d'être inséré. Sans lettre type ou sans `{paragraphe}`, un message renvoie au profil.
+- **Analyse par l'IA locale, en différé.** La recherche ajoute les offres « non analysées » (30 par défaut), sans attendre l'IA. « Les noter » (page Offres ou Accueil) les fait noter une à une (note sur 10, éligibilité, points forts et faibles, catégorie métier), des plus récentes aux plus anciennes, 30 par lancement ou toute la file pour un lancement de nuit, avec la taille de la file et le temps pour la vider, la progression et le temps restant dans le bandeau, et un bouton d'arrêt. Les règles d'archivage par mots-clés passent avant l'IA. Une option des réglages avancés la lance après chaque recherche. Un prompt par mode (alternance, job, stage) ; une analyse archive les offres hors domaine ou inéligibles. Une réponse invalide est redemandée une fois, puis l'offre reste en attente : aucune note n'est jamais inventée.
+- **Page Offres** : liste et volet de détail (note avec un mot, ce qui colle, ce qui coince, l'offre en bref), onglets À voir, Gardées et Écartées (« Pas pour moi », et les offres écartées par le Chasseur, avec leur raison). Une offre jamais ouverte est en gras avec un point vert.
+- **Lettre de motivation** : la lettre type écrite dans le profil, avec des balises (`{entreprise}`, `{poste}`, `{date}`, `{contact_entreprise}`, `{portfolio}` remplacées en Python, `{paragraphe}` obligatoire). L'IA ne rédige que le paragraphe personnalisé, modifiable et régénérable, sur la page « Ma lettre » avec un aperçu fidèle au PDF (police Carlito livrée dans `static/fonts/`, licence OFL). Sans lettre type ou sans `{paragraphe}`, un message renvoie au profil.
 - **J'ai postulé** sur une offre (date modifiable) : elle quitte la page Offres pour le tableau Candidatures, d'où elle peut être annulée.
 - **La Bonne Alternance** : une offre LBA dont la page de candidature est connue porte « Postuler sur La Bonne Alternance » (nouvel onglet), à côté de « J'ai postulé ».
 
@@ -38,18 +41,19 @@ Trois modes, chacun à son URL (`/alternance`, `/job`, `/stage`) avec son profil
 
 ### Suivi
 
-Un tableau Candidatures par mode : offres postulées et entreprises contactées, avec la date, le statut (postulée ou envoyée, à relancer après 7 jours, réponse, entretien, refus) modifiable sur place, le lien et le contact. Statistiques par source (entreprises, emails trouvés, envois, réponses, entretiens). Limites réglables à chaque lancement (offres, nouvelles entreprises, sites scrapés, mails envoyés), bornées par le serveur, et logs des traitements en direct dans l'interface.
+Un tableau Candidatures par mode, en colonnes Envoyée, Relancée, Entretien, Réponse (acceptée ou refusée) : offres postulées et entreprises contactées, un bouton par carte pour l'étape suivante, à relancer après 7 jours sans réponse, la date, le lien et le contact. Statistiques par source (entreprises, emails trouvés, envois, réponses, entretiens). Plafonds de chaque lancement (offres, offres notées, nouvelles entreprises, emails cherchés, mails envoyés) dans les réglages avancés de chaque mode, enregistrés sur le serveur et bornés par lui.
 
 ### Profil et compte
 
 - **Copie de profil** : « Copier depuis un autre mode » reprend les sections qui ne dépendent pas du mode (identité, liens, formation, expérience, compétences, projets, lettre type, email, pièces jointes), avec un aperçu avant/après et une confirmation pour toute section déjà remplie.
-- **Paramètres**, communs aux trois modes : email de connexion, mot de passe (les autres sessions sont alors fermées), compte d'envoi.
+- **Mon profil** en cinq parties (Toi, la partie du mode, Ton parcours, Ce que tu cherches, Tes documents), chacune avec ce qui lui manque (`shared/completude_profil.py`).
+- **Paramètres**, communs aux trois modes : email de connexion, mot de passe (les autres sessions sont alors fermées), compte d'envoi ; et les réglages avancés du mode ouvert.
 - **Mot de passe oublié** : l'administratrice donne un mot de passe temporaire (`scripts/reinitialiser_mot_de_passe.py`), à changer à la connexion suivante.
 
 ## Architecture technique
 
 - **Backend** : Python 3.13, FastAPI, traitements longs dans des threads par utilisateur (une recherche et une étape de spontanées à la fois, arrêt possible).
-- **Données** : SQLAlchemy 2, SQLite, schéma unique dans `database/models.py`, migrations Alembic (15 à ce jour, chacune testée en montée et en descente sans perte de lignes).
+- **Données** : SQLAlchemy 2, SQLite, schéma unique dans `database/models.py`, migrations Alembic (16 à ce jour, chacune testée en montée et en descente sans perte de lignes).
 - **Authentification** : inscription sur code d'invitation, mots de passe hachés (argon2), session par cookie signé (`httponly`, `samesite`, `secure` en production) portant une empreinte du mot de passe (le changer ferme les autres sessions). Au plus 5 essais de connexion ratés en 15 minutes. Requêtes qui modifient des données refusées si elles viennent d'une autre page (en-tête Origin). Toutes les routes sauf connexion, inscription et mot de passe oublié exigent une session.
 - **Isolation** : chaque table de données porte l'utilisateur (clé étrangère, suppression en cascade), chaque requête filtre sur l'utilisateur connecté, dédoublonnages, logs et traitements sont propres à chacun.
 - **Secrets** : mots de passe SMTP chiffrés en base (Fernet, clé dans `.env`), jamais renvoyés au navigateur.

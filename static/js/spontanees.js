@@ -2,7 +2,7 @@
    spontanees.js — Entreprises à contacter (D148) : trois étapes (trouver,
    chercher les emails, envoyer), entreprises rangées par moyen de contact
    ============================================================================ */
-import { api, limite, confirmerLancement } from "./api.js";
+import { api, limite, confirmerLancement, majCompteur } from "./api.js";
 
 let stats = null;
 let compte = null;    // compte d'envoi (mode test affiché en bandeau)
@@ -144,12 +144,7 @@ function rendreKpis() {
   rendreParSource(stats.par_source || {});
 
   // Compteur du menu : entreprises prêtes à recevoir la candidature
-  const c = document.querySelector('[data-count="spontanees"]');
-  if (c) {
-    c.textContent = fmt(stats.a_envoyer || 0);
-    c.hidden = !stats.a_envoyer;
-    c.setAttribute("aria-label", `${stats.a_envoyer || 0} prêtes à envoyer`);
-  }
+  majCompteur("spontanees", stats.a_envoyer || 0, `${stats.a_envoyer || 0} prêtes à envoyer`);
   const ae = document.querySelector('[data-stat="avec_email"]');
   if (ae) ae.textContent = fmt(stats.avec_email);
   const en = document.querySelector('[data-stat="envoyes"]');

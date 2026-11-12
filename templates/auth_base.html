@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block titre %}{% endblock %} · Chasseur</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ statique('css/auth.css') }}">
+  {% block tete %}{% endblock %}
+</head>
+<body>
+  <!-- Pages hors session (D150) : panneau vert à gauche, formulaire à droite -->
+  <div class="auth">
+    <aside class="auth__panneau">
+      <p class="auth__marque">
+        <span class="auth__logo" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.5" fill="#0F766E"/></svg>
+        </span>
+        Chasseur
+      </p>
+      <div class="auth__accroche">
+        <p class="auth__phrase">Ton stage, ton alternance ou ton job, sans y passer tes soirées.</p>
+        <p>Le Chasseur trouve les offres, te dit lesquelles valent le coup et t'aide à écrire tes lettres.</p>
+      </div>
+      <p class="auth__invitation">Sur invitation, pour un petit groupe d'utilisatrices et d'utilisateurs.</p>
+    </aside>
+    <main class="auth__formulaire">
+      <div class="auth__boite">
+        {% block contenu %}{% endblock %}
+      </div>
+    </main>
+  </div>
+</body>
+</html>

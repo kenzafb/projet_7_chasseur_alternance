@@ -90,10 +90,11 @@ def test_interface_une_seule_page():
 
 
 def test_options_du_statut_neutres():
-    """D111 : la couleur du statut s'appliquait aussi aux options de la liste."""
-    css = (config.STATIC_DIR / "css" / "pages.css").read_text(encoding="utf-8")
-    assert ".suivi-statut option { color: var(--txt); background-color: var(--surface);" in css
-    assert ".st-refus      { color: var(--rouge);" in css               # le menu fermé garde sa couleur
+    """D111, puis D146 : le menu « Changer d'étape » est un menu neutre ;
+    l'issue (acceptée, refusée) se lit à son étiquette, en couleur et en mot."""
+    js = (config.STATIC_DIR / "js" / "candidatures.js").read_text(encoding="utf-8")
+    assert '<select class="filtre-menu" data-cand-select="1">' in js
+    assert 'acceptee: ["Acceptée", "bien"], refus: ["Refusée", "refus"]' in js
 
 
 def test_etapes_relancee_et_acceptee(alice):

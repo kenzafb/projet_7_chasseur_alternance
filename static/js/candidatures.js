@@ -6,7 +6,7 @@
    Offres postulées et candidatures spontanées envoyées, lues par une seule
    route (/api/suivi) dans leurs tables d'origine.
    ============================================================================ */
-import { api, esc, lienSur } from "./api.js";
+import { api, esc, lienSur, majCompteur } from "./api.js";
 import { etiquettesAutresModes } from "./spontanees.js";
 
 const COLONNES = [
@@ -114,13 +114,8 @@ export const Candidatures = {
     try { _data = await api.suivi(); } catch (_) { return; }
     rendre();
     // Compteur du menu : ce qui attend, les candidatures à relancer
-    const c = document.querySelector('[data-count="candidatures"]');
     const aRelancer = _data.filter(x => x.statut === "a_relancer").length;
-    if (c) {
-      c.textContent = aRelancer;
-      c.hidden = !aRelancer;
-      c.setAttribute("aria-label", `${aRelancer} à relancer`);
-    }
+    majCompteur("candidatures", aRelancer, `${aRelancer} à relancer`);
     if (this._branche) return;
     const liste = document.querySelector('[data-list="candidatures"]');
 

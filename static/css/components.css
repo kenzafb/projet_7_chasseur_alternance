@@ -1,6 +1,6 @@
 /* ============================================================================
    components.css — éléments réutilisables
-   Boutons · cartes · chips · KPI · viseur de score (signature) · table
+   Boutons · cartes · pastilles · filtres · tableau · jauge du bandeau
    ============================================================================ */
 
 /* ── Boutons ─────────────────────────────────────────────────────────────── */
@@ -38,62 +38,15 @@
   font-size: 12px; font-weight: 700;
   padding: 2px 9px; border-radius: var(--r-pill);
 }
-.chip--ft    { background: var(--accent-doux);    color: var(--accent-survol); }
-.chip--lba   { background: var(--fond-neutre);    color: var(--texte-3); }
-.chip--vert  { background: var(--accent-doux);    color: var(--accent-survol); }
+.chip--ft { background: var(--accent-doux);    color: var(--accent-survol); }
+.chip--lba { background: var(--fond-neutre);    color: var(--texte-3); }
+.chip--vert { background: var(--accent-doux);    color: var(--accent-survol); }
 .chip--ambre { background: var(--attention-fond); color: var(--attention); }
 .chip--rouge { background: var(--refus-fond);     color: var(--refus); }
-.chip--gris  { background: var(--neutre-fond);    color: var(--neutre); }
-
-/* ── Le viseur de score (élément signature) ──────────────────────────────── */
-/* Une jauge horizontale graduée avec un repère au seuil 7.0 = "à postuler".
-   Lecture instantanée : la barre se remplit, sa couleur dit le verdict,
-   le tick fixe rappelle le seuil de décision. */
-.viseur { display: flex; align-items: center; gap: 11px; }
-.viseur__val {
-  font-family: var(--f-display); font-weight: 600;
-  font-size: 21px; line-height: 1; letter-spacing: -.02em;
-  min-width: 38px;
-}
-.viseur__val small { font-size: 11px; color: var(--txt-faint); font-weight: 500; }
-.viseur__track {
-  position: relative;
-  flex: 1; min-width: 90px; height: 7px;
-  background: var(--fond-neutre); border-radius: var(--r-pill);
-  overflow: visible;
-}
-.viseur__fill { position: absolute; inset: 0 auto 0 0; height: 100%; border-radius: var(--r-pill); transition: width .5s cubic-bezier(.2,.7,.3,1); }
-.viseur__tick {                      /* repère du seuil 7.0 */
-  position: absolute; top: -3px; bottom: -3px; left: 70%;
-  width: 2px; background: var(--texte); border-radius: 2px; opacity: .35;
-}
-.viseur--vert  .viseur__fill { background: var(--accent); }
-.viseur--vert  .viseur__val  { color: var(--vert); }
-.viseur--ambre .viseur__fill { background: #B7791F; }
-.viseur--ambre .viseur__val  { color: var(--ambre); }
-.viseur--rouge .viseur__fill { background: #8C9693; }
-.viseur--rouge .viseur__val  { color: var(--neutre); }
-
-/* ── Bandeau KPI ─────────────────────────────────────────────────────────── */
-.kpis { display: grid; gap: 10px; margin-bottom: 18px; }
-.kpis--4 { grid-template-columns: repeat(4, 1fr); }
-.kpis--3 { grid-template-columns: repeat(3, 1fr); }
-.kpi {
-  background: var(--surface);
-  border: 1px solid var(--hair);
-  border-radius: var(--r-md);
-  padding: 13px 15px;
-}
-.kpi__label { font-size: 13px; font-weight: 600; color: var(--texte-2); margin-bottom: 5px; }
-.kpi__val   { font-size: 26px; font-weight: 700; line-height: 1; letter-spacing: -.02em; }
-.kpi__val--vert   { color: var(--vert); }
-.kpi__val--signal { color: var(--signal); }
-.kpi__note  { font-size: 11px; color: var(--txt-muted); margin-top: 4px; }
-.kpi__note--up { color: var(--vert); }
-@media (max-width: 720px) { .kpis--4, .kpis--3 { grid-template-columns: repeat(2, 1fr); } }
+.chip--gris { background: var(--neutre-fond);    color: var(--neutre); }
 
 /* ── Filtres en pilule ───────────────────────────────────────────────────── */
-.filters { display: flex; gap: 6px; flex-wrap: wrap; }
+
 .filter {
   font-size: 13px; font-weight: 600; padding: 7px 13px; min-height: 36px;
   border-radius: var(--r-pill);
@@ -103,48 +56,13 @@
 .filter.is-active { border-color: var(--texte); background: var(--texte); color: #FFFFFF; }
 
 /* ── Table (spontanées) ──────────────────────────────────────────────────── */
-.table { background: var(--surface); border: 1px solid var(--hair); border-radius: var(--r-lg); overflow: hidden; }
-.trow {
-  display: grid; grid-template-columns: 1fr 220px 100px;
-  gap: 14px; align-items: center;
-  padding: 11px 16px;
-}
-.trow + .trow { border-top: 1px solid var(--hair); }
-.trow:nth-child(even of .trow) { background: var(--surface-2); }
-.thead { background: var(--surface-2); border-bottom: 1px solid var(--hair); }
+.table { background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--r-carte); overflow: hidden; }
+
+.thead { background: var(--fond); border-bottom: 1px solid var(--bordure); }
 .thead span { font-size: 12px; font-weight: 700; color: var(--texte-2); }
-.trow__name { font-size: 13.5px; font-weight: 500; }
-.trow__sub  { font-size: 11px; color: var(--txt-faint); font-family: var(--f-mono); margin-top: 1px; }
-.trow__mail { font-size: 12.5px; color: var(--txt-muted); font-family: var(--f-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.trow__mail--none { font-style: italic; color: var(--txt-faint); font-family: var(--f-body); }
+
 /* Répartition des spontanées par source */
 .par-source { display: grid; gap: 10px; margin-bottom: 16px; }
-.trow.trow--source { grid-template-columns: 1.6fr repeat(5, 1fr); font-size: 13px; }
-@media (max-width: 720px) { .trow.trow--source { grid-template-columns: 1.4fr repeat(5, 1fr); gap: 6px; padding: 9px 10px; font-size: 12px; } }
-@media (max-width: 720px) {
-  .trow { grid-template-columns: 1fr auto; }
-  .trow__mail { display: none; }
-}
-
-/* ── État vide générique ─────────────────────────────────────────────────── */
-.empty {
-  display: grid; place-items: center; gap: 10px;
-  padding: 60px 20px; text-align: center;
-  color: var(--texte-2);
-}
-.empty svg { width: 34px; height: 34px; opacity: .5; }
-.empty__title { font-size: 16px; color: var(--texte); font-weight: 700; }
-.empty__hint  { font-size: 14px; max-width: 360px; color: var(--texte-2); }
-
-/* ── Apparition échelonnée des cartes au chargement ──────────────────────── */
-.stagger > * { opacity: 0; transform: translateY(6px); animation: rise .45s ease forwards; }
-.stagger > *:nth-child(1) { animation-delay: .02s; }
-.stagger > *:nth-child(2) { animation-delay: .07s; }
-.stagger > *:nth-child(3) { animation-delay: .12s; }
-.stagger > *:nth-child(4) { animation-delay: .17s; }
-.stagger > *:nth-child(5) { animation-delay: .22s; }
-.stagger > *:nth-child(n+6) { animation-delay: .26s; }
-@keyframes rise { to { opacity: 1; transform: none; } }
 
 /* Jauge de progression dans la bannière runbar */
 .runbar__progress { display: none; align-items: center; gap: 8px; flex: 1; max-width: 320px; }
@@ -162,10 +80,3 @@
   font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
   color: var(--accent-survol); min-width: 38px; text-align: right;
 }
-
-/* Candidature sur La Bonne Alternance (D129) : couleur de la pastille LBA */
-.btn--lba { text-decoration: none; }
-.trow__lba { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.trow__lien { font-size: 13px; color: var(--accent); }
-.trow__date { font: inherit; font-size: 12px; padding: 3px 5px; }
-.trow__mail--lba { color: var(--texte-3); font-size: 13px; }
