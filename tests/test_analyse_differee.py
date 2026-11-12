@@ -15,6 +15,8 @@ from france_travail.analyseur import marquer_non_analysee
 from tests.conftest import erreur_http
 from tests.test_envoyeur import attendre
 from tests.test_ia import INTROUVABLE, echouer, recherche, sans_attente, texte_envoye  # noqa: F401  (fixtures)
+from routes import commun
+from database.candidatures_db import modifier_candidature
 
 
 @pytest.fixture(autouse=True)
@@ -46,8 +48,8 @@ def alice(utilisateur):
 def lancer(client, uid, **corps):
     r = client.post("/api/analyse", json=corps)
     assert r.status_code == 200, r.text
-    attendre(lambda: not main.pipelines.etat("analyse", uid)["en_cours"])
-    return r.json(), main.pipelines.etat("analyse", uid)
+    attendre(lambda: not commun.pipelines.etat("analyse", uid)["en_cours"])
+    return r.json(), commun.pipelines.etat("analyse", uid)
 
 
 # ─── File d'attente ──────────────────────────────────────────────────────────
@@ -98,7 +100,7 @@ def test_refus_avant_lancement(alice, ia):
     assert r.status_code == 400 and "Aucune offre en attente" in r.json()["erreur"]
     assert client.post("/api/analyse", json={"max_offres": 3}).status_code == 422
     en_attente(uid, "A", 1)
-    main.pipelines.demarrer("analyse", uid, mode="job")
+    commun.pipelines.demarrer("analyse", uid, mode="job")
     r = client.post("/api/analyse", json={})
     assert r.status_code == 400 and "Analyse déjà en cours (mode job)" in r.json()["erreur"]
     assert ia.appels == []
@@ -127,7 +129,7 @@ def test_ecole_archivee_en_alternance_seulement(alice, ia, mode, archivee):
     en_attente(uid, "A", 1, mode=mode, titre="Développeur", entreprise="Epitech")
     if mode == "alternance":
         # À l'insertion déjà ; on remet l'offre en attente pour voir l'effet de l'analyse
-        main.modifier_candidature(uid, "A", {"statut": "nouveau", "raison_archivage": ""}, mode=mode)
+        modifier_candidature(uid, "A", {"statut": "nouveau", "raison_archivage": ""}, mode=mode)
     ia.reponse = analyse(8)
     lancer(client, uid)
     assert (lire_candidature(uid, "A", mode=mode)["statut"] == "archive") is archivee
@@ -136,9 +138,9 @@ def test_ecole_archivee_en_alternance_seulement(alice, ia, mode, archivee):
 def test_offre_deplacee_par_l_utilisateur_pas_archivee(alice, ia):
     client, uid = alice
     en_attente(uid, "A", 1)
-    main.modifier_candidature(uid, "A", {"statut": "en_cours"})
+    modifier_candidature(uid, "A", {"statut": "en_cours"})
     client.post("/api/profil", json={"prenom": "Alice", "niveau_etudes": "Bac"})
-    main.modifier_candidature(uid, "A", {"description": "Diplôme Bac+5 exigé."})
+    modifier_candidature(uid, "A", {"description": "Diplôme Bac+5 exigé."})
     ia.reponse = analyse(8).replace('"niveau_requis": "non_precise"', '"niveau_requis": "bac+5"').replace(
         '"niveau_exigence": "non_precise"', '"niveau_exigence": "exige"')
     lancer(client, uid)
@@ -211,9 +213,9 @@ def test_arret_apres_l_offre_en_cours(alice, ia, monkeypatch):
     assert premiere.wait(5)
     assert client.post("/api/analyse/stop").json() == {"ok": True, "en_cours": True}
     liberer.set()
-    attendre(lambda: not main.pipelines.etat("analyse", uid)["en_cours"])
+    attendre(lambda: not commun.pipelines.etat("analyse", uid)["en_cours"])
     assert len(ia.appels) == 1 and compter_en_attente(uid, "alternance") == 3
-    assert main.pipelines.etat("analyse", uid)["message"].startswith("Arrêtée : 1 offres analysées")
+    assert commun.pipelines.etat("analyse", uid)["message"].startswith("Arrêtée : 1 offres analysées")
     assert client.post("/api/analyse/stop").json()["en_cours"] is False
 
 
@@ -240,8 +242,8 @@ def test_progression_dans_l_etat(alice, ia, monkeypatch):
     for i in range(1, 3):
         en_attente(uid, f"R{i}", i)
     vus = []
-    reel = main.pipelines.maj
-    monkeypatch.setattr(main.pipelines, "maj", lambda t, u, **c: (vus.append(c.get("message")), reel(t, u, **c)))
+    reel = commun.pipelines.maj
+    monkeypatch.setattr(commun.pipelines, "maj", lambda t, u, **c: (vus.append(c.get("message")), reel(t, u, **c)))
     ia.reponse = analyse()
     lancer(client, uid)
     assert any(m and m.startswith("Analyse 1/2") and "restantes" in m for m in vus)
@@ -256,7 +258,7 @@ def test_analyse_automatique_apres_la_recherche(recherche, ia):
     assert recherche.client.get("/api/profil").json()["analyse_auto"] is True
     ia.reponse = analyse(9)
     recherche.lancer()
-    attendre(lambda: not main.pipelines.etat("analyse", recherche.user_id)["en_cours"])
+    attendre(lambda: not commun.pipelines.etat("analyse", recherche.user_id)["en_cours"])
     assert compter_en_attente(recherche.user_id, "alternance") == 0
     assert len(ia.appels) == 3
     assert "(automatique après la recherche)" in recherche.client.get("/api/logs").text
@@ -265,7 +267,7 @@ def test_analyse_automatique_apres_la_recherche(recherche, ia):
 def test_pas_d_analyse_automatique_sans_l_option(recherche, ia):
     assert recherche.client.get("/api/profil").json()["analyse_auto"] is False
     recherche.lancer()
-    assert ia.appels == [] and not main.pipelines.etat("analyse", recherche.user_id)["en_cours"]
+    assert ia.appels == [] and not commun.pipelines.etat("analyse", recherche.user_id)["en_cours"]
     assert compter_en_attente(recherche.user_id, "alternance") == 3
 
 
@@ -306,7 +308,7 @@ def test_mots_cles_avant_l_ia(alice, ia):
     en_attente(uid, "A", 1)
     en_attente(uid, "B", 2)
     # Mise en attente sans archivage (règles plus anciennes), puis texte réservé
-    main.modifier_candidature(uid, "B", {"description": "Poste réservé aux bénéficiaires de l'obligation d'emploi."})
+    modifier_candidature(uid, "B", {"description": "Poste réservé aux bénéficiaires de l'obligation d'emploi."})
     ia.reponse = analyse()
     _, etat = lancer(client, uid)
     assert len(ia.appels) == 1 and "Poste A" in texte_envoye(ia.appels[0])

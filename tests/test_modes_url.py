@@ -5,6 +5,7 @@ l'URL, deux onglets dans deux modes ne se gênent pas."""
 import main
 from database.profil_db import lire_profil
 from tests.conftest import CODE, MOT_DE_PASSE, ClientDeMode
+from routes import commun
 
 
 def test_accueil_propose_les_modes(utilisateur):
@@ -51,7 +52,7 @@ def test_deux_onglets_deux_modes(utilisateur):
 
 def test_pipeline_d_un_autre_mode_signale(utilisateur, monkeypatch):
     client, uid = utilisateur("a@test.fr", prenom="Alice")
-    main.pipelines.demarrer("spontanees", uid, etape="fetch", mode="job")
+    commun.pipelines.demarrer("spontanees", uid, etape="fetch", mode="job")
     r = client.post("/api/spontanees/fetch", json={"max_entreprises": 1})
     assert r.status_code == 400 and r.json()["erreur"] == "Pipeline déjà en cours (mode job)"
     assert client.get("/api/statut_pipelines").json()["spontanees"]["mode"] == "job"

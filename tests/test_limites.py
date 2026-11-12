@@ -18,6 +18,7 @@ from database.profil_db import sauvegarder_profil
 from shared import config
 from tests.conftest import compte_verifie
 from tests.test_envoyeur import attendre, entreprises
+import routes.offres as routes_offres
 
 ANALYSE = ('{"score": 8, "eligible": true, "points_forts": [], "points_faibles": [], '
            '"domaine": "Informatique", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false, "niveau_exigence": "non_precise"}')
@@ -66,7 +67,7 @@ def sources(monkeypatch, ia):
     nombres = {"ft": 0, "lba": 0}
     monkeypatch.setattr(scraper, "recuperer_offres",
                         lambda criteres, log=print, **_: [_brut_ft(i) for i in range(nombres["ft"])])
-    monkeypatch.setattr(main, "rechercher_lba", lambda profil, log=print: {"offres": [_lba(i) for i in range(nombres["lba"])], "entreprises": [], "requetes": 0})
+    monkeypatch.setattr(routes_offres, "rechercher_lba", lambda profil, log=print: {"offres": [_lba(i) for i in range(nombres["lba"])], "entreprises": [], "requetes": 0})
     ia.reponse = ANALYSE
     return nombres
 

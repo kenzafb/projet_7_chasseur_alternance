@@ -16,6 +16,8 @@ from database.schema import config_alembic
 from tests.faux_lba import entreprise, siret_lba
 from tests.test_limites import sirene  # noqa: F401  (fixture)
 from tests.test_pipelines import attendre
+from routes import commun
+import routes.offres as routes_offres
 
 
 # ─── Entreprises dans les candidatures spontanées ─────────────────────────────
@@ -139,17 +141,17 @@ def test_migration_0009_sources_en_liste(tmp_path):
 
 # ─── Pipelines ────────────────────────────────────────────────────────────────
 def _logs(uid):
-    return "\n".join(str(l) for l in main.pipelines.logs(uid))
+    return "\n".join(str(l) for l in commun.pipelines.logs(uid))
 
 
 def test_recherche_d_offres_n_ajoute_aucune_entreprise(utilisateur, monkeypatch, pipelines_neufs):
     """D46 : seule l'étape « Récupérer » ajoute des entreprises."""
     client, uid = utilisateur("a@test.fr", prenom="Alice")
-    monkeypatch.setattr(main, "lancer_recherche", lambda *a, **k: [])
-    monkeypatch.setattr(main, "rechercher_lba", lambda profil, log=print: {
+    monkeypatch.setattr(routes_offres, "lancer_recherche", lambda *a, **k: [])
+    monkeypatch.setattr(routes_offres, "rechercher_lba", lambda profil, log=print: {
         "offres": [], "entreprises": [_norm(1)], "requetes": 19})
     client.post("/api/recherche")
-    attendre(lambda: not main.pipelines.etat("recherche", uid)["en_cours"])
+    attendre(lambda: not commun.pipelines.etat("recherche", uid)["en_cours"])
     assert lire_entreprises(uid) == []
     assert "Aucune offre LBA récupérée" in _logs(uid)                     # LBA a tourné, sans offre
 
@@ -157,19 +159,19 @@ def test_recherche_d_offres_n_ajoute_aucune_entreprise(utilisateur, monkeypatch,
 def test_pas_de_aucune_offre_apres_lba_ignoree(utilisateur, monkeypatch, pipelines_neufs):
     """Point 8 : « Aucune offre LBA récupérée » seulement si LBA a tourné."""
     client, uid = utilisateur("a@test.fr", prenom="Alice")
-    monkeypatch.setattr(main, "lancer_recherche", lambda *a, max_offres, **k: [{}] * max_offres)
+    monkeypatch.setattr(routes_offres, "lancer_recherche", lambda *a, max_offres, **k: [{}] * max_offres)
     appels = []
-    monkeypatch.setattr(main, "rechercher_lba", lambda profil, log=print: appels.append(1))
+    monkeypatch.setattr(routes_offres, "rechercher_lba", lambda profil, log=print: appels.append(1))
     client.post("/api/recherche", json={"max_offres": 3})
-    attendre(lambda: not main.pipelines.etat("recherche", uid)["en_cours"])
+    attendre(lambda: not commun.pipelines.etat("recherche", uid)["en_cours"])
     logs = _logs(uid)
     assert "LBA ignorée : limite de 3 offres" in logs
     assert "Aucune offre LBA récupérée" not in logs and appels == []
     # LBA ignorée pour une autre raison (clé absente) : pas de message en plus non plus
-    monkeypatch.setattr(main, "lancer_recherche", lambda *a, **k: [])
-    monkeypatch.setattr(main, "rechercher_lba", lambda profil, log=print: log("⚠️  LBA ignorée : clé"))
+    monkeypatch.setattr(routes_offres, "lancer_recherche", lambda *a, **k: [])
+    monkeypatch.setattr(routes_offres, "rechercher_lba", lambda profil, log=print: log("⚠️  LBA ignorée : clé"))
     client.post("/api/recherche")
-    attendre(lambda: not main.pipelines.etat("recherche", uid)["en_cours"])
+    attendre(lambda: not commun.pipelines.etat("recherche", uid)["en_cours"])
     assert "Aucune offre LBA récupérée" not in _logs(uid)
 
 

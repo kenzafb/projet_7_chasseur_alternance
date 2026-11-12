@@ -6,6 +6,7 @@ import pytest
 
 from auth import securite
 from tests.conftest import MOT_DE_PASSE, ClientDeMode
+import routes.profil as routes_profil
 
 AUTRE = {"origin": "http://localhost:3000"}
 MEME = {"origin": "http://testserver"}
@@ -99,7 +100,7 @@ def test_televersement_nom_et_taille(utilisateur):
     client, _ = utilisateur("a@test.fr")
     r = client.post("/api/profil/upload", data={"nom": "x" * 101}, files={"fichier": ("cv.pdf", b"%PDF", "application/pdf")})
     assert r.status_code == 400 and "Nom trop long" in r.json()["erreur"]
-    gros = b"%PDF" + b"0" * main.TAILLE_MAX_PJ
+    gros = b"%PDF" + b"0" * routes_profil.TAILLE_MAX_PJ
     r = client.post("/api/profil/upload", data={"nom": "CV"}, files={"fichier": ("cv.pdf", gros, "application/pdf")})
     assert r.status_code == 400 and "trop volumineux" in r.json()["erreur"]
     r = client.post("/api/profil/upload", data={"nom": "x" * 100}, files={"fichier": ("cv.pdf", b"%PDF", "application/pdf")})

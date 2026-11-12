@@ -24,6 +24,7 @@ from pydantic import Field
 from shared.schemas_ia import AnalyseOffre, _Reponse
 from tests.conftest import erreur_http, reponse_chat
 from tests.test_envoyeur import attendre
+import routes.offres as routes_offres
 
 
 class LettreIA(_Reponse):
@@ -341,7 +342,7 @@ def recherche(utilisateur, ia, monkeypatch, pipelines_neufs):
     client, user_id = utilisateur("a@test.fr", prenom="Alice")
     sources = {"ft": [_brut_ft(i) for i in range(3)], "lba": []}
     monkeypatch.setattr(scraper, "recuperer_offres", lambda criteres, log=print, **_: list(sources["ft"]))
-    monkeypatch.setattr(main, "rechercher_lba", lambda profil, log=print: {"offres": list(sources["lba"]), "entreprises": [], "requetes": 0})
+    monkeypatch.setattr(routes_offres, "rechercher_lba", lambda profil, log=print: {"offres": list(sources["lba"]), "entreprises": [], "requetes": 0})
     ia.reponse = ANALYSE
 
     def lancer(**corps):

@@ -12,6 +12,8 @@ from database.profil_db import lire_profil, sauvegarder_profil
 from database.schema import config_alembic
 from france_travail.analyseur import contexte_job
 from shared import domaines as d
+from routes import commun
+import routes.offres as routes_offres
 
 
 def test_arbre_des_domaines():
@@ -78,14 +80,14 @@ def test_lba_cherche_tout_domaine_et_l_indifferent(utilisateur, monkeypatch):
     indifférent cherche sans code métier."""
     client, uid = utilisateur("a@test.fr", prenom="Alice")
     from tests.test_pipelines import attendre
-    monkeypatch.setattr(main, "lancer_recherche", lambda *a, **k: [])
+    monkeypatch.setattr(routes_offres, "lancer_recherche", lambda *a, **k: [])
     profils = []
-    monkeypatch.setattr(main, "rechercher_lba", lambda profil, log=print: profils.append(profil) or
+    monkeypatch.setattr(routes_offres, "rechercher_lba", lambda profil, log=print: profils.append(profil) or
                         {"offres": [], "entreprises": [], "requetes": 0})
     for domaines in (["J"], []):
         sauvegarder_profil(uid, {"recherche": {"domaines": domaines}})
         r = client.post("/api/recherche").json()
-        attendre(lambda: not main.pipelines.etat("recherche", uid)["en_cours"])
+        attendre(lambda: not commun.pipelines.etat("recherche", uid)["en_cours"])
         assert "avertissement" not in r
     assert [p["recherche"]["domaines"] for p in profils] == [["J"], []]
 
@@ -143,7 +145,7 @@ def test_avertissement_au_lancement(utilisateur, monkeypatch):
     assert "La Bonne Alternance" not in r["avertissement"]      # LBA couvre tout (D37)
     # Tout couvert : pas d'avertissement
     sauvegarder_profil(uid, {"recherche": {"domaines": ["M18"]}})
-    attendre(lambda: not main.pipelines.etat("spontanees", uid)["en_cours"])
+    attendre(lambda: not commun.pipelines.etat("spontanees", uid)["en_cours"])
     assert "avertissement" not in client.post("/api/spontanees/fetch").json()
 
 

@@ -183,9 +183,10 @@ def dossiers_temporaires(monkeypatch, tmp_path):
 @pytest.fixture(autouse=True)
 def pipelines_neufs(monkeypatch):
     """États, arrêts et logs des pipelines vides à chaque test."""
+    from routes import commun
     from shared.pipelines import Pipelines
-    monkeypatch.setattr(main, "pipelines", Pipelines())
-    return main.pipelines
+    monkeypatch.setattr(commun, "pipelines", Pipelines())
+    return commun.pipelines
 
 
 # ─── Envoi de mails simulé ────────────────────────────────────────────────────

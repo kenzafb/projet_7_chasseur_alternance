@@ -11,6 +11,8 @@ import main
 import spontanees.scraper_emails
 from shared.pipelines import Pipelines, RECHERCHE
 from tests.conftest import en_parallele
+from routes import commun
+import routes.offres as routes_offres
 
 
 def attendre(condition, delai=5.0):
@@ -42,7 +44,7 @@ def faux_travaux(monkeypatch):
     arretes = set()
 
     def fausse_recherche(user_id, profil, on_offre=None, mode="alternance", **_):
-        main.pipelines.log(user_id, f"recherche de {user_id}")
+        commun.pipelines.log(user_id, f"recherche de {user_id}")
         demarres.setdefault(("recherche", user_id), threading.Event()).set()
         liberer.wait(5)
 
@@ -57,14 +59,14 @@ def faux_travaux(monkeypatch):
                 return
             time.sleep(0.01)
 
-    monkeypatch.setattr(main, "lancer_recherche", fausse_recherche)
-    monkeypatch.setattr(main, "rechercher_lba", lambda profil, log=print: {"offres": [], "entreprises": [], "requetes": 0})
+    monkeypatch.setattr(routes_offres, "lancer_recherche", fausse_recherche)
+    monkeypatch.setattr(routes_offres, "rechercher_lba", lambda profil, log=print: {"offres": [], "entreprises": [], "requetes": 0})
     monkeypatch.setattr(spontanees.scraper_emails, "main", faux_scraper)
     yield liberer, demarres, arretes
     # Laisser finir les threads AVANT que les faux soient retirés : sinon un
     # thread attardé appellerait le vrai LBA une fois les barrières levées.
     liberer.set()
-    attendre(lambda: not any(e["en_cours"] for etats in main.pipelines._etats.values()
+    attendre(lambda: not any(e["en_cours"] for etats in commun.pipelines._etats.values()
                              for e in etats.values()))
 
 

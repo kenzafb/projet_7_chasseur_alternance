@@ -13,6 +13,7 @@ from shared import config
 from shared.ia import IADesactivee, appeler_ia
 from tests.test_ia import _brut_ft, _lba, recherche, sans_attente  # noqa: F401  (fixtures)
 from tests.test_scraper_sans_ia import _lancer, sites, user_id  # noqa: F401  (fixtures)
+from routes import commun
 
 
 @pytest.fixture
@@ -156,11 +157,11 @@ def test_limite_de_la_recherche_avec_ou_sans_ia(recherche, monkeypatch, coupee):
     r = recherche.client.post("/api/recherche", json=None)
     assert r.json()["max_offres"] == defaut
     from tests.test_envoyeur import attendre
-    attendre(lambda: not main.pipelines.etat("recherche", recherche.user_id)["en_cours"])
+    attendre(lambda: not commun.pipelines.etat("recherche", recherche.user_id)["en_cours"])
     assert len(lire_candidatures(recherche.user_id)) == defaut
     r = recherche.client.post("/api/recherche", json={"max_offres": 10**6})
     assert r.json()["max_offres"] == 500
-    attendre(lambda: not main.pipelines.etat("recherche", recherche.user_id)["en_cours"])
+    attendre(lambda: not commun.pipelines.etat("recherche", recherche.user_id)["en_cours"])
     assert "ramené à 500" in recherche.client.get("/api/logs").text
 
 

@@ -19,6 +19,7 @@ from shared.erreurs import ErreurUtilisateur
 from shared.stage import date_en_lettres, duree_semaines
 from tests.conftest import compte_verifie
 from tests.faux_sirene import FausseSirene, etablissement, siret_sirene
+import routes.offres as routes_offres
 
 PROFIL_STAGE = {"prenom": "Alice", "nom": "Martin", "email": "alice@exemple.fr", "telephone": "0600000000",
                 "date_debut": "2027-01-04", "date_fin": "2027-06-25", "etablissement": "Université Paris Cité",
@@ -300,7 +301,7 @@ def test_recherche_par_la_route_en_stage(stagiaire, monkeypatch, pipelines_neufs
         marquer_non_analysee(o, mode=mode)
         on_offre(o)
         return [o]
-    monkeypatch.setattr(main, "lancer_recherche", recherche)
+    monkeypatch.setattr(routes_offres, "lancer_recherche", recherche)
     r = client.post("/api/recherche", json={"max_offres": 5})
     assert r.status_code == 200 and "avertissement" not in r.json()
     import time

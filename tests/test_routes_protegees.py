@@ -53,7 +53,7 @@ def test_inventaire_complet():
 
 def test_seules_les_routes_prevues_sont_hors_routeur_prive():
     """Toute route hors du routeur protégé doit être une route publique déclarée."""
-    protegees = {r.path for r in main.prive.routes}
+    protegees = {r.path for routeur in main.ROUTEURS_PRIVES for r in routeur.routes}
     toutes = {r.path for r in ROUTES_APP if isinstance(r, APIRoute)}
     assert toutes - protegees == ROUTES_PUBLIQUES
 
