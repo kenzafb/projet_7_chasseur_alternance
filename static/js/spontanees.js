@@ -56,11 +56,15 @@ function boutonLba(e) {
 
 function ligne(e) {
   const aEmail = !!e.email;
+  // Sans email mais avec un formulaire LBA : à postuler sur LBA, pas bloquée (D131)
+  const viaLba = !aEmail && e.lba?.formulaire;
   const statut = e.envoye
     ? `<span class="chip chip--vert">${e.historique ? "contactée avant la refonte" : "envoyé"}</span>`
     : aEmail
       ? `<span class="chip chip--ft">à envoyer</span>`
-      : `<span class="chip chip--gris">ignoré</span>`;
+      : viaLba
+        ? `<span class="chip chip--lba" title="Pas d'email : candidature par la page La Bonne Alternance">à postuler sur LBA</span>`
+        : `<span class="chip chip--gris">ignoré</span>`;
   // Pastille par source (Sirene, LBA, ou les deux) ; aucune priorité entre elles
   const pastilles = (e.sources || []).map(src => src === "lba"
     ? ` <span class="chip chip--lba" title="Fort potentiel d'embauche d'alternants (La Bonne Alternance)">LBA</span>`
@@ -73,8 +77,10 @@ function ligne(e) {
         <div class="trow__sub">${esc(e.ville || "")}</div>
         ${boutonLba(e)}
       </div>
-      <div class="trow__mail ${aEmail ? "" : "trow__mail--none"}">${(e.adresses || []).length
-        ? listeAdresses(e.adresses) : aEmail ? esc(e.email) + origine : "non trouvé"}</div>
+      <div class="trow__mail ${aEmail ? "" : viaLba ? "trow__mail--lba" : "trow__mail--none"}">${(e.adresses || []).length
+        ? listeAdresses(e.adresses) : aEmail ? esc(e.email) + origine
+        : viaLba ? `<span title="Pas d'email : candidature par la page La Bonne Alternance">pas d'email : via LBA</span>`
+        : "non trouvé"}</div>
       <div>${statut}</div>
     </div>`;
 }
@@ -87,6 +93,7 @@ function rendreTable() {
   let items = [...(stats.prochaines || [])];
   if (filtre === "email")  items = items.filter(e => e.email);
   if (filtre === "lba" || filtre === "sirene") items = items.filter(e => (e.sources || []).includes(filtre));
+  if (filtre === "lba_postuler") items = items.filter(e => !e.email && e.lba?.formulaire);
 
   el.innerHTML = items.length
     ? items.map(ligne).join("")

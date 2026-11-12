@@ -179,6 +179,12 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
         mail_envoye = sum(1 for _, m in paires if m.mail_envoye and not m.historique)
         historiques = sum(1 for _, m in paires if m.historique)
         prochaines_paires = [(e, m) for e, m in paires if not m.mail_envoye][:PROCHAINES_AFFICHEES]
+        # Entreprises LBA sans email mais avec un formulaire LBA : leur moyen de
+        # candidature est le bouton « Postuler » (D131) ; toujours listées
+        a_postuler_lba = [(e, m) for e, m in paires if not m.mail_envoye and not e.emails_trouves
+                          and (candidature_lba(e) or {}).get("formulaire")]
+        deja = {e.id for e, _ in prochaines_paires}
+        prochaines_paires += [p for p in a_postuler_lba if p[0].id not in deja][:PROCHAINES_AFFICHEES]
         recentes = sorted(((e, m) for e, m in paires if m.mail_envoye),
                           key=lambda p: (_date_envoi(p[1]), p[1].id), reverse=True)[:5]
         ailleurs = contacts_autres_modes(db, user_id, mode, [e for e, _ in prochaines_paires + recentes])
@@ -220,6 +226,7 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
             "avec_email": avec_email,
             "mail_envoye": mail_envoye,
             "historiques": historiques,
+            "a_postuler_lba": len(a_postuler_lba),
             "par_source": repartition_par_source(paires),
             "dernieres": dernieres,
             "prochaines": prochaines,

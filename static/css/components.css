@@ -196,3 +196,4 @@
 .trow__lba { margin-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .trow__lien { font-size: 12px; color: #5B3FD6; }
 .trow__date { font: inherit; font-size: 12px; padding: 3px 5px; }
+.trow__mail--lba { font-family: var(--f-body); color: #5B3FD6; font-size: 12.5px; }

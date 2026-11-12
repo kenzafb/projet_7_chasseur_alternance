@@ -141,3 +141,24 @@ def test_j_ai_postule_date_passee_et_isolation(utilisateur):
     assert client.post("/api/spontanees/postule_lba", json={"id": ident, "date": hier}).json()["date"] == hier
     assert next(l for l in client.get("/api/suivi").json() if l["entreprise"] == "Société 1")["date"] == hier
     assert client.post("/api/spontanees/postule_lba", json={"id": "x"}).status_code == 400
+
+
+# ─── Point 4 : plus « bloquées » (D131) ──────────────────────────────────────
+def test_entreprises_lba_sans_email_toujours_listees(utilisateur, monkeypatch):
+    import database.entreprises_db as edb
+    from database.entreprises_db import ajouter_entreprises, ajouter_entreprises_lba, calculer_stats
+    client, uid = utilisateur("ada@test.fr")
+    monkeypatch.setattr(edb, "PROCHAINES_AFFICHEES", 3)
+    # 5 entreprises Sirene d'abord : les LBA arrivent après les 3 premières affichées
+    ajouter_entreprises(uid, [{"siret": f"1234567890{i:04d}", "siren": f"12345678{i}", "nom": f"Sirene {i}"}
+                              for i in range(5)])
+    ajouter_entreprises_lba(uid, [_entreprise_lba(1), _entreprise_lba(2, recipient=False),
+                                  {**_entreprise_lba(3), "email": "rh@societe3.fr"}])
+    stats = calculer_stats(uid)
+    noms = [e["nom"] for e in stats["prochaines"]]
+    assert noms[:3] == ["Sirene 0", "Sirene 1", "Sirene 2"]
+    assert "Société 1" in noms                      # sans email, formulaire LBA : toujours listée
+    assert "Société 2" not in noms                  # sans formulaire : rien de plus qu'avant
+    assert "Société 3" not in noms                  # avec email : file d'envoi habituelle
+    assert stats["a_postuler_lba"] == 1
+    assert client.get("/api/spontanees/stats").json()["a_postuler_lba"] == 1
