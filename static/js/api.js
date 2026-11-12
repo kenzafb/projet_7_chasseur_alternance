@@ -16,6 +16,12 @@ export function lienSur(url) {
   return /^https?:\/\/[^\s<>"'`]+$/i.test(texte) ? texte : "";
 }
 
+/* Texte sûr dans du HTML construit par les modules */
+export function esc(texte) {
+  return String(texte ?? "").replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 export function avecMode(url) {
   const u = new URL(url, location.origin);
   if (u.pathname.startsWith("/api/") && !u.searchParams.has("mode")) u.searchParams.set("mode", MODE);
@@ -177,6 +183,7 @@ export const api = {
   postuleLba:      (id, date) => post("/api/spontanees/postule_lba", { id, date }),
   // Suivi unique des candidatures (offres postulées et spontanées, D107)
   suivi:         ()           => get("/api/suivi"),
+  accueil:       ()           => get("/api/accueil"),
   suiviStatut:   (type, id, statut) => post("/api/suivi/statut", { type, id, statut }),
   spStats:    ()       => get("/api/spontanees/stats"),
   spFetch:    (max)    => post("/api/spontanees/fetch", { max_entreprises: max }),

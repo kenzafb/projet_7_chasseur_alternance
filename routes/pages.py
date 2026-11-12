@@ -28,7 +28,7 @@ def accueil(request: Request, bienvenue: str | None = None):
         return RedirectResponse(url=f"/{MODE_DEFAUT}?bienvenue=1", status_code=303)
     # Mode de l'ancienne session, pour les anciens liens « /#page »
     ancien = request.session.get("mode")
-    return templates.TemplateResponse(request, "accueil.html", {
+    return templates.TemplateResponse(request, "choix_mode.html", {
         "modes": modes_accueil(), "ancien_mode": ancien if ancien in MODES else MODE_DEFAUT})
 
 

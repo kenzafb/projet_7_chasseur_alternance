@@ -1,0 +1,38 @@
+<!-- ════════════ PAGE ACCUEIL : page d'arrivée du mode (D144) ════════════ -->
+<section class="page accueil" data-page-content="accueil" aria-labelledby="accueil-titre">
+  <div class="accueil__tete">
+    <h1 class="accueil__titre" id="accueil-titre" data-accueil-salutation>Bonjour</h1>
+    <p class="accueil__phrase" data-accueil-phrase>Voici ce qui t'attend aujourd'hui.</p>
+  </div>
+
+  <div class="accueil__corps">
+    <section class="accueil__afaire" aria-labelledby="accueil-afaire">
+      <h2 class="accueil__h2" id="accueil-afaire">À faire</h2>
+      <ul class="afaire" data-accueil-afaire>
+        <!-- tâches injectées par accueil.js -->
+      </ul>
+    </section>
+
+    <div class="accueil__cote">
+      <section class="accueil__carte" aria-labelledby="accueil-bref">
+        <h2 class="accueil__h3" id="accueil-bref">Ta recherche en bref</h2>
+        <dl class="bref">
+          <div class="bref__ligne"><dt>Offres à regarder</dt><dd data-accueil-bref="offres_a_regarder">—</dd></div>
+          <div class="bref__ligne"><dt>Candidatures envoyées</dt><dd data-accueil-bref="candidatures_envoyees">—</dd></div>
+          <div class="bref__ligne"><dt>Réponses reçues</dt><dd data-accueil-bref="reponses_recues">—</dd></div>
+        </dl>
+      </section>
+
+      <section class="accueil__carte" aria-labelledby="accueil-profil">
+        <h2 class="accueil__h3" id="accueil-profil">Ton profil</h2>
+        <div class="avancement" role="progressbar" aria-labelledby="accueil-profil" aria-valuemin="0"
+             aria-valuemax="5" aria-valuenow="0" data-accueil-avancement>
+          <span class="avancement__rempli" data-accueil-avancement-barre></span>
+        </div>
+        <p class="accueil__texte" data-accueil-profil-texte></p>
+        <ul class="parties-manquantes" data-accueil-manques></ul>
+        <a class="accueil__lien" href="#profil" data-page="profil" data-accueil-profil-lien>Compléter mon profil</a>
+      </section>
+    </div>
+  </div>
+</section>

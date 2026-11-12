@@ -179,9 +179,11 @@ function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-async function rendreDomaines(selectionnes, selecteur = "[data-domaines-choix]") {
+async function rendreDomaines(selectionnes, selecteur = "[data-domaines-choix]", indifferentChoisi = false) {
   const c = document.querySelector(selecteur);
   if (!c) return;
+  // « Indifférent » coché par la personne elle-même, pas par défaut (D144)
+  c.dataset.indifferentChoisi = indifferentChoisi && !selectionnes.length ? "1" : "";
   let arbre = [];
   try { arbre = await api.domaines(); } catch (_) { arbre = []; }
   const choisis = new Set(selectionnes);
@@ -215,8 +217,10 @@ async function rendreDomaines(selectionnes, selecteur = "[data-domaines-choix]")
     const indifferent = c.querySelector("[data-domaine-indifferent]");
     if (e.target === indifferent) {
       if (indifferent.checked) c.querySelectorAll("[data-gd-case], [data-domaine-case]").forEach(i => { i.checked = false; });
+      c.dataset.indifferentChoisi = indifferent.checked ? "1" : "";
     } else if (e.target.checked) {
       indifferent.checked = false;
+      c.dataset.indifferentChoisi = "";
     }
     if (!c.querySelector("[data-gd-case]:checked, [data-domaine-case]:checked")) indifferent.checked = true;
     majAffichageDomaines(c);
@@ -496,7 +500,8 @@ export const Profil = {
       }
     });
     const domainesSel = Array.isArray(rech.domaines) ? rech.domaines : [];
-    await rendreDomaines(domainesSel, DOMAINES_DU_MODE[mode] || DOMAINES_DU_MODE.alternance);
+    await rendreDomaines(domainesSel, DOMAINES_DU_MODE[mode] || DOMAINES_DU_MODE.alternance,
+                         rech.domaines_indifferent === true);
     await rendreOptions(rech, mode);
     majDureeStage();
 
@@ -554,7 +559,10 @@ export const Profil = {
       if (!_champVisible(el)) return;        // ignore les doublons masqués (évite d'écraser)
       rech[el.dataset.rech] = el.value;
     });
-    rech.domaines = lireDomainesCoches(DOMAINES_DU_MODE[_modeProfilCourant] || DOMAINES_DU_MODE.alternance);
+    const selecteurDomaines = DOMAINES_DU_MODE[_modeProfilCourant] || DOMAINES_DU_MODE.alternance;
+    rech.domaines = lireDomainesCoches(selecteurDomaines);
+    const domainesC = document.querySelector(selecteurDomaines);
+    rech.domaines_indifferent = !rech.domaines.length && domainesC?.dataset.indifferentChoisi === "1";
     Object.assign(rech, lireOptions(_modeProfilCourant));
     data.recherche = rech;
     return data;

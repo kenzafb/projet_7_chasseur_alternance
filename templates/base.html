@@ -25,7 +25,7 @@
 <!-- ════════════ EN-TÊTE (D143) ════════════ -->
 <header class="entete">
   <div class="entete__int">
-    <a class="marque" href="#offres" data-nav="offres">
+    <a class="marque" href="#accueil" data-nav="accueil">
       <span class="marque__logo" aria-hidden="true">
         <!-- cible : rappel du « chasseur » -->
         <svg viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="1.5" fill="#FFFFFF"/></svg>
@@ -42,6 +42,7 @@
     </nav>
 
     <nav class="menu" aria-label="Menu principal">
+      <a class="menu__lien" href="#accueil" data-page="accueil">Accueil</a>
       <a class="menu__lien" href="#offres" data-page="offres">Offres <span class="compteur" data-count="offres" hidden>0</span></a>
       <a class="menu__lien" href="#candidatures" data-page="candidatures">Candidatures <span class="compteur compteur--attention" data-count="candidatures" hidden>0</span></a>
       <a class="menu__lien" href="#spontanees" data-page="spontanees">Entreprises à contacter <span class="compteur" data-count="spontanees" hidden>0</span></a>
@@ -66,7 +67,7 @@
 
 <main class="main" id="contenu" tabindex="-1">
   <!-- Titre de la page, phrase courte et action principale -->
-  <div class="page-tete">
+  <div class="page-tete" data-page-tete>
     <div class="page-tete__txt">
       <h1 class="page-tete__titre" data-topbar="title">Offres</h1>
       <p class="page-tete__phrase" data-topbar="phrase"></p>
@@ -103,6 +104,7 @@
       <!-- confirmation d'un lancement : valeur de limite réellement appliquée -->
       <div class="confirmation" data-confirmation hidden></div>
 
+      {% include "partials/accueil.html" %}
       {% include "partials/offres.html" %}
       {% include "partials/candidatures.html" %}
       {% include "partials/spontanees.html" %}

@@ -4,6 +4,7 @@
    polling de l'état des pipelines. Tout le reste vit dans les modules dédiés.
    ============================================================================ */
 import { api, limite, confirmerLancement, MODE } from "./api.js";
+import { Accueil }       from "./accueil.js";
 import { Offres }        from "./offres.js";
 import { Candidatures }  from "./candidatures.js";
 import { Spontanees }    from "./spontanees.js";
@@ -15,6 +16,7 @@ const CE_QUE_TU_CHERCHES = { alternance: "ton alternance", job: "ton job", stage
 
 /* Tête de chaque page : titre, phrase courte, action principale (D143) */
 const TOPBAR = {
+  accueil:      { title: "Accueil", action: null },   // la page a sa propre tête (salutation)
   offres:       { title: "Offres", phrase: `Les offres trouvées pour ${CE_QUE_TU_CHERCHES}, les mieux notées en haut.`,
                   action: "Chercher de nouvelles offres", run: async () => {
     const demandee = limite("offres");
@@ -32,15 +34,15 @@ const TOPBAR = {
                   action: null },   // chaque carte a ses boutons
 };
 
-let pageCourante = "offres";
-const PAGES_VALIDES = ["offres", "candidatures", "spontanees", "profil", "parametres"];
+let pageCourante = "accueil";
+const PAGES_VALIDES = ["accueil", "offres", "candidatures", "spontanees", "profil", "parametres"];
 
 /* Page désignée par l'ancre de l'URL ; « spontanees-suivi » : ancienne page
-   fondue dans le suivi unique (D107) ; inconnue : Offres */
+   fondue dans le suivi unique (D107) ; inconnue : Accueil (D144) */
 function pageDeLAncre() {
   const ancre = location.hash.replace("#", "");
   const page = ancre === "spontanees-suivi" ? "candidatures" : ancre;
-  return PAGES_VALIDES.includes(page) ? page : "offres";
+  return PAGES_VALIDES.includes(page) ? page : "accueil";
 }
 
 /* Clic dans le menu : nouvelle entrée d'historique (Précédent y revient),
@@ -68,6 +70,9 @@ function aller(page, { focus = false } = {}) {
   if (page === "profil" && !Profil._charge) Profil.charger();
   if (page === "candidatures") Candidatures.charger();
   if (page === "parametres") Parametres.charger();
+  if (page === "accueil") Accueil.charger();
+  // L'Accueil a sa propre tête (salutation) : pas de titre de page en plus
+  document.querySelector("[data-page-tete]").hidden = page === "accueil";
   const t = TOPBAR[page];
   document.querySelector('[data-topbar="title"]').textContent = t.title;
   document.querySelector('[data-topbar="phrase"]').textContent = t.phrase || "";
@@ -225,6 +230,7 @@ const modal = {
 
 /* ── Chargement global ───────────────────────────────────────────────────── */
 async function recharger() {
+  if (pageCourante === "accueil") Accueil.charger();
   await Offres.charger();
   await Candidatures.charger();   // suivi unique : offres postulées et spontanées envoyées
   await Spontanees.charger();
@@ -448,15 +454,17 @@ function brancher() {
     } catch (_) {}
     surveiller();
   });
-  // Analyse des offres en attente
-  const btnAnalyse = document.querySelector("[data-analyse-lancer]");
-  if (btnAnalyse) btnAnalyse.addEventListener("click", async () => {
+  // Analyse des offres en attente : bouton de la page Offres, ou « Les noter » de l'Accueil
+  const lancerAnalyse = async () => {
     const toute = !!document.querySelector("[data-analyse-toute-file]")?.checked;
     const demandee = toute ? undefined : limite("analyses");
     try { confirmerLancement("analyses", demandee, await api.analyseAttente(demandee, toute)); }
     catch (e) { alert(e.message); }
     surveiller();
-  });
+  };
+  document.querySelector("[data-analyse-lancer]")?.addEventListener("click", lancerAnalyse);
+  document.addEventListener("analyse:lancer", lancerAnalyse);
+  Accueil.brancher();
   // Boutons Arrêter sur les cartes du pipeline
   document.querySelectorAll("[data-stop]").forEach(b =>
     b.addEventListener("click", async () => {
@@ -499,7 +507,7 @@ recharger();
     // Nettoie l'URL pour ne pas réafficher le message au prochain rechargement
     history.replaceState(null, "", location.pathname);
   } else {
-    // Reprendre la page mémorisée dans l'URL (#candidatures, etc.), sinon Offres
+    // Reprendre la page mémorisée dans l'URL (#candidatures, etc.), sinon l'Accueil
     aller(pageDeLAncre());
   }
 })();
