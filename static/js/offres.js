@@ -8,6 +8,7 @@ const SEUIL = 7;                 // score minimum "à postuler" — repère du v
 const IA_ACTIVE = document.documentElement.dataset.analyseIa !== "non";
 const NON_ANALYSEE = "non_analysee";
 let cache = [];                  // offres chargées
+let erreurChargement = "";       // échec du chargement : affiché à la place de la liste (D133)
 let filtre = "all";
 let modeArchives = false;   // false = offres à postuler, true = archivées
 let fOffres = { source: "all", zone: "all", score: "all" };  // filtres combinables du mode normal
@@ -153,6 +154,12 @@ function rendre() {
   const visibles = cache.filter(appliquerFiltre)
                         .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   const el = $list();
+  if (erreurChargement) {
+    el.innerHTML = `<div class="empty">
+      <div class="empty__title">Offres non chargées</div>
+      <div class="empty__hint">${esc(erreurChargement)}. Recharge la page.</div></div>`;
+    return;
+  }
   if (!visibles.length) {
     el.innerHTML = `<div class="empty">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -201,6 +208,9 @@ function rendreAttente(actives) {
 }
 
 /* Échappement HTML basique */
+/* Échec d'une action sur une offre : message, puis liste rechargée (D133) */
+const echec = offres => err => { alert(err.message); offres.charger(); };
+
 function esc(s) {
   return String(s).replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
 }
@@ -210,8 +220,10 @@ export const Offres = {
   async charger() {
     try {
       cache = await api.candidatures();
+      erreurChargement = "";
     } catch (e) {
       cache = [];
+      erreurChargement = e.message || "erreur inconnue";
     }
     rendre();
     rendreKpis();
@@ -225,11 +237,11 @@ export const Offres = {
           const id = carteEl.dataset.id;
           // Changer la raison d'une offre déjà archivée
           if (e.target.closest("[data-raison-select]")) {
-            api.changerRaison(id, e.target.value).then(() => this.charger());
+            api.changerRaison(id, e.target.value).then(() => this.charger(), echec(this));
           }
           // Archiver une offre active avec la raison choisie
           else if (e.target.closest("[data-archiver-select]") && e.target.value) {
-            api.changerRaison(id, e.target.value).then(() => this.charger());
+            api.changerRaison(id, e.target.value).then(() => this.charger(), echec(this));
           }
         });
         this._brancheRaison = true;
@@ -283,7 +295,7 @@ export const Offres = {
       return true;
     }
     if (act === "desarchiver") {
-      api.desarchiver(id).then(() => this.charger());
+      api.desarchiver(id).then(() => this.charger(), echec(this));
       return true;
     }
     return false;

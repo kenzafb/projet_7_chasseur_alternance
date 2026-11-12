@@ -23,6 +23,22 @@ const TOPBAR = {
 };
 
 let pageCourante = "offres";
+const PAGES_VALIDES = ["offres", "candidatures", "spontanees", "profil", "parametres"];
+
+/* Page désignée par l'ancre de l'URL ; « spontanees-suivi » : ancienne page
+   fondue dans le suivi unique (D107) ; inconnue : Offres */
+function pageDeLAncre() {
+  const ancre = location.hash.replace("#", "");
+  const page = ancre === "spontanees-suivi" ? "candidatures" : ancre;
+  return PAGES_VALIDES.includes(page) ? page : "offres";
+}
+
+/* Clic dans le menu : nouvelle entrée d'historique (Précédent y revient),
+   la page change par hashchange ; même page : rechargée sur place */
+function naviguer(page) {
+  if (location.hash === "#" + page) aller(page);
+  else location.hash = page;
+}
 
 /* ── Navigation ──────────────────────────────────────────────────────────── */
 function aller(page) {
@@ -141,9 +157,15 @@ const modal = {
         && document.documentElement.dataset.analyseIa === "non"); });
   },
   fermer() { this.el().classList.remove("is-open"); this.id = null; },
+  /* Échec : la fenêtre reste ouverte avec la lettre, et le message s'affiche (D133) */
   async enregistrer() {
     if (!this.id) return;
-    await api.sauvegarder({ id: this.id, lettre: this.area().value });
+    try {
+      await api.sauvegarder({ id: this.id, lettre: this.area().value });
+    } catch (e) {
+      alert(`Lettre non enregistrée : ${e.message}`);
+      return;
+    }
     this.fermer();
     recharger();
   },
@@ -313,7 +335,9 @@ function brancher() {
   if (btnProfil) btnProfil.addEventListener("click", sauvegarderProfil);
   // navigation
   document.querySelectorAll(".nav__item[data-page]").forEach(n =>
-    n.addEventListener("click", () => aller(n.dataset.page)));
+    n.addEventListener("click", () => naviguer(n.dataset.page)));
+  // Précédent / Suivant du navigateur, ou ancre modifiée à la main (D133)
+  window.addEventListener("hashchange", () => aller(pageDeLAncre()));
 
   // bouton d'action contextuel de la topbar
   document.querySelector('[data-topbar="action"]').addEventListener("click", async () => {
@@ -445,10 +469,7 @@ recharger();
     history.replaceState(null, "", location.pathname);
   } else {
     // Reprendre la page mémorisée dans l'URL (#candidatures, etc.), sinon Offres
-    const PAGES_VALIDES = ["offres", "candidatures", "spontanees", "profil", "parametres"];
-    // Ancienne page « Spontanées envoyées » : fondue dans le suivi unique (D107)
-    const hash = location.hash.replace("#", "") === "spontanees-suivi" ? "candidatures" : location.hash.replace("#", "");
-    aller(PAGES_VALIDES.includes(hash) ? hash : "offres");
+    aller(pageDeLAncre());
   }
 })();
 surveiller();
