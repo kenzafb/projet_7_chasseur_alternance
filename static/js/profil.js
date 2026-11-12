@@ -123,10 +123,10 @@ function rendrePiecesJointes(pieces) {
     const el = document.createElement("div");
     el.className = "pj-item";
     el.innerHTML = `
-      <span class="pj-item__nom">${pj.nom}</span>
+      <span class="pj-item__nom">${esc(pj.nom)}</span>
       <span class="pj-item__actions">
         <a class="pj-item__link" href="${avecMode(`/api/profil/piece?nom=${encodeURIComponent(pj.nom)}`)}" target="_blank">Voir</a>
-        <span class="pj-item__rm" data-pj-rm="${pj.nom}">Supprimer</span>
+        <span class="pj-item__rm" data-pj-rm="${esc(pj.nom)}">Supprimer</span>
       </span>`;
     c.appendChild(el);
   });

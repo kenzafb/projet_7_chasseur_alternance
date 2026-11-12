@@ -1,7 +1,7 @@
 /* ============================================================================
    offres.js — rendu des offres + viseur de score (élément signature)
    ============================================================================ */
-import { api } from "./api.js";
+import { api, lienSur } from "./api.js";
 
 const SEUIL = 7;                 // score minimum "à postuler" — repère du viseur
 // ANALYSE_IA=false (attribut posé par le serveur) : ni analyse ni lettre automatique
@@ -96,7 +96,7 @@ function carte(o) {
           <button class="btn btn--sm btn--signal" data-act="postuler">J'ai postulé</button>` : ""}
       </div>
       <div class="offre__actions">
-        ${o.lien ? `<a class="btn" href="${o.lien}" target="_blank" rel="noopener">Voir l'offre</a>` : ""}
+        ${lienSur(o.lien) ? `<a class="btn" href="${esc(lienSur(o.lien))}" target="_blank" rel="noopener">Voir l'offre</a>` : ""}
         <button class="btn" data-act="analyser"${IA_ACTIVE ? "" : ' disabled title="IA désactivée"'}>${nonAnalysee ? "Analyser" : "Réanalyser"}</button>
         <button class="btn btn--signal" data-act="lettre">${aLettre ? "Voir la lettre" : "Préparer la lettre"}</button>
         ${!IA_ACTIVE && !aLettre ? '<span class="offre__note">IA désactivée : écris toi-même le paragraphe personnalisé.</span>' : ""}

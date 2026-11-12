@@ -9,6 +9,13 @@
    (paramètre « mode ») : deux onglets dans deux modes ne se gênent pas. */
 export const MODE = document.documentElement.dataset.mode;
 
+/* Lien externe sûr (D132) : seulement http(s), sinon "" ; le serveur filtre
+   déjà, la page vérifie encore avant de mettre un lien dans un href */
+export function lienSur(url) {
+  const texte = String(url ?? "").trim();
+  return /^https?:\/\/[^\s<>"'`]+$/i.test(texte) ? texte : "";
+}
+
 export function avecMode(url) {
   const u = new URL(url, location.origin);
   if (u.pathname.startsWith("/api/") && !u.searchParams.has("mode")) u.searchParams.set("mode", MODE);

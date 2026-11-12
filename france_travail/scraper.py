@@ -17,6 +17,7 @@ france_travail/parametres_api.py.
 """
 
 import itertools
+import re
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -28,6 +29,7 @@ from database.dedup_db import lire_offres_vues, marquer_offres_vues
 from france_travail import parametres_api
 from shared.config import FT_REGION
 from shared.criteres import criteres_france_travail
+from shared.liens import lien_http
 from shared.domaines import domaines_du_grand_domaine, est_grand_domaine
 from shared.intitules_stage import designe_un_stage
 from shared.offres import detecter_zone, generer_id
@@ -45,7 +47,17 @@ FORMAT_DATE = "%Y-%m-%dT%H:%M:%SZ"
 _token_cache = {"token": None, "expire": 0}
 
 
-def get_token():
+def _code_erreur_oauth(r) -> str:
+    """Code d'erreur OAuth de la réponse (« invalid_client »...), jamais le
+    corps brut : rien de la réponse de l'API n'est recopié tel quel."""
+    try:
+        code = (r.json() or {}).get("error") or ""
+    except ValueError:
+        code = ""
+    return re.sub(r"[^a-z_]", "", str(code).lower())[:40]
+
+
+def get_token(log=print):
     if time.time() < _token_cache["expire"]:
         return _token_cache["token"]
     r = requests.post(
@@ -56,13 +68,16 @@ def get_token():
             "client_secret": os.getenv("FT_CLIENT_SECRET"),
             "scope":         "api_offresdemploiv2 o2dsoffre",
         },
+        timeout=15,
     )
     if r.status_code == 200:
         data = r.json()
         _token_cache["token"]  = data["access_token"]
         _token_cache["expire"] = time.time() + data["expires_in"] - 60
         return _token_cache["token"]
-    print(f"Erreur token France Travail : {r.status_code} – {r.text}")
+    code = _code_erreur_oauth(r)
+    log(f"  ⚠️  France Travail : jeton refusé ({r.status_code}{', ' + code if code else ''}), "
+        "vérifier FT_CLIENT_ID et FT_CLIENT_SECRET dans .env")
     return None
 
 
@@ -271,7 +286,11 @@ def recuperer_offres(criteres: dict, log=print, retenir=None, objectif: int | No
     """Offres brutes de France Travail pour des critères, dédoublonnées.
     retenir, objectif : arrêt dès qu'objectif offres satisfont retenir
     (voir Collecte) ; sans objectif, tout est récupéré."""
-    token = get_token()
+    try:
+        token = get_token(log)
+    except requests.RequestException as e:
+        log(f"  ⚠️  France Travail injoignable ({type(e).__name__}), aucune offre récupérée")
+        return []
     if not token:
         log("  ⚠️  France Travail : token refusé, aucune offre récupérée")
         return []
@@ -286,16 +305,17 @@ def recuperer_offres(criteres: dict, log=print, retenir=None, objectif: int | No
     return list(collecte.offres.values())
 
 
-def _normaliser(bruts: list) -> list:
+def _normaliser(bruts: list, log=print) -> list:
     offres = [o for o in map(_normaliser_une, bruts) if o is not None]
     if len(offres) < len(bruts):
-        print(f"  {len(bruts) - len(offres)} offres hors IDF écartées")
+        log(f"  {len(bruts) - len(offres)} offres hors IDF écartées")
     return offres
 
 
 def _normaliser_une(offre: dict) -> dict | None:
     """Offre au format des candidatures, None hors IDF."""
-    lien = offre.get("origineOffre", {}).get("urlOrigine", "")
+    # Lien de l'offre d'origine, seulement s'il est http(s) (D132)
+    lien = lien_http((offre.get("origineOffre") or {}).get("urlOrigine"))
     if not lien:
         lien = f"https://candidat.francetravail.fr/offres/recherche/detail/{offre.get('id', '')}"
 
@@ -375,8 +395,8 @@ def chercher_offres(user_id, criteres=None, mode="alternance", limite_lot=None, 
     la taille ne sont pas marquées : elles reviennent si la taille change."""
     if criteres is None:
         criteres = criteres_france_travail({}, mode)
-    print(f"Recherche FT (IDF, domaines : {', '.join(criteres['domaines']) or 'indifférent'}, "
-          f"filtres : {criteres['filtres']})...")
+    log(f"  Recherche France Travail (IDF, domaines : {', '.join(criteres['domaines']) or 'indifférent'}, "
+        f"filtres : {criteres['filtres']})")
     offres_vues = lire_offres_vues(user_id, mode)
 
     def retenue(brut) -> bool:
@@ -388,7 +408,7 @@ def chercher_offres(user_id, criteres=None, mode="alternance", limite_lot=None, 
                 and (not criteres.get("intitules_stage") or designe_un_stage(o["titre"])))
 
     # Avec un lot : téléchargement arrêté dès limite_lot offres retenues
-    candidates = _normaliser(recuperer_offres(criteres, log=log, retenir=retenue, objectif=limite_lot))
+    candidates = _normaliser(recuperer_offres(criteres, log=log, retenir=retenue, objectif=limite_lot), log)
 
     # Taille de l'établissement, filtrée après récupération (l'API ne la filtre pas)
     ecartees = {o["id"] for o in candidates
@@ -431,7 +451,7 @@ def chercher_offres(user_id, criteres=None, mode="alternance", limite_lot=None, 
     elif marquer:
         marquer_offres_vues(user_id, mode, {o["id"] for o in candidates})
 
-    print(f"\n{len(toutes_offres)} nouvelles offres FT trouvées (hors déjà vues) !\n")
+    log(f"  {len(toutes_offres)} nouvelles offres France Travail (hors déjà vues)")
     return toutes_offres
 
 
@@ -442,7 +462,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", default="alternance")
     args = parser.parse_args()
     offres = chercher_offres(args.user, mode=args.mode)
-    print(f"\n-- Aperçu des 5 premières --")
+    print("\n-- Aperçu des 5 premières --")
     for o in offres[:5]:
         print(f"\n[{o['source']}] {o['titre']}")
         print(f"  Zone : {o['zone']} | {o['lieu']}")

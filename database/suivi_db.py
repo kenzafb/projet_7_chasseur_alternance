@@ -19,6 +19,7 @@ from datetime import date as Date, datetime, time, timedelta
 from database.candidatures_db import lire_candidature, lire_candidatures, modifier_candidature
 from database.dates import fuseau_affichage, maintenant_utc
 from database.entreprises_db import NOTE_LBA, lire_entreprises_envoyees, modifier_statut_suivi
+from shared.liens import lien_http
 
 STATUTS_SUIVI = ("envoye", "a_relancer", "reponse", "entretien", "refus", "bounce")
 STATUTS_OFFRE = ("envoye", "a_relancer", "reponse", "entretien", "refus")   # pas de bounce sans mail
@@ -62,7 +63,7 @@ def _spontanees(user_id: int, mode: str) -> list[dict]:
                        "entreprise": e.get("nom_commercial") or e.get("nom") or "",
                        "poste": "Candidature spontanée", "date": (e.get("mail_envoye_le") or "").split(" ")[0],
                        "statut": e.get("statut_suivi") or "envoye",
-                       "lien": site if not site or "://" in site else "https://" + site,
+                       "lien": lien_http(site if not site or "://" in site else "https://" + site),
                        "contact": ", ".join(e.get("mail_destinataires") or e.get("emails_trouves") or []),
                        "historique": bool(e.get("historique")),
                        "contacts_autres_modes": e.get("contacts_autres_modes") or []})

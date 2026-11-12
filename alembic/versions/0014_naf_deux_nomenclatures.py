@@ -87,7 +87,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Retire les deux colonnes."""
-    with op.batch_alter_table('entreprises', schema=None) as batch_op:
-        batch_op.drop_column('naf_2025')
-        batch_op.drop_column('naf_rev2')
+    """Retire les deux colonnes. DROP COLUMN direct (SQLite 3.35 et plus),
+    sans batch_alter_table : recréer entreprises effaçait en cascade ses
+    lignes de entreprises_modes (audit phase 12, D132)."""
+    op.drop_column('entreprises', 'naf_2025')
+    op.drop_column('entreprises', 'naf_rev2')

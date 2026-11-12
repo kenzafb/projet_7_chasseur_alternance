@@ -40,6 +40,7 @@ import requests
 
 from database.dates import instant_depuis_api
 from france_travail import parametres_lba as P
+from shared.liens import lien_http
 from shared.config import DEPTS_IDF, DEPTS_PETITE_COURONNE, LBA_CENTRES, LBA_RAYON_MIN_KM, LBA_REQUETES_MAX
 from shared.criteres import normaliser_recherche
 from shared.domaines import codes_metiers, domaines_du_profil
@@ -104,7 +105,7 @@ def _normaliser_offre_lba(offre: dict) -> dict | None:
     identifier = offre.get("identifier") or {}
     partner_id = identifier.get("partner_job_id") or identifier.get("id") or (titre + adresse)
     # apply.url de l'API, ou rien : plus de lien construit (D128)
-    lien = str((offre.get("apply") or {}).get("url") or "").strip()
+    lien = lien_http((offre.get("apply") or {}).get("url"))   # http(s) seulement (D132)
     return {
         "id":           generer_id(f"lba_{partner_id}"),
         "titre":        titre,
