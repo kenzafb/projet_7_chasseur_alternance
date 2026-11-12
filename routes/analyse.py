@@ -99,11 +99,15 @@ def api_analyse(body: Analyse | None = None, user: User = Depends(utilisateur_re
     disponibles = compter_en_attente(user.id, mode)
     if not disponibles:
         raise ErreurUtilisateur("Aucune offre en attente d'analyse dans ce mode.")
-    if body and body.toute_la_file:
+    # « Toute la file » : demandé au lancement, sinon le réglage avancé du mode (D145)
+    toute = body.toute_la_file if body and "toute_la_file" in body.model_fields_set \
+        else commun.reglage(user.id, mode, "analyse_toute_file")
+    if toute:
         maximum = disponibles
         note = f" (toute la file : {disponibles} offres, {estimation_file(disponibles)['texte']})"
     else:
-        maximum, note = limite_appliquee("analyses", body.max_analyses if body else None, disponibles)
+        maximum, note = limite_appliquee("analyses", body.max_analyses if body else None, disponibles,
+                                          user_id=user.id, mode=mode)
     if not _lancer_analyse(user.id, mode, maximum, note):
         en_cours = commun.pipelines.etat(ANALYSE, user.id).get("mode")
         return JSONResponse({"erreur": f"Analyse déjà en cours (mode {en_cours})"}, status_code=400)

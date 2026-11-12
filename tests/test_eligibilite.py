@@ -149,9 +149,10 @@ def test_archive_ineligible_motif_filtre_et_retour(utilisateur, ia):
     assert lire_candidature(uid, "O1", mode="stage")["statut"] == "nouveau"
     assert client.post("/api/offre/archivage", json={"id": "O1", "raison": "ineligible"}).status_code == 200
     page = client.get("/stage").text
-    assert 'data-filter="ineligible">Inéligible<' in page
+    # Onglet Écartées, filtre par raison du Chasseur (D145)
+    assert '<option value="ineligible">Conditions non remplies</option>' in page
     js = (config.STATIC_DIR / "js" / "offres.js").read_text(encoding="utf-8")
-    assert "Remettre dans les offres actives" in js and "motifIneligible" in js
+    assert "Remettre dans À voir" in js and "motifIneligible" in js and "api.desarchiver(o.id)" in js
 
 
 # ─── D98 : valeurs extraites contrôlées contre le texte de l'offre ───────────

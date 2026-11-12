@@ -1,6 +1,7 @@
 """Limites par lancement : valeurs par défaut, plafonds côté serveur, et
 limites respectées par la recherche, le fetch, le scraper et l'envoi."""
 
+import re
 import itertools
 from types import SimpleNamespace
 
@@ -45,7 +46,8 @@ def test_interface_reprend_defauts_et_plafonds(utilisateur):
     for cle, regle in config.LIMITES_LANCEMENT.items():
         if cle == "offres_sans_ia":   # même champ que « offres », affiché quand ANALYSE_IA=false
             continue
-        assert f'data-limite="{cle}" value="{regle["defaut"]}"' in page
+        # Plafonds des offres et des analyses dans Réglages avancés (D145)
+        assert re.search(rf'data-limite="{cle}"[^>]*\s+value="{regle["defaut"]}"', page), cle
         assert f'max="{regle["max"]}"' in page
 
 

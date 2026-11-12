@@ -1,108 +1,76 @@
-<!-- ════════════ PAGE OFFRES ════════════ -->
+<!-- ════════════ PAGE OFFRES : liste et volet de détail (D145) ════════════ -->
 <section class="page" data-page-content="offres">
 
-  <label class="limite-lancement">
-    {% set limite_offres = limites.offres if analyse_ia|default(true) else limites.offres_sans_ia %}
-    <span>Offres ajoutées au plus par recherche (max {{ limite_offres.max }})</span>
-    <input type="number" data-limite="offres" value="{{ limite_offres.defaut }}"
-           min="1" max="{{ limite_offres.max }}">
-  </label>
-
-  <!-- Analyse en différé : la recherche ajoute les offres « non analysées » -->
-  <div class="card analyse-attente" data-analyse-attente>
-    <div class="analyse-attente__txt">
-      <strong><span data-analyse-nombre>0</span> offre(s) en attente d'analyse</strong>
-      <span class="analyse-attente__sous" data-analyse-estimation></span>
-      {% if analyse_ia|default(true) %}
-      <span class="analyse-attente__sous">Analysées par l'IA locale ({{ modele_analyse|default("") }}), les plus récentes d'abord. Compte une à deux minutes par offre sur processeur.</span>
-      {% else %}
-      <span class="analyse-attente__sous">IA désactivée : les offres restent sans note.</span>
-      {% endif %}
-    </div>
-    {% if analyse_ia|default(true) %}
-    <div class="analyse-attente__actions">
-      <label class="limite-lancement">
-        <span>Au plus (max {{ limites.analyses.max }})</span>
-        <input type="number" data-limite="analyses" value="{{ limites.analyses.defaut }}"
-               min="1" max="{{ limites.analyses.max }}">
-      </label>
-      <label class="domaine-case domaine-case--petit">
-        <input type="checkbox" data-analyse-toute-file>
-        <span>Toute la file (lancement de nuit)</span>
-      </label>
-      <button class="btn btn--signal" data-analyse-lancer>Analyser les offres en attente</button>
-    </div>
-    {% endif %}
+  {% if analyse_ia|default(true) %}
+  <!-- Offres pas encore notées : bandeau discret ; nombre, plafond et
+       « toute la file » sont dans Paramètres, Réglages avancés -->
+  <div class="bandeau-noter" data-analyse-attente hidden>
+    <p class="bandeau-noter__txt"><strong data-analyse-nombre>0 nouvelle offre</strong> pas encore notée<span data-analyse-pluriel></span>.
+      <span class="bandeau-noter__sous" data-analyse-estimation></span></p>
+    <button type="button" class="btn" data-analyse-lancer>Les noter</button>
   </div>
+  {% endif %}
 
-  <div class="kpis kpis--4">
-    <div class="kpi">
-      <div class="kpi__label">Nouvelles</div>
-      <div class="kpi__val" data-kpi="nouvelles">0</div>
-      <div class="kpi__note kpi__note--up" data-kpi="nouvelles-note">—</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi__label">Score moyen</div>
-      <div class="kpi__val" data-kpi="score-moyen">—</div>
-      <div class="kpi__note">/ 10</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi__label">À postuler</div>
-      <div class="kpi__val kpi__val--vert" data-kpi="a-postuler">0</div>
-      <div class="kpi__note">score ≥ 7</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi__label">Lettres générées</div>
-      <div class="kpi__val kpi__val--signal" data-kpi="lettres">0</div>
-      <div class="kpi__note">prêtes à envoyer</div>
-    </div>
-  </div>
+  <div class="offres">
+    <section class="offres__liste" aria-label="Liste des offres" data-offres-liste>
+      <div class="onglets" role="group" aria-label="Classer les offres">
+        <button type="button" class="onglet" data-onglet="avoir" aria-pressed="true">À voir · <span data-onglet-nombre="avoir">0</span></button>
+        <button type="button" class="onglet" data-onglet="garde" aria-pressed="false">Gardées · <span data-onglet-nombre="garde">0</span></button>
+        <button type="button" class="onglet" data-onglet="ecarte" aria-pressed="false">Écartées · <span data-onglet-nombre="ecarte">0</span></button>
+      </div>
 
-  <div class="section-bar">
-    <!-- Filtres mode NORMAL : menus combinables (source + localisation + score) -->
-    <div class="filters-menus" data-mode="normal">
-      <select class="filtre-menu" data-foffre="source">
-        <option value="all">Toutes sources</option>
-        <option value="ft">France Travail</option>
-        <option value="lba">La Bonne Alternance</option>
-      </select>
-      <select class="filtre-menu" data-foffre="zone">
-        <option value="all">Toute localisation</option>
-        <option value="Paris">Paris</option>
-        <option value="Petite couronne">Petite couronne</option>
-        <option value="Grande couronne">Grande couronne</option>
-      </select>
-      <select class="filtre-menu" data-foffre="score">
-        <option value="all">Tous les scores</option>
-        <option value="haut">À postuler (≥7)</option>
-        <option value="moyen">Moyen (5-6)</option>
-        <option value="bas">Faible (&lt;5)</option>
-      </select>
-    </div>
-    <!-- Filtres mode ARCHIVES (par raison) — cachés par défaut -->
-    <div class="filters" data-filters="offres-archives" data-mode="archives" style="display:none;">
-      <button class="filter is-active" data-filter="all">Toutes</button>
-      <button class="filter" data-filter="manuel">Manuel</button>
-      <button class="filter" data-filter="ineligible">Inéligible</button>
-      <button class="filter" data-filter="note_basse">Note basse</button>
-      <button class="filter" data-filter="ecole_cfa">École / CFA</button>
-      <button class="filter" data-filter="hors_domaine">Hors domaine</button>
-      <button class="filter" data-filter="public_specifique">Public spécifique</button>
-      <button class="filter" data-filter="stage">Stage</button>
-    </div>
-    <!-- Bouton bascule normal ↔ archives -->
-    <button class="btn btn--ghost btn--sm" data-archives-toggle>
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="5" rx="1"/><path d="M4 9v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1V9"/><line x1="10" y1="13" x2="14" y2="13"/></svg>
-      <span data-archives-label>Archivées</span>
-    </button>
-  </div>
+      <details class="offres__filtres">
+        <summary>Filtrer</summary>
+        <div class="offres__filtres-corps">
+          <label class="filtre"><span>Source</span>
+            <select class="filtre-menu" data-foffre="source">
+              <option value="all">Toutes</option>
+              <option value="ft">France Travail</option>
+              <option value="lba">La Bonne Alternance</option>
+            </select></label>
+          <label class="filtre"><span>Lieu</span>
+            <select class="filtre-menu" data-foffre="zone">
+              <option value="all">Toute l'Île-de-France</option>
+              <option value="Paris">Paris</option>
+              <option value="Petite couronne">Petite couronne</option>
+              <option value="Grande couronne">Grande couronne</option>
+            </select></label>
+          <label class="filtre"><span>Note</span>
+            <select class="filtre-menu" data-foffre="score">
+              <option value="all">Toutes les notes</option>
+              <option value="haut">Bien (6 et plus)</option>
+              <option value="moyen">Moyen (4 et 5)</option>
+              <option value="bas">Faible (moins de 4)</option>
+            </select></label>
+          <!-- Onglet Écartées : par toi (« Pas pour moi ») ou par le Chasseur, avec sa raison -->
+          <label class="filtre" data-filtre-ecartees hidden><span>Écartées</span>
+            <select class="filtre-menu" data-foffre="ecartees">
+              <option value="all">Toutes</option>
+              <option value="toi">Par toi</option>
+              <optgroup label="Par le Chasseur">
+                <option value="chasseur">Toutes les raisons</option>
+                <option value="ineligible">Conditions non remplies</option>
+                <option value="note_basse">Note trop basse</option>
+                <option value="hors_domaine">Hors de tes domaines</option>
+                <option value="ecole_cfa">École ou CFA</option>
+                <option value="public_specifique">Réservée à un public</option>
+                <option value="stage">Pas un stage</option>
+              </optgroup>
+            </select></label>
+        </div>
+      </details>
 
-  <div class="offre__list stagger" data-list="offres">
-    <!-- cartes injectées par offres.js -->
-    <div class="empty">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
-      <div class="empty__title">Aucune offre pour l'instant</div>
-      <div class="empty__hint">Lance une recherche depuis le bouton en haut à droite pour interroger France Travail et La Bonne Alternance.</div>
-    </div>
+      <p class="offres__vide" data-offres-vide hidden></p>
+      <ul class="offres__items" data-list="offres">
+        <!-- offres injectées par offres.js -->
+      </ul>
+    </section>
+
+    <section class="volet" aria-label="Détail de l'offre" data-volet>
+      <button type="button" class="btn btn--ghost volet__retour" data-volet-retour hidden>← Retour à la liste</button>
+      <div data-volet-contenu>
+        <p class="volet__vide">Choisis une offre dans la liste pour la lire ici.</p>
+      </div>
+    </section>
   </div>
 </section>

@@ -17,7 +17,7 @@ function tache(t, principale) {
   const classe = `btn${principale ? " btn--primary" : ""}`;
   const bouton = t.genre === "a_noter"
     ? `<button type="button" class="${classe}" data-accueil-noter>${esc(t.bouton)}</button>`
-    : `<a class="${classe}" href="#${esc(t.page)}">${esc(t.bouton)}</a>`;
+    : `<a class="${classe}" href="#${esc(t.page)}"${t.genre === "offre" ? ` data-montrer-offre="${esc(t.id)}"` : ""}>${esc(t.bouton)}</a>`;
   return `<li class="afaire__ligne">
       <span class="afaire__icone afaire__icone--${esc(t.genre)}" aria-hidden="true">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICONES[t.genre] || ""}</svg>
@@ -69,6 +69,8 @@ export const Accueil = {
     // « Les noter » : même lancement que sur la page Offres (app.js)
     document.querySelector("[data-accueil-afaire]").addEventListener("click", e => {
       if (e.target.closest("[data-accueil-noter]")) document.dispatchEvent(new CustomEvent("analyse:lancer"));
+      const offre = e.target.closest("[data-montrer-offre]");
+      if (offre) document.dispatchEvent(new CustomEvent("offres:montrer", { detail: offre.dataset.montrerOffre }));
     });
   },
 };

@@ -15,6 +15,7 @@ from database.profil_db import lire_profil
 from lettres.redaction import (lettre_par_defaut)
 from routes.commun import routeur_prive, templates
 from shared import config
+from shared.reglages import reglages_complets
 from shared.modes import MODE_DEFAUT, MODES, get_mode, modes_accueil
 
 router = routeur_prive()
@@ -46,6 +47,8 @@ def _page_du_mode(request: Request, mode: str, user: User):
                                                              "email_utilisateur": user.email,
                                                              "sources": get_mode(mode)["sources"],
                                                              "limites": config.LIMITES_LANCEMENT,
+                                                             "reglages": reglages_complets(profil.get("reglages")),
+                                                             "analyse_auto": bool(profil.get("analyse_auto")),
                                                              "analyse_ia": config.analyse_ia_active(),
                                                              "modele_analyse": config.modele_ia("analyse"),
                                                              "exemple_lettre": lettre_par_defaut(mode),

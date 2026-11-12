@@ -142,6 +142,7 @@ export const api = {
   paragrapheLettre:  (id)      => post("/api/lettre/paragraphe", { id }),
   assemblerLettre:   (id, paragraphe) => post("/api/lettre/assembler", { id, paragraphe }),
   majStatut:         (id, s)   => post("/api/maj_statut", { id, statut: s }),
+  offreVue:          (id)      => post("/api/offre/vue", { id }),
   archiver:          (id)      => post("/api/archiver", { id }),
   postuler:          (id, corps) => post("/api/offre/postuler", { id, ...corps }),
   desarchiver:       (id)      => post("/api/offre/archivage", { id, desarchiver: true }),
@@ -166,6 +167,8 @@ export const api = {
   copieApercu:     (source, sections) => post("/api/profil/copie/apercu", { source, sections }),
   copierProfil:    (source, sections, ecraser) => post("/api/profil/copie", { source, sections, ecraser }),
 
+  // Réglages avancés du mode (page Paramètres, D145)
+  enregistrerReglages: (corps) => post("/api/reglages", corps),
   // Compte de connexion (page Paramètres)
   compte:            ()      => get("/api/compte"),
   changerMotDePasse: (ancien, nouveau, confirmation) => post("/api/compte/mot_de_passe", { ancien, nouveau, confirmation }),

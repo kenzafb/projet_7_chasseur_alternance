@@ -1,7 +1,6 @@
 <!-- ════════════ PAGE PARAMÈTRES (compte, commune aux trois modes, D122) ════════════ -->
 <section class="page" data-page-content="parametres">
 
-  <p class="parametres-intro">Réglages de ton compte, les mêmes dans les trois modes (alternance, job, stage).</p>
 
   <!-- ─── Email de connexion ─── -->
   <div class="card profil-card">
@@ -135,4 +134,46 @@
   </div>
 
 
+  <!-- ─── Réglages avancés du mode (D145) : enregistrés sur le serveur ─── -->
+  <section class="card profil-card reglages" aria-labelledby="reglages-titre" data-reglages>
+    <div class="profil-card__head">
+      <div>
+        <h2 class="profil-card__title" id="reglages-titre">Réglages avancés <span class="reglages__mode">(mode {{ mode }})</span></h2>
+        <p class="profil-card__sub">Propres à ce mode, et retrouvés sur tous tes appareils. Les valeurs par défaut conviennent la plupart du temps.</p>
+      </div>
+    </div>
+    <div class="reglages__grille">
+      {% set cle_offres = "offres" if analyse_ia|default(true) else "offres_sans_ia" %}
+      <label class="field">
+        <span class="field__label">Offres ajoutées au plus par recherche</span>
+        <input class="field__input" type="number" data-limite="offres" data-reglage="{{ cle_offres }}"
+               value="{{ reglages[cle_offres] }}" min="1" max="{{ limites[cle_offres].max }}" inputmode="numeric">
+        <span class="field__hint">Entre 1 et {{ limites[cle_offres].max }} (défaut : {{ limites[cle_offres].defaut }}).</span>
+      </label>
+      {% if analyse_ia|default(true) %}
+      <label class="field">
+        <span class="field__label">Offres notées au plus à chaque fois</span>
+        <input class="field__input" type="number" data-limite="analyses" data-reglage="analyses"
+               value="{{ reglages.analyses }}" min="1" max="{{ limites.analyses.max }}" inputmode="numeric">
+        <span class="field__hint">Entre 1 et {{ limites.analyses.max }} (défaut : {{ limites.analyses.defaut }}), les plus récentes d'abord.</span>
+      </label>
+      {% endif %}
+    </div>
+    {% if analyse_ia|default(true) %}
+    <div class="reglages__cases">
+      <label class="case">
+        <input type="checkbox" data-analyse-toute-file data-reglage="analyse_toute_file"{% if reglages.analyse_toute_file %} checked{% endif %}>
+        <span><strong>Noter toute la file d'un coup</strong> (lancement de nuit) : sans plafond, l'ordinateur doit rester allumé.</span>
+      </label>
+      <label class="case">
+        <input type="checkbox" data-reglage="analyse_auto"{% if analyse_auto %} checked{% endif %}>
+        <span><strong>Noter les offres après chaque recherche</strong>, avec le plafond ci-dessus.</span>
+      </label>
+    </div>
+    <p class="reglages__info">Modèle d'IA qui note les offres : <strong>{{ modele_analyse|default("") }}</strong>, sur cet ordinateur. Compte une à deux minutes par offre sur processeur.</p>
+    {% else %}
+    <p class="reglages__info">IA désactivée sur le serveur (ANALYSE_IA=false) : les offres restent sans note.</p>
+    {% endif %}
+    <p class="ce-message" data-reglages-message role="status"></p>
+  </section>
 </section>

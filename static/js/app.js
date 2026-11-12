@@ -30,7 +30,7 @@ const TOPBAR = {
                   action: "Trouver des entreprises", run: () => Spontanees.action("fetch") },
   profil:       { title: "Mon profil", phrase: "Ce que le Chasseur sait de toi pour noter les offres et écrire tes lettres.",
                   action: "Enregistrer", run: () => sauvegarderProfil() },
-  parametres:   { title: "Paramètres", phrase: "Ton compte de connexion et l'envoi de tes mails.",
+  parametres:   { title: "Paramètres", phrase: "Ton compte, l'envoi de tes mails et les réglages avancés de ce mode.",
                   action: null },   // chaque carte a ses boutons
 };
 
@@ -335,7 +335,7 @@ async function sauvegarderProfil() {
 
 /* ── Recherche contextuelle (filtre les lignes de la page courante) ──────── */
 const LISTES_RECHERCHE = {
-  offres:             { liste: '[data-list="offres"]',        ligne: ".offre" },
+  offres:             { liste: '[data-list="offres"]',        ligne: ".offres__item" },
   candidatures:       { liste: '[data-list="candidatures"]',  ligne: ".suivi-row" },
   spontanees:         { liste: '[data-list="spontanees"]',    ligne: ".trow:not(.thead)" },
 };
@@ -383,10 +383,10 @@ function brancher() {
     surveiller();   // un pipeline vient peut-être de démarrer
   });
 
-  // clics délégués sur les offres
-  document.querySelector('[data-list="offres"]').addEventListener("click", e => {
-    Offres.onClick(e, id => modal.ouvrir(id));
-  });
+  // Page Offres : liste, onglets, filtres et volet (offres.js) ; la lettre s'ouvre ici
+  Offres.brancher(id => modal.ouvrir(id));
+  // « Voir l'offre » depuis l'Accueil : l'offre s'ouvre dans le volet
+  document.addEventListener("offres:montrer", e => Offres.montrer(e.detail));
 
   // filtres
   document.querySelectorAll("[data-filters]").forEach(grp => {
@@ -396,41 +396,9 @@ function brancher() {
       grp.querySelectorAll(".filter").forEach(f => f.classList.remove("is-active"));
       btn.classList.add("is-active");
       const f = btn.dataset.filter;
-      if (grp.dataset.filters === "offres" || grp.dataset.filters === "offres-archives") Offres.setFiltre(f);
       if (grp.dataset.filters === "spontanees") Spontanees.setFiltre(f);
     });
   });
-
-  // bascule Offres ↔ Archivées
-  const btnArchives = document.querySelector("[data-archives-toggle]");
-  if (btnArchives) {
-    btnArchives.addEventListener("click", () => {
-      const enArchives = Offres.basculerArchives();
-      const menusNormal     = document.querySelector('.filters-menus[data-mode="normal"]');
-      const filtresArchives = document.querySelector('[data-filters="offres-archives"]');
-      const label = document.querySelector("[data-archives-label]");
-      if (enArchives) {
-        if (menusNormal)     menusNormal.style.display = "none";
-        if (filtresArchives) filtresArchives.style.display = "";
-        if (label) label.textContent = "← Retour aux offres";
-      } else {
-        if (menusNormal)     menusNormal.style.display = "flex";
-        if (filtresArchives) filtresArchives.style.display = "none";
-        if (label) label.textContent = "Archivées";
-      }
-      // En mode archives, on remet le filtre raison sur "Toutes"
-      if (filtresArchives) {
-        filtresArchives.querySelectorAll(".filter").forEach(x => x.classList.remove("is-active"));
-        const tout = filtresArchives.querySelector('[data-filter="all"]');
-        if (tout) tout.classList.add("is-active");
-      }
-    });
-  }
-
-  // Menus de filtres combinables (mode normal Offres)
-  document.querySelectorAll("[data-foffre]").forEach(menu =>
-    menu.addEventListener("change", () =>
-      Offres.setFiltreOffre(menu.dataset.foffre, menu.value)));
 
   // actions pipeline spontanées
   document.querySelectorAll("[data-action]").forEach(b =>

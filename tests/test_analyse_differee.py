@@ -281,14 +281,18 @@ def test_option_propre_au_mode(alice):
 def test_interface(alice):
     client, _ = alice
     page = client.get("/alternance").text
-    assert "data-analyse-lancer" in page and 'data-limite="analyses" value="30"' in page
-    assert "data-analyse-toute-file" in page and "data-analyse-estimation" in page
-    assert "ministral-3:3b" in page and 'data-profil-case="analyse_auto"' in page
+    import re
+    # Bandeau « Les noter » dans Offres ; plafond, toute la file et analyse
+    # automatique dans Paramètres, Réglages avancés (D145)
+    assert "data-analyse-lancer" in page and "data-analyse-estimation" in page
+    assert re.search(r'data-limite="analyses" data-reglage="analyses"\s+value="30"', page)
+    assert "data-analyse-toute-file" in page and 'data-reglage="analyse_auto"' in page
+    assert "ministral-3:3b" in page
     from shared import config
     app = (config.STATIC_DIR / "js" / "app.js").read_text(encoding="utf-8")
     assert "api.analyseStop()" in app and "api.analyseAttente(" in app
     offres = (config.STATIC_DIR / "js" / "offres.js").read_text(encoding="utf-8")
-    assert "Analyse en cours… (1 à 2 min)" in offres
+    assert "Notation en cours… (1 à 2 min)" in offres
 
 
 def test_toute_la_file(alice, ia):

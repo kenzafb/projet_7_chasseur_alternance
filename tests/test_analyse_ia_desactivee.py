@@ -108,7 +108,7 @@ def test_interface(ia_coupee, utilisateur):
     assert 'data-analyse-ia="non"' in page and "data-bandeau-ia" in page and "IA désactivée" in page
     assert 'data-action="revalider"' not in page
     js = (config.STATIC_DIR / "js" / "offres.js").read_text(encoding="utf-8")
-    assert "non analysée" in js and "écris toi-même le paragraphe personnalisé" in js
+    assert "Pas encore notée" in js and "tu écriras toi-même le paragraphe personnalisé" in js
 
 
 def test_interface_ia_active(utilisateur):
@@ -167,8 +167,10 @@ def test_limite_de_la_recherche_avec_ou_sans_ia(recherche, monkeypatch, coupee):
 def test_interface_plafond_de_la_recherche(ia_coupee, utilisateur):
     client, _ = utilisateur("a@test.fr", prenom="Alice")
     page = client.get("/alternance").text
-    assert "Offres ajoutées au plus par recherche (max 500)" in page
-    assert 'data-limite="offres" value="100"' in page and 'max="500"' in page
+    import re
+    # Réglages avancés (D145) : sans IA, le plafond des offres sans analyse
+    assert "Offres ajoutées au plus par recherche" in page and "Entre 1 et 500 (défaut : 100)" in page
+    assert re.search(r'data-limite="offres" data-reglage="offres_sans_ia"\s+value="100" min="1" max="500"', page)
 
 
 # ─── Analyse des offres en attente ───────────────────────────────────────────
