@@ -64,7 +64,7 @@ L'API ne filtre pas sur la taille dans la recherche. Les offres contiennent en g
 - Plafond : 150 résultats par source, 450 au total. Découpage géographique : plusieurs centres répartis sur l'IDF avec un rayon réduit, plutôt qu'un seul cercle de 60 km autour de Paris.
 - Les offres déjà relayées depuis France Travail restent exclues (comme aujourd'hui).
 - Usage gratuit et réservé aux usages non lucratifs : toute revente ou facturation d'accès est interdite. À garder en tête si l'app devient payante.
-- Proposition, hors périmètre immédiat : LBA propose une API qui transmet directement une candidature (CV, lettre facultative) au recruteur, sans passer par le scraper ni par Gmail. À étudier dans une phase dédiée.
+- API de candidature de LBA (jobApply) : écartée, voir DECISIONS.md, D126 (habilitation requise, usage individuel exclu, offres publiées seulement). Les candidatures passent par les pages du site LBA, ouvertes par la personne (D127 à D131).
 
 ## 4. Sirene (candidatures spontanées)
 

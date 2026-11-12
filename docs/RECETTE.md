@@ -60,7 +60,7 @@ Pour chaque étape : **Faire**, **Observer** (ce qui doit se passer), **Échec s
 
 ## 4. Compte d'envoi de A, en mode test
 
-**Faire (A)** : Profil, section 09 « Compte d'envoi ».
+**Faire (A)** : Paramètres, section 03 « Compte d'envoi » (dans Profil avant la phase 10, D122).
 1. Si aucun compte n'est configuré : choisir Gmail, saisir l'adresse d'expédition et le mot de passe d'application (16 caractères), « Enregistrer et tester ».
 2. « Tester la connexion ».
 3. « M'envoyer un mail de test ».
@@ -73,7 +73,7 @@ Pour chaque étape : **Faire**, **Observer** (ce qui doit se passer), **Échec s
 - recharger la page : la case reste cochée ;
 - page Spontanées : bandeau orangé « 🧪 Mode test actif : les mails partiront vers <adresse de A>, pas vers les entreprises ».
 
-**Faire (B)** : Profil, section 09 : ne rien configurer.
+**Faire (B)** : Paramètres, section 03 : ne rien configurer.
 
 **Observer (B)** : « Aucun compte configuré », pas de case Mode test, pas de bandeau sur la page Spontanées.
 
@@ -146,10 +146,10 @@ Vérifier d'abord que le bandeau orangé du mode test est affiché sur la page S
   - la ligne de fin `✅ Envoi terminé` avec `3 envoyés, 0 échecs`, suivie de `🧪 Mode test : tous les mails sont partis vers l'adresse d'expédition, rien n'est enregistré.`
 - Boîte de réception de A : 3 mails (ou autant que d'entreprises avec email), objet `[TEST → <adresse de l'entreprise>] Candidature spontanée en alternance` (ou l'objet du profil), corps du profil signé, pièces jointes du profil en PDF.
 - Dossier « Envoyés » de Gmail : **tous** les mails envoyés pendant la recette ont pour destinataire l'adresse de A.
-- À la fin : carte 03 « Envoi de test terminé ! », la carte « Envoyés » ne bouge pas, la page « Spontanées envoyées » reste inchangée (aucune entreprise marquée envoyée).
+- À la fin : carte 03 « Envoi de test terminé ! », la carte « Envoyés » ne bouge pas, le tableau Candidatures reste inchangé (aucune entreprise marquée envoyée).
 - Relancer « Envoyer » avec 3 : les mêmes entreprises sont de nouveau visées (rien n'a été enregistré comme contacté).
 
-**Échec (grave) si** : un mail part vers une adresse autre que celle de A, un objet ne commence pas par `[TEST →`, le compteur « Envoyés » augmente, une entreprise apparaît dans « Spontanées envoyées », ou le second lancement ne vise pas les mêmes entreprises. Dans ce cas : cliquer « Arrêter », ne rien modifier d'autre, noter et arrêter la recette.
+**Échec (grave) si** : un mail part vers une adresse autre que celle de A, un objet ne commence pas par `[TEST →`, le compteur « Envoyés » augmente, une entreprise apparaît dans le tableau Candidatures, ou le second lancement ne vise pas les mêmes entreprises. Dans ce cas : cliquer « Arrêter », ne rien modifier d'autre, noter et arrêter la recette.
 
 Autres échecs : pièces jointes absentes, corps vide, `Erreur envoi : Authentification refusée` (refaire « Tester la connexion »), `Plafond de 50 mails par jour atteint` (normal si beaucoup de mails ont déjà été envoyés aujourd'hui).
 
@@ -157,7 +157,7 @@ Autres échecs : pièces jointes absentes, corps vide, `Erreur envoi : Authentif
 
 Faire ces vérifications dans la fenêtre privée de B, les deux sessions ouvertes.
 
-1. **Données** : pages Offres, Candidatures, Spontanées et Spontanées envoyées de B : aucune offre, entreprise ou candidature de A ; compteurs de la barre latérale à 0 (ou aux seules valeurs de B).
+1. **Données** : pages Offres, Candidatures et Spontanées de B : aucune offre, entreprise ou candidature de A ; compteurs de la barre latérale à 0 (ou aux seules valeurs de B).
 2. **PDF de A** : ouvrir http://localhost:5002/api/lettre_pdf/<id noté à l'étape 6>. Attendu : `{"erreur":"PDF introuvable"}` (code 404). Dans la fenêtre de A, la même adresse télécharge le PDF.
 3. **Logs** : ouvrir http://localhost:5002/api/logs. Attendu : aucune ligne des pipelines de A (liste vide si B n'a rien lancé).
 4. **Compte d'envoi** : Spontanées, « Envoyer » avec 1. Attendu : message « Aucun compte d'envoi configuré... » ; le terminal ne montre aucune connexion SMTP ; aucun mail ne part du compte de A.
