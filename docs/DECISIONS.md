@@ -749,3 +749,7 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 - **Compteurs** mis à jour en un seul endroit (`majCompteur`, `api.js`) pour le menu et la barre d'onglets.
 - **Nettoyage.** Les anciens noms de variables (D143) sont remplacés par les jetons partout et retirés ; les règles CSS des écrans remplacés (carte d'offre, tableau de suivi en lignes, viseur, compteurs du haut, fenêtre de la lettre, cartes de l'ancien pipeline) sont supprimées. Un test vérifie qu'aucun ancien nom ne revient.
 - **README** à jour (Accueil, Offres, Ma lettre, Candidatures en colonnes, profil en cinq parties, réglages avancés, 16 migrations).
+
+### D151. Destinataire de la lettre calé sur la marge droite (complète D141)
+- Le bloc destinataire (« À l'attention du service recrutement », ou nom puis adresse de l'entreprise) n'est plus décalé par une marge gauche de 55 % : il occupe la largeur du corps et son texte est aligné à droite, chaque ligne finissant au bord droit du corps de la lettre. Ni largeur fixe ni marge en pourcentage. Même HTML pour l'aperçu et le PDF (`lettres/pdf.py`) ; la date reste à gauche.
+- Vérifié pour une entreprise connue (trois lignes) et une inconnue : dans la mise en page WeasyPrint du PDF (test qui mesure chaque ligne, écart nul au bord droit) et dans l'aperçu du navigateur (écart nul).

@@ -180,7 +180,7 @@ def construire_html(offre: dict, lettre: str, profil: dict, apercu: bool = False
   p {{ margin-bottom: 8pt; }}
   .coordonnees {{ margin-bottom: 18pt; }}
   .coordonnees .nom {{ font-weight: bold; }}
-  .destinataire {{ margin-left: 55%; margin-bottom: 18pt; }}
+  .destinataire {{ text-align: right; margin-bottom: 18pt; }}
   .objet {{ font-size: 11pt; font-weight: bold; margin-bottom: 14pt; }}{police_web() if apercu else ""}
 </style>
 </head>
