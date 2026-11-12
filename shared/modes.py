@@ -71,11 +71,6 @@ def get_mode(cle):
     return MODES.get(cle or MODE_DEFAUT, MODES[MODE_DEFAUT])
 
 
-def labels_modes():
-    """Liste {cle, label, couleur} pour l'interface de choix."""
-    return [{"cle": k, "label": v["label"], "couleur": v["couleur"]} for k, v in MODES.items()]
-
-
 def verifier_mode(cle) -> str:
     """Mode reçu par l'API : un mode ouvert, sinon ErreurUtilisateur (400).
     Aucun défaut : le mode est toujours donné explicitement."""

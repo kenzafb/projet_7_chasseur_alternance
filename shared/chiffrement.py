@@ -15,9 +15,6 @@ from cryptography.fernet import Fernet, InvalidToken
 
 from shared.erreurs import ErreurUtilisateur
 
-COMMANDE_GENERATION = ('python -c "from cryptography.fernet import Fernet; '
-                       'print(Fernet.generate_key().decode())"')
-
 
 class ChiffrementIndisponible(Exception):
     """CLE_CHIFFREMENT absente ou invalide : configuration et envoi de mails

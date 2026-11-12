@@ -49,8 +49,7 @@ VARIABLE_CODE_POSTAL = "codePostalEtablissement"
 # la référence ont toutes une tranche, 2819 connues + 16898 NN). Clause
 # employée seule, en ET avec les autres (requête à part) : dans un OU avec
 # les tranches, Lucene la lit comme une exclusion et la requête ne rend
-# plus rien (phase 6a).
-TRANCHE_SANS_SALARIE = "NN"
+# plus rien (phase 6a). La tranche « NN » elle-même : shared/tailles.py.
 ABSENTS_PAR = "-trancheEffectifsUniteLegale:*"
 
 # Valeurs réunies par OU dans une requête : OU exact (somme des valeurs

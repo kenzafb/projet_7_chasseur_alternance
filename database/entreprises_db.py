@@ -26,6 +26,7 @@ from database.models import EmailContacte, Entreprise, EntrepriseMode
 from shared.lba import page_entreprise
 from shared.modes import MODE_DEFAUT
 from shared.emails_exclus import email_exclu, filtrer as filtrer_emails_exclus
+from shared.validation_emails import MANUELLE
 
 
 LONGUEUR_CONTACT_RH = 200   # taille de la colonne entreprises.contact_rh
@@ -443,7 +444,7 @@ def valider_adresse(user_id: int, entreprise_id: int, adresse: str) -> bool:
                 extra["emails_douteux"] = douteux
         else:
             return False
-        extra["validation_emails"] = {**(extra.get("validation_emails") or {}), adresse: "manuelle"}
+        extra["validation_emails"] = {**(extra.get("validation_emails") or {}), adresse: MANUELLE}
         e.extra = extra
         db.commit()
         return True
@@ -462,7 +463,7 @@ def valider_emails(user_id: int, entreprise_id: int) -> bool:
             return False
         extra = dict(e.extra or {})
         extra["validation_emails"] = {**(extra.get("validation_emails") or {}),
-                                      **{a: "manuelle" for a in _douteux(e)}}
+                                      **{a: MANUELLE for a in _douteux(e)}}
         e.extra = {**extra, "emails_non_valides": False, "emails_douteux": [], "contextes_emails": {}}
         db.commit()
         return True

@@ -372,7 +372,6 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
 
         if traites % SAUVEGARDE_TOUS == 0:
             sauvegarder_json(user_id, entreprises, mode)
-            avec = sum(1 for x in entreprises if x.get("emails_trouves"))
             _log(f"  💾 Sauvegarde — {envoyes} envoyés, {echecs} échecs")
 
         if envoyes < limite and traites < len(a_envoyer):

@@ -17,7 +17,6 @@ Corrections v15 :
   - Tous les correctifs v14 conservés.
 """
 
-import json
 import re
 import time
 import os

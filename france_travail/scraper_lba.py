@@ -227,7 +227,6 @@ class CollecteLBA:
         self.relayees_ft = set()
         self.au_plafond = []          # (cercle, codes, « offres » ou « entreprises »), non redécoupables
         self.entreprises_non_redecoupees = []   # cercles au plafond d'entreprises laissés tels quels
-        self.non_explores = 0         # requêtes laissées faute de budget
 
     def nouvelles_entreprises(self) -> int:
         """Entreprises reçues dont ni le SIRET ni le SIREN n'est déjà en base (D59)."""
@@ -267,7 +266,6 @@ class CollecteLBA:
                 self.log(f"  LBA : {self.objectif_entreprises} nouvelles entreprises atteintes, recherche arrêtée")
                 return
             if self.requetes >= LBA_REQUETES_MAX:
-                self.non_explores = len(file)
                 self.log(f"  ⚠️  LBA : limite de {LBA_REQUETES_MAX} requêtes atteinte, "
                          f"{len(file)} recherches redécoupées non faites")
                 return

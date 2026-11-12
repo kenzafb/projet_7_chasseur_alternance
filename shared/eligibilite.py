@@ -37,8 +37,7 @@ from datetime import date, timedelta
 
 from shared.stage import MOIS, date_en_lettres, lire_date
 
-# Niveaux de l'énumération du schéma, en crans (bac = 0, bac+5 = 5)
-NIVEAUX_REQUIS = ("bac", "bac+2", "bac+3", "bac+4", "bac+5", "non_precise")
+# Niveaux de l'énumération du schéma (shared/schemas_ia.py), en crans (bac = 0, bac+5 = 5)
 CRANS = {"bac": 0, "bac+2": 2, "bac+3": 3, "bac+4": 4, "bac+5": 5}
 LIBELLES = {0: "Bac", 1: "Bac+1", 2: "Bac+2", 3: "Bac+3", 4: "Bac+4", 5: "Bac+5"}
 
