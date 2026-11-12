@@ -30,7 +30,7 @@ const TOPBAR = {
                     + "Le Chasseur les trouve, cherche leur email et leur envoie ta candidature.",
                   action: "Trouver des entreprises", run: () => Spontanees.action("fetch") },
   profil:       { title: "Mon profil", phrase: "Ce que le Chasseur sait de toi pour noter les offres et écrire tes lettres.",
-                  action: "Enregistrer", run: () => sauvegarderProfil() },
+                  action: null },   // « Enregistrer » est sous la partie affichée
   parametres:   { title: "Paramètres", phrase: "Ton compte, l'envoi de tes mails et les réglages avancés de ce mode.",
                   action: null },   // chaque carte a ses boutons
 };
@@ -74,6 +74,8 @@ function aller(page, { focus = false } = {}) {
   if (page === "accueil") Accueil.charger();
   // L'Accueil a sa propre tête (salutation) : pas de titre de page en plus
   document.querySelector("[data-page-tete]").hidden = page === "accueil";
+  // Pages au contenu étroit (1120 px, comme leurs maquettes) : la tête s'aligne dessus
+  document.getElementById("contenu").classList.toggle("main--etroit", ["profil", "spontanees"].includes(page));
   const t = TOPBAR[page];
   document.querySelector('[data-topbar="title"]').textContent = t.title;
   document.querySelector('[data-topbar="phrase"]').textContent = t.phrase || "";

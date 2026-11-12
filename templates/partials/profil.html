@@ -1,15 +1,15 @@
-<!-- ════════════ PAGE PROFIL ════════════ -->
-<section class="page" data-page-content="profil">
+<!-- ════════════ PAGE MON PROFIL : cinq parties (D147) ════════════
+     Toi, la partie propre au mode, Ton parcours, Ce que tu cherches, Tes
+     documents. Une seule partie affichée à la fois ; toutes restent dans la
+     page, et « Enregistrer » enregistre tout. Un champ présent dans
+     plusieurs modes vit dans un bloc data-mode-section par mode. -->
+<section class="page profil" data-page-content="profil">
 
-  <!-- Bandeau d'accueil / onboarding -->
   <div class="profil-intro" data-profil-intro>
-    <div class="profil-intro__txt">
-      <strong>Ton profil, c'est le carburant du Chasseur.</strong>
-      Plus il est complet, meilleures sont les analyses d'offres et les lettres générées.
-      Compte une dizaine de minutes pour tout remplir — tu pourras modifier à tout moment.
-    </div>
+    <!-- Message de bienvenue après l'inscription (app.js) ; vide sinon -->
+    <p class="profil-intro__txt"></p>
     <!-- Copie de sections depuis le profil d'un autre mode (D117 à D119) -->
-    <button class="btn btn--sm profil-intro__copie" type="button" data-copie-ouvrir>Copier depuis un autre mode</button>
+    <button class="btn btn--sm profil-intro__copie" type="button" data-copie-ouvrir>Copier depuis mon profil {{ "alternance ou job" if mode == "stage" else ("stage ou job" if mode == "alternance" else "alternance ou stage") }}</button>
     <!-- Modifications non enregistrées : la copie attend l'enregistrement (D121) -->
     <div class="copie__garde" data-copie-garde role="alert" hidden>
       <span data-copie-garde-texte>Enregistre d'abord tes modifications : la copie recharge le profil enregistré.</span>
@@ -21,464 +21,388 @@
   <!-- Champs dont l'IA a besoin pour juger : avertissement s'ils sont vides -->
   <p class="domaines-vide" data-ia-avert hidden></p>
 
-  <!-- ─── Section 1 : Identité (commun) ─── -->
-  <div class="card profil-card" data-mode-section="commun">
-    <div class="profil-card__head">
-      <span class="profil-card__num">01</span>
-      <div>
-        <h3 class="profil-card__title">Identité</h3>
-        <p class="profil-card__sub">Tes coordonnées, utilisées dans les lettres et les emails.</p>
+  <div class="profil__corps">
+    <!-- Les cinq parties, avec leur état (complet ou à compléter) -->
+    <nav class="parties" aria-label="Parties du profil">
+      <ol class="parties__liste" data-parties>
+        {% set titre_mode = {"stage": "Ton stage", "alternance": "Ton alternance", "job": "Ton job"}[mode] %}
+        {% for cle, titre in (("toi", "Toi"), ("mode", titre_mode), ("parcours", "Ton parcours"),
+                              ("recherche", "Ce que tu cherches"), ("documents", "Tes documents")) %}
+        <li><button type="button" class="partie-lien" data-partie-lien="{{ cle }}"{% if loop.first %} aria-current="step"{% endif %}>
+          <span class="partie-lien__titre">{{ titre }}</span>
+          <span class="partie-lien__etat" data-partie-etat="{{ cle }}"></span>
+        </button></li>
+        {% endfor %}
+      </ol>
+    </nav>
+
+    <div class="profil__panneau">
+
+      <!-- ═══ 1. Toi ═══ -->
+      <section class="partie" data-partie="toi" aria-labelledby="partie-toi">
+        <h2 class="partie__titre" id="partie-toi" tabindex="-1">Toi</h2>
+        <p class="partie__phrase">Tes coordonnées, en haut de tes lettres et dans tes mails.</p>
+        <p class="partie__manque" data-partie-manque="toi" hidden></p>
+        <div class="profil-grid" data-mode-section="commun">
+          <label class="field">
+            <span class="field__label">Prénom</span>
+            <input class="field__input" type="text" data-profil="prenom" autocomplete="given-name" placeholder="Camille">
+          </label>
+          <label class="field">
+            <span class="field__label">Nom</span>
+            <input class="field__input" type="text" data-profil="nom" autocomplete="family-name" placeholder="Martin">
+          </label>
+          <label class="field">
+            <span class="field__label">Email</span>
+            <input class="field__input" type="email" data-profil="email" autocomplete="email" placeholder="prenom@email.com">
+          </label>
+          <label class="field">
+            <span class="field__label">Téléphone</span>
+            <input class="field__input" type="tel" data-profil="telephone" autocomplete="tel" placeholder="06 12 34 56 78">
+          </label>
+          <label class="field">
+            <span class="field__label">Ville</span>
+            <input class="field__input" type="text" data-profil="ville" placeholder="Ville ou arrondissement">
+          </label>
+          <label class="field">
+            <span class="field__label">Portfolio <span class="field__facultatif">(facultatif)</span></span>
+            <input class="field__input" type="url" data-profil="portfolio" maxlength="255" placeholder="https://…">
+          </label>
+          <label class="field">
+            <span class="field__label">LinkedIn <span class="field__facultatif">(facultatif)</span></span>
+            <input class="field__input" type="url" data-profil="linkedin" placeholder="https://linkedin.com/in/...">
+          </label>
+          <label class="field">
+            <span class="field__label">GitHub <span class="field__facultatif">(facultatif)</span></span>
+            <input class="field__input" type="url" data-profil="github" placeholder="https://github.com/...">
+          </label>
+        </div>
+      </section>
+
+      <!-- ═══ 2. La partie propre au mode ═══ -->
+      <section class="partie" data-partie="mode" aria-labelledby="partie-mode" hidden>
+        <h2 class="partie__titre" id="partie-mode" tabindex="-1">{{ titre_mode }}</h2>
+        <p class="partie__manque" data-partie-manque="mode" hidden></p>
+
+        <div data-mode-section="stage">
+          <p class="partie__phrase">Les offres qui ne collent pas à tes dates sont mises de côté toutes seules.</p>
+          <div class="profil-grid">
+            <label class="field">
+              <span class="field__label">Début du stage</span>
+              <input class="field__input" type="date" data-profil="date_debut" data-stage-date>
+            </label>
+            <label class="field">
+              <span class="field__label">Fin du stage</span>
+              <input class="field__input" type="date" data-profil="date_fin" data-stage-date>
+            </label>
+            <div class="field field--full"><span class="field__hint" data-duree-stage aria-live="polite">Durée : renseigne les deux dates.</span></div>
+            <label class="field">
+              <span class="field__label">École</span>
+              <input class="field__input" type="text" data-profil="etablissement" maxlength="200"
+                placeholder="Ex. Université, école, IUT…">
+            </label>
+            <label class="field">
+              <span class="field__label">Formation</span>
+              <input class="field__input" type="text" data-profil="formation"
+                placeholder="Ex. Licence 3, BUT 2e année, Master 1…">
+            </label>
+            <label class="field">
+              <span class="field__label">Niveau d'études actuel</span>
+              <input class="field__input" type="text" data-profil="niveau_etudes"
+                placeholder="Ex. Bac+2 en cours (BUT2) ; vide : déduit de la formation">
+              <span class="field__hint">Sert à écarter, sans IA, les offres qui exigent un niveau bien supérieur (deux crans ou plus).</span>
+            </label>
+            <p class="domaines-vide" data-niveau-avert hidden></p>
+            <label class="field field--full">
+              <span class="field__label">Ce que tu aimerais faire pendant ce stage</span>
+              <textarea class="field__area" data-profil="missions" rows="3"
+                placeholder="Écris comme tu le dirais à quelqu'un."></textarea>
+              <span class="field__hint">Le Chasseur s'en sert pour noter les offres.</span>
+            </label>
+          </div>
+        </div>
+
+        <div data-mode-section="alternance">
+          <p class="partie__phrase">Le diplôme que tu prépares, ton rythme et quand tu peux commencer.</p>
+          <div class="profil-grid">
+            <label class="field field--full">
+              <span class="field__label">Formation visée</span>
+              <input class="field__input" type="text" data-profil="niveau_vise"
+                placeholder="Ex. BTS SIO (Bac+2), Licence pro (Bac+3)">
+              <span class="field__hint">Le diplôme que cette alternance prépare. Sert à écarter les offres demandant un niveau trop élevé.</span>
+            </label>
+            <label class="field">
+              <span class="field__label">Rythme</span>
+              <input class="field__input" type="text" data-rech="rythme" maxlength="200" placeholder="Ex. 3 jours en entreprise, 2 jours à l'école">
+            </label>
+            <label class="field">
+              <span class="field__label">Date de début</span>
+              <input class="field__input" type="text" data-rech="disponibilite" placeholder="Ex. dès la rentrée, septembre 2027">
+            </label>
+            <label class="field field--full">
+              <span class="field__label">Ce que ta formation va t'apporter</span>
+              <textarea class="field__area" data-profil="formation_apporte" rows="3"
+                placeholder="Ce que prévoit le programme : bases de données, comptabilité, droit immobilier, négociation…"></textarea>
+              <span class="field__hint">Tu ne seras pas pénalisé sur ce que tu vas justement apprendre.</span>
+            </label>
+          </div>
+        </div>
+
+        <div data-mode-section="job">
+          <p class="partie__phrase">Quand tu peux travailler et pour combien de temps.</p>
+          <div class="profil-grid">
+            <label class="field">
+              <span class="field__label">Durée souhaitée</span>
+              <input class="field__input" type="text" data-profil="duree_souhaitee" placeholder="Ex. 1 à 2,5 mois">
+            </label>
+            <label class="field">
+              <span class="field__label">Disponibilité (dates)</span>
+              <input class="field__input" type="text" data-rech="disponibilite" placeholder="Ex. de juillet à mi-septembre">
+            </label>
+            <label class="field field--full">
+              <span class="field__label">Disponibilités horaires</span>
+              <input class="field__input" type="text" data-profil="dispo_horaires" placeholder="Ex. journée, soir et week-end OK">
+              <span class="field__hint">Beaucoup de jobs d'été sont en horaires décalés (resto, événementiel…).</span>
+            </label>
+            <label class="field field--full">
+              <span class="field__label">Mobilité <span class="field__facultatif">(facultatif)</span></span>
+              <input class="field__input" type="text" data-profil="mobilite" placeholder="Ex. permis B, mobile sur Paris et petite couronne">
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ 3. Ton parcours ═══ -->
+      <section class="partie" data-partie="parcours" aria-labelledby="partie-parcours" hidden>
+        <h2 class="partie__titre" id="partie-parcours" tabindex="-1">Ton parcours</h2>
+        <p class="partie__phrase">Ce que tu sais faire et ce que tu as déjà fait.</p>
+        <p class="partie__manque" data-partie-manque="parcours" hidden></p>
+
+        <div class="profil-bloc" data-mode-section="commun">
+          <label class="field__label" for="competence-ajout">Compétences</label>
+          <p class="field__hint">Tape une compétence et appuie sur Entrée. Trois au moins.</p>
+          <ul class="tags" data-tags="competences" aria-label="Tes compétences"></ul>
+          <input class="field__input tags__input" id="competence-ajout" data-tags-input="competences"
+                 type="text" placeholder="Ex. Excel, Python, accueil client…">
+        </div>
+
+        <div class="profil-bloc" data-mode-section="commun">
+          <span class="field__label">Projets</span>
+          <p class="field__hint">Cours, perso, associatifs : cités dans la note des offres et dans la lettre.</p>
+          <div class="projets" data-projets></div>
+          <button class="btn btn--sm" type="button" data-projet-add>Ajouter un projet</button>
+        </div>
+
+        <div class="profil-grid" data-mode-section="alternance">
+          <label class="field field--full">
+            <span class="field__label">Formation</span>
+            <textarea class="field__area" data-profil="formation" rows="4"
+              placeholder="- Diplôme en cours (niveau), établissement (années)&#10;- Diplôme préparé en alternance (niveau), établissement&#10;..."></textarea>
+            <span class="field__hint">Une ligne par diplôme : niveau, intitulé, établissement, dates.</span>
+          </label>
+          <label class="field">
+            <span class="field__label">Niveau d'études actuel</span>
+            <input class="field__input" type="text" data-profil="niveau_etudes" placeholder="Ex. Bac+2 obtenu, Bac+3 en cours">
+            <span class="field__hint">Sert à écarter, sans IA, les offres qui exigent un niveau bien supérieur (deux crans ou plus).</span>
+          </label>
+          <p class="domaines-vide" data-niveau-avert hidden></p>
+          <label class="field field--full">
+            <span class="field__label">Expérience</span>
+            <textarea class="field__area" data-profil="experience" rows="4"
+              placeholder="- Stage ou job (entreprise, année) : missions principales&#10;..."></textarea>
+            <span class="field__hint">Stages, jobs, missions. Décris brièvement ce que tu as fait.</span>
+          </label>
+          <label class="field field--full">
+            <span class="field__label">Langues</span>
+            <input class="field__input" type="text" data-profil="langues" placeholder="Français (natif), Anglais (B2), Espagnol (A2)">
+          </label>
+        </div>
+
+        <div class="profil-grid" data-mode-section="stage">
+          <label class="field field--full">
+            <span class="field__label">Expérience</span>
+            <textarea class="field__area" data-profil="experience" rows="4"
+              placeholder="- Stage, job ou projet encadré (entreprise, année) : tâches principales&#10;..."></textarea>
+            <span class="field__hint">Stages, jobs, missions. Utilisée pour noter les offres et écrire la lettre.</span>
+          </label>
+        </div>
+
+        <div class="profil-grid" data-mode-section="job">
+          <label class="field field--full">
+            <span class="field__label">Niveau d'études obtenu</span>
+            <input class="field__input" type="text" data-profil="niveau_etudes" placeholder="Ex. Bac, Bac+2…">
+            <span class="field__hint">Les offres exigeant un niveau supérieur d'au moins deux crans sont écartées sans IA.</span>
+          </label>
+          <p class="domaines-vide" data-niveau-avert hidden></p>
+          <label class="field field--full">
+            <span class="field__label">Expérience</span>
+            <textarea class="field__area" data-profil="experience" rows="4"
+              placeholder="- 1 mois en relation client&#10;- petits jobs, stages…"></textarea>
+            <span class="field__hint">Tout ce que tu as fait, même court.</span>
+          </label>
+          <label class="field field--full">
+            <span class="field__label">Atouts</span>
+            <input class="field__input" type="text" data-profil="langues"
+              placeholder="Langues, permis B, savoir-être (ponctualité, contact client)…">
+          </label>
+        </div>
+      </section>
+
+      <!-- ═══ 4. Ce que tu cherches ═══ -->
+      <section class="partie" data-partie="recherche" aria-labelledby="partie-recherche" hidden>
+        <h2 class="partie__titre" id="partie-recherche" tabindex="-1">Ce que tu cherches</h2>
+        <p class="partie__phrase">Où et dans quel domaine le Chasseur doit chercher.</p>
+        <p class="partie__manque" data-partie-manque="recherche" hidden></p>
+        <p class="partie__conseil" data-partie-conseil="recherche" hidden></p>
+
+        <div data-mode-section="alternance">
+          <div class="profil-grid">
+            <label class="field">
+              <span class="field__label">Type de contrat</span>
+              <input class="field__input" type="text" data-rech="type_contrat" value="alternance" readonly>
+              <span class="field__hint">Le Chasseur ne cherche que des alternances.</span>
+            </label>
+            <label class="field">
+              <span class="field__label">Où</span>
+              <input class="field__input" type="text" data-rech="localisation" value="Île-de-France" readonly>
+              <span class="field__hint">Pour l'instant, en Île-de-France seulement.</span>
+            </label>
+            <label class="field field--full">
+              <span class="field__label">Ce que tu préfères éviter <span class="field__facultatif">(facultatif)</span></span>
+              <textarea class="field__area" data-profil="criteres_eviter" rows="2"
+                placeholder="Ex. déplacements fréquents, horaires de nuit…"></textarea>
+            </label>
+          </div>
+          <div class="profil-bloc">
+            <span class="field__label">Domaines</span>
+            <p class="field__hint">Coche les grands domaines qui t'intéressent, ou affine. « Indifférent » : tous les domaines.</p>
+            <p class="domaines-vide" data-domaines-vide hidden>Aucun domaine choisi : la recherche couvre tous les domaines. Choisis les tiens pour ne recevoir que les offres qui te concernent.</p>
+            <div class="domaines-choix" data-domaines-choix>
+              <!-- cases à cocher injectées par profil.js -->
+            </div>
+          </div>
+          <div class="options-recherche" data-options-recherche="alternance">
+            <!-- taille, départements, secteurs : injectés par profil.js -->
+          </div>
+        </div>
+
+        <div data-mode-section="job">
+          <div class="profil-grid">
+            <label class="field field--full">
+              <span class="field__label">Types de jobs qui te vont</span>
+              <textarea class="field__area" data-profil="types_jobs_ok" rows="2"
+                placeholder="Ex. vente, accueil, restauration, manutention, saisie…"></textarea>
+            </label>
+            <label class="field field--full">
+              <span class="field__label">Types de jobs à éviter <span class="field__facultatif">(facultatif)</span></span>
+              <textarea class="field__area" data-profil="types_jobs_eviter" rows="2"
+                placeholder="Ex. garde d'enfants, démarchage téléphonique…"></textarea>
+            </label>
+            <label class="field field--full">
+              <span class="field__label">Où de préférence <span class="field__facultatif">(facultatif)</span></span>
+              <input class="field__input" type="text" data-profil="localisation_pref"
+                placeholder="Ex. près de chez moi de préférence">
+              <span class="field__hint">La recherche reste en Île-de-France : ceci change seulement le tri des offres.</span>
+            </label>
+          </div>
+          <div class="profil-bloc">
+            <span class="field__label">Domaines</span>
+            <p class="field__hint">« Indifférent » : tous les domaines. Coche des domaines pour ne garder que ceux-là.</p>
+            <div class="domaines-choix" data-domaines-choix-job>
+              <!-- cases injectées par profil.js -->
+            </div>
+          </div>
+          <div class="options-recherche" data-options-recherche="job">
+            <!-- taille, thèmes, départements, secteurs : injectés par profil.js -->
+          </div>
+        </div>
+
+        <div data-mode-section="stage">
+          <div class="profil-bloc">
+            <span class="field__label">Domaines</span>
+            <p class="field__hint">Seuls l'informatique et l'immobilier correspondent aux secteurs d'entreprise de Sirene : pour un autre domaine, choisis aussi des secteurs ci-dessous.</p>
+            <div class="domaines-choix" data-domaines-choix-stage>
+              <!-- cases injectées par profil.js -->
+            </div>
+          </div>
+          <div class="options-recherche" data-options-recherche="stage">
+            <!-- tailles, départements, secteurs : injectés par profil.js -->
+          </div>
+        </div>
+      </section>
+
+      <!-- ═══ 5. Tes documents ═══ -->
+      <section class="partie" data-partie="documents" aria-labelledby="partie-documents" hidden>
+        <h2 class="partie__titre" id="partie-documents" tabindex="-1">Tes documents</h2>
+        <p class="partie__phrase">Ce que tu envoies aux entreprises.</p>
+        <p class="partie__manque" data-partie-manque="documents" hidden></p>
+
+        <div class="profil-bloc" data-mode-section="commun">
+          <span class="field__label">Ton CV et tes pièces jointes</span>
+          <p class="field__hint">Joints à chaque candidature envoyée par le Chasseur (PDF, 5 Mo au plus). Le nom du fichier sert de nom au document.</p>
+          <div class="pj-list" data-pj-list></div>
+          <div class="pj-add">
+            <input type="file" accept="application/pdf" data-pj-file id="pj-file" class="visuellement-cache">
+            <label for="pj-file" class="btn btn--sm">Choisir un PDF</label>
+            <span class="pj-add__fname" data-pj-fname>Aucun fichier</span>
+            <button class="btn btn--sm" type="button" data-pj-upload>Ajouter</button>
+          </div>
+        </div>
+
+        <div class="profil-bloc" data-mode-section="commun">
+          <label class="field__label" for="lettre-type">Ta lettre type</label>
+          <p class="field__hint">Écris ta lettre une fois. Là où tu mets <code>{paragraphe}</code>, le Chasseur ajoute quelques phrases adaptées à chaque offre ; tu les relis avant.</p>
+          <details class="profil-aide">
+            <summary>Les autres balises de la lettre</summary>
+            <code>{entreprise}</code> et <code>{poste}</code>, remplacés par ceux de l'offre ; <code>{date}</code> ;
+            <code>{contact_entreprise}</code> (bloc destinataire : entreprise puis lieu) ; <code>{portfolio}</code>, le lien
+            de la partie Toi (vide : la balise reste dans la lettre, à compléter). N'utilise pas d'autres accolades.
+          </details>
+          <textarea class="field__area" id="lettre-type" data-profil="lettre_type" rows="14"
+            placeholder="{contact_entreprise}&#10;&#10;Paris, le {date}&#10;&#10;Objet : Candidature, {poste}&#10;&#10;Madame, Monsieur,&#10;&#10;...&#10;&#10;{paragraphe}&#10;&#10;..."></textarea>
+          <button class="btn btn--sm" type="button" data-lettre-exemple>Partir d'un exemple</button>
+          <template data-lettre-exemple-texte>{{ exemple_lettre|default("") }}</template>
+        </div>
+
+        <div class="profil-bloc" data-mode-section="commun">
+          <span class="field__label">Ton mail aux entreprises à contacter</span>
+          <p class="field__hint">Le message envoyé avec ta candidature, propre à ce mode. Laissé vide, un message adapté au mode est envoyé, signé de ton nom, ton téléphone et ton email.</p>
+          <label class="field field--full">
+            <span class="field__label">Objet</span>
+            <input class="field__input" type="text" data-profil="email_objet" maxlength="300" placeholder="Ex. Candidature spontanée">
+          </label>
+          <label class="field field--full">
+            <span class="field__label">Message</span>
+            <textarea class="field__area" data-profil="email_type" rows="10"
+              placeholder="Bonjour,&#10;&#10;Je me permets de vous contacter pour une candidature spontanée...&#10;&#10;Cordialement,&#10;Prénom Nom"></textarea>
+          </label>
+          <details class="profil-aide" data-balises-mail>
+            <summary>Les balises du mail</summary>
+            Dans l'objet comme dans le message, remplacées à l'envoi par ton profil :
+            <code>{prenom}</code> <code>{nom}</code> <code>{telephone}</code> <code>{email}</code>
+            <code>{date}</code> (date du jour) <code>{portfolio}</code>{% if mode == "stage" %}, et pour le stage <code>{date_debut}</code>
+            <code>{date_fin}</code> <code>{duree_semaines}</code> <code>{etablissement}</code> <code>{formation}</code>
+            <code>{missions}</code>. Le message par défaut annonce un stage conventionné
+            avec ses dates et sa durée : remplis les dates du stage avant d'envoyer{% endif %}.
+            N'utilise pas d'autres accolades. Une balise vide dans ton profil bloque l'envoi.
+          </details>
+        </div>
+      </section>
+
+      <!-- Partie suivante et enregistrement -->
+      <div class="profil-save">
+        <span class="profil-save__status" data-profil-status role="status"></span>
+        <button class="btn" type="button" data-partie-suivante>Partie suivante</button>
+        <button class="btn btn--primary" type="button" data-profil-save>Enregistrer</button>
       </div>
     </div>
-
-    <div class="profil-grid">
-      <label class="field">
-        <span class="field__label">Prénom</span>
-        <input class="field__input" type="text" data-profil="prenom" placeholder="Camille">
-      </label>
-      <label class="field">
-        <span class="field__label">Nom</span>
-        <input class="field__input" type="text" data-profil="nom" placeholder="Martin">
-      </label>
-      <label class="field">
-        <span class="field__label">Email de contact</span>
-        <input class="field__input" type="email" data-profil="email" placeholder="prenom@email.com">
-      </label>
-      <label class="field">
-        <span class="field__label">Téléphone</span>
-        <input class="field__input" type="tel" data-profil="telephone" placeholder="06 12 34 56 78">
-      </label>
-      <label class="field">
-        <span class="field__label">Ville</span>
-        <input class="field__input" type="text" data-profil="ville" placeholder="Ville ou arrondissement">
-      </label>
-      <label class="field">
-        <span class="field__label">LinkedIn</span>
-        <input class="field__input" type="url" data-profil="linkedin" placeholder="https://linkedin.com/in/...">
-      </label>
-      <label class="field">
-        <span class="field__label">GitHub</span>
-        <input class="field__input" type="url" data-profil="github" placeholder="https://github.com/...">
-      </label>
-      <!-- Portfolio : commun aux trois modes depuis D120 (avant : carte du stage) -->
-      <label class="field">
-        <span class="field__label">Portfolio <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
-        <input class="field__input" type="url" data-profil="portfolio" maxlength="255" placeholder="https://…">
-      </label>
-    </div>
-  </div>
-
-  <!-- ─── Section 2 : Parcours (alternance) ─── -->
-  <div class="card profil-card" data-mode-section="alternance">
-    <div class="profil-card__head">
-      <span class="profil-card__num">02</span>
-      <div>
-        <h3 class="profil-card__title">Parcours</h3>
-        <p class="profil-card__sub">Ta formation et ton expérience, utilisées pour évaluer les offres.</p>
-      </div>
-    </div>
-
-    <div class="profil-grid">
-      <label class="field field--full">
-        <span class="field__label">Formation</span>
-        <textarea class="field__area" data-profil="formation" rows="5"
-          placeholder="- Diplôme en cours (niveau), établissement (années)&#10;- Diplôme préparé en alternance (niveau), établissement&#10;..."></textarea>
-        <span class="field__hint">Une ligne par diplôme. Indique le niveau, l'intitulé, l'établissement et les dates.</span>
-      </label>
-      <label class="field">
-        <span class="field__label">Niveau d'études actuel</span>
-        <input class="field__input" type="text" data-profil="niveau_etudes"
-          placeholder="Ex. Bac+2 obtenu, Bac+3 en cours">
-        <span class="field__hint">Sert à écarter, sans IA, les offres qui exigent un niveau bien supérieur (deux crans ou plus).</span>
-      </label>
-      <p class="domaines-vide" data-niveau-avert hidden></p>
-      <label class="field field--full">
-        <span class="field__label">Niveau d'études visé</span>
-        <input class="field__input" type="text" data-profil="niveau_vise"
-          placeholder="Ex. Bac+2, Bac+3… ce que le contrat prépare">
-        <span class="field__hint">Le diplôme que cette alternance prépare. Sert à écarter les offres demandant un niveau trop élevé.</span>
-      </label>
-      <label class="field field--full">
-        <span class="field__label">Ce que ta formation va t'apporter</span>
-        <textarea class="field__area" data-profil="formation_apporte" rows="3"
-          placeholder="Ce que prévoit le programme : bases de données, comptabilité, droit immobilier, négociation…"></textarea>
-        <span class="field__hint">Les compétences que tu vas acquérir pendant ta formation. Évite d'être pénalisé sur ce que tu apprends justement.</span>
-      </label>
-      <label class="field field--full">
-        <span class="field__label">Ce que tu préfères éviter <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
-        <textarea class="field__area" data-profil="criteres_eviter" rows="2"
-          placeholder="Ex. déplacements fréquents, horaires de nuit…"></textarea>
-        <span class="field__hint">Types de postes ou missions que tu préfères éviter. Laisse vide si tu n'as pas de préférence.</span>
-      </label>
-      <label class="field field--full">
-        <span class="field__label">Expérience professionnelle</span>
-        <textarea class="field__area" data-profil="experience" rows="5"
-          placeholder="- Stage ou job (entreprise, année) : missions principales&#10;..."></textarea>
-        <span class="field__hint">Stages, jobs, missions. Décris brièvement les tâches techniques.</span>
-      </label>
-      <label class="field field--full">
-        <span class="field__label">Langues</span>
-        <input class="field__input" type="text" data-profil="langues"
-          placeholder="Français (natif), Anglais (B2), Espagnol (A2)">
-      </label>
-    </div>
-  </div>
-
-  <!-- ─── Section 3 : Compétences (alternance) ─── -->
-  <div class="card profil-card" data-mode-section="alternance stage job">
-    <div class="profil-card__head">
-      <span class="profil-card__num">03</span>
-      <div>
-        <h3 class="profil-card__title">Compétences techniques</h3>
-        <p class="profil-card__sub">Ajoute tes compétences une par une. L'IA s'en sert pour matcher les offres.</p>
-      </div>
-    </div>
-
-    <div class="tags" data-tags="competences"></div>
-    <input class="field__input tags__input" data-tags-input="competences"
-           type="text" placeholder="Tape une compétence et appuie sur Entrée (ex. Excel, Python, accueil client…)">
-  </div>
-
-  <!-- ─── Section 4 : Projets (alternance) ─── -->
-  <div class="card profil-card" data-mode-section="alternance stage job">
-    <div class="profil-card__head">
-      <span class="profil-card__num">04</span>
-      <div>
-        <h3 class="profil-card__title">Projets</h3>
-        <p class="profil-card__sub">Tes projets (cours, perso, associatifs). Cités dans l'analyse et la lettre.</p>
-      </div>
-    </div>
-
-    <div class="projets" data-projets></div>
-    <button class="btn" type="button" data-projet-add>+ Ajouter un projet</button>
-  </div>
-
-  <!-- ─── Section 5 : Lettre type (tous les modes, une par mode, D106) ─── -->
-  <div class="card profil-card" data-mode-section="alternance stage job">
-    <div class="profil-card__head">
-      <span class="profil-card__num">05</span>
-      <div>
-        <h3 class="profil-card__title">Lettre de motivation type</h3>
-        <p class="profil-card__sub">Ta lettre, écrite par toi. L'IA n'écrit que le paragraphe personnalisé pour chaque offre ; tu le relis avant de l'insérer.</p>
-      </div>
-    </div>
-    <div class="profil-aide">
-      <strong>Balises :</strong> <code>{paragraphe}</code> (obligatoire) à l'endroit du paragraphe personnalisé ;
-      <code>{entreprise}</code> et <code>{poste}</code>, remplacés par ceux de l'offre ; <code>{date}</code> ;
-      <code>{contact_entreprise}</code> (bloc destinataire : entreprise puis lieu) ; <code>{portfolio}</code>, le lien
-      de la carte Identité (vide : la balise reste dans la lettre, à compléter). N'utilise pas d'autres accolades.
-    </div>
-    <label class="field field--full">
-      <textarea class="field__area" data-profil="lettre_type" rows="14"
-        placeholder="{contact_entreprise}&#10;&#10;Paris, le {date}&#10;&#10;Objet : Candidature, {poste}&#10;&#10;Madame, Monsieur,&#10;&#10;...&#10;&#10;{paragraphe}&#10;&#10;..."></textarea>
-    </label>
-    <button class="btn btn--sm" type="button" data-lettre-exemple>Partir d'un exemple</button>
-    <template data-lettre-exemple-texte>{{ exemple_lettre|default("") }}</template>
-  </div>
-
-  <!-- ─── Section 6 : Mail type (commun) ─── -->
-  <div class="card profil-card" data-mode-section="commun">
-    <div class="profil-card__head">
-      <span class="profil-card__num">06</span>
-      <div>
-        <h3 class="profil-card__title">Email de candidature spontanée</h3>
-        <p class="profil-card__sub">Le message envoyé aux entreprises lors des candidatures spontanées, propre à ce mode. Laissé vide, un message générique adapté au mode est envoyé, signé de ton nom, ton téléphone et ton email.</p>
-      </div>
-    </div>
-    <label class="field field--full">
-      <span class="field__label">Objet</span>
-      <input class="field__input" type="text" data-profil="email_objet" maxlength="300"
-        placeholder="Ex. Candidature spontanée">
-    </label>
-    <label class="field field--full">
-      <span class="field__label">Message</span>
-      <textarea class="field__area" data-profil="email_type" rows="12"
-        placeholder="Bonjour,&#10;&#10;Je me permets de vous contacter pour une candidature spontanée...&#10;&#10;Cordialement,&#10;Prénom Nom"></textarea>
-      <span class="field__hint">Termine par tes coordonnées (nom, téléphone, liens).</span>
-    </label>
-    <div class="profil-aide" data-balises-mail>
-      <strong>Balises</strong>, dans l'objet comme dans le message, remplacées à l'envoi par ton profil :
-      <code>{prenom}</code> <code>{nom}</code> <code>{telephone}</code> <code>{email}</code>
-      <code>{date}</code> (date du jour) <code>{portfolio}</code>{% if mode == "stage" %}, et pour le stage <code>{date_debut}</code>
-      <code>{date_fin}</code> <code>{duree_semaines}</code> <code>{etablissement}</code> <code>{formation}</code>
-      <code>{missions}</code>. Le message par défaut annonce un stage conventionné
-      avec ses dates et sa durée : remplis les dates du stage avant d'envoyer{% endif %}.
-      N'utilise pas d'autres accolades. Une balise vide dans ton profil bloque l'envoi.
-    </div>
-  </div>
-
-  <!-- ─── Section 7 : Critères de recherche (alternance) ─── -->
-  <div class="card profil-card" data-mode-section="alternance">
-    <div class="profil-card__head">
-      <span class="profil-card__num">07</span>
-      <div>
-        <h3 class="profil-card__title">Critères de recherche</h3>
-        <p class="profil-card__sub">Ce que tu cherches. Utilisé pour cibler les offres.</p>
-      </div>
-    </div>
-
-    <div class="profil-grid">
-      <label class="field">
-        <span class="field__label">Type de contrat</span>
-        <input class="field__input" type="text" data-rech="type_contrat" value="alternance" readonly
-               style="background:var(--surface-2,#f5f5f5);cursor:not-allowed;">
-        <span class="field__hint">Le Chasseur recherche uniquement des alternances.</span>
-      </label>
-      <label class="field">
-        <span class="field__label">Localisation</span>
-        <input class="field__input" type="text" data-rech="localisation" value="Île-de-France" readonly
-               style="background:var(--surface-2,#f5f5f5);cursor:not-allowed;">
-        <span class="field__hint">Pour l'instant, le Chasseur recherche uniquement en Île-de-France.</span>
-      </label>
-      <label class="field">
-        <span class="field__label">Date de début</span>
-        <input class="field__input" type="text" data-rech="disponibilite" placeholder="Ex. dès la rentrée, septembre 2027">
-      </label>
-      <label class="field">
-        <span class="field__label">Rythme</span>
-        <input class="field__input" type="text" data-rech="rythme" maxlength="200" placeholder="Ex. 3 jours en entreprise, 2 jours à l'école">
-      </label>
-    </div>
-
-    <div style="margin-top:14px;">
-      <span class="field__label">Domaines recherchés</span>
-      <p class="profil-card__sub" style="margin:4px 0 10px;">Coche les grands domaines qui t'intéressent, ou affine par domaine. La recherche France Travail ne garde que ces domaines (classement par métier : un poste informatique dans une banque compte en informatique). Indifférent : tous les domaines.</p>
-      <p class="domaines-vide" data-domaines-vide hidden>Aucun domaine choisi : la recherche France Travail couvre tous les domaines. Choisis tes domaines ci-dessous pour ne recevoir que les offres qui te concernent.</p>
-      <div class="domaines-choix" data-domaines-choix>
-        <!-- cases à cocher injectées par profil.js -->
-      </div>
-    </div>
-    <div class="options-recherche" data-options-recherche="alternance">
-      <!-- taille, secteurs : injectés par profil.js -->
-    </div>
-  </div>
-
-
-  <!-- ─── Section 8 : Pièces jointes (commun) ─── -->
-  <div class="card profil-card" data-mode-section="commun">
-    <div class="profil-card__head">
-      <span class="profil-card__num">08</span>
-      <div>
-        <h3 class="profil-card__title">Pièces jointes</h3>
-        <p class="profil-card__sub">CV, lettre de recommandation, etc. Jointes aux candidatures spontanées (PDF, max 5 Mo).</p>
-      </div>
-    </div>
-
-    <div class="pj-list" data-pj-list></div>
-
-    <div class="pj-add">
-      <input type="file" accept="application/pdf" data-pj-file id="pj-file" hidden>
-      <label for="pj-file" class="btn">Choisir un PDF</label>
-      <span class="pj-add__fname" data-pj-fname>Aucun fichier</span>
-      <button class="btn btn--signal" type="button" data-pj-upload>Téléverser</button>
-    </div>
-    <span class="field__hint">Le nom du fichier sera utilisé comme nom du document. Tu peux en ajouter plusieurs.</span>
-  </div>
-
-  <!-- ════════ SECTIONS MODE JOB ════════ -->
-
-  <!-- ─── Job A : Ce que tu as (job) ─── -->
-  <div class="card profil-card" data-mode-section="job">
-    <div class="profil-card__head">
-      <span class="profil-card__num">02</span>
-      <div>
-        <h3 class="profil-card__title">Ton profil</h3>
-        <p class="profil-card__sub">Ce que tu as déjà. Sert à juger si un job t'est accessible.</p>
-      </div>
-    </div>
-    <div class="profil-grid">
-      <label class="field field--full">
-        <span class="field__label">Niveau d'études obtenu</span>
-        <input class="field__input" type="text" data-profil="niveau_etudes"
-          placeholder="Ex. Bac, Bac+2…">
-        <span class="field__hint">Ton niveau actuel. Les offres exigeant un niveau supérieur d'au moins deux crans sont écartées sans IA.</span>
-      </label>
-      <p class="domaines-vide" data-niveau-avert hidden></p>
-      <label class="field field--full">
-        <span class="field__label">Expérience professionnelle</span>
-        <textarea class="field__area" data-profil="experience" rows="4"
-          placeholder="- 1 mois en relation client&#10;- petits jobs, stages…"></textarea>
-        <span class="field__hint">Tout ce que tu as fait, même court. Les offres exigeant plus d'expérience que la tienne seront écartées.</span>
-      </label>
-      <label class="field field--full">
-        <span class="field__label">Atouts / compétences</span>
-        <input class="field__input" type="text" data-profil="langues"
-          placeholder="Langues, permis B, savoir-être (ponctualité, contact client)…">
-        <span class="field__hint">Langues, permis, qualités utiles pour un job.</span>
-      </label>
-    </div>
-  </div>
-
-  <!-- ─── Job B : Disponibilité & durée ─── -->
-  <div class="card profil-card" data-mode-section="job">
-    <div class="profil-card__head">
-      <span class="profil-card__num">03</span>
-      <div>
-        <h3 class="profil-card__title">Disponibilité &amp; durée</h3>
-        <p class="profil-card__sub">Quand tu peux travailler et pour combien de temps.</p>
-      </div>
-    </div>
-    <div class="profil-grid">
-      <label class="field">
-        <span class="field__label">Durée souhaitée</span>
-        <input class="field__input" type="text" data-profil="duree_souhaitee"
-          placeholder="Ex. 1 à 2,5 mois">
-      </label>
-      <label class="field">
-        <span class="field__label">Disponibilité (dates)</span>
-        <input class="field__input" type="text" data-rech="disponibilite"
-          placeholder="Ex. de juillet à mi-septembre">
-      </label>
-      <label class="field field--full">
-        <span class="field__label">Disponibilité horaire</span>
-        <input class="field__input" type="text" data-profil="dispo_horaires"
-          placeholder="Ex. journée, soir et week-end OK">
-        <span class="field__hint">Beaucoup de jobs d'été sont en horaires décalés (resto, événementiel…).</span>
-      </label>
-      <label class="field field--full">
-        <span class="field__label">Mobilité</span>
-        <input class="field__input" type="text" data-profil="mobilite"
-          placeholder="Ex. permis B, mobile sur Paris et petite couronne">
-      </label>
-    </div>
-  </div>
-
-  <!-- ─── Job C : Préférences de jobs ─── -->
-  <div class="card profil-card" data-mode-section="job">
-    <div class="profil-card__head">
-      <span class="profil-card__num">04</span>
-      <div>
-        <h3 class="profil-card__title">Tes préférences de jobs</h3>
-        <p class="profil-card__sub">Ce que tu acceptes ou non. Affine le tri des offres.</p>
-      </div>
-    </div>
-    <div class="profil-grid">
-      <label class="field field--full">
-        <span class="field__label">Types de jobs qui te vont</span>
-        <textarea class="field__area" data-profil="types_jobs_ok" rows="2"
-          placeholder="Ex. vente, accueil, restauration, manutention, saisie…"></textarea>
-      </label>
-      <label class="field field--full">
-        <span class="field__label">Types de jobs à éviter <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
-        <textarea class="field__area" data-profil="types_jobs_eviter" rows="2"
-          placeholder="Ex. garde d'enfants, démarchage téléphonique…"></textarea>
-      </label>
-    </div>
-  </div>
-
-  <!-- ─── Job D : Préférences fines (optionnelles) ─── -->
-  <div class="card profil-card" data-mode-section="job">
-    <div class="profil-card__head">
-      <span class="profil-card__num">05</span>
-      <div>
-        <h3 class="profil-card__title">Localisation &amp; domaines <span style="opacity:.6;font-weight:400;font-size:.8em;">(optionnel)</span></h3>
-        <p class="profil-card__sub">Si tu remplis, la recherche et l'analyse en tiennent compte. Sinon, tous les domaines sont cherchés.</p>
-      </div>
-    </div>
-    <div class="profil-grid">
-      <label class="field field--full">
-        <span class="field__label">Localisation préférée <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
-        <input class="field__input" type="text" data-profil="localisation_pref"
-          placeholder="Ex. près de chez moi de préférence, plus c'est loin moins ça me va">
-        <span class="field__hint">La recherche reste en Île-de-France. Ceci influence seulement le tri des offres.</span>
-      </label>
-    </div>
-    <div style="margin-top:14px;">
-      <span class="field__label">Domaines <span style="opacity:.6;font-weight:400;">(optionnel)</span></span>
-      <p class="profil-card__sub" style="margin:4px 0 10px;">Indifférent par défaut : la recherche couvre tous les domaines. Coche des grands domaines ou des domaines pour ne garder que ceux-là.</p>
-      <div class="domaines-choix" data-domaines-choix-job>
-        <!-- cases injectées par profil.js -->
-      </div>
-    </div>
-    <div class="options-recherche" data-options-recherche="job">
-      <!-- taille, thèmes, secteurs : injectés par profil.js -->
-    </div>
-  </div>
-
-  <!-- ════════ SECTIONS MODE STAGE ════════ -->
-
-  <!-- ─── Stage A : le stage ─── -->
-  <div class="card profil-card" data-mode-section="stage">
-    <div class="profil-card__head">
-      <span class="profil-card__num">02</span>
-      <div>
-        <h3 class="profil-card__title">Ton stage</h3>
-        <p class="profil-card__sub">Dates, formation et ce que tu veux faire. Repris dans le mail de candidature spontanée par les balises.</p>
-      </div>
-    </div>
-    <div class="profil-grid">
-      <label class="field">
-        <span class="field__label">Date de début</span>
-        <input class="field__input" type="date" data-profil="date_debut" data-stage-date>
-      </label>
-      <label class="field">
-        <span class="field__label">Date de fin</span>
-        <input class="field__input" type="date" data-profil="date_fin" data-stage-date>
-      </label>
-      <div class="field field--full"><span class="field__hint" data-duree-stage>Durée : renseigne les deux dates.</span></div>
-      <label class="field">
-        <span class="field__label">Établissement</span>
-        <input class="field__input" type="text" data-profil="etablissement" maxlength="200"
-          placeholder="Ex. Université, école, IUT…">
-      </label>
-      <label class="field">
-        <span class="field__label">Formation</span>
-        <input class="field__input" type="text" data-profil="formation"
-          placeholder="Ex. Licence 3, BUT 2e année, Master 1…">
-      </label>
-      <label class="field">
-        <span class="field__label">Niveau d'études actuel</span>
-        <input class="field__input" type="text" data-profil="niveau_etudes"
-          placeholder="Ex. Bac+2 en cours (BUT2) ; vide : déduit de la formation">
-        <span class="field__hint">Sert à écarter, sans IA, les offres qui exigent un niveau bien supérieur (deux crans ou plus).</span>
-      </label>
-      <p class="domaines-vide" data-niveau-avert hidden></p>
-      <label class="field field--full">
-        <span class="field__label">Missions visées</span>
-        <textarea class="field__area" data-profil="missions" rows="3"
-          placeholder="Ce que tu aimerais faire pendant le stage"></textarea>
-      </label>
-      <label class="field field--full">
-        <span class="field__label">Expérience</span>
-        <textarea class="field__area" data-profil="experience" rows="4"
-          placeholder="- Stage, job ou projet encadré (entreprise, année) : tâches principales&#10;..."></textarea>
-        <span class="field__hint">Stages, jobs, missions. Utilisée pour noter les offres et écrire la lettre.</span>
-      </label>
-    </div>
-  </div>
-
-  <!-- ─── Stage B : domaines et candidatures spontanées ─── -->
-  <div class="card profil-card" data-mode-section="stage">
-    <div class="profil-card__head">
-      <span class="profil-card__num">03</span>
-      <div>
-        <h3 class="profil-card__title">Domaines et candidatures spontanées</h3>
-        <p class="profil-card__sub">Les entreprises cherchées sur Sirene pour tes candidatures spontanées.</p>
-      </div>
-    </div>
-    <div style="margin-top:4px;">
-      <span class="field__label">Domaines</span>
-      <p class="profil-card__sub" style="margin:4px 0 10px;">Seuls l'informatique et l'immobilier ont une correspondance avec les secteurs d'entreprise de Sirene : pour un autre domaine, choisis aussi des secteurs ci-dessous.</p>
-      <div class="domaines-choix" data-domaines-choix-stage>
-        <!-- cases injectées par profil.js -->
-      </div>
-    </div>
-    <div class="options-recherche" data-options-recherche="stage">
-      <!-- tailles, départements, secteurs : injectés par profil.js -->
-    </div>
-  </div>
-
-  <!-- Barre d'enregistrement -->
-  <div class="profil-save">
-    <span class="profil-save__status" data-profil-status></span>
-    <button class="btn btn--signal" data-profil-save>Enregistrer mon profil</button>
   </div>
 
   <!-- Fenêtre « Copier depuis un autre mode » : source, sections, aperçu, confirmation -->
   <div class="modal-bg" data-copie-modal>
-    <div class="modal modal--large">
+    <div class="modal modal--large" role="dialog" aria-modal="true" aria-labelledby="copie-titre">
       <div class="modal__head">
-        <span class="modal__title">Copier depuis un autre mode</span>
+        <h2 class="modal__title" id="copie-titre">Copier depuis un autre mode</h2>
         <button class="btn btn--ghost btn--sm" type="button" data-copie-fermer>Fermer</button>
       </div>
       <div class="modal__body">

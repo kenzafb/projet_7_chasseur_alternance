@@ -52,6 +52,13 @@ def api_get_profil(request: Request, user: User = Depends(utilisateur_requis), m
     return lire_profil(user.id, mode=mode)
 
 
+@router.get("/api/profil/completude")
+def api_profil_completude(user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
+    """État des cinq parties du profil (D144, D147)."""
+    from shared.completude_profil import completude
+    return completude(lire_profil(user.id, mode=mode), mode)
+
+
 @router.post("/api/profil")
 def api_post_profil(request: Request, body: dict = Body(...), user: User = Depends(utilisateur_requis),
                     mode: str = Depends(mode_requis)):

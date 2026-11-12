@@ -157,6 +157,7 @@ export const api = {
   // Profil, mode, domaines
   profil:          ()        => get("/api/profil"),
   sauverProfil:    (donnees) => post("/api/profil", donnees),
+  completudeProfil: ()       => get("/api/profil/completude"),
   mode:            ()        => get("/api/mode"),
   domaines:        ()        => get("/api/domaines"),
   criteresOptions: ()        => get("/api/criteres_options"),

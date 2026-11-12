@@ -222,7 +222,7 @@ def test_bouton_et_fenetre_sur_la_page_profil_de_chaque_mode(utilisateur, mode):
     for attribut in ("data-copie-ouvrir", "data-copie-modal", "data-copie-sources", "data-copie-apercu-liste",
                      "data-copie-valider", "data-copie-garde", "data-copie-enregistrer"):   # garde : D121
         assert attribut in page, attribut
-    assert "Copier depuis un autre mode" in page
+    assert "Copier depuis mon profil" in page and "Copier depuis un autre mode" in page
     assert "Enregistre d'abord tes modifications" in page and "Enregistrer puis copier" in page
 
 
@@ -233,10 +233,12 @@ def test_portfolio_dans_la_carte_identite_de_chaque_mode(utilisateur, mode):
     _stage(uid)
     page = client.get(f"/{mode}").text
     assert page.count('data-profil="portfolio"') == 1
-    debut = page.index('<h3 class="profil-card__title">Identité</h3>')
-    identite = page[debut:page.index("data-mode-section=", debut)]          # jusqu'à la carte suivante
-    assert 'data-profil="portfolio"' in identite
-    assert page[:debut].rsplit("data-mode-section=", 1)[1].startswith('"commun"')
+    # Partie « Toi » du profil (D147), dans un bloc commun aux trois modes
+    debut = page.index('data-partie="toi"')
+    toi = page[debut:page.index('data-partie="mode"', debut)]
+    assert 'data-profil="portfolio"' in toi
+    i = page.index('data-profil="portfolio"')
+    assert page[:i].rsplit("data-mode-section=", 1)[1].startswith('"commun"')
 
 
 def test_portfolio_du_stage_conserve_et_copiable(utilisateur):

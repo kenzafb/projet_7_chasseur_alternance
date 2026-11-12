@@ -20,17 +20,18 @@ REPONSE = ('{"score": 7, "eligible": true, "points_forts": [], "points_faibles":
            '"alternance_seulement": false, "niveau_exigence": "non_precise"}')
 
 
-def _sections(page, titre):
-    """Modes de la carte du profil qui porte ce titre."""
-    i = page.index(f'<h3 class="profil-card__title">{titre}</h3>')
-    return re.findall(r'data-mode-section="([^"]+)"', page[:i])[-1].split()
+def _sections(page, repere):
+    """Modes du bloc du profil qui contient ce repère (« commun » : les trois)."""
+    i = page.index(repere)
+    modes = re.findall(r'data-mode-section="([^"]+)"', page[:i])[-1].split()
+    return ["alternance", "stage", "job"] if modes == ["commun"] else modes
 
 
 @pytest.mark.parametrize("mode", ["alternance", "stage", "job"])
 def test_sections_dans_les_trois_modes(utilisateur, mode):
     client, _ = utilisateur("a@test.fr", prenom="Alice")
     page = client.get(f"/{mode}").text
-    assert mode in _sections(page, "Compétences techniques") and mode in _sections(page, "Projets")
+    assert mode in _sections(page, 'data-tags-input="competences"') and mode in _sections(page, "data-projet-add")
     # Une zone « Expérience » dans une section du mode
     sections = re.findall(r'data-mode-section="([^"]+)"(.*?)(?=data-mode-section=|\Z)', page, flags=re.S)
     assert any(mode in m.split() and 'data-profil="experience"' in bloc for m, bloc in sections)
