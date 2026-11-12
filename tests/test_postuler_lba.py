@@ -59,3 +59,40 @@ def test_page_entreprise():
     for siret in ("", "123", "8484577840002X"):
         assert pages.page_entreprise(siret, "X") == ""
     assert pages.page_entreprise("", "X", PAGE_ENTREPRISE) == PAGE_ENTREPRISE
+
+
+# ─── Point 2 : boutons « Postuler sur La Bonne Alternance » (D129) ───────────
+def test_offres_page_lba_dans_l_api(utilisateur):
+    client, uid = utilisateur("ada@test.fr")
+    base = {"titre": "Dev", "entreprise": "ACME", "lieu": "Paris", "description": "x"}
+    ajouter_candidature(uid, {**base, "id": "L1", "source": "La Bonne Alternance",
+                              "lien": f"{SITE}/emploi/offres_emploi_lba/6a0/dev"})
+    ajouter_candidature(uid, {**base, "id": "L2", "source": "La Bonne Alternance", "lien": "https://partenaire.example/o"})
+    ajouter_candidature(uid, {**base, "id": "F1", "source": "France Travail", "lien": "https://francetravail.fr/o/1"})
+    pages_lba = {o["id"]: o["page_lba"] for o in client.get("/api/candidatures").json()}
+    assert pages_lba == {"L1": f"{SITE}/emploi/offres_emploi_lba/6a0/dev", "L2": "", "F1": ""}
+
+
+def _entreprise_lba(n, recipient=True, url=True, siret=None):
+    from tests.faux_lba import entreprise, siret_lba
+    e = entreprise(n, siret=siret or siret_lba(n))
+    e["apply"]["url"] = f"{SITE}/emploi/recruteurs_lba/{e['workplace']['siret']}/societe-{n}" if url else None
+    if not recipient:
+        del e["apply"]["recipient_id"]
+    return lba.normaliser_entreprise(e)
+
+
+def test_entreprises_formulaire_seulement_avec_contact(utilisateur):
+    from database.entreprises_db import ajouter_entreprises, ajouter_entreprises_lba, calculer_stats
+    from tests.faux_lba import siret_lba
+    client, uid = utilisateur("ada@test.fr")
+    ajouter_entreprises_lba(uid, [_entreprise_lba(1), _entreprise_lba(2, recipient=False),
+                                  _entreprise_lba(3, url=False)])
+    ajouter_entreprises(uid, [{"siret": "12345678900011", "siren": "123456789", "nom": "Sirene seule"}])
+    par_nom = {e["nom"]: e["lba"] for e in calculer_stats(uid)["prochaines"]}
+    assert par_nom["Société 1"] == {"url": f"{SITE}/emploi/recruteurs_lba/{siret_lba(1)}/societe-1", "formulaire": True}
+    assert par_nom["Société 2"] == {"url": f"{SITE}/emploi/recruteurs_lba/{siret_lba(2)}/societe-2", "formulaire": False}
+    assert par_nom["Société 3"] == {"url": f"{SITE}/emploi/recruteurs_lba/{siret_lba(3)}/societe-3", "formulaire": True}
+    assert par_nom["Sirene seule"] is None                                 # pas trouvée par LBA : rien
+    stats = client.get("/api/spontanees/stats").json()
+    assert any(e.get("lba") and e["lba"]["formulaire"] for e in stats["prochaines"])

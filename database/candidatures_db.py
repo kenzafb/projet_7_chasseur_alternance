@@ -15,7 +15,7 @@ from database.connexion import SessionLocal
 from database.dates import JOUR, en_texte, vers_utc
 from database.insertion import inserer_ou_ignorer
 from database.models import Candidature
-from shared.lba import lien_invente
+from shared.lba import lien_invente, page_offre
 
 
 # Colonnes simples de la table (hors id technique, user_id, et ref_offre)
@@ -42,6 +42,8 @@ def candidature_vers_dict(c: Candidature) -> dict:
     # Ancien lien LBA inventé (/emploi/<id>, D128) : ni affiché ni proposé
     if lien_invente(d.get("lien")):
         d["lien"] = ""
+    # Page de candidature sur La Bonne Alternance, ou "" (D129)
+    d["page_lba"] = page_offre(d)
     return d
 
 

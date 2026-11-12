@@ -39,6 +39,17 @@ function listeAdresses(adresses) {
   return adresses.map(a => `<div>${esc(a.adresse)} ${etiquetteAdresse(a)}</div>`).join("");
 }
 
+/* Page de l'entreprise sur La Bonne Alternance (D129) : « Postuler » si LBA
+   a un contact (formulaire sur la page), sinon simple lien d'information */
+function boutonLba(e) {
+  if (!e.lba?.url) return "";
+  return e.lba.formulaire
+    ? `<div class="trow__lba"><a class="btn btn--sm btn--lba" href="${esc(e.lba.url)}" target="_blank" rel="noopener"
+         title="Ouvre la page de candidature dans un nouvel onglet">Postuler sur La Bonne Alternance</a></div>`
+    : `<div class="trow__lba"><a class="trow__lien" href="${esc(e.lba.url)}" target="_blank" rel="noopener"
+         title="LBA n'a pas de contact pour cette entreprise : pas de formulaire">Voir sur La Bonne Alternance</a></div>`;
+}
+
 function ligne(e) {
   const aEmail = !!e.email;
   const statut = e.envoye
@@ -56,6 +67,7 @@ function ligne(e) {
       <div>
         <div class="trow__name">${esc(e.nom || "—")}${pastilles}${etiquettesAutresModes(e)}</div>
         <div class="trow__sub">${esc(e.ville || "")}</div>
+        ${boutonLba(e)}
       </div>
       <div class="trow__mail ${aEmail ? "" : "trow__mail--none"}">${(e.adresses || []).length
         ? listeAdresses(e.adresses) : aEmail ? esc(e.email) + origine : "non trouvé"}</div>

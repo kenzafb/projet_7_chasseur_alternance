@@ -89,6 +89,8 @@ function carte(o) {
         <div class="analyse-col faibles"><h4>Points faibles</h4><ul>${faibles || "<li>—</li>"}</ul></div>
       </div>
       <div class="offre__postuler" data-postuler-bloc>
+        ${o.page_lba ? `<a class="btn btn--sm btn--lba" href="${esc(o.page_lba)}" target="_blank" rel="noopener"
+          title="Ouvre la page de candidature dans un nouvel onglet">Postuler sur La Bonne Alternance</a>` : ""}
         ${o.statut !== "archive" ? `
           <input type="date" data-postuler-date value="${aujourdhui()}" max="${aujourdhui()}" title="Date de candidature">
           <button class="btn btn--sm btn--signal" data-act="postuler">J'ai postulé</button>` : ""}

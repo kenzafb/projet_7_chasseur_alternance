@@ -23,6 +23,7 @@ _TRES_ANCIEN = datetime.min.replace(tzinfo=timezone.utc)
 from sqlalchemy.orm import selectinload
 
 from database.models import EmailContacte, Entreprise, EntrepriseMode
+from shared.lba import page_entreprise
 from shared.modes import MODE_DEFAUT
 from shared.emails_exclus import email_exclu, filtrer as filtrer_emails_exclus
 
@@ -210,6 +211,7 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
                 "email_lba": bool(set(e.emails_trouves or []) & set((e.extra or {}).get("emails_lba") or [])),
                 "adresses":  adresses(e),
                 "contacts_autres_modes": ailleurs.get(e.id, []),
+                "lba":       candidature_lba(e),
             }
             for e, m in prochaines_paires
         ]
@@ -254,6 +256,20 @@ def _completer_naf(e, d: dict):
             setattr(e, champ, code)
 
 
+def candidature_lba(e: Entreprise) -> dict | None:
+    """Page de l'entreprise sur La Bonne Alternance, pour une entreprise
+    trouvée par LBA : {url, formulaire}. formulaire : LBA a un contact
+    (apply.recipient_id), la page permet de candidater ; sinon elle dit
+    « pas de contact » (D127, D129). None : pas de LBA, ou URL indéterminable."""
+    if SOURCE_LBA not in (e.sources or []):
+        return None
+    extra = e.extra or {}
+    infos = extra.get("lba") or {}
+    url = page_entreprise(extra.get("siret") or "", e.nom_commercial or extra.get("nom") or "",
+                          infos.get("candidature_url") or "")
+    return {"url": url, "formulaire": bool(infos.get("candidature_id"))} if url else None
+
+
 def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
     """Une entreprise et son état dans un mode → dict au format attendu par
     l'envoyeur et le scraper (comme l'ancien JSON)."""
@@ -280,6 +296,7 @@ def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
         "statut_suivi":   m.statut_suivi or "envoye",
         "sources":        list(e.sources or []),
         "emails_lba":     list(extra.get("emails_lba") or []),
+        "lba":            candidature_lba(e),
         "contacts_autres_modes": list(ailleurs),
     }
     # On remonte les champs utiles depuis extra
