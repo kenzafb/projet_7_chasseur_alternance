@@ -1,5 +1,5 @@
 """
-france_travail/scraper.py
+offres/france_travail.py
 =========================
 Recherche d'offres France Travail (API Offres d'emploi v2) en Île-de-France,
 selon les critères du profil et du mode (shared.criteres).
@@ -13,7 +13,7 @@ Départements et domaines ne servent qu'aux filtres choisis par l'utilisateur :
 découper par eux perdait les offres sans département ou sans domaine. Ce qui
 dépend du comportement de l'API (paramètres de domaine, valeurs multiples,
 champ de tranche d'effectif, fenêtre de dates) est lu dans
-france_travail/parametres_api.py.
+offres/parametres_france_travail.py.
 """
 
 import itertools
@@ -26,7 +26,7 @@ import requests
 
 from database.dates import instant_depuis_api
 from database.dedup_db import lire_offres_vues, marquer_offres_vues
-from france_travail import parametres_api
+from offres import parametres_france_travail as parametres_api
 from shared.config import FT_REGION
 from shared.criteres import criteres_france_travail
 from shared.liens import lien_http

@@ -9,8 +9,8 @@ from datetime import datetime, timezone
 import pytest
 from alembic import command
 
-import spontanees.envoyeur as envoyeur
-import spontanees.fetch_entreprises as fetch
+import spontanees.envoi as envoyeur
+import spontanees.recuperation as fetch
 from database.connexion import SessionLocal
 from database.dedup_db import ajouter_emails_contactes
 from database.entreprises_db import (ajouter_entreprises, ajouter_entreprises_lba, calculer_stats,
@@ -136,7 +136,7 @@ def test_sirene_en_job_reprend_une_entreprise_de_l_alternance(utilisateur, monke
 
 def test_lba_selectionne_une_entreprise_connue_dans_un_autre_mode(utilisateur):
     from tests.faux_lba import entreprise
-    import france_travail.scraper_lba as lba
+    import offres.la_bonne_alternance as lba
     _, uid = utilisateur("a@test.fr", prenom="Alice")
     ajouter_entreprises(uid, [{"siret": f"{i:09d}00012"} for i in (1, 2)], mode="job")
     b = ajouter_entreprises_lba(uid, [lba.normaliser_entreprise(entreprise(i, siret=f"{i:09d}00012"))

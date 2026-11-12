@@ -6,7 +6,7 @@ modes."""
 import pytest
 
 import main
-import spontanees.fetch_entreprises as fetch
+import spontanees.recuperation as fetch
 from database.entreprises_db import lire_entreprises
 from database.profil_db import lire_profil, sauvegarder_profil
 from shared import naf

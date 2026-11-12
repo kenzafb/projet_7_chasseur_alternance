@@ -8,8 +8,8 @@ import subprocess
 
 import pytest
 
-from france_travail import generateur
-from france_travail import pdf_generator as pdf
+from lettres import redaction as generateur
+from lettres import pdf
 
 PROFIL = {"prenom": "Hélène", "nom": "Dupont", "email": "helene@exemple.fr", "telephone": "06 12 34 56 78",
           "ville": "Paris", "linkedin": "linkedin.com/in/helene", "portfolio": "https://helene.exemple.fr",

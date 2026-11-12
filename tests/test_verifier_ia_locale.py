@@ -8,7 +8,7 @@ import pytest
 
 from database.candidatures_db import ajouter_candidature, lire_candidatures
 from database.entreprises_db import ajouter_entreprises, lire_entreprises, sauvegarder_enrichissement
-from france_travail.analyseur import marquer_non_analysee
+from offres.analyse import marquer_non_analysee
 from shared import config
 from tests.conftest import erreur_http
 from tests.test_ia import texte_envoye

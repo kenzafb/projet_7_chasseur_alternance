@@ -1,5 +1,5 @@
 """
-france_travail/scraper_lba.py
+offres/la_bonne_alternance.py
 =============================
 Recherche La Bonne Alternance (mode alternance), SPEC_SOURCES.md section 3.
 
@@ -26,7 +26,7 @@ Recherche La Bonne Alternance (mode alternance), SPEC_SOURCES.md section 3.
   Travail).
 
 Ce qui dépend du comportement de l'API est lu dans
-france_travail/parametres_lba.py (vérifié par scripts/verifier_lba.py).
+offres/parametres_lba.py (vérifié par scripts/verifier_lba.py).
 """
 
 import math
@@ -39,7 +39,7 @@ from collections import deque
 import requests
 
 from database.dates import instant_depuis_api
-from france_travail import parametres_lba as P
+from offres import parametres_lba as P
 from shared.liens import lien_http
 from shared.config import DEPTS_IDF, DEPTS_PETITE_COURONNE, LBA_CENTRES, LBA_RAYON_MIN_KM, LBA_REQUETES_MAX
 from shared.criteres import normaliser_recherche

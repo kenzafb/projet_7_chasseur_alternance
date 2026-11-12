@@ -3,8 +3,8 @@ erreur de jeton France Travail sans le corps de la réponse."""
 
 import pytest
 
-import france_travail.scraper as scraper
-import france_travail.scraper_lba as lba
+import offres.france_travail as scraper
+import offres.la_bonne_alternance as lba
 from database.candidatures_db import ajouter_candidature, lire_candidatures
 from shared.liens import lien_http
 from tests.faux_france_travail import Reponse, offre

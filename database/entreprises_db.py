@@ -23,7 +23,7 @@ _TRES_ANCIEN = datetime.min.replace(tzinfo=timezone.utc)
 from sqlalchemy.orm import selectinload
 
 from database.models import EmailContacte, Entreprise, EntrepriseMode
-from shared.lba import page_entreprise
+from offres.pages_lba import page_entreprise
 from shared.modes import MODE_DEFAUT
 from shared.emails_exclus import email_exclu, filtrer as filtrer_emails_exclus
 from shared.validation_emails import MANUELLE
@@ -684,7 +684,7 @@ def completer_codes_naf(user_id: int, par_siret: dict) -> int:
 def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None = None,
                             mode: str = MODE_DEFAUT) -> dict:
     """Entreprises à fort potentiel de La Bonne Alternance (normalisées par
-    france_travail.scraper_lba) dans les candidatures spontanées du mode
+    offres.la_bonne_alternance) dans les candidatures spontanées du mode
     (alternance), source « lba ». Dédoublonnage par SIRET avec toutes les
     entreprises de l'utilisateur (Sirene comprises, tous modes), puis par
     SIREN (un autre établissement de la même entreprise, D59), à défaut par

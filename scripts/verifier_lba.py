@@ -36,7 +36,7 @@ Vérifie sur la vraie API de La Bonne Alternance les points encore ouverts
 
 Résultat détaillé dans docs/referentiels/lba/verification_api.json
 (--sortie pour un autre dossier), sans clé ni email ni téléphone. À la fin,
-les valeurs à reporter dans france_travail/parametres_lba.py, seul endroit
+les valeurs à reporter dans offres/parametres_lba.py, seul endroit
 du code qui dépend de ces réponses. Une quarantaine de requêtes, moins
 d'une minute. Code de sortie 1 si la clé manque ou est refusée, 0 sinon.
 """
@@ -56,7 +56,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from shared import config  # noqa: E402  (charge le .env)
-from france_travail import parametres_lba as P  # noqa: E402
+from offres import parametres_lba as P  # noqa: E402
 from shared import referentiels  # noqa: E402
 
 DOSSIER_SORTIE = config.BASE_DIR / "docs" / "referentiels" / "lba"
@@ -378,7 +378,7 @@ class Verificateur:
 
 
 def propositions(res: dict) -> dict:
-    """Valeurs proposées pour france_travail/parametres_lba.py (valeur actuelle si non tranché)."""
+    """Valeurs proposées pour offres/parametres_lba.py (valeur actuelle si non tranché)."""
     prop = {}
     prop["CODES_PAR_REQUETE"] = res["codes"]["max_par_requete"] or P.CODES_PAR_REQUETE
     prop["ACCEPTE_SANS_CODES"] = res["codes"]["accepte_sans_codes"]
@@ -393,7 +393,7 @@ def propositions(res: dict) -> dict:
 
 def resume(res: dict, afficher=print):
     afficher("")
-    afficher("══ À reporter dans france_travail/parametres_lba.py ══")
+    afficher("══ À reporter dans offres/parametres_lba.py ══")
     for nom, valeur in res["propositions"].items():
         actuel = getattr(P, nom)
         note = "inchangé" if actuel == valeur else f"actuel : {actuel!r}"

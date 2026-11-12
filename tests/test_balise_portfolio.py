@@ -3,7 +3,7 @@
 
 import pytest
 
-from france_travail import generateur
+from lettres import redaction as generateur
 from shared import balises_mail
 from shared.erreurs import ErreurUtilisateur
 

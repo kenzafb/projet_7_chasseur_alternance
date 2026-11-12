@@ -3,11 +3,11 @@ données, scraper, enregistrement en base."""
 
 import pytest
 
-import france_travail.scraper_lba as lba
+import offres.la_bonne_alternance as lba
 import main
 from database.entreprises_db import ajouter_entreprises, lire_entreprises, sauvegarder_enrichissement
 from shared import emails_exclus
-from spontanees.scraper_emails import est_email_valide, meilleurs_emails
+from spontanees.recherche_emails import est_email_valide, meilleurs_emails
 import routes.offres as routes_offres
 
 SENTRY = "aa4c3f2b9d1e4f6a8b7c5d3e2f1a0b9c@o4506196830715904.ingest.us.sentry.io"

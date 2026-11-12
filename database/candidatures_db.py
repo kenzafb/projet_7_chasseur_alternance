@@ -15,7 +15,7 @@ from database.connexion import SessionLocal
 from database.dates import JOUR, en_texte, vers_utc
 from database.insertion import inserer_ou_ignorer
 from database.models import Candidature
-from shared.lba import lien_invente, page_offre
+from offres.pages_lba import lien_invente, page_offre
 from shared.liens import lien_http
 from shared.offres import entreprise_connue
 
@@ -67,7 +67,7 @@ def lire_candidatures(user_id: int, mode: str = "alternance") -> list[dict]:
 
 
 # Offre en attente d'analyse : insérée sans analyse (verdict non_analysee,
-# cf. france_travail.analyseur.VERDICT_NON_ANALYSEE) et pas archivée
+# cf. offres.analyse.VERDICT_NON_ANALYSEE) et pas archivée
 NON_ANALYSEE = "non_analysee"
 
 

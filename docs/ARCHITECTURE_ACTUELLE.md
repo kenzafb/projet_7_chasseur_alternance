@@ -81,7 +81,7 @@ Dossiers ignorés et présents : `assets/` (anciens PDF codés en dur), `lettres
 
 ## 2. Point d'entrée et flux principal
 
-**Lancement [V]** : `uvicorn main:app --reload --port 5002` (ou `python main.py`). Le bot se lance à part : `python telegram_bot.py`. L'envoyeur peut aussi tourner en CLI (`python -m spontanees.envoyeur --limite 50 --user 1`) ; une ligne cron existe mais est **commentée** [V].
+**Lancement [V]** : `uvicorn main:app --reload --port 5002` (ou `python main.py`). Le bot se lance à part : `python telegram_bot.py`. L'envoyeur peut aussi tourner en CLI (`python -m spontanees.envoi --limite 50 --user 1`) ; une ligne cron existe mais est **commentée** [V].
 
 **Requête HTTP [V]** : `SessionMiddleware` (cookie signé, 14 jours) ; chaque route appelle `utilisateur_courant(request)` qui relit `users` en base, puis `mode_courant(request)` qui lit `session["mode"]` (défaut `alternance`). Pas de `Depends`, la vérification est copiée dans chaque route.
 

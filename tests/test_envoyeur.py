@@ -5,7 +5,7 @@ import time
 
 import pytest
 
-import spontanees.envoyeur as envoyeur
+import spontanees.envoi as envoyeur
 from database import compte_envoi_db
 from database.dedup_db import lire_emails_contactes
 from database.entreprises_db import ajouter_entreprises, lire_entreprises, sauvegarder_enrichissement

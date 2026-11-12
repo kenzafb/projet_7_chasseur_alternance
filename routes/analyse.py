@@ -15,7 +15,7 @@ from auth.securite import utilisateur_requis
 from database.candidatures_db import (compter_en_attente)
 from database.models import User
 from database.profil_db import (lire_profil)
-from france_travail.analyse_differee import analyser_en_attente, duree_lisible, estimation_file
+from offres.analyse_differee import analyser_en_attente, duree_lisible, estimation_file
 from routes import commun
 from routes.commun import limite_appliquee, mode_requis, routeur_prive
 from shared import config

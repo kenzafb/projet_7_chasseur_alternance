@@ -36,7 +36,7 @@ ses identifiants (FT_CLIENT_ID, FT_CLIENT_SECRET du .env) :
 
 Résultat détaillé dans docs/referentiels/france_travail/verification_api.json
 (--sortie pour un autre dossier), sans identifiant ni token. À la fin, les
-valeurs à reporter dans france_travail/parametres_api.py, seul endroit du
+valeurs à reporter dans offres/parametres_france_travail.py, seul endroit du
 code qui dépend de ces réponses. Une centaine de requêtes, une à deux
 minutes. Code de sortie 1 si le token ne peut pas être obtenu, 0 sinon.
 """
@@ -49,7 +49,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from france_travail import parametres_api  # noqa: E402
+from offres import parametres_france_travail as parametres_api  # noqa: E402
 from scripts.explorer_france_travail import (  # noqa: E402
     DOSSIER_SORTIE, PAUSE_S, ROUTE_RECHERCHE, ErreurToken, Explorateur, _message, _total)
 from shared import referentiels  # noqa: E402
@@ -343,7 +343,7 @@ class Verificateur:
 
 
 def propositions(resultat: dict) -> dict:
-    """Valeurs proposées pour france_travail/parametres_api.py (None : non tranché)."""
+    """Valeurs proposées pour offres/parametres_france_travail.py (None : non tranché)."""
     dom = resultat["domaine"]
     valeurs = {"PARAM_GRAND_DOMAINE": dom["param_grand_domaine"], "PARAM_DOMAINE": dom["param_domaine"]}
     par_requete = dict(parametres_api.VALEURS_PAR_REQUETE)
@@ -366,7 +366,7 @@ def propositions(resultat: dict) -> dict:
 
 def resume(resultat: dict, afficher=print):
     afficher("")
-    afficher("══ À reporter dans france_travail/parametres_api.py ══")
+    afficher("══ À reporter dans offres/parametres_france_travail.py ══")
     for nom, valeur in resultat["propositions"].items():
         actuel = getattr(parametres_api, nom)
         if nom == "VALEURS_PAR_REQUETE":

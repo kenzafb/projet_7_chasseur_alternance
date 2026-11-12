@@ -4,11 +4,11 @@ validables à la main un par un ou repassés aux règles et à l'IA plus tard.""
 
 import pytest
 
-import spontanees.envoyeur as envoyeur
-import spontanees.scraper_emails as se
+import spontanees.envoi as envoyeur
+import spontanees.recherche_emails as se
 from database.dedup_db import lire_emails_contactes
 from database.entreprises_db import lire_entreprises, sauvegarder_enrichissement
-from france_travail.analyseur import reserve_public_specifique
+from offres.analyse import reserve_public_specifique
 from shared import config
 from tests.conftest import compte_verifie
 from tests.test_envoyeur import attendre, entreprises
@@ -171,7 +171,7 @@ def test_relance_bornee_et_refusee_sans_attente(alice, utilisateur, monkeypatch,
 # ─── Décision D17 : « maazi » retiré de la règle ─────────────────────────────
 def test_maazi_ne_declenche_plus_l_archivage():
     assert reserve_public_specifique("Programme MAAZI, accompagnement des alternants.") is False
-    source = (config.BASE_DIR / "france_travail" / "analyseur.py").read_text(encoding="utf-8").lower()
+    source = (config.BASE_DIR / "offres" / "analyse.py").read_text(encoding="utf-8").lower()
     assert "maazi" not in source
 
 

@@ -96,7 +96,7 @@ def site_fiable(domaine_site: str | None, nom: str) -> bool:
     domaine = domaine_site.lower().removeprefix("www.")
     if _dans(domaine, regles()["hebergeurs"]) or generique(domaine):
         return False
-    from spontanees.scraper_emails import analyser_nom, domaine_correspond, est_annuaire
+    from spontanees.recherche_emails import analyser_nom, domaine_correspond, est_annuaire
     return not est_annuaire(domaine) and domaine_correspond(domaine, analyser_nom(nom or ""))[0]
 
 

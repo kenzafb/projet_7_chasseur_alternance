@@ -3,16 +3,16 @@ insertions idempotentes."""
 
 import pytest
 
-import france_travail.analyseur
-import france_travail.scraper as scraper
-import spontanees.envoyeur as envoyeur
+import offres.analyse
+import offres.france_travail as scraper
+import spontanees.envoi as envoyeur
 from database.candidatures_db import ajouter_candidature, lire_candidatures
 from database.connexion import SessionLocal
 from database.dedup_db import (ajouter_emails_contactes, lire_emails_contactes,
                                lire_offres_vues, marquer_offres_vues)
 from database.entreprises_db import ajouter_entreprises, lire_entreprises, sauvegarder_enrichissement
 from database.models import Candidature, EmailContacte, OffreVue
-from france_travail.main import lancer_recherche
+from offres.recherche import lancer_recherche
 from tests.conftest import compte_verifie, en_parallele
 
 

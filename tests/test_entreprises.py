@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-import spontanees.scraper_emails as scraper_emails
+import spontanees.recherche_emails as scraper_emails
 from database.connexion import SessionLocal
 from database.entreprises_db import (ajouter_entreprises, calculer_stats, lire_entreprises,
                                      lire_entreprises_envoyees, normaliser_contact_rh,

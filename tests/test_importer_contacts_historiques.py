@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-import spontanees.envoyeur as envoyeur
+import spontanees.envoi as envoyeur
 from database.connexion import SessionLocal
 from database.dedup_db import lire_emails_contactes
 from database.entreprises_db import (ajouter_entreprises, lire_entreprises, lire_entreprises_envoyees,
@@ -154,7 +154,7 @@ def test_etiquette_sur_une_entreprise_recuperee_apres_l_import(ancienne_base, hi
     récupérée plus tard par Sirene dans un autre mode, porte l'étiquette
     « déjà contactée en alternance » dès qu'une de ses adresses scrapées
     est dans l'historique importé. L'envoi n'est pas bloqué."""
-    import spontanees.fetch_entreprises as fetch
+    import spontanees.recuperation as fetch
     from database.entreprises_db import calculer_stats
     from database.profil_db import sauvegarder_profil
     from tests.faux_sirene import FausseSirene, etablissement, siret_sirene

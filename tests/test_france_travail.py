@@ -6,9 +6,9 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-import france_travail.scraper as scraper
+import offres.france_travail as scraper
 from database.dedup_db import lire_offres_vues
-from france_travail import parametres_api
+from offres import parametres_france_travail as parametres_api
 from shared.criteres import criteres_france_travail, normaliser_recherche
 from tests.faux_france_travail import DEPTS, FausseAPI, Reponse, offre
 

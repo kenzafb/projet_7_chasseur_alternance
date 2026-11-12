@@ -3,7 +3,7 @@ par utilisateur au nom unique, téléchargement réservé au propriétaire."""
 
 import pytest
 
-import france_travail.pdf_generator as pdf
+import lettres.pdf as pdf
 from database.candidatures_db import ajouter_candidature
 
 PIEGES = [

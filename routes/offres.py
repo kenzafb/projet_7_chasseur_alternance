@@ -18,11 +18,11 @@ from database.candidatures_db import (ajouter_candidature, lire_candidature, lir
 from database.dates import maintenant_utc
 from database.models import User
 from database.profil_db import (lire_profil)
-from france_travail.analyse_differee import enregistrer_analyse
-from france_travail.analyseur import analyser_offre, marquer_non_analysee
-from france_travail.main import lancer_recherche
-from france_travail.scraper_lba import ignoree_pour_profil as lba_ignoree_pour_profil
-from france_travail.scraper_lba import rechercher_offres_pour_profil as rechercher_lba
+from offres.analyse_differee import enregistrer_analyse
+from offres.analyse import analyser_offre, marquer_non_analysee
+from offres.recherche import lancer_recherche
+from offres.la_bonne_alternance import ignoree_pour_profil as lba_ignoree_pour_profil
+from offres.la_bonne_alternance import rechercher_offres_pour_profil as rechercher_lba
 from routes import commun
 from routes.analyse import analyse_automatique
 from routes.commun import OffreId, limite_appliquee, mode_requis, routeur_prive

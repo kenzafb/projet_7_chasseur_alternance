@@ -6,11 +6,11 @@ from types import SimpleNamespace
 
 import pytest
 
-import france_travail.scraper as scraper
+import offres.france_travail as scraper
 import main
-import spontanees.envoyeur as envoyeur
-import spontanees.fetch_entreprises as fetch
-import spontanees.scraper_emails as scraper_emails
+import spontanees.envoi as envoyeur
+import spontanees.recuperation as fetch
+import spontanees.recherche_emails as scraper_emails
 from database.candidatures_db import lire_candidatures
 from database.dedup_db import lire_offres_vues
 from database.entreprises_db import ajouter_entreprises, lire_entreprises

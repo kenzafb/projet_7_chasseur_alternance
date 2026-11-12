@@ -17,7 +17,7 @@ from database import compte_envoi_db
 from database.entreprises_db import calculer_stats
 from database.models import User
 from database.profil_db import (lire_profil)
-from france_travail.scraper_lba import ignoree_pour_profil as lba_ignoree_pour_profil
+from offres.la_bonne_alternance import ignoree_pour_profil as lba_ignoree_pour_profil
 from routes import commun
 from routes.commun import limite_appliquee, mode_requis, routeur_prive
 from shared import compte_envoi, config
@@ -87,7 +87,7 @@ def api_spontanees_stats(request: Request, user: User = Depends(utilisateur_requ
     stats = calculer_stats(user.id, mode)
     # Maximums utiles des lancements (le serveur les applique aussi)
     from database.entreprises_db import compter_a_scraper
-    from spontanees.envoyeur import compter_a_envoyer
+    from spontanees.envoi import compter_a_envoyer
     stats["a_scraper"] = compter_a_scraper(user.id, mode)
     stats["a_envoyer"] = compter_a_envoyer(user.id, mode)
     from database.entreprises_db import compter_a_valider
@@ -170,7 +170,7 @@ def api_spontanees_fetch(request: Request, body: Fetch | None = None,
                                            sirene["avertissement"]]))
 
     def travail(arret, log, on_progress):
-        from spontanees.fetch_entreprises import main as fetch_main
+        from spontanees.recuperation import main as fetch_main
         fetch_main(stop_event=arret, on_progress=on_progress, user_id=user_id,
                    max_entreprises=maximum, log_fn=log, mode=mode)
 
@@ -191,7 +191,7 @@ def api_spontanees_scraper(request: Request, body: Scraper | None = None,
     maximum, note = limite_appliquee("scrapees", body.max_scrapees if body else None, disponibles)
 
     def travail(arret, log, on_progress):
-        from spontanees.scraper_emails import main as scraper_main
+        from spontanees.recherche_emails import main as scraper_main
         scraper_main(stop_event=arret, log_fn=log, user_id=user_id, on_progress=on_progress,
                      max_scrapees=maximum, mode=mode)
 
@@ -238,7 +238,7 @@ def api_spontanees_revalider(request: Request, body: Revalider | None = None,
     maximum, note = limite_appliquee("revalidations", body.max_revalidations if body else None, disponibles)
 
     def travail(arret, log, on_progress):
-        from spontanees.scraper_emails import revalider
+        from spontanees.recherche_emails import revalider
         revalider(user_id, stop_event=arret, log_fn=log, on_progress=on_progress, max_n=maximum, mode=mode)
 
     return _aveclimite_appliquee(_lancer_spontanees(
@@ -258,7 +258,7 @@ def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends
     if compte_envoi_db.envois_du_jour(user_id) >= config.PLAFOND_ENVOIS_JOUR:
         raise ErreurUtilisateur(f"Plafond de {config.PLAFOND_ENVOIS_JOUR} mails par jour atteint : "
                                 "les envois reprendront demain.")
-    from spontanees.envoyeur import compter_a_envoyer, objet_et_corps
+    from spontanees.envoi import compter_a_envoyer, objet_et_corps
     # Balise inconnue, ou vide dans le profil (dates du stage...) : 400 avant tout lancement
     objet_et_corps(lire_profil(user_id, mode=mode), mode)
     disponibles = compter_a_envoyer(user_id, mode)
@@ -275,7 +275,7 @@ def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends
         debut = f"▶ Envoi démarré, limite {limite}{note}"
 
     def travail(arret, log, on_progress):
-        from spontanees.envoyeur import main as env_main
+        from spontanees.envoi import main as env_main
         env_main(limite=limite, test=test, stop_event=arret, log_fn=log,
                  user_id=user_id, on_progress=on_progress, mode=mode)
 

@@ -7,7 +7,7 @@ import math
 
 import pytest
 
-import france_travail.scraper_lba as lba
+import offres.la_bonne_alternance as lba
 from shared.config import LBA_CENTRES
 from shared.niveaux import niveau_europeen
 from shared.tailles import taille_depuis_tranche

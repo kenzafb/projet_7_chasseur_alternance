@@ -1,15 +1,15 @@
 """
-france_travail/main.py
+offres/recherche.py
 ======================
 Pipeline "offres" : recherche France Travail, puis écriture de chaque
 offre « non analysée » via le callback on_offre (l'appelant écrit en base).
-L'analyse par l'IA vient après, en différé (france_travail/analyse_differee.py) :
+L'analyse par l'IA vient après, en différé (offres/analyse_differee.py) :
 la recherche n'attend jamais l'IA. Les offres déjà vues sont suivies en
 base par utilisateur et par mode (database/dedup_db.py).
 """
 
-from france_travail.scraper import chercher_offres
-from france_travail.analyseur import marquer_non_analysee
+from offres.france_travail import chercher_offres
+from offres.analyse import marquer_non_analysee
 from database.dedup_db import marquer_offres_vues
 
 

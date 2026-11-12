@@ -136,7 +136,7 @@ venv/bin/uvicorn main:app --port 5002     # --reload pendant le développement
 
 Ouvrir http://localhost:5002, créer un compte sur `/register` avec le code d'invitation, choisir un mode, remplir le profil, puis configurer le compte d'envoi (Paramètres, section Compte d'envoi) et le vérifier avec « Tester la connexion ». La documentation de l'API est sur http://localhost:5002/docs une fois connecté. En production derrière HTTPS : `COOKIE_SECURE=true`, et le proxy doit transmettre l'en-tête Host d'origine (contrôle de l'origine des requêtes).
 
-Les pipelines existent aussi en ligne de commande, pour un utilisateur donné par son identifiant (`--user`, obligatoire) et un mode (`--mode`, `alternance` par défaut) : `venv/bin/python -m spontanees.fetch_entreprises`, `venv/bin/python -m spontanees.scraper_emails`, `venv/bin/python -m spontanees.envoyeur --limite 10 --test`.
+Les pipelines existent aussi en ligne de commande, pour un utilisateur donné par son identifiant (`--user`, obligatoire) et un mode (`--mode`, `alternance` par défaut) : `venv/bin/python -m spontanees.recuperation`, `venv/bin/python -m spontanees.recherche_emails`, `venv/bin/python -m spontanees.envoi --limite 10 --test`.
 
 ### Tests et analyse du code
 

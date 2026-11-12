@@ -1,5 +1,5 @@
 """
-france_travail/pdf_generator.py
+lettres/pdf.py
 ===============================
 Lettre de motivation -> PDF (WeasyPrint).
 
@@ -30,7 +30,7 @@ from pathlib import Path
 
 from weasyprint import HTML as WeasyHTML
 
-from france_travail.generateur import contact_entreprise, date_du_jour
+from lettres.redaction import contact_entreprise, date_du_jour
 from shared import config
 from shared.offres import entreprise_connue
 from shared.erreurs import exiger_profil, CHAMPS_IDENTITE

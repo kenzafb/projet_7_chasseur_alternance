@@ -8,7 +8,7 @@ import main
 from database.candidatures_db import ajouter_candidature, lire_candidature, lire_candidatures
 from database.dedup_db import lire_offres_vues
 from database.entreprises_db import lire_entreprises, sauvegarder_enrichissement
-from france_travail.analyseur import VERDICT_NON_ANALYSEE, marquer_non_analysee
+from offres.analyse import VERDICT_NON_ANALYSEE, marquer_non_analysee
 from shared import config
 from shared.ia import IADesactivee, appeler_ia
 from tests.test_ia import _brut_ft, _lba, recherche, sans_attente  # noqa: F401  (fixtures)
@@ -134,7 +134,7 @@ def test_revalidation_refusee(ia_coupee, user_id, ia, utilisateur):
     liste = lire_entreprises(user_id)
     liste[0].update(emails_trouves=["a@acme1.fr"], emails_non_valides=True, traite=True)
     sauvegarder_enrichissement(user_id, liste)
-    from spontanees.scraper_emails import revalider
+    from spontanees.recherche_emails import revalider
     logs = []
     revalider(user_id, log_fn=logs.append)
     assert ia.appels == [] and "IA désactivée" in logs[0]

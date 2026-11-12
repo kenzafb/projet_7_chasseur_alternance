@@ -153,7 +153,7 @@ def comparer_lettres(o: dict, modeles: list[str], sortie=print, tirage=None) -> 
     tirage : fonction qui mélange une liste en place (random.shuffle)."""
     import random
 
-    from france_travail.generateur import (LettreTypeInvalide, exiger_lettre_type, lettre_par_defaut,
+    from lettres.redaction import (LettreTypeInvalide, exiger_lettre_type, lettre_par_defaut,
                                            nombre_de_mots, rediger_paragraphe_verifie)
     from shared import ia
     from shared.ia import ErreurIA, ErreurIABloquante
@@ -227,7 +227,7 @@ def main(argv=None, sortie=print) -> int:
     parser.add_argument("--mode", choices=["alternance", "job", "stage"], help="seulement les offres de ce mode")
     args = parser.parse_args(argv)
 
-    from france_travail.analyseur import analyser_offre
+    from offres.analyse import analyser_offre
     from shared import ia
     from shared.ia import ErreurIA, ErreurIABloquante, ErreurIAPassagere, IAInjoignable, ReponseInvalide
     from shared.validation_emails import avis_ia

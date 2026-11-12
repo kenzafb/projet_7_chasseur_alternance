@@ -77,7 +77,7 @@ Incident corrigé : `compileall` a créé `data/backup_avant_migration/__pycache
 - `.gitignore` : entrées obsolètes (`credentials.json`, `token_chasseur.json`, `app_route_envoi.py`, `offres_vues.json`, `candidatures.json`...) laissées, inoffensives.
 - Fichiers hérités dans `data/` (`candidatures.json`, `entreprises_raw.json`, `offres_vues.json`...) : interdiction de toucher à `data/`.
 - `database/migration.py` : seuls ses deux chemins passent par `DATA_DIR`. Il reste désynchronisé du schéma (ne connaît pas `mode`).
-- La ligne cron (commentée, hors dépôt) utilise des chemins absolus `/home/kenza/...` ; elle lance `python -m spontanees.envoyeur --limite 50 --user 1`, toujours valide.
+- La ligne cron (commentée, hors dépôt) utilise des chemins absolus `/home/kenza/...` ; elle lance `python -m spontanees.envoi --limite 50 --user 1`, toujours valide.
 
 ## 8. Points à valider par un humain
 

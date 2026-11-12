@@ -3,9 +3,9 @@ candidature fournies par l'API, jamais de lien construit au hasard."""
 
 import pytest
 
-import france_travail.scraper_lba as lba
+import offres.la_bonne_alternance as lba
 from database.candidatures_db import ajouter_candidature, lire_candidatures
-from shared import lba as pages
+from offres import pages_lba as pages
 from tests.faux_lba import offre
 
 SITE = "https://labonnealternance.apprentissage.beta.gouv.fr"

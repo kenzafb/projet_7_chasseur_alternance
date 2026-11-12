@@ -1,5 +1,5 @@
 """
-shared/lba.py
+offres/pages_lba.py
 =============
 Pages du site La Bonne Alternance où l'on candidate (phase 11, D126 à D131).
 Seul endroit qui décide si un lien LBA est fiable : jamais de lien construit

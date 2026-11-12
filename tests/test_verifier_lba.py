@@ -46,7 +46,7 @@ def test_valeurs_trouvees(cle, tmp_path):
     assert res["niveau"]["par_niveau"]["6"]["niveaux_lus_dans_les_offres"] == {"6": 60}   # M1800 hors des codes de référence
     assert res["france_travail"]["partenaires_france_travail"] == ["France Travail"]
     assert res["france_travail"]["exclusion_efficace"] is True
-    assert "À reporter dans france_travail/parametres_lba.py" in sortie
+    assert "À reporter dans offres/parametres_lba.py" in sortie
     assert "CODES_PAR_REQUETE = 20   # actuel : 100" in sortie
     assert "RAYON_MAX_KM = 200   # inchangé" in sortie
 

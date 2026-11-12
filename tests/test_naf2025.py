@@ -7,7 +7,7 @@ import sqlite3
 import pytest
 from alembic import command
 
-import spontanees.fetch_entreprises as fetch
+import spontanees.recuperation as fetch
 from database.entreprises_db import ajouter_entreprises, ajouter_entreprises_lba, lire_entreprises
 from database.profil_db import sauvegarder_profil
 from database.schema import config_alembic
@@ -65,7 +65,7 @@ def test_extraire_infos_avant_et_apres_la_bascule():
 # ─── En base ──────────────────────────────────────────────────────────────────
 def test_sirene_et_lba_enregistrent_les_deux_codes(utilisateur, sirene):
     from tests.faux_lba import entreprise
-    import france_travail.scraper_lba as lba
+    import offres.la_bonne_alternance as lba
     _, uid = utilisateur("a@test.fr", prenom="Alice")
     ajouter_entreprises_lba(uid, [lba.normaliser_entreprise(entreprise(9))])       # 6201Z
     sirene(FausseSirene([etablissement(1), etablissement(2, naf="68.31Z", naf25="68.32H")]))

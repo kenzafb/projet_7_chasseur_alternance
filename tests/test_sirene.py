@@ -4,7 +4,7 @@ complète contre l'API simulée, pas de doublon avec LBA."""
 
 import pytest
 
-import spontanees.fetch_entreprises as fetch
+import spontanees.recuperation as fetch
 from database.entreprises_db import ajouter_entreprises_lba, lire_entreprises
 from database.profil_db import sauvegarder_profil
 from shared.criteres import normaliser_recherche, options_du_profil
@@ -194,7 +194,7 @@ def test_ancienne_clause_d_absence_ne_rendait_rien():
 
 def test_pas_de_doublon_avec_lba_et_trace_des_deux_sources(utilisateur, sirene):
     from tests.faux_lba import entreprise
-    import france_travail.scraper_lba as lba
+    import offres.la_bonne_alternance as lba
     _, uid = utilisateur("a@test.fr", prenom="Alice")
     ajouter_entreprises_lba(uid, [lba.normaliser_entreprise(entreprise(1, siret=siret_sirene(1)))])
     sirene(FausseSirene(_jeu()))
@@ -211,7 +211,7 @@ def test_meme_siren_autre_etablissement_pas_de_doublon(utilisateur, sirene):
     """D59 : LBA donne un établissement secondaire (autre SIRET, même SIREN)
     que Sirene retrouve par son siège : une seule entreprise, deux sources."""
     from tests.faux_lba import entreprise
-    import france_travail.scraper_lba as lba
+    import offres.la_bonne_alternance as lba
     _, uid = utilisateur("a@test.fr", prenom="Alice")
     secondaire = f"{1:09d}00099"
     ajouter_entreprises_lba(uid, [lba.normaliser_entreprise(entreprise(1, siret=secondaire))])

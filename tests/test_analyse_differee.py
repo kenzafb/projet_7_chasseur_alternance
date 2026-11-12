@@ -10,8 +10,8 @@ import pytest
 
 import main
 from database.candidatures_db import ajouter_candidature, compter_en_attente, lire_candidature, lire_en_attente
-from france_travail.analyse_differee import analyser_en_attente, duree_lisible
-from france_travail.analyseur import marquer_non_analysee
+from offres.analyse_differee import analyser_en_attente, duree_lisible
+from offres.analyse import marquer_non_analysee
 from tests.conftest import erreur_http
 from tests.test_envoyeur import attendre
 from tests.test_ia import INTROUVABLE, echouer, recherche, sans_attente, texte_envoye  # noqa: F401  (fixtures)
@@ -23,7 +23,7 @@ from database.candidatures_db import modifier_candidature
 def durees_neuves(monkeypatch):
     """Durées d'analyse mesurées : vides à chaque test."""
     import collections
-    from france_travail import analyse_differee
+    from offres import analyse_differee
     monkeypatch.setattr(analyse_differee, "_durees", collections.deque(maxlen=50))
 
 
@@ -230,7 +230,7 @@ def test_temps_restant_estime(alice, ia):
     analyser_en_attente(uid, "alternance", {"prenom": "Alice"}, 3, horloge=lambda: next(temps),
                         on_progress=lambda f, t, r: suivi.append((f, t, r)), log=lambda m: None)
     assert suivi == [(0, 3, None), (1, 3, 180.0), (2, 3, 100.0), (3, 3, 0.0)]
-    from france_travail import analyse_differee
+    from offres import analyse_differee
     assert analyse_differee.duree_moyenne_s() == 100
     assert analyse_differee.estimation_file(36) == {"secondes": 3600, "texte": "environ 1 h 00", "mesure": True}
     assert duree_lisible(None) == "" and duree_lisible(20) == "moins d'une minute"

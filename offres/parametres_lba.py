@@ -1,5 +1,5 @@
 """
-france_travail/parametres_lba.py
+offres/parametres_lba.py
 ================================
 Seul endroit qui dépend des points de l'API de La Bonne Alternance encore
 à vérifier sur la vraie API (SPEC_SOURCES.md, section 7). Le reste du code
@@ -54,7 +54,7 @@ PARTENAIRES_FRANCE_TRAVAIL = ("france travail", "pole emploi")
 # offres LBA + 261 France Travail + 39 autres = 450). Les entreprises sont
 # à 150 sur presque tous les cercles (seul Cergy à 10 km en donne 98).
 # Une réponse au plafond est peut-être tronquée : son cercle est redécoupé
-# (france_travail.scraper_lba).
+# (offres.la_bonne_alternance).
 PLAFOND_PAR_SOURCE = 150
 PLAFOND_TOTAL_OFFRES = 450
 

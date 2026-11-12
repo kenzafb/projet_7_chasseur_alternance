@@ -56,7 +56,7 @@ def test_parametres_trouves_et_listes_acceptees(api, tmp_path):
     assert prop["VALEURS_PAR_REQUETE"]["domaine"] == 5
     assert prop["VALEURS_PAR_REQUETE"]["secteurActivite"] == 5
     assert prop["VALEURS_PAR_REQUETE"]["theme"] == 2
-    assert "À reporter dans france_travail/parametres_api.py" in sortie
+    assert "À reporter dans offres/parametres_france_travail.py" in sortie
     assert "PARAM_DOMAINE = 'domaine'   # inchangé" in sortie
 
 

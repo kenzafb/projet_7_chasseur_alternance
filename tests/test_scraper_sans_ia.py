@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 import shared.ia
-import spontanees.scraper_emails as se
+import spontanees.recherche_emails as se
 from database.entreprises_db import ajouter_entreprises, lire_entreprises, sauvegarder_enrichissement
 from shared.validation_emails import emails_douteux
 from tests.test_ia import INTROUVABLE, echouer, erreur_http, texte_envoye

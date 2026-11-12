@@ -1,5 +1,5 @@
 """
-france_travail/analyse_differee.py
+offres/analyse_differee.py
 ==================================
 Analyse en différé des offres « non analysées » (décision D21, phase 7).
 
@@ -22,7 +22,7 @@ import threading
 import time
 
 from database.candidatures_db import lire_candidature, lire_en_attente, modifier_candidature
-from france_travail.analyseur import analyser_offre, appliquer_analyse, archivage_mots_cles
+from offres.analyse import analyser_offre, appliquer_analyse, archivage_mots_cles
 from shared.ia import ErreurIAPassagere, verifier_demarrage
 
 # Champs de l'offre écrits après une analyse réussie

@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from france_travail.analyseur import analyser_offre, appliquer_archivage_auto, appliquer_analyse
+from offres.analyse import analyser_offre, appliquer_archivage_auto, appliquer_analyse
 from shared import eligibilite as el
 
 # BUT2, 10 semaines de février à avril (le profil de la comparaison humaine)
@@ -132,7 +132,7 @@ def test_avertissement_dans_le_profil(utilisateur):
 
 def test_archive_ineligible_motif_filtre_et_retour(utilisateur, ia):
     from database.candidatures_db import ajouter_candidature, lire_candidature
-    from france_travail.analyseur import marquer_non_analysee
+    from offres.analyse import marquer_non_analysee
     from shared import config
     client, uid = utilisateur("a@test.fr", prenom="Alice")
     client.mode = "stage"

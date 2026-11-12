@@ -50,7 +50,7 @@ def a_et_b(utilisateur, smtp_simule, monkeypatch):
                                "statut": "nouveau", "lettre": SECRET_A, "source": "La Bonne Alternance",
                                "lien": "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/offres_emploi_lba/a/b"})
     from tests.faux_lba import entreprise
-    import france_travail.scraper_lba as lba
+    import offres.la_bonne_alternance as lba
     e = lba.normaliser_entreprise(entreprise(1))
     e["nom_commercial"] = e["nom"] = SECRET_A
     e["email"] = "rh@secret-alice.fr"

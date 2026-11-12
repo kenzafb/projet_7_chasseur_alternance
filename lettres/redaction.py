@@ -1,5 +1,5 @@
 """
-france_travail/generateur.py
+lettres/redaction.py
 ============================
 Lettre de motivation (D106) : la personne écrit sa lettre type dans son
 profil, avec des balises ; l'IA (IA_MODELE_LETTRE) n'écrit que le

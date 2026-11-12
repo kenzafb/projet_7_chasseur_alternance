@@ -392,7 +392,7 @@ def appliquer_analyse(offre, analyse, mode="alternance", verbeux=True):
 
 # Offre insérée sans analyse (toute offre trouvée par la recherche) : verdict
 # « non_analysee », ni score ni points ; analysée ensuite en différé
-# (france_travail/analyse_differee.py) ou une à une par le bouton « Analyser ».
+# (offres/analyse_differee.py) ou une à une par le bouton « Analyser ».
 VERDICT_NON_ANALYSEE = "non_analysee"
 
 

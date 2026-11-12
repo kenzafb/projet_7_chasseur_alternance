@@ -1,5 +1,5 @@
 """
-spontanees/fetch_entreprises.py
+spontanees/recuperation.py
 ===============================
 Étape « Récupérer » des candidatures spontanées : entreprises à fort
 potentiel de La Bonne Alternance, puis entreprises de l'API Sirene de
@@ -352,7 +352,7 @@ def entreprises_lba(user_id, profil, max_entreprises=None, stop_event=None, log_
     """Entreprises à fort potentiel de La Bonne Alternance (SPEC_SOURCES
     section 3). Retourne le nombre de nouvelles entreprises ajoutées (au
     plus max_entreprises)."""
-    from france_travail.scraper_lba import rechercher_pour_profil
+    from offres.la_bonne_alternance import rechercher_pour_profil
     from database.entreprises_db import ajouter_entreprises_lba, cles_connues
     from shared.config import LBA_RAYON_MIN_KM, LBA_REQUETES_MAX
     log_fn("🔍 La Bonne Alternance : entreprises à fort potentiel d'embauche d'alternants "

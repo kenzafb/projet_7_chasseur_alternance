@@ -4,7 +4,7 @@ adresse enregistrée comme contactée, aucune entreprise marquée envoyée."""
 
 import pytest
 
-import spontanees.envoyeur as envoyeur
+import spontanees.envoi as envoyeur
 from database.dedup_db import ajouter_emails_contactes, lire_emails_contactes
 from database.entreprises_db import ajouter_entreprises, lire_entreprises, sauvegarder_enrichissement
 from tests.conftest import compte_verifie

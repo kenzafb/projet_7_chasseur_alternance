@@ -121,7 +121,7 @@ DATABASE_URL=sqlite:////home/kenza/Bureau/chasseur_alternance/data/chasseur_v2.d
 DATABASE_URL=sqlite:////home/kenza/Bureau/chasseur_alternance/data/chasseur_v2.db alembic current   # attendu : 0005 (head)
 ```
 
-Puis chaque utilisateur configure son compte dans Profil, section Compte d'envoi, et clique « Enregistrer et tester » (Gmail : validation en deux étapes puis mot de passe d'application). La ligne cron `python -m spontanees.envoyeur --limite 50 --user 1` reste valide, mais échouera tant que le user 1 n'a pas de compte vérifié ; ajouter `--mode job` pour envoyer avec le profil job.
+Puis chaque utilisateur configure son compte dans Profil, section Compte d'envoi, et clique « Enregistrer et tester » (Gmail : validation en deux étapes puis mot de passe d'application). La ligne cron `python -m spontanees.envoi --limite 50 --user 1` reste valide, mais échouera tant que le user 1 n'a pas de compte vérifié ; ajouter `--mode job` pour envoyer avec le profil job.
 
 ## 9. Points à valider
 

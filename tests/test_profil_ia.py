@@ -6,7 +6,8 @@ import re
 
 import pytest
 
-from france_travail import analyseur, generateur
+from lettres import redaction as generateur
+from offres import analyse as analyseur
 from shared import config
 
 STAGE = {"prenom": "Alice", "nom": "Martin", "email": "a@test.fr", "formation": "BUT 2e année informatique",

@@ -8,7 +8,7 @@ import sqlite3
 
 from alembic import command
 
-import france_travail.scraper_lba as lba
+import offres.la_bonne_alternance as lba
 import main
 from database.entreprises_db import (ajouter_entreprises, ajouter_entreprises_lba, calculer_stats,
                                      cles_connues, lire_entreprises, noter_source)
@@ -179,7 +179,7 @@ def test_recuperer_partage_la_limite_entre_lba_et_sirene(utilisateur, monkeypatc
     """D44 : aucune source prioritaire ; LBA a droit à la moitié de la
     limite, Sirene au reste. Une entreprise trouvée par les deux garde les
     deux sources. Durée et requêtes de LBA dans les logs."""
-    import spontanees.fetch_entreprises as fetch
+    import spontanees.recuperation as fetch
     from database.profil_db import sauvegarder_profil
     _, uid = utilisateur("a@test.fr", prenom="Alice")
     sauvegarder_profil(uid, {"recherche": {"domaines": ["M18"]}})

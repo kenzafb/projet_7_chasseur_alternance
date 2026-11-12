@@ -9,8 +9,8 @@ from datetime import date
 import pytest
 from alembic import command
 
-import spontanees.envoyeur as envoyeur
-import spontanees.fetch_entreprises as fetch
+import spontanees.envoi as envoyeur
+import spontanees.recuperation as fetch
 from database.entreprises_db import ajouter_entreprises, lire_entreprises, sauvegarder_enrichissement
 from database.profil_db import lire_profil, sauvegarder_profil
 from database.schema import config_alembic
@@ -263,7 +263,7 @@ def test_criteres_france_travail_du_stage():
 
 
 def test_recherche_d_offres_de_stage(api, stagiaire):
-    from france_travail.main import lancer_recherche
+    from offres.recherche import lancer_recherche
     from tests.faux_france_travail import offre
     _, uid = stagiaire
     api.offres = [offre(1, nature="E1", type_contrat="CDD", titre="Stage - Assistant(e) RH H/F"),
@@ -297,7 +297,7 @@ def test_recherche_par_la_route_en_stage(stagiaire, monkeypatch, pipelines_neufs
     def recherche(user_id, profil, max_offres, on_offre, mode, log_fn):
         o = {"id": "s1", "titre": "Stage - Assistant RH", "entreprise": "ACME", "lieu": "75 - Paris",
              "zone": "Paris", "lien": "", "source": "France Travail", "description": "", "statut": "nouveau"}
-        from france_travail.analyseur import marquer_non_analysee
+        from offres.analyse import marquer_non_analysee
         marquer_non_analysee(o, mode=mode)
         on_offre(o)
         return [o]
@@ -316,7 +316,7 @@ def test_recherche_par_la_route_en_stage(stagiaire, monkeypatch, pipelines_neufs
 
 
 def test_archivage_par_mots_cles_en_stage():
-    from france_travail.analyseur import marquer_non_analysee
+    from offres.analyse import marquer_non_analysee
     def offre(**k):
         return {"titre": "Stage - Assistant", "description": "", "entreprise": "ACME", **k}
     assert marquer_non_analysee(offre(), mode="stage").get("statut") != "archive"

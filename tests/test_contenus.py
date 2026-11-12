@@ -7,9 +7,10 @@ import re
 
 import pytest
 
-import spontanees.envoyeur as envoyeur
-from france_travail import analyseur, generateur
-from france_travail.pdf_generator import construire_html
+import spontanees.envoi as envoyeur
+from lettres import redaction as generateur
+from offres import analyse as analyseur
+from lettres.pdf import construire_html
 from shared import config
 
 # Traces d'utilisateurs réels (identité, établissements, expériences,

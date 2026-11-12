@@ -16,9 +16,9 @@ from database.candidatures_db import (enregistrer_lettre_pdf,
                                      lire_candidature, lire_lettre_pdf, modifier_candidature)
 from database.models import User
 from database.profil_db import (lire_profil)
-from france_travail.generateur import (A_COMPLETER, assembler_lettre, exiger_lettre_type, infos_lettre,
+from lettres.redaction import (A_COMPLETER, assembler_lettre, exiger_lettre_type, infos_lettre,
                                       marqueurs_a_completer, rediger_paragraphe_verifie)
-from france_travail.pdf_generator import generer_pdf_lettre, nom_telechargement
+from lettres.pdf import generer_pdf_lettre, nom_telechargement
 from routes.commun import OffreId, mode_requis, routeur_prive
 from shared import config
 from shared.config import chemin_lettre_pdf
@@ -48,7 +48,7 @@ def api_lettre_paragraphe(body: OffreId, user: User = Depends(utilisateur_requis
     if not offre:
         return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
     profil = lire_profil(user.id, mode=mode)
-    from france_travail.generateur import exiger_lettre_type
+    from lettres.redaction import exiger_lettre_type
     exiger_profil(profil, CHAMPS_IDENTITE)
     exiger_lettre_type(profil)
     if not config.analyse_ia_active():

@@ -1,5 +1,5 @@
 """
-france_travail/parametres_api.py
+offres/parametres_france_travail.py
 ================================
 Seul endroit qui dépend des points de l'API France Travail encore à
 vérifier sur la vraie API (SPEC_SOURCES.md, section 7). Le reste du code

@@ -2,11 +2,11 @@
 envoyeur.py
 ===========
 Depuis l'application (main.py) :
-  from spontanees.envoyeur import main as env_main
+  from spontanees.envoi import main as env_main
   env_main(limite=10, test=True, stop_event=event, log_fn=log, user_id=user_id)
 
 CLI (--user obligatoire) :
-  python -m spontanees.envoyeur --user 1 --limite 10 --test
+  python -m spontanees.envoi --user 1 --limite 10 --test
 
 Compte d'envoi : uniquement celui de l'utilisateur qui lance le pipeline
 (table comptes_envoi), configuré ET vérifié, sinon rien ne part. Aucun

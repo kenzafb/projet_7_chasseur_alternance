@@ -10,7 +10,7 @@ from alembic import command
 import main
 from database.profil_db import lire_profil, sauvegarder_profil
 from database.schema import config_alembic
-from france_travail.analyseur import contexte_job
+from offres.analyse import contexte_job
 from shared import domaines as d
 from routes import commun
 import routes.offres as routes_offres
@@ -136,7 +136,7 @@ def test_migration_0007(tmp_path):
 def test_avertissement_au_lancement(utilisateur, monkeypatch):
     client, uid = utilisateur("a@test.fr", prenom="Alice")
     sauvegarder_profil(uid, {"recherche": {"domaines": ["J", "M18"]}})
-    import spontanees.fetch_entreprises as fetch
+    import spontanees.recuperation as fetch
     monkeypatch.setattr(fetch, "main", lambda **kw: None)
     from tests.test_pipelines import attendre
     r = client.post("/api/spontanees/fetch").json()

@@ -8,7 +8,7 @@ import time
 import pytest
 
 import main
-import spontanees.scraper_emails
+import spontanees.recherche_emails
 from shared.pipelines import Pipelines, RECHERCHE
 from tests.conftest import en_parallele
 from routes import commun
@@ -61,7 +61,7 @@ def faux_travaux(monkeypatch):
 
     monkeypatch.setattr(routes_offres, "lancer_recherche", fausse_recherche)
     monkeypatch.setattr(routes_offres, "rechercher_lba", lambda profil, log=print: {"offres": [], "entreprises": [], "requetes": 0})
-    monkeypatch.setattr(spontanees.scraper_emails, "main", faux_scraper)
+    monkeypatch.setattr(spontanees.recherche_emails, "main", faux_scraper)
     yield liberer, demarres, arretes
     # Laisser finir les threads AVANT que les faux soient retirés : sinon un
     # thread attardé appellerait le vrai LBA une fois les barrières levées.

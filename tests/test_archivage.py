@@ -3,7 +3,7 @@ réservées (BOETH, RQTH), jamais la mention standard d'égalité des chances.""
 
 import pytest
 
-from france_travail.analyseur import appliquer_archivage_auto, reserve_public_specifique
+from offres.analyse import appliquer_archivage_auto, reserve_public_specifique
 
 # Les trois offres archivées à tort pendant la recette (data/chasseur_v2.db)
 MENTIONS_DE_LA_RECETTE = [

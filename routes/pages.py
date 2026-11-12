@@ -10,7 +10,7 @@ from fastapi import Request
 from fastapi.responses import RedirectResponse
 
 from auth.securite import LONGUEUR_MIN_MOT_DE_PASSE
-from france_travail.generateur import (lettre_par_defaut)
+from lettres.redaction import (lettre_par_defaut)
 from routes.commun import routeur_prive, templates
 from shared import config
 from shared.modes import MODE_DEFAUT, MODES, get_mode, modes_accueil

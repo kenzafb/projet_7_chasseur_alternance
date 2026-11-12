@@ -9,13 +9,13 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
-import france_travail.scraper as scraper
+import offres.france_travail as scraper
 import main
 import shared.ia
 from database.candidatures_db import ajouter_candidature, lire_candidature, lire_candidatures
 from database.dedup_db import lire_offres_vues
-from france_travail.analyseur import analyser_offre
-from france_travail.generateur import rediger_paragraphe_verifie
+from offres.analyse import analyser_offre
+from lettres.redaction import rediger_paragraphe_verifie
 from shared import config
 from shared.ia import (ErreurIABloquante, ErreurIAPassagere, IAInjoignable, ReponseInvalide, appeler_ia,
                        appeler_structure)
