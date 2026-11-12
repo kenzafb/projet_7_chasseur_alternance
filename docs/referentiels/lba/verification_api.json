@@ -1,5 +1,5 @@
 {
-  "verifie_le": "2026-10-08T22:11:36+00:00",
+  "verifie_le": "2026-11-12T00:18:48+00:00",
   "requetes": 32,
   "reference": {
     "params": {
@@ -10,11 +10,11 @@
       "partners_to_exclude": "France Travail"
     },
     "statut": 200,
-    "offres": 3,
+    "offres": 7,
     "entreprises": 150,
     "par_source": {
-      "offres_emploi_lba": 2,
-      "PASS": 1,
+      "Hellowork": 6,
+      "Jobs that make sense": 1,
       "<entreprises>": 150
     },
     "cles_reponse": [
@@ -34,11 +34,12 @@
           "partners_to_exclude": "France Travail"
         },
         "statut": 200,
-        "offres": 3,
+        "offres": 11,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 2,
-          "PASS": 1,
+          "offres_emploi_lba": 1,
+          "Hellowork": 9,
+          "Jobs that make sense": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -56,11 +57,12 @@
           "partners_to_exclude": "France Travail"
         },
         "statut": 200,
-        "offres": 4,
+        "offres": 11,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 2,
-          "PASS": 2,
+          "offres_emploi_lba": 1,
+          "Hellowork": 9,
+          "Jobs that make sense": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -78,14 +80,14 @@
           "partners_to_exclude": "France Travail"
         },
         "statut": 200,
-        "offres": 7,
+        "offres": 14,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 2,
-          "PASS": 2,
-          "Veritone": 1,
+          "offres_emploi_lba": 1,
+          "Hellowork": 10,
+          "Jobs that make sense": 1,
           "RH Alternance": 1,
-          "Meteojob": 1,
+          "APEC": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -103,14 +105,15 @@
           "partners_to_exclude": "France Travail"
         },
         "statut": 200,
-        "offres": 7,
+        "offres": 15,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 2,
-          "PASS": 2,
-          "Veritone": 1,
+          "offres_emploi_lba": 1,
+          "Hellowork": 10,
+          "Jobs that make sense": 1,
           "RH Alternance": 1,
-          "Meteojob": 1,
+          "PASS": 1,
+          "APEC": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -128,17 +131,17 @@
           "partners_to_exclude": "France Travail"
         },
         "statut": 200,
-        "offres": 16,
+        "offres": 37,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 2,
+          "offres_emploi_lba": 1,
+          "Hellowork": 25,
+          "Jobs that make sense": 1,
+          "RH Alternance": 2,
+          "FranceTravail CEGID": 1,
           "PASS": 4,
-          "Veritone": 1,
-          "RH Alternance": 3,
-          "Meteojob": 2,
-          "Le bon coin emploi": 2,
-          "Jobposting": 1,
-          "Talentplug": 1,
+          "APEC": 2,
+          "Le bon coin emploi": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -161,9 +164,14 @@
       "entreprises": 150,
       "par_source": {
         "offres_emploi_lba": 150,
-        "France Travail": 261,
-        "Meteojob": 31,
-        "RH Alternance": 7,
+        "France Travail": 178,
+        "ATS_Hellowork": 1,
+        "OPCO EP": 3,
+        "Hellowork": 95,
+        "Meteojob": 18,
+        "annonces Atlas": 2,
+        "Jobs that make sense": 1,
+        "RH Alternance": 1,
         "Jobposting": 1,
         "<entreprises>": 150
       },
@@ -186,11 +194,11 @@
           "partners_to_exclude": "France Travail"
         },
         "statut": 200,
-        "offres": 2,
+        "offres": 6,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 1,
-          "PASS": 1,
+          "Hellowork": 5,
+          "Jobs that make sense": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -208,11 +216,11 @@
           "partners_to_exclude": "France Travail"
         },
         "statut": 200,
-        "offres": 3,
+        "offres": 7,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 2,
-          "PASS": 1,
+          "Hellowork": 6,
+          "Jobs that make sense": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -230,11 +238,11 @@
           "partners_to_exclude": "France Travail"
         },
         "statut": 200,
-        "offres": 4,
+        "offres": 8,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 3,
-          "PASS": 1,
+          "Hellowork": 7,
+          "Jobs that make sense": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -252,11 +260,11 @@
           "partners_to_exclude": "France Travail"
         },
         "statut": 200,
-        "offres": 4,
+        "offres": 8,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 3,
-          "PASS": 1,
+          "Hellowork": 7,
+          "Jobs that make sense": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -274,11 +282,12 @@
           "partners_to_exclude": "France Travail"
         },
         "statut": 200,
-        "offres": 5,
+        "offres": 9,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 4,
-          "PASS": 1,
+          "offres_emploi_lba": 1,
+          "Hellowork": 7,
+          "Jobs that make sense": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -296,11 +305,12 @@
           "partners_to_exclude": "France Travail"
         },
         "statut": 200,
-        "offres": 5,
+        "offres": 9,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 4,
-          "PASS": 1,
+          "offres_emploi_lba": 1,
+          "Hellowork": 7,
+          "Jobs that make sense": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -333,13 +343,16 @@
         "partners_to_exclude": "France Travail"
       },
       "statut": 200,
-      "offres": 7,
+      "offres": 25,
       "entreprises": 150,
       "par_source": {
-        "offres_emploi_lba": 4,
-        "Meteojob": 1,
+        "offres_emploi_lba": 1,
+        "Hellowork": 18,
+        "Meteojob": 2,
         "PASS": 1,
-        "Nos Talents Nos Emplois": 1,
+        "Jobs that make sense": 1,
+        "Direct Emploi": 1,
+        "RH Alternance": 1,
         "<entreprises>": 150
       },
       "cles_reponse": [
@@ -357,11 +370,11 @@
         "partners_to_exclude": "France Travail"
       },
       "statut": 200,
-      "offres": 2,
+      "offres": 6,
       "entreprises": 150,
       "par_source": {
-        "offres_emploi_lba": 1,
-        "PASS": 1,
+        "Hellowork": 5,
+        "Jobs that make sense": 1,
         "<entreprises>": 150
       },
       "cles_reponse": [
@@ -380,9 +393,9 @@
       },
       "statut": 200,
       "offres": 0,
-      "entreprises": 98,
+      "entreprises": 91,
       "par_source": {
-        "<entreprises>": 98
+        "<entreprises>": 91
       },
       "cles_reponse": [
         "jobs",
@@ -404,10 +417,11 @@
           "target_diploma_level": "6"
         },
         "statut": 200,
-        "offres": 1,
+        "offres": 2,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 1,
+          "Jobs that make sense": 1,
+          "Hellowork": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -429,11 +443,11 @@
           "diploma": "6"
         },
         "statut": 200,
-        "offres": 3,
+        "offres": 7,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 2,
-          "PASS": 1,
+          "Hellowork": 6,
+          "Jobs that make sense": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -455,11 +469,11 @@
           "diploma": "6 (Licence, BUT...)"
         },
         "statut": 200,
-        "offres": 3,
+        "offres": 7,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 2,
-          "PASS": 1,
+          "Hellowork": 6,
+          "Jobs that make sense": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -481,11 +495,11 @@
           "diplomaLevel": "6"
         },
         "statut": 200,
-        "offres": 3,
+        "offres": 7,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 2,
-          "PASS": 1,
+          "Hellowork": 6,
+          "Jobs that make sense": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -507,11 +521,11 @@
           "niveau": "6"
         },
         "statut": 200,
-        "offres": 3,
+        "offres": 7,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 2,
-          "PASS": 1,
+          "Hellowork": 6,
+          "Jobs that make sense": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -555,9 +569,10 @@
           "target_diploma_level": "3"
         },
         "statut": 200,
-        "offres": 0,
+        "offres": 1,
         "entreprises": 150,
         "par_source": {
+          "Jobs that make sense": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -566,7 +581,9 @@
           "warnings"
         ],
         "valeur": "3",
-        "niveaux_lus_dans_les_offres": {}
+        "niveaux_lus_dans_les_offres": {
+          "None": 1
+        }
       },
       "4": {
         "params": {
@@ -581,7 +598,7 @@
         "offres": 1,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 1,
+          "Jobs that make sense": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -591,7 +608,7 @@
         ],
         "valeur": "4",
         "niveaux_lus_dans_les_offres": {
-          "4": 1
+          "None": 1
         }
       },
       "5": {
@@ -604,9 +621,11 @@
           "target_diploma_level": "5"
         },
         "statut": 200,
-        "offres": 0,
+        "offres": 2,
         "entreprises": 150,
         "par_source": {
+          "Jobs that make sense": 1,
+          "Hellowork": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -615,7 +634,10 @@
           "warnings"
         ],
         "valeur": "5",
-        "niveaux_lus_dans_les_offres": {}
+        "niveaux_lus_dans_les_offres": {
+          "None": 1,
+          "5": 1
+        }
       },
       "6": {
         "params": {
@@ -627,10 +649,11 @@
           "target_diploma_level": "6"
         },
         "statut": 200,
-        "offres": 1,
+        "offres": 3,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 1,
+          "Jobs that make sense": 1,
+          "Hellowork": 2,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -640,7 +663,8 @@
         ],
         "valeur": "6",
         "niveaux_lus_dans_les_offres": {
-          "6": 1
+          "None": 1,
+          "6": 2
         }
       },
       "7": {
@@ -653,11 +677,11 @@
           "target_diploma_level": "7"
         },
         "statut": 200,
-        "offres": 2,
+        "offres": 5,
         "entreprises": 150,
         "par_source": {
-          "offres_emploi_lba": 1,
-          "PASS": 1,
+          "Hellowork": 4,
+          "Jobs that make sense": 1,
           "<entreprises>": 150
         },
         "cles_reponse": [
@@ -667,7 +691,8 @@
         ],
         "valeur": "7",
         "niveaux_lus_dans_les_offres": {
-          "7": 2
+          "7": 4,
+          "None": 1
         }
       }
     }
@@ -683,20 +708,20 @@
           "partners_to_exclude": "France Travail"
         },
         "statut": 200,
-        "offres": 238,
+        "offres": 262,
         "entreprises": 150,
         "par_source": {
           "offres_emploi_lba": 150,
-          "Meteojob": 20,
+          "ATS_Hellowork": 1,
+          "OPCO EP": 33,
+          "Hellowork": 58,
           "RH Alternance": 9,
-          "OPCO EP": 42,
-          "Veritone": 5,
-          "Kelio": 2,
-          "annonces Atlas": 2,
+          "Kelio": 1,
+          "Meteojob": 3,
+          "APEC": 3,
           "iquesta": 1,
+          "Talentplug": 1,
           "La Poste": 1,
-          "Talentplug": 3,
-          "Le bon coin emploi": 2,
           "Jobposting": 1,
           "<entreprises>": 150
         },
@@ -715,20 +740,20 @@
           "partners_to_exclude": "France Travail"
         },
         "statut": 200,
-        "offres": 253,
+        "offres": 286,
         "entreprises": 150,
         "par_source": {
           "offres_emploi_lba": 150,
-          "Meteojob": 29,
-          "RH Alternance": 12,
-          "OPCO EP": 45,
-          "Veritone": 5,
-          "Kelio": 2,
-          "annonces Atlas": 2,
+          "ATS_Hellowork": 2,
+          "OPCO EP": 36,
+          "Hellowork": 73,
+          "RH Alternance": 9,
+          "Kelio": 1,
+          "Meteojob": 8,
+          "APEC": 3,
           "iquesta": 1,
+          "Talentplug": 1,
           "La Poste": 1,
-          "Talentplug": 3,
-          "Le bon coin emploi": 2,
           "Jobposting": 1,
           "<entreprises>": 150
         },
@@ -740,103 +765,108 @@
       }
     },
     "max_par_source": {
-      "offres_emploi_lba": 150,
-      "PASS": 4,
+      "Hellowork": 95,
+      "Jobs that make sense": 1,
       "<entreprises>": 150,
-      "Veritone": 5,
-      "RH Alternance": 12,
-      "Meteojob": 31,
-      "Le bon coin emploi": 2,
-      "Jobposting": 1,
-      "Talentplug": 3,
-      "France Travail": 261,
-      "Nos Talents Nos Emplois": 1,
-      "OPCO EP": 45,
-      "Kelio": 2,
+      "offres_emploi_lba": 150,
+      "RH Alternance": 9,
+      "APEC": 3,
+      "PASS": 4,
+      "FranceTravail CEGID": 1,
+      "Le bon coin emploi": 1,
+      "France Travail": 178,
+      "ATS_Hellowork": 2,
+      "OPCO EP": 36,
+      "Meteojob": 18,
       "annonces Atlas": 2,
+      "Jobposting": 1,
+      "Direct Emploi": 1,
+      "Kelio": 1,
       "iquesta": 1,
+      "Talentplug": 1,
       "La Poste": 1
     },
-    "plafond_observe": 150
+    "plafond_observe": 150,
+    "max_offres": 450
   },
   "entreprises": {
-    "lues": 4148,
+    "lues": 4141,
     "champs": {
       "identifier.id": {
-        "presence": 4148,
-        "sur": 4148,
+        "presence": 4141,
+        "sur": 4141,
         "exemples": [
-          "6a003c399a6be614e48abba9",
-          "68f7bed849b8c5a9668a3f23",
-          "6a003c889a6be614e48ec247"
+          "6af03b4a30cb61190c1e3c2f",
+          "6a003c889a6be614e48ec247",
+          "6ae700c61b7811ea8da5f739"
         ]
       },
       "workplace.siret": {
-        "presence": 4148,
-        "sur": 4148,
+        "presence": 4141,
+        "sur": 4141,
         "exemples": [
-          "82846965000075",
-          "97885742300013",
-          "84845778400025"
+          "34467149000037",
+          "84845778400025",
+          "95151062700023"
         ]
       },
       "workplace.brand": {
-        "presence": 4148,
-        "sur": 4148,
+        "presence": 4141,
+        "sur": 4141,
         "exemples": [
-          "WETRADELOCAL",
-          "GRANITE",
-          "LEHIBOU CYBERSECURITY"
+          "ARETE",
+          "LEHIBOU CYBERSECURITY",
+          "ENDURING DEFENSE"
         ]
       },
       "workplace.legal_name": {
-        "presence": 4148,
-        "sur": 4148,
+        "presence": 4141,
+        "sur": 4141,
         "exemples": [
-          "WETRADELOCAL",
-          "GRANITE",
-          "LEHIBOU CYBERSECURITY"
+          "ARETE",
+          "LEHIBOU CYBERSECURITY",
+          "ENDURING DEFENSE"
         ]
       },
       "workplace.name": {
-        "presence": 4148,
-        "sur": 4148,
+        "presence": 4141,
+        "sur": 4141,
         "exemples": [
-          "WETRADELOCAL",
-          "GRANITE",
-          "LEHIBOU CYBERSECURITY"
+          "ARETE",
+          "LEHIBOU CYBERSECURITY",
+          "ENDURING DEFENSE"
         ]
       },
       "workplace.size": {
-        "presence": 4148,
-        "sur": 4148,
+        "presence": 4141,
+        "sur": 4141,
         "exemples": [
-          "0-0",
-          "0-0",
-          "6-9"
+          "6-9",
+          "6-9",
+          "0-0"
         ]
       },
       "workplace.location.address": {
-        "presence": 4148,
-        "sur": 4148,
+        "presence": 4141,
+        "sur": 4141,
         "exemples": [
-          "3 avenue Victoria 75004 PARIS",
-          "86 rue de Rivoli 75004 PARIS",
-          "99 rue de la Verrerie 75004 PARIS"
+          "99 RUE DE LA VERRERIE 75004 PARIS",
+          "99 rue de la Verrerie 75004 PARIS",
+          "23 RUE DU RENARD 75004 PARIS"
         ]
       },
       "workplace.location.geopoint.coordinates": {
-        "presence": 4148,
-        "sur": 4148,
+        "presence": 4141,
+        "sur": 4141,
         "exemples": [
-          "[2.3503879999999997, 48.85684199998633]",
-          "[2.349936000000001, 48.85807599998632]",
-          "[2.3503730000000003, 48.85885899998632]"
+          "[2.3503730000000003, 48.85885899998632]",
+          "[2.3503730000000003, 48.85885899998632]",
+          "[2.3522349793927075, 48.85923196275251]"
         ]
       },
       "workplace.location.geopoint.type": {
-        "presence": 4148,
-        "sur": 4148,
+        "presence": 4141,
+        "sur": 4141,
         "exemples": [
           "Point",
           "Point",
@@ -844,57 +874,57 @@
         ]
       },
       "workplace.domain.opco": {
-        "presence": 4148,
-        "sur": 4148,
+        "presence": 4141,
+        "sur": 4141,
         "exemples": [
-          "Opco entreprises de proximité",
+          "ATLAS",
           "ATLAS",
           "ATLAS"
         ]
       },
       "workplace.domain.naf.code": {
-        "presence": 4148,
-        "sur": 4148,
+        "presence": 4141,
+        "sur": 4141,
         "exemples": [
-          "62.01Z",
           "62.02A",
-          "62.02A"
+          "62.02A",
+          "62.01Z"
         ]
       },
       "workplace.domain.naf.label": {
-        "presence": 4148,
-        "sur": 4148,
+        "presence": 4141,
+        "sur": 4141,
         "exemples": [
-          "Programmation informatique",
           "Conseil en systèmes et logiciels informatiques",
-          "Conseil en systèmes et logiciels informatiques"
+          "Conseil en systèmes et logiciels informatiques",
+          "Programmation informatique"
         ]
       },
       "apply.url": {
-        "presence": 4148,
-        "sur": 4148,
+        "presence": 4141,
+        "sur": 4141,
         "exemples": [
-          "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/82846965000075/wetradelocal",
-          "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/97885742300013/granite",
-          "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/84845778400025/lehibou-cybersecurity"
+          "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/34467149000037/arete",
+          "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/84845778400025/lehibou-cybersecurity",
+          "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/95151062700023/enduring-defense"
         ]
       },
       "workplace.domain.idcc": {
-        "presence": 3283,
-        "sur": 4148,
+        "presence": 3157,
+        "sur": 4141,
         "exemples": [
-          "1978",
+          "1486",
           "1486",
           "1486"
         ]
       },
       "apply.recipient_id": {
-        "presence": 772,
-        "sur": 4148,
+        "presence": 522,
+        "sur": 4141,
         "exemples": [
-          "partners_6a65bf51d55499013b5d68f7",
-          "partners_6a816ed3b53a80d8beb1fd7b",
-          "partners_6a003cc69a6be614e491d3b9"
+          "partners_6af03aac30cb61190c1620a3",
+          "partners_6ae700c61b7811ea8da5ca5f",
+          "partners_6af03adb30cb61190c18ac7b"
         ]
       }
     },
@@ -926,7 +956,7 @@
           "workplace.siret"
         ],
         "presence": {
-          "workplace.siret": 4148
+          "workplace.siret": 4141
         }
       },
       "nom": {
@@ -936,9 +966,9 @@
           "workplace.legal_name"
         ],
         "presence": {
-          "workplace.brand": 4148,
-          "workplace.name": 4148,
-          "workplace.legal_name": 4148
+          "workplace.brand": 4141,
+          "workplace.name": 4141,
+          "workplace.legal_name": 4141
         }
       },
       "raison_sociale": {
@@ -946,7 +976,7 @@
           "workplace.legal_name"
         ],
         "presence": {
-          "workplace.legal_name": 4148
+          "workplace.legal_name": 4141
         }
       },
       "adresse": {
@@ -954,7 +984,7 @@
           "workplace.location.address"
         ],
         "presence": {
-          "workplace.location.address": 4148
+          "workplace.location.address": 4141
         }
       },
       "effectif": {
@@ -962,7 +992,7 @@
           "workplace.size"
         ],
         "presence": {
-          "workplace.size": 4148
+          "workplace.size": 4141
         }
       },
       "code_naf": {
@@ -970,7 +1000,7 @@
           "workplace.domain.naf.code"
         ],
         "presence": {
-          "workplace.domain.naf.code": 4148
+          "workplace.domain.naf.code": 4141
         }
       },
       "libelle_naf": {
@@ -978,7 +1008,7 @@
           "workplace.domain.naf.label"
         ],
         "presence": {
-          "workplace.domain.naf.label": 4148
+          "workplace.domain.naf.label": 4141
         }
       },
       "site_web": {
@@ -1014,7 +1044,7 @@
           "apply.recipient_id"
         ],
         "presence": {
-          "apply.recipient_id": 772
+          "apply.recipient_id": 522
         }
       },
       "candidature_url": {
@@ -1022,7 +1052,7 @@
           "apply.url"
         ],
         "presence": {
-          "apply.url": 4148
+          "apply.url": 4141
         }
       },
       "identifiant": {
@@ -1030,7 +1060,7 @@
           "identifier.id"
         ],
         "presence": {
-          "identifier.id": 4148
+          "identifier.id": 4141
         }
       }
     }
@@ -1045,11 +1075,11 @@
         "partners_to_exclude": "France Travail"
       },
       "statut": 200,
-      "offres": 4,
+      "offres": 8,
       "entreprises": 150,
       "par_source": {
-        "offres_emploi_lba": 3,
-        "PASS": 1,
+        "Hellowork": 7,
+        "Jobs that make sense": 1,
         "<entreprises>": 150
       },
       "cles_reponse": [
@@ -1066,12 +1096,12 @@
         "radius": 60
       },
       "statut": 200,
-      "offres": 32,
+      "offres": 20,
       "entreprises": 150,
       "par_source": {
-        "offres_emploi_lba": 3,
-        "France Travail": 28,
-        "PASS": 1,
+        "France Travail": 12,
+        "Hellowork": 7,
+        "Jobs that make sense": 1,
         "<entreprises>": 150
       },
       "cles_reponse": [
@@ -1086,19 +1116,113 @@
     "restantes_malgre_exclusion": {},
     "exclusion_efficace": true
   },
+  "pages_candidature": {
+    "entreprises_avec_recipient_id": [
+      {
+        "nom": "SILAE",
+        "url": "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/51889221100088/silae"
+      },
+      {
+        "nom": "GANYMED ROBOTICS",
+        "url": "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/84063435600041/ganymed-robotics"
+      },
+      {
+        "nom": "HARGOS",
+        "url": "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/87943371200046/hargos"
+      }
+    ],
+    "entreprises_sans_recipient_id": [
+      {
+        "nom": "ARETE",
+        "url": "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/34467149000037/arete"
+      },
+      {
+        "nom": "LEHIBOU CYBERSECURITY",
+        "url": "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/84845778400025/lehibou-cybersecurity"
+      },
+      {
+        "nom": "ENDURING DEFENSE",
+        "url": "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/recruteurs_lba/95151062700023/enduring-defense"
+      }
+    ],
+    "offres_par_partenaire": {
+      "Hellowork": [
+        "https://r.holeest.com/redirect?jd_token=pJbIAu&o=1&from=https%3A%2F%2Fwww.hellowork.com%2Ffr-fr%2Femplois%2F79768077.html%3Futm_source%3Dbonnealternance%26utm_medium%3Dmetamoteurs-free%26utm_campaign%3Dalternance%2B-%2B%7Bseo_domain%7D%26utm_content%3Dfluxbonnealternance%26utm_term%3D79768077",
+        "https://r.holeest.com/redirect?jd_token=BTunDp&o=1&from=https%3A%2F%2Fwww.hellowork.com%2Ffr-fr%2Femplois%2F84912582.html%3Futm_source%3Dbonnealternance%26utm_medium%3Dmetamoteurs-free%26utm_campaign%3Dalternance%2B-%2B%7Bseo_domain%7D%26utm_content%3Dfluxbonnealternance%26utm_term%3D84912582",
+        "https://r.holeest.com/redirect?jd_token=EPMEvr&o=1&from=https%3A%2F%2Fwww.hellowork.com%2Ffr-fr%2Femplois%2F83282282.html%3Futm_source%3Dbonnealternance%26utm_medium%3Dmetamoteurs-free%26utm_campaign%3Dalternance%2B-%2Binformatique%26utm_content%3Dfluxbonnealternance%26utm_term%3D83282282"
+      ],
+      "Jobs that make sense": [
+        "https://jobs.makesense.org/fr/jobs/woodoo-alternance-developpeurse-full-stack-industrie-40-hf-yGvoUSTAta9bd4OUhj3X?source=api-apprentissage"
+      ],
+      "offres_emploi_lba": [
+        "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/offres_emploi_lba/6af4a6ee7e03d84ce3afbb19/architecte-big-data",
+        "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/offres_emploi_lba/6af4729ca22168ab1670ce56/conseiller-commercial-conseillère-commerciale-auprès-d-une-clientèle-de-particuliers",
+        "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/offres_emploi_lba/6ad600a41f0749091ffaf221/assistant-e-administratif-ve-h-f-en-alternance-bts-sam"
+      ],
+      "RH Alternance": [
+        "https://rhalternance.com/jobs/informatique-internet-et-telecommunication/paris/chef-de-projet-déploiement-junior-h-f-alternance-750128743",
+        "https://rhalternance.com/jobs/informatique-internet-et-telecommunication/paris/consultant-web-analytics-h-f-alternance-janvier-2027-624801641",
+        "https://rhalternance.com/jobs/informatique-internet-et-telecommunication/lyon/développeuse-développeur-logiciel-alternance-936255857"
+      ],
+      "APEC": [
+        "https://www.apec.fr/candidat/recherche-emploi.html/emploi/detail-offre/179574107W?xtor=#at_medium=affiliate&at_campaign=Export_offres_la_bonne_alternance&at_type=partenaire_export",
+        "https://www.apec.fr/candidat/recherche-emploi.html/emploi/detail-offre/179696009W?xtor=#at_medium=affiliate&at_campaign=Export_offres_la_bonne_alternance&at_type=partenaire_export",
+        "https://www.apec.fr/candidat/recherche-emploi.html/emploi/detail-offre/179462331W?xtor=#at_medium=affiliate&at_campaign=Export_offres_la_bonne_alternance&at_type=partenaire_export"
+      ],
+      "PASS": [
+        "https://www.pass.fonction-publique.gouv.fr/offre/ingenieur-de-la-connaissance-et-pilotage-projets-donnees",
+        "https://www.pass.fonction-publique.gouv.fr/offre/apprentie-analyste-thematique-zone-russie-2",
+        "https://www.pass.fonction-publique.gouv.fr/offre/apprentie-analyste-thematique-zone-russie-1"
+      ],
+      "FranceTravail CEGID": [
+        "https://recrute.francetravail.org/Pages/Offre/detailoffre.aspx?idOffre=90734&idOrigine=502&LCID=1036&offerReference=2026-90734"
+      ],
+      "Le bon coin emploi": [
+        "https://www.leboncoin.fr/offres_d_emploi/3193320661.htm"
+      ],
+      "France Travail": [
+        "https://candidat.francetravail.fr/offres/recherche/detail/215RLZN",
+        "https://careers.werecruit.io/fr/dessange/offres/apprentie-coiffeurse-895596?utm_source=francetravail&utm_medium=job-board",
+        "https://careers.werecruit.io/fr/dessange/offres/apprentie-coiffeurse-66f85b?utm_source=francetravail&utm_medium=job-board"
+      ],
+      "Meteojob": [
+        "https://www.meteojob.com/jobs/57451415?utm_source=labonnealternance&utm_medium=aggregator-free&utm_campaign=alternance",
+        "https://www.meteojob.com/jobs/57218907?utm_source=labonnealternance&utm_medium=aggregator-free&utm_campaign=alternance",
+        "https://www.meteojob.com/jobs/57268842?utm_source=labonnealternance&utm_medium=aggregator-free&utm_campaign=alternance"
+      ],
+      "Direct Emploi": [
+        "https://www.directemploi.com/candidatOffre/56666912?utm_source=labonnealternance&utm_medium=referral&utm_campaign=La-bonne-alternance"
+      ],
+      "ATS_Hellowork": [
+        "https://labonnealternance.apprentissage.beta.gouv.fr/emploi/offres_emploi_partenaires/6ae3d178ec4f5594ab405a8c/alternant-customer-success-sav-respect-des-procédures"
+      ],
+      "OPCO EP": [
+        "https://hub-alternance.opcoep.fr/jeune/je-cherche-un-emploi/offre-emploi/6aec58a7dae20430cf4ebe0c",
+        "https://hub-alternance.opcoep.fr/jeune/je-cherche-un-emploi/offre-emploi/6ab2615c59ed7877acd139a7",
+        "https://hub-alternance.opcoep.fr/jeune/je-cherche-un-emploi/offre-emploi/6ab260c559ed7877acd1399d"
+      ],
+      "Kelio": [
+        "https://auchan.talentview.io/jobs/y9etsj?source=la_bonne_alternance"
+      ],
+      "iquesta": [
+        "https://www.iquesta.com/Offre-Apprentie-Commerciale-hfx-Sofitel-Paris-Le-Faubourg-accor-Group-347465.html"
+      ],
+      "Talentplug": [
+        "https://api.mytalentplug.com/job/v1/joboffer/redirect?id=2e5bb9d0-940a-4d7b-b60b-ba5069b3ec29"
+      ],
+      "La Poste": [
+        "https://www.laposterecrute.fr/offre/2026-215239"
+      ]
+    },
+    "offres_sans_apply_url": 0,
+    "offres_lues": 843
+  },
   "propositions": {
     "CODES_PAR_REQUETE": 100,
     "ACCEPTE_SANS_CODES": true,
     "RAYON_MAX_KM": 200,
-    "PARAM_NIVEAU": "target_diploma_level",
-    "VALEURS_NIVEAU": {
-      "3": "3",
-      "4": "4",
-      "5": "5",
-      "6": "6",
-      "7": "7"
-    },
     "PLAFOND_PAR_SOURCE": 150,
+    "PLAFOND_TOTAL_OFFRES": 450,
     "PARTENAIRES_FRANCE_TRAVAIL": [
       "france travail",
       "pole emploi"
