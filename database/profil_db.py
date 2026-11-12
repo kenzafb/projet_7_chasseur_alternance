@@ -75,6 +75,7 @@ def _profil_vers_dict(p: Profil) -> dict:
         "missions": p.missions or "",
         "portfolio": p.portfolio or "",
         "analyse_auto": bool(p.analyse_auto),
+        "reglages": p.reglages or {},
         "competences": p.competences or [],
         "projets": p.projets or [],
         "recherche": p.recherche or {},
@@ -236,5 +237,26 @@ def copier_sections(user_id: int, source: str, cible: str, sections, ecraser=())
                 setattr(p_cible, _COLONNE.get(champ, champ), copy.deepcopy(ligne["copie"]))
         db.commit()
         return {"copiees": [s["cle"] for s in plan], "fichiers_retires": [f for f in retires if f]}
+    finally:
+        db.close()
+
+
+def sauvegarder_reglages(user_id: int, reglages: dict, mode: str) -> dict:
+    """Réglages avancés du mode (D145), fusionnés avec ceux déjà enregistrés
+    et bornés ; crée le profil du mode s'il n'existe pas. analyse_auto
+    (colonne du profil) s'y règle aussi. Retourne les réglages complets
+    (défauts compris) et analyse_auto."""
+    from shared.reglages import normaliser_reglages, reglages_complets
+    db = SessionLocal()
+    try:
+        p = db.query(Profil).filter_by(user_id=user_id, mode=mode).first()
+        if not p:
+            p = Profil(user_id=user_id, mode=mode)
+            db.add(p)
+        p.reglages = {**normaliser_reglages(p.reglages or {}), **normaliser_reglages(reglages)}
+        if isinstance(reglages.get("analyse_auto"), bool):
+            p.analyse_auto = reglages["analyse_auto"]
+        db.commit()
+        return {**reglages_complets(p.reglages), "analyse_auto": bool(p.analyse_auto)}
     finally:
         db.close()

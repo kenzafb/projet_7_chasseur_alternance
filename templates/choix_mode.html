@@ -1,0 +1,27 @@
+{% extends "auth_base.html" %}
+{% block titre %}Que cherches-tu ?{% endblock %}
+{% block tete %}
+  <script>
+    // Anciennes URL (« /#candidatures », du temps du mode en session) : la
+    // page demandée est reprise dans le mode d'alors
+    (function () {
+      const pages = ["offres", "candidatures", "spontanees", "profil"];
+      const page = location.hash.replace("#", "");
+      if (pages.includes(page)) location.replace("/{{ ancien_mode }}#" + page);
+    })();
+  </script>
+{% endblock %}
+{% block contenu %}
+<h1>Que cherches-tu ?</h1>
+<p class="auth__sous">Chaque mode a son profil, ses offres et ses entreprises à contacter. Tu peux en ouvrir plusieurs dans des onglets différents.</p>
+<ul class="auth__modes">
+  {% for m in modes %}
+  <li><a class="auth__mode" href="/{{ m.cle }}" data-mode-lien="{{ m.cle }}">
+    <strong>{{ m.nom }}</strong>
+    <span>{{ m.texte }}</span>
+    {% if m.bientot %}<span class="auth__badge">bientôt disponible</span>{% endif %}
+  </a></li>
+  {% endfor %}
+</ul>
+<form class="auth__alt" method="post" action="/logout"><button type="submit" class="auth__lien-bouton">Se déconnecter</button></form>
+{% endblock %}

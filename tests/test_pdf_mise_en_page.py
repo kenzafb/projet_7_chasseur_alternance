@@ -76,7 +76,11 @@ def test_mise_en_page():
     ordre = [html.index(x) for x in ('class="coordonnees"', 'class="destinataire"', 'class="date"',
                                       'class="objet"', 'class="corps"')]
     assert ordre == sorted(ordre)
-    assert ".objet { font-size: 11pt; font-weight: bold;" in html and ".destinataire { margin-left: 55%;" in html
+    assert ".objet { font-size: 11pt; font-weight: bold;" in html
+    # Destinataire calé sur la marge droite, texte aligné à droite, sans
+    # largeur fixe ni marge en pourcentage
+    assert ".destinataire { text-align: right; margin-bottom: 18pt; }" in html
+    assert "55%" not in html and not re.search(r"\.destinataire \{[^}]*(width|margin-left)", html)
     assert "@page { size: A4; margin: 2.5cm; }" in html
     coordonnees = html[html.index('class="coordonnees"'):html.index('class="destinataire"')]
     for valeur in ("Hélène Dupont", "Paris", "06 12 34 56 78", "helene@exemple.fr"):
@@ -129,3 +133,36 @@ def test_pdf_genere(tmp_path):
                                capture_output=True, text=True).stdout
         assert "À l'attention du service recrutement" in texte and "Inconnue" not in texte
         assert texte.index("Hélène Dupont") < texte.index("service recrutement") < texte.index("Objet :")
+
+
+# ─── Destinataire calé sur la marge droite ────────────────────────────────────
+def _boites(b):
+    yield b
+    for e in getattr(b, "children", []) or []:
+        yield from _boites(e)
+
+
+def _ecarts_au_bord_droit(offre):
+    """Écart entre le bord droit du corps et la fin de chaque ligne du
+    destinataire, dans la mise en page WeasyPrint qui produit le PDF."""
+    from weasyprint import HTML
+    lettre = generateur.contact_entreprise(offre) + "\n\nMadame, Monsieur,\n\nP."
+    page = HTML(string=pdf.construire_html(offre, lettre, PROFIL), base_url=None,
+                url_fetcher=pdf.refuser_ressource).render().pages[0]
+    corps = next(b for b in _boites(page._page_box) if getattr(b, "element_tag", "") == "body")
+    bord = corps.content_box_x() + corps.width
+    dest = next(b for b in _boites(page._page_box) if getattr(b, "element_tag", "") == "p"
+                and "destinataire" in (b.element.get("class") or ""))
+    lignes = [b for b in dest.children if type(b).__name__ == "LineBox"]
+    fins = [[t for t in _boites(ligne) if type(t).__name__ == "TextBox"][-1] for ligne in lignes]
+    return [round(bord - (t.position_x + t.width), 2) for t in fins]
+
+
+@pytest.mark.parametrize("offre,lignes", [
+    ({"id": "A", "titre": "Dev", "entreprise": "ACME Conseil et Ingénierie des Systèmes",
+      "lieu": "12 rue des Exemples\n92350 Le Plessis-Robinson"}, 3),
+    ({"id": "B", "titre": "Dev", "entreprise": "Inconnue", "lieu": "Paris"}, 1),
+])
+def test_destinataire_finit_au_bord_droit(offre, lignes):
+    ecarts = _ecarts_au_bord_droit(offre)
+    assert len(ecarts) == lignes and all(abs(e) < 0.01 for e in ecarts), ecarts

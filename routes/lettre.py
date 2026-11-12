@@ -26,11 +26,21 @@ from shared.erreurs import CHAMPS_IDENTITE, exiger_profil
 
 router = routeur_prive()
 
+PLACE_DU_PARAGRAPHE = "[Le paragraphe pour cette offre viendra ici.]"
+
 
 class Assembler(BaseModel):
     model_config = ConfigDict(extra="forbid")
     id: str = Field(min_length=1, max_length=64)
     paragraphe: str = Field(max_length=3000)
+
+class Apercu(BaseModel):
+    """Aperçu de la lettre : la lettre entière telle qu'écrite dans la page,
+    ou à défaut la lettre type avec ce paragraphe ; le paragraphe est surligné."""
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(min_length=1, max_length=64)
+    paragraphe: str = Field("", max_length=3000)
+    lettre: str | None = Field(None, max_length=20000)
 
 class TelechargerPdf(BaseModel):
     id: str
@@ -77,6 +87,26 @@ def api_lettre_assembler(body: Assembler, user: User = Depends(utilisateur_requi
             "message": " ; ".join(dict.fromkeys(A_COMPLETER[b] for b in a_completer)),
             "infos": infos_lettre(offre, exiger_lettre_type(profil))}
 
+
+@router.post("/api/lettre/apercu")
+def api_lettre_apercu(body: Apercu, user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
+    """Aperçu fidèle au PDF (D149), sans rien enregistrer : même HTML que le
+    PDF, police livrée par l'application, paragraphe personnalisé surligné."""
+    from lettres.pdf import construire_html
+    offre = lire_candidature(user.id, body.id, mode=mode)
+    if not offre:
+        return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
+    profil = lire_profil(user.id, mode=mode)
+    # Pas encore de paragraphe : sa place est montrée, surlignée
+    paragraphe = body.paragraphe.strip() or PLACE_DU_PARAGRAPHE
+    if body.lettre and body.lettre.strip():
+        lettre = body.lettre
+    else:
+        exiger_lettre_type(profil)
+        lettre = assembler_lettre(offre, profil, paragraphe)
+    return {"html": construire_html(offre, lettre, profil, apercu=True, surligner=paragraphe),
+            "lettre": lettre if body.paragraphe.strip() or body.lettre else "",
+            "a_completer": marqueurs_a_completer(lettre), "infos": infos_lettre(offre, profil.get("lettre_type") or "")}
 
 @router.post("/api/telecharger_pdf")
 def api_telecharger_pdf(body: TelechargerPdf, request: Request, user: User = Depends(utilisateur_requis),

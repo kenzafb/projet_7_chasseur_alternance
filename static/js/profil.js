@@ -1,7 +1,6 @@
 /* ============================================================================
    profil.js — gestion du formulaire profil utilisateur
    - champs simples : [data-profil="..."]
-   - cases à cocher : [data-profil-case="..."] (booléens)
    - tags : [data-tags="..."] + [data-tags-input="..."]
    - projets : [data-projets] (liste de cartes nom/url/description)
    ============================================================================ */
@@ -20,9 +19,10 @@ function rendreTags(champ) {
   if (!c) return;
   c.innerHTML = "";
   (_tags[champ] || []).forEach((v, i) => {
-    const el = document.createElement("span");
+    const el = document.createElement("li");
     el.className = "tag";
-    el.innerHTML = `<span>${v}</span><span class="tag__x" data-rm="${i}">×</span>`;
+    el.innerHTML = `<span>${esc(v)}</span><button type="button" class="tag__x" data-rm="${i}"
+      aria-label="Retirer ${esc(v)}">×</button>`;
     c.appendChild(el);
   });
 }
@@ -42,13 +42,17 @@ function brancherTags(champ) {
     }
   });
   c.addEventListener("click", e => {
-    const i = e.target.dataset.rm;
-    if (i !== undefined) { _tags[champ].splice(Number(i), 1); rendreTags(champ); }
+    const i = e.target.closest("[data-rm]")?.dataset.rm;
+    if (i !== undefined) {
+      _tags[champ].splice(Number(i), 1);
+      rendreTags(champ);
+      input.focus();   // le bouton retiré disparaît : le focus revient au champ
+    }
   });
 }
 
 /* ── Projets ───────────────────────────────────────────────────────────── */
-function echap(s) { return (s || "").replace(/"/g, "&quot;"); }
+function echap(s) { return esc(s || ""); }
 
 function rendreProjets() {
   const c = document.querySelector("[data-projets]");
@@ -58,7 +62,7 @@ function rendreProjets() {
     const el = document.createElement("div");
     el.className = "projet";
     el.innerHTML = `
-      <span class="projet__rm" data-projet-rm="${i}">Retirer</span>
+      <button type="button" class="lien-bouton projet__rm" data-projet-rm="${i}">Retirer ce projet</button>
       <div class="projet__grid">
         <label class="field"><span class="field__label">Nom du projet</span>
           <input class="field__input" data-pj="${i}:nom" type="text" value="${echap(p.nom)}" placeholder="Mon projet"></label>
@@ -87,8 +91,57 @@ function brancherProjets() {
     rendreProjets();
   });
   if (c) c.addEventListener("click", e => {
-    const i = e.target.dataset.projetRm;
+    const i = e.target.closest("[data-projet-rm]")?.dataset.projetRm;
     if (i !== undefined) { lireProjetsDepuisDOM(); _projets.splice(Number(i), 1); rendreProjets(); }
+  });
+}
+
+/* ── Les cinq parties (D147) : une affichée à la fois, état de chacune ─── */
+const PARTIES = ["toi", "mode", "parcours", "recherche", "documents"];
+let _partie = "toi";
+
+function montrerPartie(cle, { focus = false } = {}) {
+  _partie = cle;
+  document.querySelectorAll("[data-partie]").forEach(p => { p.hidden = p.dataset.partie !== cle; });
+  document.querySelectorAll("[data-partie-lien]").forEach(b => {
+    if (b.dataset.partieLien === cle) b.setAttribute("aria-current", "step");
+    else b.removeAttribute("aria-current");
+  });
+  const suivante = PARTIES[PARTIES.indexOf(cle) + 1];
+  const bouton = document.querySelector("[data-partie-suivante]");
+  bouton.hidden = !suivante;
+  if (suivante) {
+    const titre = document.querySelector(`[data-partie-lien="${suivante}"] .partie-lien__titre`).textContent;
+    bouton.textContent = `Partie suivante : ${titre}`;
+    bouton.dataset.suivante = suivante;
+  }
+  if (focus) document.getElementById(`partie-${cle}`)?.focus();
+}
+
+async function afficherCompletude() {
+  let c;
+  try { c = await api.completudeProfil(); } catch (_) { return; }
+  for (const p of c.parties) {
+    const etat = document.querySelector(`[data-partie-etat="${p.id}"]`);
+    if (etat) {
+      etat.textContent = p.complet ? "Complet" : "À compléter";
+      etat.className = `partie-lien__etat partie-lien__etat--${p.complet ? "complet" : "manque"}`;
+    }
+    const manque = document.querySelector(`[data-partie-manque="${p.id}"]`);
+    if (manque) { manque.textContent = p.manque; manque.hidden = p.complet; }
+    const conseil = document.querySelector(`[data-partie-conseil="${p.id}"]`);
+    if (conseil) { conseil.textContent = p.conseil; conseil.hidden = !p.conseil; }
+  }
+}
+
+// « Modifier ma lettre type » depuis la page de la lettre : partie Tes documents
+document.addEventListener("profil:partie", e => montrerPartie(e.detail));
+
+function brancherParties() {
+  document.querySelectorAll("[data-partie-lien]").forEach(b =>
+    b.addEventListener("click", () => montrerPartie(b.dataset.partieLien, { focus: true })));
+  document.querySelector("[data-partie-suivante]")?.addEventListener("click", e => {
+    montrerPartie(e.currentTarget.dataset.suivante, { focus: true });
   });
 }
 
@@ -179,9 +232,11 @@ function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
-async function rendreDomaines(selectionnes, selecteur = "[data-domaines-choix]") {
+async function rendreDomaines(selectionnes, selecteur = "[data-domaines-choix]", indifferentChoisi = false) {
   const c = document.querySelector(selecteur);
   if (!c) return;
+  // « Indifférent » coché par la personne elle-même, pas par défaut (D144)
+  c.dataset.indifferentChoisi = indifferentChoisi && !selectionnes.length ? "1" : "";
   let arbre = [];
   try { arbre = await api.domaines(); } catch (_) { arbre = []; }
   const choisis = new Set(selectionnes);
@@ -215,8 +270,10 @@ async function rendreDomaines(selectionnes, selecteur = "[data-domaines-choix]")
     const indifferent = c.querySelector("[data-domaine-indifferent]");
     if (e.target === indifferent) {
       if (indifferent.checked) c.querySelectorAll("[data-gd-case], [data-domaine-case]").forEach(i => { i.checked = false; });
+      c.dataset.indifferentChoisi = indifferent.checked ? "1" : "";
     } else if (e.target.checked) {
       indifferent.checked = false;
+      c.dataset.indifferentChoisi = "";
     }
     if (!c.querySelector("[data-gd-case]:checked, [data-domaine-case]:checked")) indifferent.checked = true;
     majAffichageDomaines(c);
@@ -473,7 +530,6 @@ export const Profil = {
       if (!_champVisible(el)) return;        // ignore les doublons masqués
       el.value = p[el.dataset.profil] ?? "";
     });
-    document.querySelectorAll("[data-profil-case]").forEach(el => { el.checked = p[el.dataset.profilCase] === true; });
     afficherNiveau(p.niveau_profil);
     afficherManquesIA(p.manques_ia);
 
@@ -496,7 +552,8 @@ export const Profil = {
       }
     });
     const domainesSel = Array.isArray(rech.domaines) ? rech.domaines : [];
-    await rendreDomaines(domainesSel, DOMAINES_DU_MODE[mode] || DOMAINES_DU_MODE.alternance);
+    await rendreDomaines(domainesSel, DOMAINES_DU_MODE[mode] || DOMAINES_DU_MODE.alternance,
+                         rech.domaines_indifferent === true);
     await rendreOptions(rech, mode);
     majDureeStage();
 
@@ -529,11 +586,14 @@ export const Profil = {
             brancherTags("competences");
       brancherProjets();
       brancherPiecesJointes();
+      brancherParties();
+      montrerPartie(_partie);
       this._charge = true;
     }
     // Référence des modifications non enregistrées : le formulaire tel que chargé
     _reference = JSON.stringify(this.collecter());
     CopieProfil.masquerGarde();
+    afficherCompletude();
   },
 
   /* Ce que « Enregistrer » envoie : tout le formulaire du mode */
@@ -543,7 +603,6 @@ export const Profil = {
       if (!_champVisible(el)) return;        // ignore les doublons masqués (évite d'écraser)
       data[el.dataset.profil] = el.value;
     });
-    document.querySelectorAll("[data-profil-case]").forEach(el => { data[el.dataset.profilCase] = el.checked; });
     data.competences = [...(_tags["competences"] || [])];
     lireProjetsDepuisDOM();
     data.projets = _projets.filter(p => p.nom || p.url || p.description).map(p => ({ ...p }));
@@ -554,7 +613,10 @@ export const Profil = {
       if (!_champVisible(el)) return;        // ignore les doublons masqués (évite d'écraser)
       rech[el.dataset.rech] = el.value;
     });
-    rech.domaines = lireDomainesCoches(DOMAINES_DU_MODE[_modeProfilCourant] || DOMAINES_DU_MODE.alternance);
+    const selecteurDomaines = DOMAINES_DU_MODE[_modeProfilCourant] || DOMAINES_DU_MODE.alternance;
+    rech.domaines = lireDomainesCoches(selecteurDomaines);
+    const domainesC = document.querySelector(selecteurDomaines);
+    rech.domaines_indifferent = !rech.domaines.length && domainesC?.dataset.indifferentChoisi === "1";
     Object.assign(rech, lireOptions(_modeProfilCourant));
     data.recherche = rech;
     return data;
@@ -580,6 +642,7 @@ export const Profil = {
         _reference = JSON.stringify(data);
         CopieProfil.masquerGarde();
         api.profil().then(p => { afficherNiveau(p.niveau_profil); afficherManquesIA(p.manques_ia); }, () => {});
+        afficherCompletude();
       }
       return ok;
     } catch (e) {

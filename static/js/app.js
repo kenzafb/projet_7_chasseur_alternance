@@ -1,36 +1,53 @@
 /* ============================================================================
    app.js — orchestrateur de l'interface
-   Navigation par onglets · topbar contextuelle · modale lettre ·
+   Navigation par ancres · tête de page contextuelle · menu du compte ·
    polling de l'état des pipelines. Tout le reste vit dans les modules dédiés.
    ============================================================================ */
 import { api, limite, confirmerLancement, MODE } from "./api.js";
+import { Accueil }       from "./accueil.js";
+import { Lettre }        from "./lettre.js";
 import { Offres }        from "./offres.js";
 import { Candidatures }  from "./candidatures.js";
 import { Spontanees }    from "./spontanees.js";
 import { Profil }        from "./profil.js";
 import { Parametres }    from "./parametres.js";
 
-/* Contenu contextuel de la topbar selon la page */
+/* Ce que le mode cherche, pour les phrases de tête de page */
+const CE_QUE_TU_CHERCHES = { alternance: "ton alternance", job: "ton job", stage: "ton stage" }[MODE] || "ta recherche";
+
+/* Tête de chaque page : titre, phrase courte, action principale (D143) */
 const TOPBAR = {
-  offres:       { title: "Offres d'alternance",   action: "Lancer la recherche", run: async () => {
+  accueil:      { title: "Accueil", action: null },   // la page a sa propre tête (salutation)
+  lettre:       { title: "Ma lettre", action: null },  // sa barre : retour, enregistrer, PDF
+  offres:       { title: "Offres", phrase: `Les offres trouvées pour ${CE_QUE_TU_CHERCHES}, les mieux notées en haut.`,
+                  action: "Chercher de nouvelles offres", run: async () => {
     const demandee = limite("offres");
     confirmerLancement("offres", demandee, await api.recherche(demandee));
   } },
-  candidatures: { title: "Suivi des candidatures", action: "Actualiser",         run: () => Candidatures.charger() },
-  spontanees:   { title: "Candidatures spontanées", action: "Récupérer",         run: () => Spontanees.action("fetch") },
-  profil:       { title: "Mon profil",            action: "Enregistrer",         run: () => sauvegarderProfil() },
-  parametres:   { title: "Paramètres",            action: null },   // chaque carte a ses boutons
+  candidatures: { title: "Candidatures",
+                  phrase: "Où en est chaque candidature envoyée. Clique sur le bouton d'une carte pour la faire avancer.",
+                  action: null },   // rechargée à chaque ouverture de la page
+  spontanees:   { title: "Entreprises à contacter",
+                  phrase: "Des entreprises de ton domaine qui ne publient pas forcément d'offre. "
+                    + "Le Chasseur les trouve, cherche leur email et leur envoie ta candidature.",
+                  action: null },   // chaque étape a son bouton
+  profil:       { title: "Mon profil", phrase: "Ce que le Chasseur sait de toi pour noter les offres et écrire tes lettres.",
+                  action: null },   // « Enregistrer » est sous la partie affichée
+  parametres:   { title: "Paramètres", phrase: "Ton compte, l'envoi de tes mails et les réglages avancés de ce mode.",
+                  action: null },   // chaque carte a ses boutons
 };
 
-let pageCourante = "offres";
-const PAGES_VALIDES = ["offres", "candidatures", "spontanees", "profil", "parametres"];
+let pageCourante = "accueil";
+const PAGES_VALIDES = ["accueil", "offres", "candidatures", "spontanees", "profil", "parametres", "lettre"];
 
 /* Page désignée par l'ancre de l'URL ; « spontanees-suivi » : ancienne page
-   fondue dans le suivi unique (D107) ; inconnue : Offres */
+   fondue dans le suivi unique (D107) ; inconnue : Accueil (D144) */
 function pageDeLAncre() {
   const ancre = location.hash.replace("#", "");
   const page = ancre === "spontanees-suivi" ? "candidatures" : ancre;
-  return PAGES_VALIDES.includes(page) ? page : "offres";
+  // Ma lettre sans offre ouverte (page rechargée) : retour aux offres
+  if (page === "lettre" && !Lettre.id()) return "offres";
+  return PAGES_VALIDES.includes(page) ? page : "accueil";
 }
 
 /* Clic dans le menu : nouvelle entrée d'historique (Précédent y revient),
@@ -41,7 +58,7 @@ function naviguer(page) {
 }
 
 /* ── Navigation ──────────────────────────────────────────────────────────── */
-function aller(page) {
+function aller(page, { focus = false } = {}) {
   pageCourante = page;
   // Mémorise la page dans l'URL (pour la retrouver après actualisation)
   if (location.hash !== "#" + page) {
@@ -49,157 +66,76 @@ function aller(page) {
   }
   document.querySelectorAll("[data-page-content]").forEach(s =>
     s.classList.toggle("is-active", s.dataset.pageContent === page));
-  document.querySelectorAll(".nav__item[data-page]").forEach(n =>
-    n.classList.toggle("is-active", n.dataset.page === page));
+  // Lien de la page ouverte : aria-current (menu principal et menu du compte) ;
+  // la lettre fait partie des offres
+  const courante = page === "lettre" ? "offres" : page;
+  document.querySelectorAll(".menu__lien[data-page], .compte__lien[data-page], .onglet-tel[data-page], .plus-tel__lien[data-page]").forEach(n => {
+    if (n.dataset.page === courante) n.setAttribute("aria-current", "page");
+    else n.removeAttribute("aria-current");
+  });
 
   if (page === "profil" && !Profil._charge) Profil.charger();
   if (page === "candidatures") Candidatures.charger();
   if (page === "parametres") Parametres.charger();
+  if (page === "accueil") Accueil.charger();
+  // L'Accueil a sa propre tête (salutation) : pas de titre de page en plus
+  document.querySelector("[data-page-tete]").hidden = page === "accueil" || page === "lettre";
+  // Téléphone : « Plus » marqué quand la page ouverte est dans son menu
+  const dansPlus = ["spontanees", "profil", "parametres"].includes(page);
+  document.querySelector("[data-plus-bouton]")?.classList.toggle("is-courant", dansPlus);
+  document.getElementById("contenu").classList.remove("detail-ouvert");
+  // Pages au contenu étroit (1120 px, comme leurs maquettes) : la tête s'aligne dessus
+  document.getElementById("contenu").classList.toggle("main--etroit", ["profil", "spontanees"].includes(page));
   const t = TOPBAR[page];
-  let titre = t.title;
-  // Le titre de la page Offres s'adapte au mode (alternance / job / stage)
-  if (page === "offres" && MODE === "job") titre = "Offres de jobs";
-  if (page === "offres" && MODE === "stage") titre = "Offres de stage";
-  document.querySelector('[data-topbar="title"]').textContent = titre;
+  document.querySelector('[data-topbar="title"]').textContent = t.title;
+  document.querySelector('[data-topbar="phrase"]').textContent = t.phrase || "";
   document.querySelector('[data-topbar="action-label"]').textContent = t.action || "";
-  document.querySelector('[data-topbar="action"]').style.display = t.action ? "" : "none";
-  majBadge();
+  document.querySelector('[data-topbar="action"]').hidden = !t.action;
+  document.title = `${t.title} · Chasseur`;
+  // Recherche dans la page : seulement là où il y a une liste à filtrer
+  document.querySelector("[data-search-zone]").hidden = !LISTES_RECHERCHE[page];
+  // Page choisie dans le menu : le lecteur d'écran repart du contenu
+  if (focus) (page === "lettre" ? document.getElementById("lettre-titre")
+    : document.getElementById("contenu")).focus({ preventScroll: true });
 }
 
-/* Badge contextuel de la topbar (compteur de la page courante) */
-function majBadge() {
-  const badge = document.querySelector('[data-topbar="badge"]');
-  const compteur = document.querySelector(`[data-count="${pageCourante}"]`);
-  const n = compteur ? compteur.textContent : "0";
-  const mots = { offres: "offres", candidatures: "candidatures", spontanees: "entreprises", profil: "" };
-  if (pageCourante === "profil" || pageCourante === "parametres") { badge.textContent = ""; return; }
-  badge.textContent = `${n} ${mots[pageCourante]}`;
+/* ── Menus repliables : Mon compte (rond aux initiales), Plus (téléphone) ── */
+function brancherCompte() {
+  brancherMenu("[data-compte-bouton]", "[data-compte-menu]", ".compte");
+  brancherMenu("[data-plus-bouton]", "[data-plus-menu]", ".plus-tel, [data-plus-bouton]");
 }
 
-/* ── Modale lettre ───────────────────────────────────────────────────────── */
-/* Balise restée dans la lettre (portfolio vide, D125) : aperçu surligné */
-const A_COMPLETER = { "{portfolio}": "Portfolio vide dans le profil (carte Identité), à compléter" };
-/* Entreprise inconnue (D138) : formulations neutres déjà dans la lettre, et
-   une simple information (mêmes textes que shared/offres.py) */
-const INFO_DESTINATAIRE = "Contact de l'entreprise inconnu : la lettre est adressée au service recrutement. "
-  + "Tu peux modifier cette ligne.";
-const INFO_ENTREPRISE = "Nom de l'entreprise inconnu : la lettre parle de « votre entreprise ». Tu peux modifier ce passage.";
-function infosLettre(infos) {
-  const el = document.querySelector("[data-modal-info]");
-  el.textContent = (infos || []).join(" ");
-  el.hidden = !(infos || []).length;
+function brancherMenu(selBouton, selMenu, dedans) {
+  const bouton = document.querySelector(selBouton);
+  const menu = document.querySelector(selMenu);
+  if (!bouton || !menu) return;
+  const ouvrir = oui => {
+    menu.hidden = !oui;
+    bouton.setAttribute("aria-expanded", String(oui));
+  };
+  bouton.addEventListener("click", () => {
+    ouvrir(menu.hidden);
+    if (!menu.hidden) menu.querySelector("a, button")?.focus();
+  });
+  menu.addEventListener("keydown", e => {
+    if (e.key === "Escape") { ouvrir(false); bouton.focus(); }
+  });
+  // Clic ailleurs ou focus sorti du menu : refermé
+  document.addEventListener("click", e => {
+    if (!menu.hidden && !e.target.closest(dedans)) ouvrir(false);
+  });
+  menu.addEventListener("focusout", e => {
+    if (!menu.hidden && e.relatedTarget && !e.relatedTarget.closest?.(dedans)) ouvrir(false);
+  });
+  menu.querySelectorAll("a").forEach(a => a.addEventListener("click", () => ouvrir(false)));
 }
-/* Lettre déjà enregistrée : informations d'après l'offre et le texte */
-function infosDeLaLettre(offre, texte) {
-  if (!offre || offre.entreprise_connue !== false || !texte) return [];
-  return [texte.includes("À l'attention du service recrutement") ? INFO_DESTINATAIRE : null,
-          texte.includes("votre entreprise") ? INFO_ENTREPRISE : null].filter(Boolean);
-}
-function apercuLettre() {
-  const texte = document.querySelector("[data-modal-letter]").value;
-  const restes = Object.keys(A_COMPLETER).filter(b => texte.includes(b));
-  const alerte = document.querySelector("[data-modal-alerte]");
-  const apercu = document.querySelector("[data-modal-apercu]");
-  alerte.hidden = apercu.hidden = !restes.length;
-  if (!restes.length) return;
-  alerte.textContent = [...new Set(restes.map(b => A_COMPLETER[b]))].join(" ; ") + " : remplace la balise surlignée.";
-  const esc = t => t.replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
-  apercu.innerHTML = restes.reduce((html, b) => html.split(esc(b)).join(`<mark>${esc(b)}</mark>`), esc(texte));
-}
-
-const modal = {
-  el:    () => document.querySelector("[data-modal]"),
-  area:  () => document.querySelector("[data-modal-letter]"),
-  para:  () => document.querySelector("[data-modal-paragraphe]"),
-  etat:  () => document.querySelector("[data-modal-para-etat]"),
-  id:    null,
-  /* Lettre déjà prête : affichée ; sinon le paragraphe est rédigé tout de
-     suite (IA active), à relire avant de l'insérer dans la lettre type */
-  async ouvrir(id) {
-    this.id = id;
-    const offre = Offres.data().find(o => o.id === id);
-    this.area().value = offre?.lettre || "";
-    apercuLettre();
-    infosLettre(infosDeLaLettre(offre, offre?.lettre));
-    this.para().value = "";
-    this.etat().textContent = "";
-    this.el().classList.add("is-open");
-    if (!offre?.lettre && document.documentElement.dataset.analyseIa !== "non") await this.rediger();
-  },
-  /* IA locale : environ une minute, davantage si une analyse occupe déjà l'IA */
-  async rediger() {
-    const id = this.id;
-    const debut = Date.now();
-    let minuteur = null;
-    const tic = () => {
-      const s = Math.round((Date.now() - debut) / 1000);
-      this.etat().textContent = `Rédaction par l'IA locale… ${s} s (environ une minute, davantage si une `
-        + "analyse d'offres est en cours : l'IA traite une demande à la fois).";
-      minuteur = setTimeout(tic, 1000);
-    };
-    tic();
-    this.attendre(true);
-    try {
-      const { paragraphe, avertissement } = await api.paragrapheLettre(id);
-      if (this.id !== id) return;
-      this.para().value = paragraphe;
-      // Plus de 80 mots même après un second essai : gardé, avec un avertissement (D109)
-      this.etat().textContent = avertissement
-        ? "⚠️ " + avertissement : "Relis et modifie le paragraphe, puis insère-le dans ta lettre type.";
-    } catch (e) {
-      // Lettre type absente, sans {paragraphe}, IA indisponible : message, rien d'inventé
-      this.etat().textContent = "";
-      alert("Paragraphe non rédigé : " + e.message);
-    } finally {
-      clearTimeout(minuteur);
-      this.attendre(false);
-    }
-  },
-  async assembler() {
-    if (!this.id) return;
-    try {
-      const r = await api.assemblerLettre(this.id, this.para().value);
-      this.area().value = r.lettre;
-      apercuLettre();
-      infosLettre(r.infos);
-      this.etat().textContent = "Paragraphe inséré : la lettre est enregistrée, modifiable ci-dessous.";
-      Offres.charger();
-    } catch (e) { alert(e.message); }
-  },
-  /* Pendant la rédaction : ni insertion, ni enregistrement, ni PDF */
-  attendre(oui) {
-    this.para().readOnly = oui;
-    document.querySelectorAll("[data-modal-save], [data-modal-pdf], [data-modal-assembler], [data-modal-regenerer]")
-      .forEach(b => { b.disabled = oui || (b.matches("[data-modal-regenerer]")
-        && document.documentElement.dataset.analyseIa === "non"); });
-  },
-  fermer() { this.el().classList.remove("is-open"); this.id = null; },
-  /* Échec : la fenêtre reste ouverte avec la lettre, et le message s'affiche (D133) */
-  async enregistrer() {
-    if (!this.id) return;
-    try {
-      await api.sauvegarder({ id: this.id, lettre: this.area().value });
-    } catch (e) {
-      alert(`Lettre non enregistrée : ${e.message}`);
-      return;
-    }
-    this.fermer();
-    recharger();
-  },
-  async pdf() {
-    if (!this.id) return;
-    try {
-      await api.telechargerPdf(this.id, this.area().value);
-    } catch (e) { alert(e.message); }
-  },
-};
 
 /* ── Chargement global ───────────────────────────────────────────────────── */
 async function recharger() {
+  if (pageCourante === "accueil") Accueil.charger();
   await Offres.charger();
   await Candidatures.charger();   // suivi unique : offres postulées et spontanées envoyées
   await Spontanees.charger();
-  majBadge();
 }
 
 /* ── Polling : reflète l'état des pipelines en haut de page ───────────────
@@ -301,9 +237,9 @@ async function sauvegarderProfil() {
 
 /* ── Recherche contextuelle (filtre les lignes de la page courante) ──────── */
 const LISTES_RECHERCHE = {
-  offres:             { liste: '[data-list="offres"]',        ligne: ".offre" },
-  candidatures:       { liste: '[data-list="candidatures"]',  ligne: ".suivi-row" },
-  spontanees:         { liste: '[data-list="spontanees"]',    ligne: ".trow:not(.thead)" },
+  offres:             { liste: '[data-list="offres"]',        ligne: ".offres__item" },
+  candidatures:       { liste: '[data-list="candidatures"]',  ligne: ".carte-cand" },
+  spontanees:         { liste: '[data-list="spontanees"]',    ligne: ".ent" },
 };
 
 function rechercher(texte) {
@@ -326,35 +262,22 @@ function rechercher(texte) {
 
 /* ── Branchement des événements ──────────────────────────────────────────── */
 function brancher() {
-  // repli de la sidebar
-  const btnToggle = document.querySelector("[data-sidebar-toggle]");
-  const sidebar = document.querySelector("[data-sidebar]");
-  if (btnToggle && sidebar) {
-    btnToggle.addEventListener("click", () => {
-      const replie = sidebar.classList.toggle("is-collapsed");
-      try { localStorage.setItem("sidebar_repliee", replie ? "1" : "0"); } catch (_) {}
-    });
-    // Restaurer l'état mémorisé au chargement
-    try {
-      if (localStorage.getItem("sidebar_repliee") === "1") sidebar.classList.add("is-collapsed");
-    } catch (_) {}
-    // Retire la classe temporaire anti-flash (le vrai état est maintenant posé)
-    document.documentElement.classList.remove("sidebar-pre-collapsed");
-  }
+  brancherCompte();
   // barre de recherche contextuelle
   const champRecherche = document.querySelector("[data-search]");
   if (champRecherche) champRecherche.addEventListener("input", e => rechercher(e.target.value));
-  // fermeture des encarts guide
-  document.querySelectorAll("[data-guide-close]").forEach(x =>
-    x.addEventListener("click", () => x.closest(".guide").classList.add("is-hidden")));
   // bouton enregistrer du profil (dans la page)
   const btnProfil = document.querySelector("[data-profil-save]");
   if (btnProfil) btnProfil.addEventListener("click", sauvegarderProfil);
-  // navigation
-  document.querySelectorAll(".nav__item[data-page]").forEach(n =>
-    n.addEventListener("click", () => naviguer(n.dataset.page)));
+  // Navigation : de vrais liens (#offres...) ; la page change par hashchange,
+  // et un clic sur la page déjà ouverte la recharge sur place
+  document.querySelectorAll("a[data-page], a[data-nav]").forEach(n =>
+    n.addEventListener("click", e => {
+      const page = n.dataset.page || n.dataset.nav;
+      if (location.hash === "#" + page) { e.preventDefault(); naviguer(page); }
+    }));
   // Précédent / Suivant du navigateur, ou ancre modifiée à la main (D133)
-  window.addEventListener("hashchange", () => aller(pageDeLAncre()));
+  window.addEventListener("hashchange", () => aller(pageDeLAncre(), { focus: true }));
 
   // bouton d'action contextuel de la topbar
   document.querySelector('[data-topbar="action"]').addEventListener("click", async () => {
@@ -362,69 +285,22 @@ function brancher() {
     surveiller();   // un pipeline vient peut-être de démarrer
   });
 
-  // clics délégués sur les offres
-  document.querySelector('[data-list="offres"]').addEventListener("click", e => {
-    Offres.onClick(e, id => modal.ouvrir(id));
-  });
+  // Page Offres : liste, onglets, filtres et volet (offres.js) ; la lettre s'ouvre ici
+  Offres.brancher(id => Lettre.ouvrir(Offres.data().find(o => o.id === id), "offres"));
+  Lettre.brancher();
+  // « Voir l'offre » depuis l'Accueil : l'offre s'ouvre dans le volet
+  document.addEventListener("offres:montrer", e => Offres.montrer(e.detail));
 
   // filtres
-  document.querySelectorAll("[data-filters]").forEach(grp => {
-    grp.addEventListener("click", e => {
-      const btn = e.target.closest("[data-filter]");
-      if (!btn) return;
-      grp.querySelectorAll(".filter").forEach(f => f.classList.remove("is-active"));
-      btn.classList.add("is-active");
-      const f = btn.dataset.filter;
-      if (grp.dataset.filters === "offres" || grp.dataset.filters === "offres-archives") Offres.setFiltre(f);
-      if (grp.dataset.filters === "spontanees") Spontanees.setFiltre(f);
-    });
+  // Onglets des entreprises à contacter
+  document.querySelector('[data-filters="spontanees"]')?.addEventListener("click", e => {
+    const btn = e.target.closest("[data-filter]");
+    if (btn) Spontanees.setFiltre(btn.dataset.filter);
   });
-
-  // bascule Offres ↔ Archivées
-  const btnArchives = document.querySelector("[data-archives-toggle]");
-  if (btnArchives) {
-    btnArchives.addEventListener("click", () => {
-      const enArchives = Offres.basculerArchives();
-      const menusNormal     = document.querySelector('.filters-menus[data-mode="normal"]');
-      const filtresArchives = document.querySelector('[data-filters="offres-archives"]');
-      const label = document.querySelector("[data-archives-label]");
-      if (enArchives) {
-        if (menusNormal)     menusNormal.style.display = "none";
-        if (filtresArchives) filtresArchives.style.display = "";
-        if (label) label.textContent = "← Retour aux offres";
-      } else {
-        if (menusNormal)     menusNormal.style.display = "flex";
-        if (filtresArchives) filtresArchives.style.display = "none";
-        if (label) label.textContent = "Archivées";
-      }
-      // En mode archives, on remet le filtre raison sur "Toutes"
-      if (filtresArchives) {
-        filtresArchives.querySelectorAll(".filter").forEach(x => x.classList.remove("is-active"));
-        const tout = filtresArchives.querySelector('[data-filter="all"]');
-        if (tout) tout.classList.add("is-active");
-      }
-    });
-  }
-
-  // Menus de filtres combinables (mode normal Offres)
-  document.querySelectorAll("[data-foffre]").forEach(menu =>
-    menu.addEventListener("change", () =>
-      Offres.setFiltreOffre(menu.dataset.foffre, menu.value)));
 
   // actions pipeline spontanées
   document.querySelectorAll("[data-action]").forEach(b =>
     b.addEventListener("click", async () => { await Spontanees.action(b.dataset.action); surveiller(); }));
-
-  // modale
-  document.querySelector("[data-modal-close]").addEventListener("click", () => modal.fermer());
-  document.querySelector("[data-modal-save]").addEventListener("click", () => modal.enregistrer());
-  document.querySelector("[data-modal-pdf]").addEventListener("click", () => modal.pdf());
-  document.querySelector("[data-modal-regenerer]").addEventListener("click", () => modal.rediger());
-  document.querySelector("[data-modal-letter]").addEventListener("input", apercuLettre);
-  document.querySelector("[data-modal-assembler]").addEventListener("click", () => modal.assembler());
-  document.querySelector("[data-modal]").addEventListener("click", e => {
-    if (e.target.matches("[data-modal]")) modal.fermer();
-  });
 
   // bouton arrêter du runbar : l'analyse en cours, sinon le pipeline spontané
   document.querySelector("[data-runbar-stop]").addEventListener("click", async () => {
@@ -433,15 +309,17 @@ function brancher() {
     } catch (_) {}
     surveiller();
   });
-  // Analyse des offres en attente
-  const btnAnalyse = document.querySelector("[data-analyse-lancer]");
-  if (btnAnalyse) btnAnalyse.addEventListener("click", async () => {
+  // Analyse des offres en attente : bouton de la page Offres, ou « Les noter » de l'Accueil
+  const lancerAnalyse = async () => {
     const toute = !!document.querySelector("[data-analyse-toute-file]")?.checked;
     const demandee = toute ? undefined : limite("analyses");
     try { confirmerLancement("analyses", demandee, await api.analyseAttente(demandee, toute)); }
     catch (e) { alert(e.message); }
     surveiller();
-  });
+  };
+  document.querySelector("[data-analyse-lancer]")?.addEventListener("click", lancerAnalyse);
+  document.addEventListener("analyse:lancer", lancerAnalyse);
+  Accueil.brancher();
   // Boutons Arrêter sur les cartes du pipeline
   document.querySelectorAll("[data-stop]").forEach(b =>
     b.addEventListener("click", async () => {
@@ -460,7 +338,7 @@ function brancher() {
   document.addEventListener("candidatures:maj", () => Candidatures.charger());
   // « Annuler la candidature » depuis le tableau : l'offre revient dans la page Offres
   document.addEventListener("offres:maj", () => Offres.charger());
-  Candidatures.onOuvrir(id => modal.ouvrir(id));
+  Candidatures.onOuvrir(id => Lettre.ouvrir(Offres.data().find(o => o.id === id), "candidatures"));
 }
 
 /* ── Démarrage ───────────────────────────────────────────────────────────── */
@@ -484,7 +362,7 @@ recharger();
     // Nettoie l'URL pour ne pas réafficher le message au prochain rechargement
     history.replaceState(null, "", location.pathname);
   } else {
-    // Reprendre la page mémorisée dans l'URL (#candidatures, etc.), sinon Offres
+    // Reprendre la page mémorisée dans l'URL (#candidatures, etc.), sinon l'Accueil
     aller(pageDeLAncre());
   }
 })();

@@ -25,7 +25,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from auth.origine import ControleOrigine
 from auth.routes import router as auth_router
 from auth.securite import MotDePasseTemporaire, NonConnecte
-from routes import (analyse, candidatures, documentation, lettre, offres, pages, parametres, profil,
+from routes import (accueil, analyse, candidatures, documentation, lettre, offres, pages, parametres, profil,
                     spontanees)
 from routes.commun import mode_requis  # noqa: F401  (dépendance des routes du mode, citée par les tests)
 from shared.chiffrement import ChiffrementIndisponible, raison_indisponible
@@ -55,7 +55,7 @@ app.add_middleware(ControleOrigine)
 app.include_router(auth_router)   # /login, /logout, /register : publiques
 
 # Routeurs privés : chaque route exige une session (routes.commun.routeur_prive)
-ROUTEURS_PRIVES = [pages.router, offres.router, profil.router, parametres.router, analyse.router,
+ROUTEURS_PRIVES = [pages.router, accueil.router, offres.router, profil.router, parametres.router, analyse.router,
                    lettre.router, candidatures.router, spontanees.router, documentation.router]
 for routeur in ROUTEURS_PRIVES:
     app.include_router(routeur)

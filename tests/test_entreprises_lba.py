@@ -111,7 +111,8 @@ def test_stats_par_source_et_affichage(utilisateur):
     assert reponse["par_source"]["lba"]["entreprises"] == 2
     assert {tuple(d["sources"]) for d in reponse["dernieres"]} == {("sirene",), ("sirene", "lba"), ("lba",)}
     page = client.get("/alternance").text
-    assert 'data-filter="lba"' in page and 'data-filter="sirene"' in page and "data-par-source" in page
+    # Onglets par moyen de contact et menu par source (D148)
+    assert 'data-filter="lba"' in page and '<option value="sirene">Sirene</option>' in page and "data-par-source" in page
 
 
 def test_migration_0009_sources_en_liste(tmp_path):

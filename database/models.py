@@ -121,6 +121,9 @@ class Profil(Base):
     portfolio         = Column(String(255), default="")   # lien vers un portfolio
     # Analyse des offres en attente lancée d'elle-même après chaque recherche
     analyse_auto      = Column(Boolean, nullable=False, default=False, server_default=false())
+    # Réglages avancés du mode (Paramètres, D145) : plafonds de lancement,
+    # toute la file d'analyse. Vide : défauts de config.LIMITES_LANCEMENT
+    reglages          = Column(JSON, nullable=False, default=dict, server_default=text("'{}'"))
 
     lettre_type      = Column(Text, default="")   # trame de lettre de motivation (l'IA ne fait que le paragraphe entreprise)
     email_objet      = Column(String(300), default="")   # objet du mail de candidature spontanée
@@ -170,8 +173,11 @@ class Candidature(Base):
     lettre            = Column(Text, default="")
     email_candidature = Column(String(255), default="")
     objet_email       = Column(String(300), default="")
-    statut            = Column(String(50), default="nouveau")
+    statut            = Column(String(50), default="nouveau")   # nouveau, en_cours, gardee, archive, envoye...
     raison_archivage  = Column(String(40), default="")   # ineligible, note_basse, ecole_cfa, hors_domaine, stage, public_specifique, manuel
+    # Offre ouverte au moins une fois dans le volet de la page Offres (D145).
+    # Rien à voir avec la table offres_vues, qui dédoublonne les recherches
+    vue               = Column(Boolean, nullable=False, default=False, server_default=false())
 
     # Dernière lettre PDF générée : chemin relatif à LETTRES_PDF_DIR
     # ("user_<id>/lettre_<hex>.pdf"), servie par /api/lettre_pdf/<ref_offre>

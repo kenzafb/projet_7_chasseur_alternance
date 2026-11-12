@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Chasseur : offres</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F7F8F7}
+a{color:#0F766E}a:hover{color:#0B5A54}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F7F8F7; color: #17201F; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 15px; line-height: 1.5">
+
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E2E6E5">
+    <div style="max-width: 1360px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px">
+      <a href="Accueil.dc.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #17201F">
+        <span style="width: 34px; height: 34px; border-radius: 10px; background: #0F766E; display: flex; align-items: center; justify-content: center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="1.5" fill="#FFFFFF"></circle></svg>
+        </span>
+        <span style="font-weight: 700; font-size: 20px; letter-spacing: -0.02em">Chasseur</span>
+      </a>
+      <nav aria-label="Ce que je cherche" style="display: flex; background: #EEF1F0; border-radius: 999px; padding: 4px; gap: 2px">
+        <a href="#" style="padding: 7px 14px; border-radius: 999px; color: #56625F; text-decoration: none; font-weight: 600; font-size: 14px">Alternance</a>
+        <a href="#" style="padding: 7px 14px; border-radius: 999px; color: #56625F; text-decoration: none; font-weight: 600; font-size: 14px">Job</a>
+        <a href="#" aria-current="true" style="padding: 7px 14px; border-radius: 999px; background: #FFFFFF; color: #17201F; text-decoration: none; font-weight: 700; font-size: 14px; box-shadow: 0 1px 2px rgba(23,32,31,.12); display: flex; align-items: center; gap: 7px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #0F766E"></span>Stage</a>
+      </nav>
+      <nav aria-label="Menu principal" style="display: flex; flex-wrap: wrap; gap: 2px; flex: 1 1 auto">
+        <a href="Accueil.dc.html" style="padding: 8px 12px; color: #56625F; text-decoration: none; font-weight: 600">Accueil</a>
+        <a href="#" aria-current="page" style="padding: 8px 12px; color: #17201F; text-decoration: none; font-weight: 700; border-bottom: 2px solid #0F766E; display: flex; align-items: center; gap: 6px">Offres <sc-if value="{{aVoirNonLues}}" hint-placeholder-val="{{ true }}"><span style="font-size: 12px; font-weight: 700; color: #0B5A54; background: #E3F1EF; padding: 0 7px; border-radius: 999px">{{nonLues}}</span></sc-if></a>
+        <a href="Candidatures.dc.html" style="padding: 8px 12px; color: #56625F; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 6px">Candidatures <span style="font-size: 12px; font-weight: 700; color: #7A4A00; background: #FCEFD8; padding: 0 7px; border-radius: 999px">1</span></a>
+        <a href="Entreprises.dc.html" style="padding: 8px 12px; color: #56625F; text-decoration: none; font-weight: 600">Entreprises à contacter</a>
+        <a href="Profil.dc.html" style="padding: 8px 12px; color: #56625F; text-decoration: none; font-weight: 600">Mon profil</a>
+      </nav>
+      <button aria-label="Mon compte et paramètres" style="width: 40px; height: 40px; border-radius: 50%; border: none; background: #E3F1EF; color: #0B5A54; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer">KF</button>
+    </div>
+  </header>
+
+  <main style="max-width: 1360px; margin: 0 auto; padding: 32px 24px 64px; display: flex; flex-direction: column; gap: 20px">
+
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px">
+      <div>
+        <h1 style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15">Offres</h1>
+        <p style="margin: 4px 0 0; color: #56625F">Les offres trouvées pour ton stage, les mieux notées en haut.</p>
+      </div>
+      <button style="padding: 11px 18px; border-radius: 12px; border: none; background: #0F766E; color: #FFFFFF; font-family: inherit; font-weight: 700; font-size: 15px; cursor: pointer; display: flex; align-items: center; gap: 8px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+        Chercher de nouvelles offres</button>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 16px; border-radius: 14px; background: #FFFFFF; border: 1px solid #E2E6E5">
+      <span style="flex: 1 1 260px; font-size: 14px"><strong>3 nouvelles offres</strong> ne sont pas encore notées.</span>
+      <button style="padding: 8px 14px; border-radius: 10px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #17201F; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer">Les noter</button>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start">
+
+      <section aria-label="Liste des offres" style="flex: 1 1 340px; max-width: 460px; min-width: 0; background: #FFFFFF; border: 1px solid #E2E6E5; border-radius: 20px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+        <div role="tablist" aria-label="Classer les offres" style="display: flex; gap: 6px; flex-wrap: wrap; padding: 2px">
+          <sc-for list="{{onglets}}" as="t" hint-placeholder-count="3">
+            <button role="tab" aria-selected="{{t.actif}}" onClick="{{t.choisir}}" style="padding: 7px 13px; border-radius: 999px; font-family: inherit; font-weight: 600; font-size: 13px; cursor: pointer; border: 1px solid {{t.bord}}; background: {{t.fond}}; color: {{t.texte}}">{{t.libelle}}</button>
+          </sc-for>
+        </div>
+        <sc-if value="{{listeVide}}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 0; padding: 24px 12px; text-align: center; color: #56625F; font-size: 14px">{{messageVide}}</p>
+        </sc-if>
+        <div style="display: flex; flex-direction: column; gap: 2px">
+          <sc-for list="{{liste}}" as="o" hint-placeholder-count="4">
+            <button onClick="{{o.ouvrir}}" aria-current="{{o.choisie}}" style="display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 12px; border-radius: 12px; border: none; cursor: pointer; font-family: inherit; color: #17201F; background: {{o.fondLigne}}">
+              <span style="flex: none; width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; background: {{o.fond}}; color: {{o.encre}}">{{o.note}}</span>
+              <span style="min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; text-align: left">
+                <span style="font-size: 15px; line-height: 1.3; font-weight: {{o.poids}}">{{o.titre}}</span>
+                <span style="font-size: 13px; color: #56625F">{{o.lieu}} · {{o.quand}}</span>
+              </span>
+              <sc-if value="{{o.nonLue}}" hint-placeholder-val="{{ true }}">
+                <span aria-label="Pas encore vue" style="flex: none; width: 9px; height: 9px; border-radius: 50%; background: #0F766E; margin-top: 6px"></span>
+              </sc-if>
+            </button>
+          </sc-for>
+        </div>
+      </section>
+
+      <section aria-label="Offre ouverte" style="flex: 999 1 520px; min-width: 0; background: #FFFFFF; border: 1px solid #E2E6E5; border-radius: 20px; display: flex; flex-direction: column">
+        <sc-if value="{{aucune}}" hint-placeholder-val="{{ false }}">
+          <p style="margin: 0; padding: 64px 24px; text-align: center; color: #56625F">Choisis une offre dans la liste pour la lire ici.</p>
+        </sc-if>
+        <sc-if value="{{ouverte.existe}}" hint-placeholder-val="{{ true }}">
+          <div style="padding: 28px 32px; display: flex; flex-direction: column; gap: 22px">
+            <div style="display: flex; gap: 16px; align-items: flex-start">
+              <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px">
+                <p style="margin: 0; font-size: 14px; color: #56625F">{{ouverte.entreprise}} · {{ouverte.lieu}}</p>
+                <h2 style="margin: 0; font-size: 28px; line-height: 1.15; font-weight: 700; letter-spacing: -0.02em">{{ouverte.titre}}</h2>
+              </div>
+              <button aria-label="Fermer l'offre" onClick="{{fermer}}" style="flex: none; width: 40px; height: 40px; border-radius: 10px; border: 1px solid #E2E6E5; background: #FFFFFF; color: #56625F; cursor: pointer; display: flex; align-items: center; justify-content: center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+              </button>
+            </div>
+
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 18px 20px; border-radius: 16px; background: {{ouverte.fond}}; color: {{ouverte.encre}}">
+              <span style="font-size: 38px; font-weight: 700; line-height: 1">{{ouverte.note}}<span style="font-size: 17px">/10</span></span>
+              <span style="flex: 1 1 220px"><strong>{{ouverte.verdict}}</strong><br><span style="font-size: 14px; color: #3E4846">Tu remplis les conditions : niveau, dates et lieu.</span></span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px">
+              <div style="display: flex; flex-direction: column; gap: 10px">
+                <h3 style="margin: 0; font-size: 15px">Ce qui colle</h3>
+                <sc-for list="{{ouverte.colle}}" as="c" hint-placeholder-count="2">
+                  <p style="margin: 0; display: flex; gap: 8px; font-size: 14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex: none; margin-top: 2px" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg><span>{{c.texte}}</span></p>
+                </sc-for>
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 10px">
+                <h3 style="margin: 0; font-size: 15px">Ce qui coince</h3>
+                <sc-for list="{{ouverte.coince}}" as="c" hint-placeholder-count="2">
+                  <p style="margin: 0; display: flex; gap: 8px; font-size: 14px"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8A5300" stroke-width="2.4" stroke-linecap="round" style="flex: none; margin-top: 2px" aria-hidden="true"><path d="M6 12h12"></path></svg><span>{{c.texte}}</span></p>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <h3 style="margin: 0; font-size: 15px">L'offre en bref</h3>
+              <p style="margin: 0; color: #3E4846">{{ouverte.resume}}</p>
+              <a href="#" style="font-weight: 600; font-size: 14px">Lire l'annonce complète</a>
+            </div>
+
+            <sc-if value="{{postulee}}" hint-placeholder-val="{{ false }}">
+              <p style="margin: 0; padding: 12px 16px; border-radius: 12px; background: #E3F1EF; color: #0B5A54; font-weight: 600; font-size: 14px">C'est noté : elle est dans tes Candidatures, avec la date d'aujourd'hui.</p>
+            </sc-if>
+          </div>
+
+          <div style="border-top: 1px solid #E2E6E5; padding: 16px 32px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+            <a href="Lettre.dc.html" style="padding: 11px 18px; border-radius: 12px; background: #0F766E; color: #FFFFFF; text-decoration: none; font-weight: 700; font-size: 15px">Préparer ma lettre</a>
+            <button onClick="{{postuler}}" style="padding: 11px 18px; border-radius: 12px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #17201F; font-family: inherit; font-weight: 700; font-size: 15px; cursor: pointer">J'ai postulé</button>
+            <button onClick="{{garder}}" style="padding: 11px 18px; border-radius: 12px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #17201F; font-family: inherit; font-weight: 700; font-size: 15px; cursor: pointer">{{libelleGarder}}</button>
+            <button onClick="{{ecarter}}" style="padding: 11px 12px; border: none; background: none; color: #56625F; font-family: inherit; font-weight: 600; font-size: 15px; cursor: pointer; margin-left: auto">{{libelleEcarter}}</button>
+          </div>
+        </sc-if>
+      </section>
+
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { choisie: 'ipv6', lues: { ipv6: true, cpp: true }, statuts: {}, onglet: 'avoir', postulees: {} };
+  }
+  renderVals() {
+    const s = this.state;
+    const offres = [
+      { id: 'ipv6', note: 6, titre: 'Ingénieur(e) plateforme IPv6, Défense et Sécurité', entreprise: 'Entreprise non communiquée', lieu: 'Le Plessis-Robinson (92)', quand: 'il y a 6 semaines',
+        colle: ['Conteneurisation et Linux, au cœur de ce que tu vises.', 'Travail en équipe avec des développeurs.'],
+        coince: ['Vocabulaire réseau pointu : IPv6, VoIP.', 'Nom de l’entreprise inconnu.'],
+        resume: 'Concevoir une plateforme IPv6 pour des systèmes de contrôle aérien, intégrer des solutions de conteneurisation et participer aux Plug Tests IPv6 avec Eurocontrol, aux côtés des équipes logicielles.' },
+      { id: 'tel', note: 4, titre: 'Ingénieur(e) sécurisation de la téléphonie', entreprise: 'Entreprise non communiquée', lieu: 'Le Plessis-Robinson (92)', quand: 'il y a 6 semaines',
+        colle: ['Réseaux et sécurité, une de tes pistes.'],
+        coince: ['Très spécialisé : téléphonie et contrôle aérien.', 'Aucune expérience VoIP dans ton profil.'],
+        resume: 'Sécuriser et tester une infrastructure de téléphonie sur IP (SIP, SBC) en haute disponibilité, pour des centres de contrôle aérien.' },
+      { id: 'sys', note: 3, titre: 'Ingénieur(e) système, Défense et Sécurité', entreprise: 'Entreprise non communiquée', lieu: 'Le Plessis-Robinson (92)', quand: 'il y a 6 semaines',
+        colle: ['Intégration de systèmes complexes.'],
+        coince: ['Ingénierie système (exigences, Capella), pas administration système.'],
+        resume: 'Rédiger et suivre les exigences techniques d’un système de communication vocale, avec des outils d’ingénierie système.' },
+      { id: 'cpp', note: 3, titre: 'Ingénieur(e) développement logiciel C++', entreprise: 'Entreprise non communiquée', lieu: 'Le Plessis-Robinson (92)', quand: 'il y a 6 semaines',
+        colle: ['Environnement Linux et réseaux.'],
+        coince: ['C++ et Qt demandés, absents de ton profil.'],
+        resume: 'Développer des interfaces en C++ et Qt pour des postes de communication vocale.' }
+    ];
+    const ton = (n) => n >= 6
+      ? { fond: '#E3F1EF', encre: '#0B5A54', verdict: 'Correspond assez bien à ton profil' }
+      : n >= 4
+        ? { fond: '#FCEFD8', encre: '#7A4A00', verdict: 'Correspond en partie à ton profil' }
+        : { fond: '#EEF1F0', encre: '#46504E', verdict: 'Correspond peu à ton profil' };
+    const statut = (o) => s.statuts[o.id] || 'avoir';
+    const compte = (k) => offres.filter((o) => statut(o) === k).length;
+    const nonLues = offres.filter((o) => statut(o) === 'avoir' && !s.lues[o.id]).length;
+
+    const libelles = { avoir: 'À voir', garde: 'Gardées', ecarte: 'Écartées' };
+    const onglets = ['avoir', 'garde', 'ecarte'].map((k) => {
+      const actif = s.onglet === k;
+      return {
+        actif: actif ? 'true' : 'false',
+        libelle: libelles[k] + ' · ' + compte(k),
+        choisir: () => this.setState({ onglet: k }),
+        bord: actif ? '#17201F' : '#D7DDDB',
+        fond: actif ? '#17201F' : '#FFFFFF',
+        texte: actif ? '#FFFFFF' : '#3E4846'
+      };
+    });
+
+    const liste = offres.filter((o) => statut(o) === s.onglet).map((o) => {
+      const t = ton(o.note);
+      const choisie = s.choisie === o.id;
+      const nonLue = !s.lues[o.id];
+      return Object.assign({}, o, {
+        choisie: choisie ? 'true' : 'false',
+        nonLue,
+        ouvrir: () => this.setState({ choisie: o.id, lues: Object.assign({}, s.lues, { [o.id]: true }) }),
+        fondLigne: choisie ? '#E3F1EF' : 'transparent',
+        fond: t.fond,
+        encre: t.encre,
+        poids: nonLue ? '700' : '500'
+      });
+    });
+
+    const o = offres.find((x) => x.id === s.choisie && statut(x) === s.onglet);
+    const t = o ? ton(o.note) : ton(0);
+    const ouverte = o
+      ? Object.assign({}, o, {
+          existe: true,
+          verdict: t.verdict,
+          colle: o.colle.map((texte) => ({ texte })),
+          coince: o.coince.map((texte) => ({ texte })),
+          fond: t.fond,
+          encre: t.encre
+        })
+      : { existe: false };
+
+    const deplacer = (k) => {
+      if (!o) return;
+      const statuts = Object.assign({}, s.statuts, { [o.id]: statut(o) === k ? 'avoir' : k });
+      const suivante = offres.find((x) => x.id !== o.id && (statuts[x.id] || 'avoir') === s.onglet);
+      this.setState({ statuts, choisie: suivante ? suivante.id : null });
+    };
+
+    return {
+      onglets, liste, ouverte,
+      nonLues, aVoirNonLues: nonLues > 0,
+      listeVide: liste.length === 0,
+      messageVide: s.onglet === 'garde' ? 'Aucune offre gardée pour l’instant.' : s.onglet === 'ecarte' ? 'Aucune offre écartée.' : 'Tu as tout trié. Lance une nouvelle recherche quand tu veux.',
+      aucune: !o,
+      postulee: !!(o && s.postulees[o.id]),
+      libelleGarder: o && statut(o) === 'garde' ? 'Ne plus garder' : 'Garder pour plus tard',
+      libelleEcarter: o && statut(o) === 'ecarte' ? 'Remettre dans À voir' : 'Pas pour moi',
+      fermer: () => this.setState({ choisie: null }),
+      garder: () => deplacer('garde'),
+      ecarter: () => deplacer('ecarte'),
+      postuler: () => o && this.setState({ postulees: Object.assign({}, s.postulees, { [o.id]: true }) })
+    };
+  }
+}
+</script>
+</body>
+</html>

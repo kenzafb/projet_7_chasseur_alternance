@@ -8,9 +8,9 @@ statut_suivi). Une seule notion de candidature : chaque ligne est lue dans
 sa table d'origine, rien n'est recopié ; un changement de statut est écrit
 là où la candidature vit.
 
-Statuts de suivi communs (ceux qui existaient déjà) : envoye (offre
-postulée ou mail envoyé), a_relancer, reponse, entretien, refus, et bounce
-(mail revenu, spontanées seulement). « À relancer » est aussi calculé : une
+Statuts de suivi communs : envoye (offre postulée ou mail envoyé),
+a_relancer, relancee, entretien, reponse, acceptee, refus, et bounce
+(adresse invalide, spontanées seulement). « À relancer » est aussi calculé : une
 candidature encore « envoye » depuis au moins 7 jours s'affiche à relancer.
 """
 
@@ -21,8 +21,9 @@ from database.dates import fuseau_affichage, maintenant_utc
 from database.entreprises_db import NOTE_LBA, lire_entreprises_envoyees, modifier_statut_suivi
 from shared.liens import lien_http
 
-STATUTS_SUIVI = ("envoye", "a_relancer", "reponse", "entretien", "refus", "bounce")
-STATUTS_OFFRE = ("envoye", "a_relancer", "reponse", "entretien", "refus")   # pas de bounce sans mail
+# relancee et acceptee : étapes du tableau en colonnes de la refonte (D146)
+STATUTS_SUIVI = ("envoye", "a_relancer", "relancee", "entretien", "reponse", "acceptee", "refus", "bounce")
+STATUTS_OFFRE = ("envoye", "a_relancer", "relancee", "entretien", "reponse", "acceptee", "refus")   # pas de bounce sans mail
 DELAI_RELANCE = timedelta(days=7)
 OFFRE, SPONTANEE = "offre", "spontanee"
 

@@ -71,8 +71,8 @@ def test_interface():
     page = (config.TEMPLATES_DIR / "partials" / "offres.html").read_text(encoding="utf-8")
     assert 'data-foffre="statut"' not in page and "Postulées" not in page
     js = (config.STATIC_DIR / "js" / "offres.js").read_text(encoding="utf-8")
-    assert "J'ai postulé" in js and "if (estPostulee(o)) return false;" in js
-    assert "Annuler la candidature" not in js and 'data-act="desarchiver"' in js
+    assert "J'ai postulé" in js and "if (estPostulee(o)) return null;" in js   # ni À voir, ni Gardées, ni Écartées
+    assert "Annuler la candidature" not in js and "api.desarchiver(o.id)" in js
     cand = (config.STATIC_DIR / "js" / "candidatures.js").read_text(encoding="utf-8")
     assert "data-cand-date" in cand and "data-annuler" in cand and "{ annuler: true }" in cand
     assert 'new Event("offres:maj")' in cand and '"Postulée"' in cand

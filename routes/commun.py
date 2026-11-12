@@ -47,10 +47,21 @@ class OffreId(BaseModel):
 
 
 # Limites d'un lancement : absentes = défaut, bornées par config.limite_lancement
-def limite_appliquee(cle: str, demandee, disponibles: int | None = None) -> tuple[int, str]:
+def reglage(user_id: int, mode: str, cle: str):
+    """Réglage avancé du mode (D145) : celui de la personne, sinon le défaut."""
+    from database.profil_db import lire_profil
+    from shared.reglages import reglages_complets
+    return reglages_complets(lire_profil(user_id, mode=mode).get("reglages"))[cle]
+
+
+def limite_appliquee(cle: str, demandee, disponibles: int | None = None, *,
+                     user_id: int | None = None, mode: str | None = None) -> tuple[int, str]:
     """Limite appliquée à un lancement, bornée par le plafond et, s'il est
     donné, par le nombre d'éléments disponibles ; et la précision à
-    journaliser quand la valeur demandée a été ramenée (décision D6)."""
+    journaliser quand la valeur demandée a été ramenée (décision D6).
+    Rien de demandé : le réglage avancé du mode (D145), s'il est connu."""
+    if demandee is None and user_id is not None and mode:
+        demandee = reglage(user_id, mode, cle)
     appliquee = config.limite_lancement(cle, demandee)
     if disponibles is not None:
         appliquee = min(appliquee, disponibles)

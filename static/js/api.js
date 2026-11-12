@@ -16,6 +16,22 @@ export function lienSur(url) {
   return /^https?:\/\/[^\s<>"'`]+$/i.test(texte) ? texte : "";
 }
 
+/* Compteur de ce qui attend (menu et barre d'onglets du téléphone) : masqué
+   à zéro, nommé pour les lecteurs d'écran */
+export function majCompteur(cle, n, libelle) {
+  document.querySelectorAll(`[data-count="${cle}"]`).forEach(c => {
+    c.textContent = Number(n || 0).toLocaleString("fr-FR");
+    c.hidden = !n;
+    c.setAttribute("aria-label", libelle);
+  });
+}
+
+/* Texte sûr dans du HTML construit par les modules */
+export function esc(texte) {
+  return String(texte ?? "").replace(/[&<>"']/g, c =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
 export function avecMode(url) {
   const u = new URL(url, location.origin);
   if (u.pathname.startsWith("/api/") && !u.searchParams.has("mode")) u.searchParams.set("mode", MODE);
@@ -41,10 +57,10 @@ export function limite(cle) {
 const LANCEMENTS = {
   offres:      { champ: "max_offres",      texte: n => `Recherche lancée : ${n} offres ajoutées au plus, sans analyse` },
   analyses:    { champ: "max_analyses",    texte: n => `Analyse lancée : ${n} offres au plus, les plus récentes d'abord` },
-  entreprises: { champ: "max_entreprises", texte: n => `Récupération lancée : ${n} nouvelles entreprises au plus` },
-  scrapees:    { champ: "max_scrapees",    texte: n => `Scraping lancé : ${n} entreprises au plus` },
+  entreprises: { champ: "max_entreprises", texte: n => `Recherche d'entreprises lancée : ${n} nouvelles au plus` },
+  scrapees:    { champ: "max_scrapees",    texte: n => `Recherche des emails lancée : ${n} entreprises au plus` },
   mails:       { champ: "limite",          texte: n => `Envoi lancé : ${n} mails au plus` },
-  revalidations: { champ: "max_revalidations", texte: n => `Validation IA lancée : ${n} entreprises au plus` },
+  revalidations: { champ: "max_revalidations", texte: n => `Vérification par l'IA lancée : ${n} entreprises au plus` },
 };
 
 export function confirmerLancement(cle, demandee, reponse) {
@@ -53,7 +69,7 @@ export function confirmerLancement(cle, demandee, reponse) {
   if (appliquee === undefined) return;
   let texte = regle.texte(appliquee);
   if (demandee !== undefined && demandee !== appliquee) texte += ` (demandé : ${demandee}, ramené à ${appliquee})`;
-  if (reponse.mode_test) texte += ". 🧪 Mode test : tout part vers ton adresse d'expédition";
+  if (reponse.mode_test) texte += ". Mode essai : tout part vers ton adresse d'expédition";
   if (reponse.avertissement) texte += ". ⚠️ " + reponse.avertissement.replace(/\.$/, "");
   const champ = document.querySelector(`[data-limite="${cle}"]`);
   if (champ) champ.value = appliquee;
@@ -135,7 +151,9 @@ export const api = {
   analyser:          (id)      => post("/api/analyser", { id }),
   paragrapheLettre:  (id)      => post("/api/lettre/paragraphe", { id }),
   assemblerLettre:   (id, paragraphe) => post("/api/lettre/assembler", { id, paragraphe }),
+  apercuLettre:      (id, paragraphe, lettre) => post("/api/lettre/apercu", lettre === null ? { id, paragraphe } : { id, paragraphe, lettre }),
   majStatut:         (id, s)   => post("/api/maj_statut", { id, statut: s }),
+  offreVue:          (id)      => post("/api/offre/vue", { id }),
   archiver:          (id)      => post("/api/archiver", { id }),
   postuler:          (id, corps) => post("/api/offre/postuler", { id, ...corps }),
   desarchiver:       (id)      => post("/api/offre/archivage", { id, desarchiver: true }),
@@ -150,6 +168,7 @@ export const api = {
   // Profil, mode, domaines
   profil:          ()        => get("/api/profil"),
   sauverProfil:    (donnees) => post("/api/profil", donnees),
+  completudeProfil: ()       => get("/api/profil/completude"),
   mode:            ()        => get("/api/mode"),
   domaines:        ()        => get("/api/domaines"),
   criteresOptions: ()        => get("/api/criteres_options"),
@@ -160,6 +179,8 @@ export const api = {
   copieApercu:     (source, sections) => post("/api/profil/copie/apercu", { source, sections }),
   copierProfil:    (source, sections, ecraser) => post("/api/profil/copie", { source, sections, ecraser }),
 
+  // Réglages avancés du mode (page Paramètres, D145)
+  enregistrerReglages: (corps) => post("/api/reglages", corps),
   // Compte de connexion (page Paramètres)
   compte:            ()      => get("/api/compte"),
   changerMotDePasse: (ancien, nouveau, confirmation) => post("/api/compte/mot_de_passe", { ancien, nouveau, confirmation }),
@@ -177,6 +198,7 @@ export const api = {
   postuleLba:      (id, date) => post("/api/spontanees/postule_lba", { id, date }),
   // Suivi unique des candidatures (offres postulées et spontanées, D107)
   suivi:         ()           => get("/api/suivi"),
+  accueil:       ()           => get("/api/accueil"),
   suiviStatut:   (type, id, statut) => post("/api/suivi/statut", { type, id, statut }),
   spStats:    ()       => get("/api/spontanees/stats"),
   spFetch:    (max)    => post("/api/spontanees/fetch", { max_entreprises: max }),

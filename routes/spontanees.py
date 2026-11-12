@@ -157,7 +157,7 @@ def _aveclimite_appliquee(reponse, **limite):
 def api_spontanees_fetch(request: Request, body: Fetch | None = None,
                          user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
     user_id = user.id
-    maximum, note = limite_appliquee("entreprises", body.max_entreprises if body else None)
+    maximum, note = limite_appliquee("entreprises", body.max_entreprises if body else None, user_id=user.id, mode=mode)
     # Même profil que fetch_entreprises (celui du mode) : LBA si le mode l'utilise, et Sirene
     from shared.naf import sirene_pour_profil
     profil = lire_profil(user_id, mode=mode)
@@ -187,8 +187,8 @@ def api_spontanees_scraper(request: Request, body: Scraper | None = None,
     from database.entreprises_db import compter_a_scraper
     disponibles = compter_a_scraper(user_id, mode)
     if not disponibles:
-        raise ErreurUtilisateur("Aucune entreprise à scraper : lance d'abord « Récupérer ».")
-    maximum, note = limite_appliquee("scrapees", body.max_scrapees if body else None, disponibles)
+        raise ErreurUtilisateur("Aucune entreprise dont chercher les emails : lance d'abord « Trouver des entreprises ».")
+    maximum, note = limite_appliquee("scrapees", body.max_scrapees if body else None, disponibles, user_id=user.id, mode=mode)
 
     def travail(arret, log, on_progress):
         from spontanees.recherche_emails import main as scraper_main
@@ -235,7 +235,7 @@ def api_spontanees_revalider(request: Request, body: Revalider | None = None,
     disponibles = compter_a_valider(user_id, mode)
     if not disponibles:
         raise ErreurUtilisateur("Aucun email en attente de validation.")
-    maximum, note = limite_appliquee("revalidations", body.max_revalidations if body else None, disponibles)
+    maximum, note = limite_appliquee("revalidations", body.max_revalidations if body else None, disponibles, user_id=user.id, mode=mode)
 
     def travail(arret, log, on_progress):
         from spontanees.recherche_emails import revalider
@@ -264,7 +264,7 @@ def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends
     disponibles = compter_a_envoyer(user_id, mode)
     if not disponibles:
         raise ErreurUtilisateur("Rien à envoyer : aucune entreprise avec un email non contacté dans ce mode.")
-    limite, note = limite_appliquee("mails", body.limite, disponibles)
+    limite, note = limite_appliquee("mails", body.limite, disponibles, user_id=user.id, mode=mode)
     # Mode test : option du compte d'envoi, ou demandé pour ce lancement
     test = bool(body.test or compte["mode_test"])
     if test:

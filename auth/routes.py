@@ -27,9 +27,12 @@ from database.models import User, Profil
 from auth.securite import (attente_connexion, authentifier, effacer_echecs, hacher_mot_de_passe,
                            LONGUEUR_MIN_MOT_DE_PASSE, noter_echec, ouvrir_session, utilisateur_courant,
                            verifier_nouveau_mot_de_passe)
+from shared.statique import url_statique
 
 router = APIRouter()
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
+# Feuille de style des pages de connexion, versionnée par son contenu (D150)
+templates.env.globals.update(statique=url_statique)
 
 
 # ─── Connexion ────────────────────────────────────────────────────────────────

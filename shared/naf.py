@@ -178,9 +178,9 @@ def _libelle(code: str) -> str:
 VOLUME_TOUS_SECTEURS = ("382 663 entreprises en Île-de-France hors « sans salarié », dont 67 755 à partir "
                         "de 10 salariés ; mesure Sirene du 9 octobre 2026")
 
-MESSAGE_RIEN_A_CHERCHER = ("Aucun domaine, aucun secteur et « tous les secteurs » non cochée : « Récupérer » "
-                           "ne cherchera aucune entreprise sur Sirene. Choisis des domaines ou des secteurs "
-                           "d'entreprise dans le profil, ou coche « tous les secteurs ».")
+MESSAGE_RIEN_A_CHERCHER = ("Aucun domaine, aucun secteur et « tous les secteurs » non cochée : « Trouver des "
+                           "entreprises » ne cherchera rien sur Sirene. Choisis des domaines ou des secteurs "
+                           "d'entreprise dans ton profil (Ce que tu cherches), ou coche « tous les secteurs ».")
 
 
 def avertissement_sirene(domaines, secteurs=(), tous_secteurs=False) -> str:

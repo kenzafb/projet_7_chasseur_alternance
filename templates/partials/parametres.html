@@ -1,7 +1,6 @@
 <!-- ════════════ PAGE PARAMÈTRES (compte, commune aux trois modes, D122) ════════════ -->
 <section class="page" data-page-content="parametres">
 
-  <p class="parametres-intro">Réglages de ton compte, les mêmes dans les trois modes (alternance, job, stage).</p>
 
   <!-- ─── Email de connexion ─── -->
   <div class="card profil-card">
@@ -135,4 +134,75 @@
   </div>
 
 
+  <!-- ─── Réglages avancés du mode (D145) : enregistrés sur le serveur ─── -->
+  <section class="card profil-card reglages" aria-labelledby="reglages-titre" data-reglages>
+    <div class="profil-card__head">
+      <div>
+        <h2 class="profil-card__title" id="reglages-titre">Réglages avancés <span class="reglages__mode">(mode {{ mode }})</span></h2>
+        <p class="profil-card__sub">Propres à ce mode, et retrouvés sur tous tes appareils. Les valeurs par défaut conviennent la plupart du temps.</p>
+      </div>
+    </div>
+    <h3 class="reglages__sous-titre">Offres</h3>
+    <div class="reglages__grille">
+      {% set cle_offres = "offres" if analyse_ia|default(true) else "offres_sans_ia" %}
+      <label class="field">
+        <span class="field__label">Offres ajoutées au plus par recherche</span>
+        <input class="field__input" type="number" data-limite="offres" data-reglage="{{ cle_offres }}"
+               value="{{ reglages[cle_offres] }}" min="1" max="{{ limites[cle_offres].max }}" inputmode="numeric">
+        <span class="field__hint">Entre 1 et {{ limites[cle_offres].max }} (défaut : {{ limites[cle_offres].defaut }}).</span>
+      </label>
+      {% if analyse_ia|default(true) %}
+      <label class="field">
+        <span class="field__label">Offres notées au plus à chaque fois</span>
+        <input class="field__input" type="number" data-limite="analyses" data-reglage="analyses"
+               value="{{ reglages.analyses }}" min="1" max="{{ limites.analyses.max }}" inputmode="numeric">
+        <span class="field__hint">Entre 1 et {{ limites.analyses.max }} (défaut : {{ limites.analyses.defaut }}), les plus récentes d'abord.</span>
+      </label>
+      {% endif %}
+    </div>
+    <h3 class="reglages__sous-titre">Entreprises à contacter</h3>
+    <div class="reglages__grille">
+      <label class="field">
+        <span class="field__label">Nouvelles entreprises au plus par recherche</span>
+        <input class="field__input" type="number" data-limite="entreprises" data-reglage="entreprises"
+               value="{{ reglages.entreprises }}" min="1" max="{{ limites.entreprises.max }}" inputmode="numeric">
+        <span class="field__hint">Entre 1 et {{ limites.entreprises.max }} (défaut : {{ limites.entreprises.defaut }}).</span>
+      </label>
+      <label class="field">
+        <span class="field__label">Entreprises dont chercher les emails à chaque fois</span>
+        <input class="field__input" type="number" data-limite="scrapees" data-reglage="scrapees"
+               value="{{ reglages.scrapees }}" min="1" max="{{ limites.scrapees.max }}" data-plafond="{{ limites.scrapees.max }}" inputmode="numeric">
+        <span class="field__hint">Entre 1 et <span data-limite-max="scrapees">max {{ limites.scrapees.max }}</span> (défaut : {{ limites.scrapees.defaut }}).</span>
+      </label>
+      <label class="field">
+        <span class="field__label">Mails envoyés au plus à chaque fois</span>
+        <input class="field__input" type="number" data-limite="mails" data-reglage="mails"
+               value="{{ reglages.mails }}" min="1" max="{{ limites.mails.max }}" data-plafond="{{ limites.mails.max }}" inputmode="numeric">
+        <span class="field__hint">Entre 1 et <span data-limite-max="mails">max {{ limites.mails.max }}</span> (défaut : {{ limites.mails.defaut }}), dans la limite du jour.</span>
+      </label>
+      <label class="field">
+        <span class="field__label">Entreprises revues par l'IA à chaque fois</span>
+        <input class="field__input" type="number" data-limite="revalidations" data-reglage="revalidations"
+               value="{{ reglages.revalidations }}" min="1" max="{{ limites.revalidations.max }}" inputmode="numeric">
+        <span class="field__hint">Adresses à vérifier : entre 1 et {{ limites.revalidations.max }} (défaut : {{ limites.revalidations.defaut }}).</span>
+      </label>
+    </div>
+
+    {% if analyse_ia|default(true) %}
+    <div class="reglages__cases">
+      <label class="case">
+        <input type="checkbox" data-analyse-toute-file data-reglage="analyse_toute_file"{% if reglages.analyse_toute_file %} checked{% endif %}>
+        <span><strong>Noter toute la file d'un coup</strong> (lancement de nuit) : sans plafond, l'ordinateur doit rester allumé.</span>
+      </label>
+      <label class="case">
+        <input type="checkbox" data-reglage="analyse_auto"{% if analyse_auto %} checked{% endif %}>
+        <span><strong>Noter les offres après chaque recherche</strong>, avec le plafond ci-dessus.</span>
+      </label>
+    </div>
+    <p class="reglages__info">Modèle d'IA qui note les offres : <strong>{{ modele_analyse|default("") }}</strong>, sur cet ordinateur. Compte une à deux minutes par offre sur processeur.</p>
+    {% else %}
+    <p class="reglages__info">IA désactivée sur le serveur (ANALYSE_IA=false) : les offres restent sans note.</p>
+    {% endif %}
+    <p class="ce-message" data-reglages-message role="status"></p>
+  </section>
 </section>

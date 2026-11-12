@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Chasseur : mon profil</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F7F8F7}
+a{color:#0F766E}a:hover{color:#0B5A54}
+input,textarea,select{font-family:inherit}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F7F8F7; color: #17201F; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 15px; line-height: 1.5">
+
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E2E6E5">
+    <div style="max-width: 1360px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px 28px">
+      <a href="Accueil.dc.html" style="display: flex; align-items: center; gap: 10px; text-decoration: none; color: #17201F">
+        <span style="width: 34px; height: 34px; border-radius: 10px; background: #0F766E; display: flex; align-items: center; justify-content: center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="7"></circle><circle cx="12" cy="12" r="1.5" fill="#FFFFFF"></circle></svg>
+        </span>
+        <span style="font-weight: 700; font-size: 20px; letter-spacing: -0.02em">Chasseur</span>
+      </a>
+      <nav aria-label="Ce que je cherche" style="display: flex; background: #EEF1F0; border-radius: 999px; padding: 4px; gap: 2px">
+        <a href="#" style="padding: 7px 14px; border-radius: 999px; color: #56625F; text-decoration: none; font-weight: 600; font-size: 14px">Alternance</a>
+        <a href="#" style="padding: 7px 14px; border-radius: 999px; color: #56625F; text-decoration: none; font-weight: 600; font-size: 14px">Job</a>
+        <a href="#" aria-current="true" style="padding: 7px 14px; border-radius: 999px; background: #FFFFFF; color: #17201F; text-decoration: none; font-weight: 700; font-size: 14px; box-shadow: 0 1px 2px rgba(23,32,31,.12); display: flex; align-items: center; gap: 7px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #0F766E"></span>Stage</a>
+      </nav>
+      <nav aria-label="Menu principal" style="display: flex; flex-wrap: wrap; gap: 2px; flex: 1 1 auto">
+        <a href="Accueil.dc.html" style="padding: 8px 12px; color: #56625F; text-decoration: none; font-weight: 600">Accueil</a>
+        <a href="Offres.dc.html" style="padding: 8px 12px; color: #56625F; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 6px">Offres <span style="font-size: 12px; font-weight: 700; color: #0B5A54; background: #E3F1EF; padding: 0 7px; border-radius: 999px">2</span></a>
+        <a href="Candidatures.dc.html" style="padding: 8px 12px; color: #56625F; text-decoration: none; font-weight: 600; display: flex; align-items: center; gap: 6px">Candidatures <span style="font-size: 12px; font-weight: 700; color: #7A4A00; background: #FCEFD8; padding: 0 7px; border-radius: 999px">1</span></a>
+        <a href="Entreprises.dc.html" style="padding: 8px 12px; color: #56625F; text-decoration: none; font-weight: 600">Entreprises à contacter</a>
+        <a href="#" aria-current="page" style="padding: 8px 12px; color: #17201F; text-decoration: none; font-weight: 700; border-bottom: 2px solid #0F766E">Mon profil</a>
+      </nav>
+      <button aria-label="Mon compte et paramètres" style="width: 40px; height: 40px; border-radius: 50%; border: none; background: #E3F1EF; color: #0B5A54; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer">KF</button>
+    </div>
+  </header>
+
+  <main style="max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; display: flex; flex-direction: column; gap: 24px">
+
+    <div style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px">
+      <div>
+        <h1 style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15">Mon profil</h1>
+        <p style="margin: 4px 0 0; color: #56625F">Ce que le Chasseur sait de toi pour noter les offres et écrire tes lettres.</p>
+      </div>
+      <button style="padding: 9px 14px; border-radius: 10px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #17201F; font-family: inherit; font-weight: 600; font-size: 14px; cursor: pointer">Copier depuis mon profil alternance ou job</button>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+      <nav aria-label="Parties du profil" style="flex: 1 1 240px; max-width: 280px; display: flex; flex-direction: column; gap: 4px">
+        <sc-for list="{{parties}}" as="p" hint-placeholder-count="5">
+          <button onClick="{{p.ouvrir}}" aria-current="{{p.actif}}" style="display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid {{p.bord}}; background: {{p.fond}}; font-family: inherit; color: #17201F; cursor: pointer; text-align: left">
+            <span style="flex: none; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: {{p.pastilleFond}}; color: {{p.pastilleEncre}}; font-size: 13px; font-weight: 700">
+              <sc-if value="{{p.complet}}" hint-placeholder-val="{{ true }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg></sc-if>
+              <sc-if value="{{p.incomplet}}" hint-placeholder-val="{{ false }}">!</sc-if>
+            </span>
+            <span style="flex: 1; min-width: 0"><span style="display: block; font-weight: 700">{{p.titre}}</span><span style="display: block; font-size: 13px; color: #56625F">{{p.etat}}</span></span>
+          </button>
+        </sc-for>
+      </nav>
+
+      <section style="flex: 999 1 520px; min-width: 0; background: #FFFFFF; border: 1px solid #E2E6E5; border-radius: 20px; display: flex; flex-direction: column">
+        <div style="padding: 28px 32px; display: flex; flex-direction: column; gap: 22px">
+
+          <sc-if value="{{vue.toi}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <h2 style="margin: 0; font-size: 22px; font-weight: 700">Toi</h2>
+              <p style="margin: 0; color: #56625F; font-size: 14px">Tes coordonnées, en haut de tes lettres.</p>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px">
+              <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px">Prénom<input value="Kenza" style="padding: 11px 12px; border-radius: 10px; border: 1px solid #D7DDDB; font-size: 15px; font-weight: 400"></label>
+              <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px">Nom<input value="Filali-Bouami" style="padding: 11px 12px; border-radius: 10px; border: 1px solid #D7DDDB; font-size: 15px; font-weight: 400"></label>
+              <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px">Email<input value="kenzafilbou@gmail.com" style="padding: 11px 12px; border-radius: 10px; border: 1px solid #D7DDDB; font-size: 15px; font-weight: 400"></label>
+              <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px">Téléphone<input value="07 50 87 21 76" style="padding: 11px 12px; border-radius: 10px; border: 1px solid #D7DDDB; font-size: 15px; font-weight: 400"></label>
+              <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px">Ville<input value="Paris 14e" style="padding: 11px 12px; border-radius: 10px; border: 1px solid #D7DDDB; font-size: 15px; font-weight: 400"></label>
+              <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px">Portfolio <span style="font-weight: 400; color: #56625F">(facultatif)</span><input value="https://kenzafb.github.io" style="padding: 11px 12px; border-radius: 10px; border: 1px solid #D7DDDB; font-size: 15px; font-weight: 400"></label>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{vue.stage}}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <h2 style="margin: 0; font-size: 22px; font-weight: 700">Ton stage</h2>
+              <p style="margin: 0; color: #56625F; font-size: 14px">Les offres qui ne collent pas à tes dates sont mises de côté toutes seules.</p>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px">
+              <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px">Début du stage<input type="date" value="2027-02-08" style="padding: 10px 12px; border-radius: 10px; border: 1px solid #D7DDDB; font-size: 15px; font-weight: 400"></label>
+              <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px">Fin du stage<input type="date" value="2027-04-18" style="padding: 10px 12px; border-radius: 10px; border: 1px solid #D7DDDB; font-size: 15px; font-weight: 400"></label>
+            </div>
+            <p style="margin: -8px 0 0; font-size: 14px; color: #0B5A54; font-weight: 600">Soit 10 semaines.</p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px">
+              <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px">École<input value="Université Sorbonne Paris Nord" style="padding: 11px 12px; border-radius: 10px; border: 1px solid #D7DDDB; font-size: 15px; font-weight: 400"></label>
+              <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px">Formation<input value="BUT Informatique, 2e année" style="padding: 11px 12px; border-radius: 10px; border: 1px solid #D7DDDB; font-size: 15px; font-weight: 400"></label>
+            </div>
+            <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px">Ce que tu aimerais faire pendant ce stage
+              <textarea rows="4" style="padding: 11px 12px; border-radius: 10px; border: 1px solid #D7DDDB; font-size: 15px; font-weight: 400; line-height: 1.5; resize: vertical">Administration système et maintenance, développement (Python, web), automatisation et intégration d'IA. Curieuse de la coordination de projet.</textarea>
+              <span style="font-weight: 400; font-size: 13px; color: #56625F">Écris comme tu le dirais à quelqu'un. Le Chasseur s'en sert pour noter les offres.</span>
+            </label>
+          </sc-if>
+
+          <sc-if value="{{vue.parcours}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <h2 style="margin: 0; font-size: 22px; font-weight: 700">Ton parcours</h2>
+              <p style="margin: 0; color: #56625F; font-size: 14px">Ce que tu sais faire et ce que tu as déjà fait.</p>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <span style="font-weight: 600; font-size: 14px">Compétences</span>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                <sc-for list="{{competences}}" as="c" hint-placeholder-count="8">
+                  <span style="display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 12px; border-radius: 999px; background: #EEF1F0; font-size: 14px">{{c.nom}}<button aria-label="Retirer {{c.nom}}" style="width: 22px; height: 22px; border-radius: 50%; border: none; background: none; color: #56625F; cursor: pointer; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button></span>
+                </sc-for>
+                <input aria-label="Ajouter une compétence" placeholder="Ajouter…" style="padding: 6px 12px; border-radius: 999px; border: 1px dashed #B8C1BE; font-size: 14px; width: 120px">
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <span style="font-weight: 600; font-size: 14px">Projets</span>
+              <sc-for list="{{projets}}" as="p" hint-placeholder-count="3">
+                <div style="display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; padding: 12px 14px; border-radius: 12px; border: 1px solid #E2E6E5">
+                  <strong>{{p.nom}}</strong><span style="color: #56625F; font-size: 14px; flex: 1 1 240px">{{p.texte}}</span><button style="border: none; background: none; color: #0F766E; font-family: inherit; font-weight: 600; font-size: 14px; cursor: pointer">Modifier</button>
+                </div>
+              </sc-for>
+              <button style="align-self: flex-start; padding: 8px 12px; border-radius: 10px; border: 1px dashed #B8C1BE; background: #FFFFFF; color: #17201F; font-family: inherit; font-weight: 600; font-size: 14px; cursor: pointer">Ajouter un projet</button>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{vue.recherche}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <h2 style="margin: 0; font-size: 22px; font-weight: 700">Ce que tu cherches</h2>
+              <p style="margin: 0; color: #56625F; font-size: 14px">Où et dans quel domaine le Chasseur doit chercher.</p>
+            </div>
+            <fieldset style="border: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+              <legend style="font-weight: 600; font-size: 14px; padding: 0; margin-bottom: 8px">Domaine</legend>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                <label style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid #0F766E; background: #E3F1EF; font-size: 14px; font-weight: 600; color: #0B5A54"><input type="checkbox" checked style="accent-color: #0F766E">Informatique et télécoms</label>
+                <button style="padding: 8px 14px; border-radius: 999px; border: 1px dashed #B8C1BE; background: #FFFFFF; color: #17201F; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer">Ajouter un domaine</button>
+              </div>
+            </fieldset>
+            <fieldset style="border: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+              <legend style="font-weight: 600; font-size: 14px; padding: 0; margin-bottom: 8px">Où</legend>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                <sc-for list="{{departements}}" as="d" hint-placeholder-count="8">
+                  <label style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid {{d.bord}}; background: {{d.fond}}; font-size: 14px; font-weight: 600"><input type="checkbox" checked="{{d.coche}}" onChange="{{d.basculer}}" style="accent-color: #0F766E">{{d.nom}}</label>
+                </sc-for>
+              </div>
+            </fieldset>
+            <fieldset style="border: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+              <legend style="font-weight: 600; font-size: 14px; padding: 0; margin-bottom: 8px">Taille des entreprises</legend>
+              <p style="margin: 0 0 4px; font-size: 13px; color: #8A5300; font-weight: 600">Pas encore choisi : toutes les tailles sont gardées.</p>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                <label style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid #D7DDDB; font-size: 14px; font-weight: 600"><input type="checkbox" style="accent-color: #0F766E">Moins de 10 personnes</label>
+                <label style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid #D7DDDB; font-size: 14px; font-weight: 600"><input type="checkbox" style="accent-color: #0F766E">10 à 249</label>
+                <label style="display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid #D7DDDB; font-size: 14px; font-weight: 600"><input type="checkbox" style="accent-color: #0F766E">250 et plus</label>
+              </div>
+            </fieldset>
+          </sc-if>
+
+          <sc-if value="{{vue.documents}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 4px">
+              <h2 style="margin: 0; font-size: 22px; font-weight: 700">Tes documents</h2>
+              <p style="margin: 0; color: #56625F; font-size: 14px">Ce que tu envoies aux entreprises.</p>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; border: 1px solid #E2E6E5">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#56625F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path></svg>
+              <span style="flex: 1 1 200px"><strong>CV_Kenza_Filali-Bouami.pdf</strong><br><span style="font-size: 13px; color: #56625F">Ton CV, joint à chaque candidature</span></span>
+              <button style="padding: 8px 12px; border-radius: 10px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #17201F; font-family: inherit; font-weight: 600; font-size: 14px; cursor: pointer">Remplacer</button>
+            </div>
+            <label style="display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 14px">Ta lettre type
+              <span style="font-weight: 400; font-size: 13px; color: #56625F">Écris ta lettre une fois. Là où tu mets [paragraphe], le Chasseur ajoute quelques phrases adaptées à chaque offre.</span>
+              <textarea rows="7" style="padding: 11px 12px; border-radius: 10px; border: 1px solid #D7DDDB; font-size: 15px; font-weight: 400; line-height: 1.5; resize: vertical">Madame, Monsieur,
+
+[paragraphe]
+
+Étudiante en 2e année de BUT Informatique à l'Université Sorbonne Paris Nord, après un Diplôme de Spécialisation Professionnelle DevOps obtenu au Conservatoire National des Arts et Métiers…</textarea>
+            </label>
+          </sc-if>
+
+        </div>
+        <div style="border-top: 1px solid #E2E6E5; padding: 14px 32px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center">
+          <span style="flex: 1 1 200px; font-size: 14px; color: #56625F">{{etatEnregistrement}}</span>
+          <sc-if value="{{suivante.existe}}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{suivante.ouvrir}}" style="padding: 11px 16px; border-radius: 12px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #17201F; font-family: inherit; font-weight: 700; font-size: 15px; cursor: pointer">Partie suivante : {{suivante.titre}}</button>
+          </sc-if>
+          <button onClick="{{enregistrer}}" style="padding: 11px 18px; border-radius: 12px; border: none; background: #0F766E; color: #FFFFFF; font-family: inherit; font-weight: 700; font-size: 15px; cursor: pointer">Enregistrer</button>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":960}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { partie: 'stage', enregistre: false, deps: { '75': true, '92': true, '93': true, '94': true } };
+  }
+  renderVals() {
+    const s = this.state;
+    const defs = [
+      { id: 'toi', titre: 'Toi', etat: 'Complet', complet: true },
+      { id: 'stage', titre: 'Ton stage', etat: 'Du 8 févr. au 18 avr. 2027', complet: true },
+      { id: 'parcours', titre: 'Ton parcours', etat: '8 compétences, 3 projets', complet: true },
+      { id: 'recherche', titre: 'Ce que tu cherches', etat: 'Taille des entreprises à choisir', complet: false },
+      { id: 'documents', titre: 'Tes documents', etat: 'CV et lettre type', complet: true }
+    ];
+    const parties = defs.map((d) => {
+      const actif = s.partie === d.id;
+      return Object.assign({}, d, {
+        incomplet: !d.complet,
+        actif: actif ? 'true' : 'false',
+        ouvrir: () => this.setState({ partie: d.id }),
+        bord: actif ? '#0F766E' : 'transparent',
+        fond: actif ? '#FFFFFF' : 'transparent',
+        pastilleFond: d.complet ? '#E3F1EF' : '#FCEFD8',
+        pastilleEncre: d.complet ? '#0B5A54' : '#7A4A00'
+      });
+    });
+    const i = defs.findIndex((d) => d.id === s.partie);
+    const suite = defs[i + 1];
+    const deps = ['Paris (75)', 'Hauts-de-Seine (92)', 'Seine-Saint-Denis (93)', 'Val-de-Marne (94)', 'Seine-et-Marne (77)', 'Yvelines (78)', 'Essonne (91)', "Val-d'Oise (95)"].map((nom) => {
+      const code = nom.slice(-3, -1);
+      const coche = !!s.deps[code];
+      return { nom, coche, bord: coche ? '#0F766E' : '#D7DDDB', fond: coche ? '#E3F1EF' : '#FFFFFF',
+        basculer: () => this.setState({ deps: Object.assign({}, s.deps, { [code]: !coche }) }) };
+    });
+    return {
+      parties,
+      vue: { toi: s.partie === 'toi', stage: s.partie === 'stage', parcours: s.partie === 'parcours', recherche: s.partie === 'recherche', documents: s.partie === 'documents' },
+      suivante: suite ? { existe: true, titre: suite.titre, ouvrir: () => this.setState({ partie: suite.id }) } : { existe: false },
+      etatEnregistrement: s.enregistre ? 'Enregistré.' : 'Pense à enregistrer avant de changer de page.',
+      enregistrer: () => this.setState({ enregistre: true }),
+      competences: ['Linux', 'Bash', 'Python', 'FastAPI', 'Docker', 'Git', 'SQL', 'HTML et CSS'].map((nom) => ({ nom })),
+      projets: [
+        { nom: 'Le Chasseur', texte: 'Application web multi-utilisateurs de recherche de stage et d’alternance, avec IA locale.' },
+        { nom: 'Grabber', texte: 'Supervision d’un parc de machines, entièrement conteneurisée avec Docker.' },
+        { nom: 'Assistant email IA', texte: 'Tri et rédaction de mails avec Ollama et l’API Gmail.' }
+      ],
+      departements: deps
+    };
+  }
+}
+</script>
+</body>
+</html>

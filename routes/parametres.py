@@ -13,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr
 from auth.securite import utilisateur_requis
 from database import compte_envoi_db
 from database.models import User
-from routes.commun import routeur_prive
+from routes.commun import mode_requis, routeur_prive
 from shared import compte_envoi, config
 from shared.chiffrement import raison_indisponible
 from shared.erreurs import ErreurUtilisateur
@@ -112,3 +112,34 @@ def api_compte_envoi_mode_test(body: ModeTest, user: User = Depends(utilisateur_
 def api_compte_envoi_mail_test(body: MailTest | None = None, user: User = Depends(utilisateur_requis)):
     """Mail de test, uniquement vers l'adresse d'expédition du compte."""
     return compte_envoi.envoyer_mail_test(user.id, body.destinataire if body else None)
+
+
+# ─── Réglages avancés du mode (D145) ─────────────────────────────────────────
+class Reglages(BaseModel):
+    """Plafonds de lancement et « toute la file » ; chaque valeur est bornée
+    par le serveur, une clé absente garde sa valeur."""
+    model_config = ConfigDict(extra="forbid")
+    offres: int | None = None
+    offres_sans_ia: int | None = None
+    analyses: int | None = None
+    entreprises: int | None = None
+    scrapees: int | None = None
+    revalidations: int | None = None
+    mails: int | None = None
+    analyse_toute_file: bool | None = None
+    analyse_auto: bool | None = None   # colonne du profil, réglée ici depuis D145
+
+
+@router.get("/api/reglages")
+def api_reglages(user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
+    from database.profil_db import lire_profil
+    from shared.reglages import reglages_complets
+    profil = lire_profil(user.id, mode=mode)
+    return {**reglages_complets(profil.get("reglages")), "analyse_auto": bool(profil.get("analyse_auto"))}
+
+
+@router.post("/api/reglages")
+def api_reglages_enregistrer(body: Reglages, user: User = Depends(utilisateur_requis),
+                             mode: str = Depends(mode_requis)):
+    from database.profil_db import sauvegarder_reglages
+    return sauvegarder_reglages(user.id, body.model_dump(exclude_none=True), mode)

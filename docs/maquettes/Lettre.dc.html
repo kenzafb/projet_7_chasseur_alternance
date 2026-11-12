@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Chasseur : ma lettre</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#F7F8F7}
+a{color:#0F766E}a:hover{color:#0B5A54}
+textarea{font-family:inherit}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #F7F8F7; color: #17201F; font-family: 'Instrument Sans', system-ui, sans-serif; font-size: 15px; line-height: 1.5">
+
+  <header style="background: #FFFFFF; border-bottom: 1px solid #E2E6E5">
+    <div style="max-width: 1360px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px">
+      <a href="Offres.dc.html" style="display: flex; align-items: center; gap: 8px; text-decoration: none; color: #17201F; font-weight: 600">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"></path></svg>
+        Retour à l'offre</a>
+      <span style="flex: 1 1 300px; min-width: 0; color: #56625F; font-size: 14px">Ta lettre pour <strong style="color: #17201F">Ingénieur(e) plateforme IPv6, Défense et Sécurité</strong></span>
+      <button onClick="{{enregistrer}}" style="padding: 10px 16px; border-radius: 10px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #17201F; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer">{{texteEnregistrer}}</button>
+      <button style="padding: 10px 16px; border-radius: 10px; border: none; background: #0F766E; color: #FFFFFF; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer; display: flex; align-items: center; gap: 8px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"></path><path d="M7 10l5 5 5-5"></path><path d="M5 20h14"></path></svg>
+        Télécharger le PDF</button>
+    </div>
+  </header>
+
+  <main style="max-width: 1360px; margin: 0 auto; padding: 32px 24px 64px; display: flex; flex-wrap: wrap; gap: 28px; align-items: flex-start">
+
+    <section aria-labelledby="perso" style="flex: 1 1 360px; max-width: 460px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+      <div>
+        <h1 id="perso" style="margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.015em">Le paragraphe pour cette offre</h1>
+        <p style="margin: 4px 0 0; color: #56625F; font-size: 14px">Le Chasseur l'a écrit à partir de l'offre et de ton profil. Relis-le et change ce que tu veux : le reste de la lettre est ta lettre type.</p>
+      </div>
+      <label style="display: flex; flex-direction: column; gap: 6px">
+        <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Paragraphe personnalisé</span>
+        <textarea rows="8" value="{{paragraphe}}" onChange="{{ecrire}}" style="padding: 14px; border-radius: 14px; border: 1px solid #D7DDDB; background: #FFFFFF; font-size: 15px; line-height: 1.55; resize: vertical; color: #17201F"></textarea>
+      </label>
+      <div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center">
+        <button onClick="{{regenerer}}" style="padding: 9px 14px; border-radius: 10px; border: 1px solid #D7DDDB; background: #FFFFFF; color: #17201F; font-family: inherit; font-weight: 700; font-size: 14px; cursor: pointer">Proposer une autre version</button>
+        <span style="font-size: 13px; color: #56625F">{{version}}</span>
+      </div>
+      <div style="display: flex; gap: 10px; padding: 12px 14px; border-radius: 12px; background: #EEF1F0; font-size: 14px; color: #3E4846">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="flex: none; margin-top: 2px" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v5"></path><circle cx="12" cy="7.8" r="0.6" fill="currentColor"></circle></svg>
+        <span>Le nom de l'entreprise n'est pas donné dans l'offre : la lettre est adressée au service recrutement.</span>
+      </div>
+      <a href="Profil.dc.html" style="font-weight: 600; font-size: 14px">Modifier ma lettre type</a>
+    </section>
+
+    <section aria-label="Aperçu de la lettre" style="flex: 999 1 560px; min-width: 0; display: flex; justify-content: center">
+      <article style="width: 100%; max-width: 680px; background: #FFFFFF; border-radius: 6px; box-shadow: 0 1px 3px rgba(23,32,31,.12), 0 12px 32px rgba(23,32,31,.08); padding: 56px 60px; font-family: Calibri, Carlito, 'Liberation Sans', Arial, sans-serif; font-size: 14.5px; line-height: 1.5; color: #1A1A1A; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; flex-direction: column">
+          <strong>Kenza Filali-Bouami</strong>
+          <span>Paris 14e</span>
+          <span>07 50 87 21 76</span>
+          <span>kenzafilbou@gmail.com</span>
+        </div>
+        <div style="align-self: flex-end; text-align: right">À l'attention du service recrutement</div>
+        <div>Paris, le 12 novembre 2026</div>
+        <div><strong>Objet : Candidature au stage Ingénieur(e) plateforme IPv6</strong></div>
+        <div>Madame, Monsieur,</div>
+        <div style="background: #E3F1EF; margin: 0 -8px; padding: 4px 8px; border-radius: 4px">{{paragraphe}}</div>
+        <div>Étudiante en 2e année de BUT Informatique à l'Université Sorbonne Paris Nord, après un Diplôme de Spécialisation Professionnelle DevOps obtenu au Conservatoire National des Arts et Métiers avec 15,53/20 de moyenne, je recherche un stage de 8 à 10 semaines, du 8 février au 18 avril 2027.</div>
+        <div>Lors de mon stage au Garage Numérique, j'ai installé et configuré des systèmes Linux sur une dizaine de machines. Installer Arch Linux m'a demandé une journée entière de recherches et d'essais, et y être parvenue par moi-même reste l'une de mes plus grandes fiertés.</div>
+        <div style="color: #8A918F">…</div>
+        <div>Kenza Filali-Bouami</div>
+      </article>
+    </section>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { v: 0, enregistre: false, texte: null };
+  }
+  renderVals() {
+    const versions = [
+      'Votre projet de plateforme IPv6 pour les systèmes de contrôle aérien m’intéresse particulièrement, car il combine administration système et développement, deux domaines que je souhaite approfondir. Participer aux Plug Tests avec Eurocontrol et travailler aux côtés de vos équipes logicielles me permettrait de découvrir l’intégration dans un environnement où la fiabilité est essentielle.',
+      'Concevoir une plateforme IPv6 et y intégrer des conteneurs, c’est exactement le type de mission qui relie ce que j’aime : Linux, l’infrastructure et l’automatisation. Contribuer à des systèmes de contrôle aérien, où chaque détail compte, serait pour moi une vraie école de rigueur.'
+    ];
+    const v = this.state.v;
+    const texte = this.state.texte;
+    return {
+      paragraphe: texte === null ? versions[v] : texte,
+      ecrire: (e) => this.setState({ texte: e.target.value, enregistre: false }),
+      version: 'Version ' + (v + 1) + ' sur ' + versions.length,
+      regenerer: () => this.setState({ v: (v + 1) % versions.length, enregistre: false, texte: null }),
+      texteEnregistrer: this.state.enregistre ? 'Enregistrée' : 'Enregistrer',
+      enregistrer: () => this.setState({ enregistre: true })
+    };
+  }
+}
+</script>
+</body>
+</html>

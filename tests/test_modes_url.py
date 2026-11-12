@@ -23,7 +23,22 @@ def test_page_de_chaque_mode(utilisateur):
                         ("stage", "Chasseur de Stage")):
         page = client.get(f"/{mode}").text
         assert f'data-mode="{mode}"' in page and f"<title>{titre}" in page.replace("&#39;", "'")
-        assert f'class="mode-switch__btn is-active" href="/{mode}"' in page
+        # Sélecteur de mode de l'en-tête : le mode ouvert est marqué (D143)
+        assert f'href="/{mode}" data-mode-btn="{mode}" aria-current="true"' in page
+        assert page.count('aria-current="true"') == 1
+        # Sélecteur du téléphone (D150) : le même mode marqué
+        assert f'href="/{mode}" data-mode-btn="{mode}" aria-current="page"' in page
+
+
+def test_initiales_du_rond_mon_compte(utilisateur):
+    """Prénom et nom du profil du mode, sinon la première lettre de l'email."""
+    from routes.pages import initiales
+    assert initiales({"prenom": "alice", "nom": "Martin"}, "a@test.fr") == "AM"
+    assert initiales({"prenom": " ", "nom": ""}, "zoe@test.fr") == "Z"
+    client, _ = utilisateur("b@test.fr", prenom="Bea")
+    page = client.get("/alternance").text
+    assert 'aria-label="Mon compte et paramètres">B</button>' in page
+    assert "b@test.fr" in page and 'action="/logout"' in page
 
 
 def test_anciennes_url_redirigees(client, code_invitation):

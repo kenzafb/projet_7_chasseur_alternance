@@ -1,12 +1,14 @@
 /* ============================================================================
-   spontanees.js — table des entreprises + pilotage du pipeline
+   spontanees.js — Entreprises à contacter (D148) : trois étapes (trouver,
+   chercher les emails, envoyer), entreprises rangées par moyen de contact
    ============================================================================ */
-import { api, limite, confirmerLancement } from "./api.js";
+import { api, limite, confirmerLancement, majCompteur } from "./api.js";
 
 let stats = null;
 let compte = null;    // compte d'envoi (mode test affiché en bandeau)
 let aValider = [];    // entreprises aux emails non validés par l'IA
-let filtre = "all";
+let filtre = "pretes";
+let source = "all";   // all | sirene | lba
 const aujourdhui = () => new Date().toLocaleDateString("sv-SE");   // AAAA-MM-JJ, jour local
 
 /* Contacts de l'entreprise dans les autres modes : simple étiquette,
@@ -29,7 +31,7 @@ export function etiquettesAutresModes(e) {
 const VALIDATION = {
   regle: ["validée par règle", "chip--vert"], ia: ["validée par l'IA", "chip--vert"],
   manuelle: ["validée à la main", "chip--vert"], lba: ["fournie par LBA", "chip--lba"],
-  inconnue: ["validée avant la phase 7", "chip--gris"], douteuse: ["non validée", "chip--gris"],
+  inconnue: ["adresse validée", "chip--gris"], douteuse: ["à vérifier", "chip--gris"],
   ecartee_ia: ["écartée par l'IA", "chip--rouge"],
 };
 function etiquetteAdresse(a) {
@@ -37,7 +39,7 @@ function etiquetteAdresse(a) {
   return `<span class="chip ${classe}" title="${esc(texte)}">${esc(texte)}</span>${a.meilleur ? ' <span class="chip chip--ft" title="Meilleur contact selon l\'IA">meilleur contact</span>' : ""}`;
 }
 function listeAdresses(adresses) {
-  return adresses.map(a => `<div>${esc(a.adresse)} ${etiquetteAdresse(a)}</div>`).join("");
+  return adresses.map(a => `<p class="ent__detail">${esc(a.adresse)} ${etiquetteAdresse(a)}</p>`).join("");
 }
 
 /* Page de l'entreprise sur La Bonne Alternance (D129) : « Postuler » si LBA
@@ -46,78 +48,103 @@ function boutonLba(e) {
   if (!e.lba?.url) return "";
   // « J'ai postulé » à côté du bouton (D130) : l'entreprise passe « Envoyée » à la date choisie
   return e.lba.formulaire
-    ? `<div class="trow__lba"><a class="btn btn--sm btn--lba" href="${esc(e.lba.url)}" target="_blank" rel="noopener"
-         title="Ouvre la page de candidature dans un nouvel onglet">Postuler sur La Bonne Alternance</a>
-       <input type="date" class="trow__date" data-lba-date value="${aujourdhui()}" max="${aujourdhui()}" title="Date de candidature">
-       <button class="btn btn--sm btn--signal" data-lba-postule="${e.id}">J'ai postulé</button></div>`
-    : `<div class="trow__lba"><a class="trow__lien" href="${esc(e.lba.url)}" target="_blank" rel="noopener"
-         title="LBA n'a pas de contact pour cette entreprise : pas de formulaire">Voir sur La Bonne Alternance</a></div>`;
+    ? `<div class="ent__actions"><a class="btn btn--sm" href="${esc(e.lba.url)}" target="_blank" rel="noopener">Postuler sur La Bonne Alternance<span class="visuellement-cache"> (nouvel onglet)</span></a>
+       <label class="volet__date"><span>le</span><input type="date" data-lba-date value="${aujourdhui()}" max="${aujourdhui()}" aria-label="Date de candidature"></label>
+       <button type="button" class="btn btn--sm" data-lba-postule="${e.id}">J'ai postulé</button></div>`
+    : `<a class="ent__lien" href="${esc(e.lba.url)}" target="_blank" rel="noopener">Voir sur La Bonne Alternance<span class="visuellement-cache"> (nouvel onglet)</span></a>`;
 }
 
+/* Onglet d'une entreprise à contacter : email trouvé, formulaire LBA, ou rien */
+const ongletDe = e => e.email ? "pretes" : e.lba?.formulaire ? "lba" : "aucun";
+const AIDES = {
+  pretes: "Leur email est trouvé : le Chasseur peut leur envoyer ta candidature (étape 3).",
+  lba: "Pas d'email, mais un formulaire sur La Bonne Alternance. Postule là-bas, puis indique-le ici.",
+  aucun: "Aucun moyen de contact trouvé pour l'instant. Le Chasseur réessaiera à la prochaine recherche d'emails.",
+  faites: "Elles sont aussi dans tes Candidatures, où tu suis leurs réponses.",
+};
+const SOURCES = { sirene: "Sirene", lba: "La Bonne Alternance" };
+const ETAPES_SUIVI = { envoye: "envoyée", a_relancer: "à relancer", relancee: "relancée", entretien: "entretien",
+  reponse: "réponse reçue", acceptee: "acceptée", refus: "refusée", bounce: "adresse invalide" };
+let contactees = [];   // candidatures spontanées envoyées (suivi)
+
 function ligne(e) {
-  const aEmail = !!e.email;
-  // Sans email mais avec un formulaire LBA : à postuler sur LBA, pas bloquée (D131)
-  const viaLba = !aEmail && e.lba?.formulaire;
-  const statut = e.envoye
-    ? `<span class="chip chip--vert">${e.historique ? "contactée avant la refonte" : "envoyé"}</span>`
-    : aEmail
-      ? `<span class="chip chip--ft">à envoyer</span>`
-      : viaLba
-        ? `<span class="chip chip--lba" title="Pas d'email : candidature par la page La Bonne Alternance">à postuler sur LBA</span>`
-        : `<span class="chip chip--gris">ignoré</span>`;
-  // Pastille par source (Sirene, LBA, ou les deux) ; aucune priorité entre elles
-  const pastilles = (e.sources || []).map(src => src === "lba"
-    ? ` <span class="chip chip--lba" title="Fort potentiel d'embauche d'alternants (La Bonne Alternance)">LBA</span>`
-    : ` <span class="chip chip--gris" title="Répertoire Sirene de l'INSEE">Sirene</span>`).join("");
-  const origine = aEmail && e.email_lba ? ` <span class="trow__sub">(fourni par LBA)</span>` : "";
-  return `
-    <div class="trow">
-      <div>
-        <div class="trow__name">${esc(e.nom || "—")}${pastilles}${etiquettesAutresModes(e)}</div>
-        <div class="trow__sub">${esc(e.ville || "")}</div>
+  const sources = (e.sources || []).map(s => SOURCES[s] || s).join(" et ");
+  const onglet = ongletDe(e);
+  const detail = onglet === "pretes"
+    ? `Email trouvé : ${esc(e.email)}${e.email_lba ? " (fourni par La Bonne Alternance)" : ""}`
+    : onglet === "lba" ? "Formulaire de candidature sur La Bonne Alternance"
+    : (e.adresses || []).length ? "Adresses à vérifier, voir plus haut" : "Ni email ni formulaire trouvés";
+  const recherche = `${e.nom || ""} ${e.ville || ""} ${e.email || ""}`.toLowerCase();
+  return `<li class="ent" data-search-text="${esc(recherche)}">
+      <span class="ent__initiale" aria-hidden="true">${esc((e.nom || "?").trim()[0] || "?")}</span>
+      <div class="ent__corps">
+        <p class="ent__nom">${esc(e.nom || "Entreprise sans nom")}${etiquettesAutresModes(e)}</p>
+        <p class="ent__detail">${detail}${sources ? ` · ${esc(sources)}` : ""}${e.ville ? ` · ${esc(e.ville)}` : ""}</p>
+        ${onglet === "pretes" && (e.adresses || []).length > 1 ? `<details class="ent__adresses"><summary>Ses ${e.adresses.length} adresses</summary>${listeAdresses(e.adresses)}</details>`
+          : onglet === "pretes" && (e.adresses || []).length ? `<p class="ent__detail">${etiquetteAdresse(e.adresses[0])}</p>` : ""}
         ${boutonLba(e)}
       </div>
-      <div class="trow__mail ${aEmail ? "" : viaLba ? "trow__mail--lba" : "trow__mail--none"}">${(e.adresses || []).length
-        ? listeAdresses(e.adresses) : aEmail ? esc(e.email) + origine
-        : viaLba ? `<span title="Pas d'email : candidature par la page La Bonne Alternance">pas d'email : via LBA</span>`
-        : "non trouvé"}</div>
-      <div>${statut}</div>
-    </div>`;
+    </li>`;
+}
+
+function ligneContactee(c) {
+  const recherche = `${c.entreprise || ""} ${c.contact || ""}`.toLowerCase();
+  return `<li class="ent" data-search-text="${esc(recherche)}">
+      <span class="ent__initiale" aria-hidden="true">${esc((c.entreprise || "?").trim()[0] || "?")}</span>
+      <div class="ent__corps">
+        <p class="ent__nom">${esc(c.entreprise || "Entreprise")}${etiquettesAutresModes(c)}</p>
+        <p class="ent__detail">${c.historique ? "Contactée avant la refonte" : `Contactée${c.date ? ` le ${esc(dateFr(c.date))}` : ""}`}${
+          c.contact ? ` · ${esc(c.contact)}` : ""} · ${esc(ETAPES_SUIVI[c.statut] || c.statut)}</p>
+        <a class="ent__lien" href="#candidatures">Voir dans Candidatures</a>
+      </div>
+    </li>`;
 }
 
 function rendreTable() {
   const el = document.querySelector('[data-list="spontanees"]');
   if (!el || !stats) return;
-  // Prochaines entreprises (ordre du scraper et de l'envoyeur), puis les dernières envoyées
-  // Entreprises à traiter seulement : une fois envoyées, elles sont dans Candidatures (D110)
-  let items = [...(stats.prochaines || [])];
-  if (filtre === "email")  items = items.filter(e => e.email);
-  if (filtre === "lba" || filtre === "sirene") items = items.filter(e => (e.sources || []).includes(filtre));
-  if (filtre === "lba_postuler") items = items.filter(e => !e.email && e.lba?.formulaire);
-
-  el.innerHTML = items.length
-    ? items.map(ligne).join("")
-    : `<div class="empty" style="padding:40px 20px;">
-         <div class="empty__title">Rien à afficher</div>
-         <div class="empty__hint">Lance le pipeline pour récupérer des entreprises et leurs contacts.</div>
-       </div>`;
+  // Les prochaines entreprises (ordre de la recherche d'emails et de l'envoi) ;
+  // une fois contactées, elles sont dans Candidatures (D110)
+  const prochaines = stats.prochaines || [];
+  const compte = { pretes: 0, lba: 0, aucun: 0, faites: contactees.length };
+  prochaines.forEach(e => { compte[ongletDe(e)]++; });
+  for (const [k, n] of Object.entries(compte)) {
+    const nb = document.querySelector(`[data-sp-nombre="${k}"]`);
+    if (nb) nb.textContent = fmt(n);
+  }
+  document.querySelectorAll('[data-filters="spontanees"] [data-filter]').forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.filter === filtre)));
+  const aide = document.querySelector("[data-sp-aide]");
+  if (aide) aide.textContent = AIDES[filtre] || "";
+  const deSource = e => source === "all" || (e.sources || []).includes(source);
+  const items = filtre === "faites" ? contactees.filter(deSource).map(ligneContactee)
+    : prochaines.filter(e => ongletDe(e) === filtre && deSource(e)).map(ligne);
+  el.innerHTML = items.length ? items.join("") : '<li class="ent-liste__vide">Rien ici pour l\'instant.</li>';
 }
 
+/* Ligne d'état de chaque étape, d'après les chiffres du mode */
 function rendreKpis() {
   if (!stats) return;
-  const set = (k, v) => { const e = document.querySelector(`[data-sp="${k}"]`); if (e) e.textContent = v; };
-  set("raw", fmt(stats.raw));
-  set("avec_email", fmt(stats.avec_email));
-  set("mail_envoye", fmt(stats.mail_envoye));
-  const taux = stats.raw ? Math.round((stats.avec_email / stats.raw) * 100) : 0;
-  set("taux_email", `${taux}% de la base`);
-  const ps = stats.par_source || {};
-  set("lba", ps.lba?.entreprises ? `dont ${fmt(ps.lba.entreprises)} à fort potentiel (LBA)` : "dans la base");
-  rendreParSource(ps);
+  const set = (k, v) => { const e = document.querySelector(`[data-sp-etat="${k}"]`); if (e) e.textContent = v; };
+  const n = (x, un, plusieurs) => `${fmt(x)} ${x > 1 ? plusieurs : un}`;
+  const lba = stats.par_source?.lba?.entreprises;
+  set("fetch", stats.raw ? `${n(stats.raw, "trouvée", "trouvées")}${lba ? `, dont ${fmt(lba)} par La Bonne Alternance` : ""}.`
+    : "Aucune entreprise pour l'instant.");
+  set("scraper", `${n(stats.avec_email, "email trouvé", "emails trouvés")}${stats.a_postuler_lba
+    ? `, ${n(stats.a_postuler_lba, "entreprise joignable", "entreprises joignables")} par La Bonne Alternance` : ""}${
+    stats.a_scraper ? `. ${n(stats.a_scraper, "entreprise", "entreprises")} à chercher.` : "."}`);
+  set("envoyer", stats.a_envoyer ? `${n(stats.a_envoyer, "entreprise prête", "entreprises prêtes")} à recevoir ta candidature.`
+    : "Aucune entreprise prête pour l'instant.");
+  const btnEnvoyer = document.querySelector('[data-sp-bouton="envoyer"]');
+  if (btnEnvoyer && !stats.en_cours) btnEnvoyer.disabled = !stats.a_envoyer;
+  const btnTrouver = document.querySelector('[data-sp-bouton="fetch"]');
+  if (btnTrouver) btnTrouver.textContent = stats.raw ? "En trouver d'autres" : "Trouver des entreprises";
+  const raw = document.querySelector('[data-sp="raw"]');
+  if (raw) raw.textContent = fmt(stats.raw);
+  rendreParSource(stats.par_source || {});
 
-  // compteur sidebar + pied
-  const c = document.querySelector('[data-count="spontanees"]');
-  if (c) c.textContent = fmt(stats.raw);
+  // Compteur du menu : entreprises prêtes à recevoir la candidature
+  majCompteur("spontanees", stats.a_envoyer || 0, `${stats.a_envoyer || 0} prêtes à envoyer`);
   const ae = document.querySelector('[data-stat="avec_email"]');
   if (ae) ae.textContent = fmt(stats.avec_email);
   const en = document.querySelector('[data-stat="envoyes"]');
@@ -126,7 +153,7 @@ function rendreKpis() {
   const bar = document.querySelector('[data-stat="taux-bar"]');
   if (bar) bar.style.width = `${tx}%`;
   const lbl = document.querySelector('[data-stat="taux"]');
-  if (lbl) lbl.textContent = `${tx}% de taux d'envoi`;
+  if (lbl) lbl.textContent = `${tx} % de taux d'envoi`;
 }
 
 /* Surligne l'étape active du pipeline + affiche l'état et le message */
@@ -167,13 +194,21 @@ function rendreModeTest() {
   if (adr) adr.textContent = compte ? compte.adresse : "ton adresse d'expédition";
 }
 
-/* Ce que « Récupérer » ne cherchera pas, dit avant tout lancement */
+/* « Passer en envoi réel » : coupe le mode essai du compte d'envoi, après confirmation */
+async function passerEnEnvoiReel() {
+  if (!confirm("Les prochains envois partiront vraiment vers les entreprises. Continuer ?")) return;
+  try { compte = (await api.modeTestCompte(false)).compte || { ...compte, mode_test: false }; }
+  catch (err) { alert(err.message); return; }
+  rendreModeTest();
+}
+
+/* Ce que « Trouver des entreprises » ne cherchera pas, dit avant tout lancement */
 function rendreAvertissement() {
   const bandeau = document.querySelector("[data-sp-avertissement]");
   if (!bandeau) return;
   const texte = stats?.avertissement_recuperer || "";
   bandeau.hidden = !texte;
-  bandeau.textContent = texte ? "⚠️ " + texte : "";
+  bandeau.textContent = texte;
 }
 
 /* Maximum d'un lancement : le plafond, borné par ce qui reste à traiter
@@ -207,31 +242,29 @@ function rendreAValider() {
   // Chaque adresse avec sa mention ; douteuses et écartées par l'IA validables une à une
   const adresse = (e, a) => `<div>${esc(a.adresse)} ${etiquetteAdresse(a)}${
     ["douteuse", "ecartee_ia"].includes(a.validation)
-      ? ` <button class="btn btn--sm btn--ghost" data-valider-adresse="${esc(a.adresse)}" data-entreprise="${e.id}">${
+      ? ` <button type="button" class="btn btn--sm" data-valider-adresse="${esc(a.adresse)}" data-entreprise="${e.id}">${
           a.validation === "ecartee_ia" ? "Valider quand même" : "Valider"}</button>` : ""}</div>`;
   liste.innerHTML = aValider.map(e => `
     <div class="a-valider__ligne">
-      <div><div class="trow__name">${esc(e.nom)}</div><div class="trow__sub">${esc(e.ville)}</div></div>
-      <div class="trow__mail">${(e.adresses || []).map(a => adresse(e, a)).join("")}</div>
-      ${e.emails.length ? `<button class="btn btn--sm" data-valider="${e.id}">Tout valider</button>` : ""}
+      <div><p class="ent__nom">${esc(e.nom)}</p><p class="ent__detail">${esc(e.ville)}</p></div>
+      <div class="a-valider__adresses">${(e.adresses || []).map(a => adresse(e, a)).join("")}</div>
+      ${e.emails.length ? `<button type="button" class="btn btn--sm" data-valider="${e.id}">Tout valider</button>` : ""}
     </div>`).join("");
 }
 
 /* Répartition par source : entreprises, emails, envoyés, réponses, entretiens */
 function rendreParSource(ps) {
-  const carte = document.querySelector("[data-par-source]");
   const liste = document.querySelector('[data-list="par-source"]');
-  if (!carte || !liste) return;
+  if (!liste) return;
   const lignes = [["Sirene", ps.sirene], ["La Bonne Alternance", ps.lba], ["Les deux", ps.les_deux]];
-  carte.hidden = !lignes.some(([, l]) => l && l.entreprises);
   liste.innerHTML = lignes.filter(([, l]) => l).map(([nom, l]) => `
-    <div class="trow trow--source"><span>${nom}</span><span>${fmt(l.entreprises)}</span><span>${fmt(l.avec_email)}</span>
-      <span>${fmt(l.envoyes)}</span><span>${fmt(l.reponses)}</span><span>${fmt(l.entretiens)}</span></div>`).join("");
+    <tr><th scope="row">${nom}</th><td>${fmt(l.entreprises)}</td><td>${fmt(l.avec_email)}</td>
+      <td>${fmt(l.envoyes)}</td><td>${fmt(l.reponses)}</td><td>${fmt(l.entretiens)}</td></tr>`).join("");
 }
 
 function fmt(n) { return (n ?? 0).toLocaleString("fr-FR"); }
 function esc(s) {
-  return String(s).replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
+  return String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
 }
 
 export const Spontanees = {
@@ -239,6 +272,12 @@ export const Spontanees = {
     try { stats = await api.spStats(); } catch (_) { stats = null; }
     try { compte = (await api.compteEnvoi()).compte; } catch (_) { compte = null; }
     try { aValider = await api.spAValider(); } catch (_) { aValider = []; }
+    try { contactees = (await api.suivi()).filter(c => c.type === "spontanee"); } catch (_) { contactees = []; }
+    if (!this._brancheEssai) {
+      document.querySelector("[data-sp-envoi-reel]")?.addEventListener("click", passerEnEnvoiReel);
+      document.querySelector("[data-sp-source]")?.addEventListener("change", e => { source = e.target.value; rendreTable(); });
+      this._brancheEssai = true;
+    }
     rendreAValider();
     if (!this._brancheValider) {
       const liste = document.querySelector('[data-list="a-valider"]');

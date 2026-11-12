@@ -39,7 +39,7 @@ SOURCE_SIRENE = "sirene"
 SOURCES = (SOURCE_SIRENE, SOURCE_LBA)
 PROCHAINES_AFFICHEES = 30
 # Statuts de suivi comptés comme une réponse de l'entreprise
-STATUTS_REPONSE = {"reponse", "entretien", "refus"}
+STATUTS_REPONSE = {"reponse", "entretien", "refus", "acceptee"}
 
 
 def _siren(e) -> str:
@@ -818,8 +818,9 @@ def lire_entreprises_envoyees(user_id: int, mode: str = MODE_DEFAUT) -> list[dic
 
 
 def modifier_statut_suivi(user_id: int, entreprise_id: int, statut: str, mode: str = MODE_DEFAUT) -> bool:
-    """Change le statut de suivi d'une entreprise dans ce mode (envoye/reponse/entretien/refus/bounce)."""
-    valides = {"envoye", "a_relancer", "reponse", "entretien", "refus", "bounce"}
+    """Change le statut de suivi d'une entreprise dans ce mode (statuts de suivi, D107 et D146)."""
+    from database.suivi_db import STATUTS_SUIVI
+    valides = set(STATUTS_SUIVI)
     if statut not in valides:
         return False
     db = SessionLocal()

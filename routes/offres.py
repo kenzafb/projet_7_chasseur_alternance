@@ -35,7 +35,9 @@ router = routeur_prive()
 
 
 # Valeurs autorisées (cf. database/models.py)
-StatutCandidature = Literal["nouveau", "en_cours", "envoye", "a_relancer", "reponse", "entretien", "refus", "archive"]
+# « gardee » : gardée pour plus tard (D145) ; écartée = « archive », raison « manuel »
+StatutCandidature = Literal["nouveau", "en_cours", "gardee", "envoye", "a_relancer", "relancee", "entretien",
+                            "reponse", "acceptee", "refus", "archive"]
 # « a_relancer » : statut de suivi commun aux offres et aux spontanées (D107)
 RaisonArchivage = Literal["manuel", "note_basse", "ineligible", "ecole_cfa", "hors_domaine", "public_specifique",
                           "stage"]
@@ -131,7 +133,7 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
     # Offres ajoutées au plus, France Travail et LBA confondues : 30 par défaut
     # avec l'IA (à analyser ensuite), 100 sans elle (D20)
     max_offres, note = limite_appliquee("offres" if config.analyse_ia_active() else "offres_sans_ia",
-                               body.max_offres if body else None)
+                               body.max_offres if body else None, user_id=user.id, mode=mode)
     cfg_mode = get_mode(mode)
     profil = lire_profil(user_id, mode=mode)
     exiger_profil(profil)   # 400 tout de suite plutôt qu'une erreur dans le thread
@@ -224,7 +226,7 @@ def api_maj_statut(body: MajStatut, request: Request, user: User = Depends(utili
 
 # Statuts d'une offre où la personne a postulé (D105) : « envoye » (affiché
 # « Postulée »), puis le suivi de la page Mes candidatures
-STATUTS_POSTULEE = ("envoye", "a_relancer", "reponse", "entretien", "refus")
+STATUTS_POSTULEE = ("envoye", "a_relancer", "relancee", "entretien", "reponse", "acceptee", "refus")
 
 
 @router.post("/api/offre/postuler")
@@ -250,6 +252,13 @@ def api_offre_postuler(body: Postuler, user: User = Depends(utilisateur_requis),
     modifier_candidature(user.id, body.id, {"statut": statut, "date_candidature": instant,
                                             "raison_archivage": ""}, mode=mode)
     return {"ok": True, "statut": statut, "date_candidature": jour.isoformat()}
+
+@router.post("/api/offre/vue")
+def api_offre_vue(body: OffreId, user: User = Depends(utilisateur_requis), mode: str = Depends(mode_requis)):
+    """L'offre a été ouverte dans le volet (D145) : elle n'est plus « nouvelle »."""
+    if not modifier_candidature(user.id, body.id, {"vue": True}, mode=mode):
+        return JSONResponse({"erreur": "Offre introuvable"}, status_code=404)
+    return {"ok": True}
 
 @router.post("/api/archiver")
 def api_archiver(body: OffreId, request: Request, user: User = Depends(utilisateur_requis),

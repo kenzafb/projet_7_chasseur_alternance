@@ -101,8 +101,10 @@ def test_paragraphe_modifie_puis_insere_et_enregistre(ada, ia):
 def test_profil_lettre_type_dans_les_trois_modes(ada):
     for mode in ("alternance", "stage", "job"):
         page = ada.get(f"/{mode}").text
-        i = page.index('<h3 class="profil-card__title">Lettre de motivation type</h3>')
-        assert mode in page[:i].rsplit('data-mode-section="', 1)[1].split('"')[0].split()
+        # Partie « Tes documents » (D147), bloc commun aux trois modes
+        i = page.index('data-profil="lettre_type"')
+        assert page[:i].rsplit('data-mode-section="', 1)[1].split('"')[0] == "commun"
+        assert page.rfind('data-partie="documents"', 0, i) > page.rfind('data-partie="recherche"', 0, i)
         assert "{paragraphe}" in page and "data-lettre-exemple" in page
 
 

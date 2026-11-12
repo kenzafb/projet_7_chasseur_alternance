@@ -37,6 +37,32 @@ const ENVOIS = {
   },
 };
 
+/* Réglages avancés du mode (D145) : enregistrés dès qu'ils changent ; le
+   serveur borne chaque valeur et renvoie celles retenues */
+function brancherReglages() {
+  const bloc = $("[data-reglages]");
+  if (!bloc) return;
+  bloc.addEventListener("change", async e => {
+    const champ = e.target.closest("[data-reglage]");
+    if (!champ) return;
+    const cle = champ.dataset.reglage;
+    const valeur = champ.type === "checkbox" ? champ.checked : parseInt(champ.value, 10);
+    const el = $("[data-reglages-message]");
+    if (champ.type !== "checkbox" && Number.isNaN(valeur)) { el.textContent = "Indique un nombre."; return; }
+    try {
+      const r = await api.enregistrerReglages({ [cle]: valeur });
+      if (champ.type !== "checkbox") champ.value = r[cle];
+      el.textContent = champ.type !== "checkbox" && r[cle] !== valeur
+        ? `Enregistré, ramené à ${r[cle]} (valeurs permises : ${champ.min} à ${champ.max}).` : "Enregistré.";
+      el.classList.add("is-ok");
+    } catch (err) {
+      el.textContent = `Non enregistré : ${err.message}`;
+      el.classList.remove("is-ok");
+    }
+  });
+}
+brancherReglages();
+
 export const Parametres = {
   _charge: false,
 

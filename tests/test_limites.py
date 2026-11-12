@@ -1,6 +1,7 @@
 """Limites par lancement : valeurs par défaut, plafonds côté serveur, et
 limites respectées par la recherche, le fetch, le scraper et l'envoi."""
 
+import re
 import itertools
 from types import SimpleNamespace
 
@@ -45,7 +46,8 @@ def test_interface_reprend_defauts_et_plafonds(utilisateur):
     for cle, regle in config.LIMITES_LANCEMENT.items():
         if cle == "offres_sans_ia":   # même champ que « offres », affiché quand ANALYSE_IA=false
             continue
-        assert f'data-limite="{cle}" value="{regle["defaut"]}"' in page
+        # Plafonds des offres et des analyses dans Réglages avancés (D145)
+        assert re.search(rf'data-limite="{cle}"[^>]*\s+value="{regle["defaut"]}"', page), cle
         assert f'max="{regle["max"]}"' in page
 
 
@@ -287,7 +289,7 @@ def test_scraper_borne_par_les_entreprises_a_traiter(utilisateur, monkeypatch, p
 def test_scraper_refuse_sans_entreprise_a_traiter(utilisateur, pipelines_neufs):
     client, user_id = utilisateur("a@test.fr", prenom="Alice")
     r = client.post("/api/spontanees/scraper", json={"max_scrapees": 5})
-    assert r.status_code == 400 and "Aucune entreprise à scraper" in r.json()["erreur"]
+    assert r.status_code == 400 and "Aucune entreprise dont chercher les emails" in r.json()["erreur"]
     assert pipelines_neufs.etat("spontanees", user_id)["en_cours"] is False
 
 
@@ -325,7 +327,8 @@ def test_envoi_refuse_quand_rien_a_envoyer(utilisateur, smtp_simule, pipelines_n
 
 
 def test_front_affiche_le_maximum_disponible():
-    page = (config.TEMPLATES_DIR / "partials" / "spontanees.html").read_text(encoding="utf-8")
+    # Plafonds dans Paramètres, Réglages avancés (D148)
+    page = (config.TEMPLATES_DIR / "partials" / "parametres.html").read_text(encoding="utf-8")
     for cle in ("scrapees", "mails"):
         assert f'data-limite-max="{cle}"' in page
     js = (config.STATIC_DIR / "js" / "spontanees.js").read_text(encoding="utf-8")
