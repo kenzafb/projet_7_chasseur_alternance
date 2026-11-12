@@ -598,3 +598,9 @@ Sur les 8 offres de stage : O1, O2 et O8 inéligibles pour de bonnes raisons, O3
 - **Emails.** `{portfolio}` passe des balises du stage aux balises communes : objet et message du mail de candidature spontanée, dans les trois modes. Comme toute balise du mail, vide dans le profil, elle bloque l'envoi avant le premier mail, avec le message qui renvoie au profil. Les autres balises du stage (dates, durée, établissement, formation, missions) restent propres au stage.
 - **Lettres.** `{portfolio}` rejoint les balises de la lettre type (contrôle côté serveur et côté page), remplacée par le portfolio de la carte Identité. Vide : la balise reste dans la lettre assemblée, surlignée avec « Portfolio vide dans le profil (carte Identité), à compléter », comme l'entreprise inconnue (D108) ; la lettre n'est pas bloquée, la personne la complète avant le PDF.
 - **Aides du profil** (lettre type, email) mises à jour.
+
+## Phase 11, candidature via La Bonne Alternance (12 novembre 2026)
+
+### D126. Pas d'API de candidature LBA : pages de candidature du site
+- **Décision.** L'API de candidature de La Bonne Alternance (jobApply, api.apprentissage.beta.gouv.fr) n'est pas utilisée : l'accès en production demande une habilitation, la documentation exclut l'usage individuel ou personnel, et elle ne couvre que les offres publiées. Les candidatures passent par les pages du site labonnealternance.apprentissage.beta.gouv.fr, ouvertes par la personne dans son navigateur ; l'app ne soumet rien elle-même.
+- **Remplace** la proposition de SPEC_SOURCES section 3 (« LBA propose une API qui transmet directement une candidature »), et l'identifiant `apply.recipient_id` reste noté sans servir à un envoi.
