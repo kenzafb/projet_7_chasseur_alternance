@@ -7,7 +7,6 @@ from pathlib import Path
 
 import pytest
 from tests.conftest import ClientDeMode
-from fastapi_users.password import PasswordHelper
 
 import main
 from database.connexion import SessionLocal
@@ -30,10 +29,10 @@ def ancienne_base(tmp_path):
     chemin = tmp_path / "ancienne.db"
     cx = sqlite3.connect(chemin)
     cx.executescript(DDL.read_text(encoding="utf-8"))
-    aide = PasswordHelper()
+    from auth.securite import hacher_mot_de_passe
     for uid, mdp in MOTS_DE_PASSE.items():
         cx.execute("INSERT INTO users (id, email, mot_de_passe_hash, cree_le) VALUES (?, ?, ?, ?)",
-                   (uid, f"user{uid}@test.fr", aide.hash(mdp), "2026-06-17 17:48:54.794014"))
+                   (uid, f"user{uid}@test.fr", hacher_mot_de_passe(mdp), "2026-06-17 17:48:54.794014"))
     profils = [
         (1, "alternance", "Ada", [_pj("CV", "data/uploads/user_1/cv.pdf"),
                                   _pj("Reco", "data/uploads/user_1/reco_sans_ext"),

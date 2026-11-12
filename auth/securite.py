@@ -7,8 +7,9 @@ Briques de sécurité de l'authentification :
   - récupérer l'utilisateur actuellement connecté depuis la session
   - utilisateur_requis : LA dépendance FastAPI de toutes les routes privées
 
-On réutilise le PasswordHelper de fastapi-users (déjà utilisé à la migration),
-donc les hashs créés hier restent valides.
+Hachage par pwdlib, configuré comme le PasswordHelper de fastapi-users qui
+l'enveloppait jusqu'à D140 (argon2 pour les nouveaux hashs, argon2 et
+bcrypt acceptés) : les hashs déjà en base restent valides.
 """
 
 import hashlib
@@ -18,13 +19,17 @@ import threading
 import time
 
 from fastapi import Request
-from fastapi_users.password import PasswordHelper
+from pwdlib import PasswordHash
+from pwdlib.hashers.argon2 import Argon2Hasher
+from pwdlib.hashers.bcrypt import BcryptHasher
 
 from database.connexion import SessionLocal
 from database.models import User
 from shared.config import secret_key
 
-_pwd = PasswordHelper()
+# Même configuration que fastapi_users.password.PasswordHelper (15.0.5) :
+# le premier hacheur sert aux nouveaux hashs, tous servent à la vérification
+_pwd = PasswordHash((Argon2Hasher(), BcryptHasher()))
 
 # Pour les nouveaux comptes seulement : les hashs existants restent valides
 LONGUEUR_MIN_MOT_DE_PASSE = 10

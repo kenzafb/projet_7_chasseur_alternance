@@ -14,8 +14,8 @@ itsdangerous==2.2.0         # SessionMiddleware
 SQLAlchemy==2.0.51
 alembic==1.20.0             # migrations : alembic upgrade head
 
-# Authentification (PasswordHelper de fastapi-users, hashs argon2 / bcrypt)
-fastapi-users==15.0.5
+# Authentification : hashs argon2 (nouveaux) et bcrypt (anciens), par pwdlib
+# directement (fastapi-users retiré, D140)
 pwdlib==0.3.0
 argon2-cffi==25.1.0
 bcrypt==5.0.0
