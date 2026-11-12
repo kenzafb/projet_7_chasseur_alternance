@@ -69,18 +69,30 @@ def test_aucun_tiret_cadratin_produit():
 # ─── Mise en page Word ────────────────────────────────────────────────────────
 def test_mise_en_page():
     html = pdf.construire_html(OFFRE, generateur.assembler_lettre(OFFRE, PROFIL, "P."), PROFIL)
-    assert "font-family: 'Inter', 'Carlito', 'Liberation Sans', sans-serif" in html
+    assert "font-family: 'Carlito', 'Liberation Sans', sans-serif" in html
     assert "font-size: 11pt" in html and "text-align: left" in html
     assert "justify" not in html and not re.search(r"border(-top|-bottom)?\s*:", html)   # aucun trait
     # Coordonnées en haut, puis destinataire, date, objet en gras, corps
     ordre = [html.index(x) for x in ('class="coordonnees"', 'class="destinataire"', 'class="date"',
                                       'class="objet"', 'class="corps"')]
     assert ordre == sorted(ordre)
-    assert ".objet { font-weight: bold;" in html and ".destinataire { margin-left: 55%;" in html
+    assert ".objet { font-size: 11pt; font-weight: bold;" in html and ".destinataire { margin-left: 55%;" in html
+    assert "@page { size: A4; margin: 2.5cm; }" in html
     coordonnees = html[html.index('class="coordonnees"'):html.index('class="destinataire"')]
-    for valeur in ("Hélène Dupont", "Paris", "06 12 34 56 78", "helene@exemple.fr", "linkedin.com/in/helene",
-                   "https://helene.exemple.fr"):
+    for valeur in ("Hélène Dupont", "Paris", "06 12 34 56 78", "helene@exemple.fr"):
         assert valeur in coordonnees
+    # Ni liens ni portfolio dans l'en-tête, ni ailleurs s'ils ne sont pas écrits dans la lettre (D141)
+    for valeur in ("linkedin.com/in/helene", "https://helene.exemple.fr"):
+        assert valeur not in html
+
+
+def test_portfolio_toujours_possible_dans_le_texte():
+    profil = {**PROFIL, "lettre_type": "Madame, Monsieur,\n\n{paragraphe}\n\nMon portfolio : {portfolio}"}
+    lettre = generateur.assembler_lettre(OFFRE, profil, "P.")
+    html = pdf.construire_html(OFFRE, lettre, profil)
+    corps = html[html.index('class="corps"'):]
+    assert "Mon portfolio : https://helene.exemple.fr" in corps
+    assert "https://helene.exemple.fr" not in html[:html.index('class="corps"')]
 
 
 # ─── Nom du fichier ───────────────────────────────────────────────────────────
@@ -102,9 +114,16 @@ def test_pdf_genere(tmp_path):
     assert contenu.startswith(b"%PDF")
     installee = subprocess.run(["fc-list", ":", "family"], capture_output=True, text=True).stdout \
         if shutil.which("fc-list") else ""
-    if re.search(r"^Inter$", installee, re.M) and shutil.which("pdffonts"):
+    if re.search(r"^Carlito$", installee, re.M) and shutil.which("pdffonts"):
         polices = subprocess.run(["pdffonts", str(tmp_path / relatif)], capture_output=True, text=True).stdout
-        assert "+Inter " in polices and "+Inter-Bold" in polices   # embarquées (sous-ensembles)
+        assert "+Carlito " in polices and "+Carlito-Bold" in polices   # embarquées (sous-ensembles)
+    if shutil.which("pdftotext"):
+        # Objet en gras de même taille que le corps : même hauteur de ligne
+        boites = subprocess.run(["pdftotext", "-bbox", str(tmp_path / relatif), "-"],
+                                capture_output=True, text=True).stdout
+        hauteur = {mot: float(y2) - float(y1) for y1, y2, mot in
+                   re.findall(r'yMin="([\d.]+)" xMax="[\d.]+" yMax="([\d.]+)">([^<]+)<', boites)}
+        assert abs(hauteur["Objet"] - hauteur["Madame,"]) < 0.01
     if shutil.which("pdftotext"):
         texte = subprocess.run(["pdftotext", "-layout", str(tmp_path / relatif), "-"],
                                capture_output=True, text=True).stdout

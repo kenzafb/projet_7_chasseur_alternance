@@ -8,7 +8,7 @@ Sécurité :
     est échappé avant d'entrer dans le HTML : une balise tapée dans la lettre
     s'imprime comme du texte, elle n'est jamais interprétée ;
   - le gabarit n'a besoin d'aucune ressource (styles en ligne, polices du
-    système, Inter de préférence : README) : le url_fetcher refuse tout,
+    système, Carlito de préférence : README) : le url_fetcher refuse tout,
     fichier local comme réseau.
 
 Mise en page (D138) : celle d'une lettre Word, et le texte même de la
@@ -65,10 +65,11 @@ _APPEL = re.compile(r"^(madame|monsieur|mesdames|bonjour|à qui de droit)\b", re
 _OBJET = re.compile(r"^objet\s*:", re.IGNORECASE)
 _DATE = re.compile(r"\b\d{1,2}(er)?\s+(" + "|".join(MOIS) + r")\s+\d{4}\b", re.IGNORECASE)
 
-# Police libre proche d'Aptos (Word) : Inter, paquet Fedora rsms-inter-fonts,
-# installée sur le système et trouvée par fontconfig (aucun fichier chargé
-# par le PDF lui-même) ; Carlito, puis Liberation Sans, à défaut (D138)
-POLICES = "'Inter', 'Carlito', 'Liberation Sans', sans-serif"
+# Police : Carlito (paquet Fedora google-carlito-fonts, mêmes métriques que
+# Calibri), installée sur le système et trouvée par fontconfig (aucun fichier
+# chargé par le PDF lui-même) ; Liberation Sans à défaut (D141, remplace
+# Inter de D138)
+POLICES = "'Carlito', 'Liberation Sans', sans-serif"
 
 
 def _paragraphes(texte: str) -> list[str]:
@@ -121,14 +122,15 @@ def _bloc(texte: str, classe: str = "") -> str:
 
 
 def construire_html(offre: dict, lettre: str, profil: dict) -> str:
-    """HTML de la lettre, mise en page d'une lettre Word (D138) : coordonnées
-    en haut à gauche, destinataire en dessous à droite, date puis objet en
-    gras, corps aligné à gauche, police proche d'Aptos en 11 pt. Chaque
-    valeur variable est échappée."""
+    """HTML de la lettre, mise en page d'une lettre Word (D138, D141) : nom,
+    ville, téléphone et email en haut à gauche, destinataire en dessous à
+    droite, date puis objet en gras de même taille, corps aligné à gauche,
+    Carlito 11 pt. Chaque valeur variable est échappée."""
     parties = decouper_lettre(offre, lettre, profil)
     nom = " ".join(x for x in ((profil.get("prenom") or "").strip(), (profil.get("nom") or "").strip()) if x)
-    coordonnees = [(profil.get(c) or "").strip() for c in ("ville", "telephone", "email", "linkedin", "github",
-                                                            "portfolio")]
+    # En-tête : nom, ville, téléphone, email seulement (D141) ; liens et
+    # portfolio s'écrivent dans le texte de la lettre si on le souhaite
+    coordonnees = [(profil.get(c) or "").strip() for c in ("ville", "telephone", "email")]
     lignes = "".join(f"<div>{_e(c)}</div>" for c in coordonnees if c)
     corps = "".join(_bloc(p) for p in parties["autres"] + parties["corps"])
     return f"""<!DOCTYPE html>
@@ -143,7 +145,7 @@ def construire_html(offre: dict, lettre: str, profil: dict) -> str:
   .coordonnees {{ margin-bottom: 18pt; }}
   .coordonnees .nom {{ font-weight: bold; }}
   .destinataire {{ margin-left: 55%; margin-bottom: 18pt; }}
-  .objet {{ font-weight: bold; margin-bottom: 14pt; }}
+  .objet {{ font-size: 11pt; font-weight: bold; margin-bottom: 14pt; }}
 </style>
 </head>
 <body>
