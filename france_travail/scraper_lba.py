@@ -103,8 +103,8 @@ def _normaliser_offre_lba(offre: dict) -> dict | None:
         return None
     identifier = offre.get("identifier") or {}
     partner_id = identifier.get("partner_job_id") or identifier.get("id") or (titre + adresse)
-    lien = ((offre.get("apply") or {}).get("url")
-            or f"https://labonnealternance.apprentissage.beta.gouv.fr/emploi/{identifier.get('id', '')}")
+    # apply.url de l'API, ou rien : plus de lien construit (D128)
+    lien = str((offre.get("apply") or {}).get("url") or "").strip()
     return {
         "id":           generer_id(f"lba_{partner_id}"),
         "titre":        titre,

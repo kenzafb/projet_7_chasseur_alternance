@@ -15,6 +15,7 @@ from database.connexion import SessionLocal
 from database.dates import JOUR, en_texte, vers_utc
 from database.insertion import inserer_ou_ignorer
 from database.models import Candidature
+from shared.lba import lien_invente
 
 
 # Colonnes simples de la table (hors id technique, user_id, et ref_offre)
@@ -38,6 +39,9 @@ def candidature_vers_dict(c: Candidature) -> dict:
     for champ in _DATES:
         d[champ] = en_texte(d[champ], JOUR)
     d["id"] = c.ref_offre          # la clé "id" attendue par l'app = ref_offre
+    # Ancien lien LBA inventé (/emploi/<id>, D128) : ni affiché ni proposé
+    if lien_invente(d.get("lien")):
+        d["lien"] = ""
     return d
 
 
