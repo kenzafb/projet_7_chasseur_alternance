@@ -955,6 +955,30 @@ def api_spontanees_statut(request: Request, body: dict = Body(...), user: User =
 
 # ─── Spontanées — Stats ───────────────────────────────────────────────────────
 
+@prive.post("/api/spontanees/postule_lba")
+def api_spontanees_postule_lba(body: dict = Body(...), user: User = Depends(utilisateur_requis),
+                               mode: str = Depends(mode_requis)):
+    """« J'ai postulé » après une candidature sur La Bonne Alternance (D130) :
+    l'entreprise passe « Envoyée » à la date donnée (jour de Paris,
+    aujourd'hui par défaut, jamais dans le futur) et entre dans le suivi."""
+    from datetime import datetime, time
+    from database.dates import fuseau_affichage, maintenant_affichage
+    from database.entreprises_db import marquer_postule_lba
+    from shared.stage import lire_date
+    jour = lire_date(str(body.get("date") or ""), "Date de candidature") or maintenant_affichage().date()
+    if jour > maintenant_affichage().date():
+        raise ErreurUtilisateur("La date de candidature ne peut pas être dans le futur.")
+    try:
+        ident = int(body.get("id"))
+    except (TypeError, ValueError):
+        raise ErreurUtilisateur("Entreprise introuvable.")
+    instant = datetime.combine(jour, time(12), tzinfo=fuseau_affichage())
+    if not marquer_postule_lba(user.id, ident, instant, mode=mode):
+        return JSONResponse({"erreur": "Entreprise introuvable, déjà envoyée ou sans candidature La Bonne Alternance."},
+                            status_code=404)
+    return {"ok": True, "date": jour.isoformat()}
+
+
 @prive.get("/api/spontanees/stats")
 def api_spontanees_stats(request: Request, user: User = Depends(utilisateur_requis),
                          mode: str = Depends(mode_requis)):

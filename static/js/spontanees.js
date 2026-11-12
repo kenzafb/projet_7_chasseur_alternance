@@ -7,6 +7,7 @@ let stats = null;
 let compte = null;    // compte d'envoi (mode test affiché en bandeau)
 let aValider = [];    // entreprises aux emails non validés par l'IA
 let filtre = "all";
+const aujourdhui = () => new Date().toLocaleDateString("sv-SE");   // AAAA-MM-JJ, jour local
 
 /* Contacts de l'entreprise dans les autres modes : simple étiquette,
    l'envoi dans le mode courant n'est jamais bloqué */
@@ -43,9 +44,12 @@ function listeAdresses(adresses) {
    a un contact (formulaire sur la page), sinon simple lien d'information */
 function boutonLba(e) {
   if (!e.lba?.url) return "";
+  // « J'ai postulé » à côté du bouton (D130) : l'entreprise passe « Envoyée » à la date choisie
   return e.lba.formulaire
     ? `<div class="trow__lba"><a class="btn btn--sm btn--lba" href="${esc(e.lba.url)}" target="_blank" rel="noopener"
-         title="Ouvre la page de candidature dans un nouvel onglet">Postuler sur La Bonne Alternance</a></div>`
+         title="Ouvre la page de candidature dans un nouvel onglet">Postuler sur La Bonne Alternance</a>
+       <input type="date" class="trow__date" data-lba-date value="${aujourdhui()}" max="${aujourdhui()}" title="Date de candidature">
+       <button class="btn btn--sm btn--signal" data-lba-postule="${e.id}">J'ai postulé</button></div>`
     : `<div class="trow__lba"><a class="trow__lien" href="${esc(e.lba.url)}" target="_blank" rel="noopener"
          title="LBA n'a pas de contact pour cette entreprise : pas de formulaire">Voir sur La Bonne Alternance</a></div>`;
 }
@@ -242,6 +246,24 @@ export const Spontanees = {
         this.charger();
       });
       this._brancheValider = true;
+    }
+    // « J'ai postulé » après une candidature sur La Bonne Alternance (D130)
+    if (!this._branchePostule) {
+      document.querySelector('[data-list="spontanees"]')?.addEventListener("click", async e => {
+        const bouton = e.target.closest("[data-lba-postule]");
+        if (!bouton) return;
+        const date = bouton.parentElement.querySelector("[data-lba-date]")?.value;
+        bouton.disabled = true;
+        try {
+          await api.postuleLba(parseInt(bouton.dataset.lbaPostule, 10), date);
+          document.dispatchEvent(new Event("candidatures:maj"));
+          this.charger();
+        } catch (err) {
+          alert(err.message);
+          bouton.disabled = false;
+        }
+      });
+      this._branchePostule = true;
     }
     rendreModeTest();
     rendreAvertissement();

@@ -270,6 +270,29 @@ def candidature_lba(e: Entreprise) -> dict | None:
     return {"url": url, "formulaire": bool(infos.get("candidature_id"))} if url else None
 
 
+# Note d'envoi d'une candidature déposée sur La Bonne Alternance (D130)
+NOTE_LBA = "Candidature sur La Bonne Alternance"
+
+
+def marquer_postule_lba(user_id: int, entreprise_id: int, instant, mode: str = MODE_DEFAUT) -> bool:
+    """« J'ai postulé » sur La Bonne Alternance : l'entreprise du mode passe
+    « Envoyée » à instant (UTC), sans email ni destinataire, note NOTE_LBA.
+    False si elle n'est pas dans le mode, déjà envoyée, ou sans formulaire LBA."""
+    db = SessionLocal()
+    try:
+        m = (db.query(EntrepriseMode).filter_by(user_id=user_id, entreprise_id=entreprise_id, mode=mode).first())
+        e = db.query(Entreprise).filter_by(id=entreprise_id, user_id=user_id).first()
+        lba = candidature_lba(e) if e else None
+        if not m or not e or m.mail_envoye or not (lba and lba["formulaire"]):
+            return False
+        m.mail_envoye, m.mail_envoye_le = True, instant
+        m.statut_suivi, m.mail_destinataires, m.mail_note = "envoye", [], NOTE_LBA
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+
 def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
     """Une entreprise et son état dans un mode → dict au format attendu par
     l'envoyeur et le scraper (comme l'ancien JSON)."""

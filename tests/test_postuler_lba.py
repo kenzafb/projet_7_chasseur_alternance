@@ -96,3 +96,48 @@ def test_entreprises_formulaire_seulement_avec_contact(utilisateur):
     assert par_nom["Sirene seule"] is None                                 # pas trouvée par LBA : rien
     stats = client.get("/api/spontanees/stats").json()
     assert any(e.get("lba") and e["lba"]["formulaire"] for e in stats["prochaines"])
+
+
+# ─── Point 3 : « J'ai postulé » à côté du bouton (D130) ──────────────────────
+def _ids_par_nom(uid):
+    from database.entreprises_db import calculer_stats
+    return {e["nom"]: e["id"] for e in calculer_stats(uid)["prochaines"]}
+
+
+def test_j_ai_postule_sur_lba_entre_dans_le_suivi(utilisateur):
+    from datetime import date, timedelta
+    from database.entreprises_db import ajouter_entreprises_lba
+    from database.dates import maintenant_affichage
+    from tests.faux_lba import siret_lba
+    client, uid = utilisateur("ada@test.fr")
+    ajouter_entreprises_lba(uid, [_entreprise_lba(1), _entreprise_lba(2, recipient=False)])
+    ids = _ids_par_nom(uid)
+    # Sans formulaire LBA : refusé
+    assert client.post("/api/spontanees/postule_lba", json={"id": ids["Société 2"]}).status_code == 404
+    demain = (maintenant_affichage().date() + timedelta(days=1)).isoformat()
+    assert client.post("/api/spontanees/postule_lba", json={"id": ids["Société 1"], "date": demain}).status_code == 400
+    r = client.post("/api/spontanees/postule_lba", json={"id": ids["Société 1"]})
+    assert r.status_code == 200 and r.json()["date"] == maintenant_affichage().date().isoformat()
+    # Plus dans les entreprises à traiter, dans le suivi en « Envoyée » avec la date du jour
+    assert "Société 1" not in _ids_par_nom(uid)
+    ligne = next(l for l in client.get("/api/suivi").json() if l["entreprise"] == "Société 1")
+    assert (ligne["type"], ligne["statut"], ligne["date"]) == ("spontanee", "envoye", r.json()["date"])
+    assert ligne["contact"] == "La Bonne Alternance"
+    assert ligne["lien"] == f"{SITE}/emploi/recruteurs_lba/{siret_lba(1)}/societe-1"
+    # Deux fois : refusé
+    assert client.post("/api/spontanees/postule_lba", json={"id": ids["Société 1"]}).status_code == 404
+
+
+def test_j_ai_postule_date_passee_et_isolation(utilisateur):
+    from datetime import timedelta
+    from database.entreprises_db import ajouter_entreprises_lba
+    from database.dates import maintenant_affichage
+    client, uid = utilisateur("ada@test.fr")
+    autre, _ = utilisateur("bob@test.fr")
+    ajouter_entreprises_lba(uid, [_entreprise_lba(1)])
+    ident = _ids_par_nom(uid)["Société 1"]
+    assert autre.post("/api/spontanees/postule_lba", json={"id": ident}).status_code == 404   # pas à Bob
+    hier = (maintenant_affichage().date() - timedelta(days=1)).isoformat()
+    assert client.post("/api/spontanees/postule_lba", json={"id": ident, "date": hier}).json()["date"] == hier
+    assert next(l for l in client.get("/api/suivi").json() if l["entreprise"] == "Société 1")["date"] == hier
+    assert client.post("/api/spontanees/postule_lba", json={"id": "x"}).status_code == 400

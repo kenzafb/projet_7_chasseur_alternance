@@ -167,6 +167,7 @@ export const api = {
   modeTestCompte:       (actif) => post("/api/compte_envoi/mode_test", { actif }),
 
   // Spontanées
+  postuleLba:      (id, date) => post("/api/spontanees/postule_lba", { id, date }),
   // Suivi unique des candidatures (offres postulées et spontanées, D107)
   suivi:         ()           => get("/api/suivi"),
   suiviStatut:   (type, id, statut) => post("/api/suivi/statut", { type, id, statut }),

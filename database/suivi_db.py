@@ -18,7 +18,7 @@ from datetime import date as Date, datetime, time, timedelta
 
 from database.candidatures_db import lire_candidature, lire_candidatures, modifier_candidature
 from database.dates import fuseau_affichage, maintenant_utc
-from database.entreprises_db import lire_entreprises_envoyees, modifier_statut_suivi
+from database.entreprises_db import NOTE_LBA, lire_entreprises_envoyees, modifier_statut_suivi
 
 STATUTS_SUIVI = ("envoye", "a_relancer", "reponse", "entretien", "refus", "bounce")
 STATUTS_OFFRE = ("envoye", "a_relancer", "reponse", "entretien", "refus")   # pas de bounce sans mail
@@ -49,6 +49,15 @@ def _spontanees(user_id: int, mode: str) -> list[dict]:
     lignes = []
     for e in lire_entreprises_envoyees(user_id, mode):   # « à relancer » déjà calculé
         site = e.get("site_web") or e.get("url_scrapee") or ""
+        if e.get("mail_note") == NOTE_LBA and e.get("lba"):
+            # Candidature déposée sur La Bonne Alternance (D130) : lien vers sa page
+            lignes.append({"type": SPONTANEE, "id": str(e["_id"]),
+                           "entreprise": e.get("nom_commercial") or e.get("nom") or "",
+                           "poste": "Candidature spontanée", "date": (e.get("mail_envoye_le") or "").split(" ")[0],
+                           "statut": e.get("statut_suivi") or "envoye", "lien": e["lba"]["url"],
+                           "contact": "La Bonne Alternance", "historique": False,
+                           "contacts_autres_modes": e.get("contacts_autres_modes") or []})
+            continue
         lignes.append({"type": SPONTANEE, "id": str(e["_id"]),
                        "entreprise": e.get("nom_commercial") or e.get("nom") or "",
                        "poste": "Candidature spontanée", "date": (e.get("mail_envoye_le") or "").split(" ")[0],
