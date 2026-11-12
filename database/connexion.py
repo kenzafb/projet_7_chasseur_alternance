@@ -37,15 +37,3 @@ def creer_moteur(url: str):
 engine = creer_moteur(DATABASE_URL)
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
-
-def get_session():
-    """
-    Fournit une session de base de données, à utiliser puis fermer.
-    Dans FastAPI on s'en servira via Depends ; en script direct, en context manager.
-    """
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()

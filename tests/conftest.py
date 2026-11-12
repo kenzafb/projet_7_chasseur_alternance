@@ -40,7 +40,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from shared import config  # noqa: E402
 
-assert not str(config.DATABASE_URL).endswith("data/chasseur.db"), "les tests visent la vraie base"
+# Jamais une base du dossier data/ du projet (ni l'ancienne, ni chasseur_v2.db, le défaut depuis D139)
+assert str(config.BASE_DIR / "data") not in str(config.DATABASE_URL), "les tests visent la vraie base"
 
 import main  # noqa: E402
 import shared.ia  # noqa: E402

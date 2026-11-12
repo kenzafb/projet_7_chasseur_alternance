@@ -24,9 +24,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(os.getenv("CHASSEUR_ENV_FILE", BASE_DIR / ".env"))
 
 # ─── Chemins ──────────────────────────────────────────────────────────────────
-DATA_DIR        = BASE_DIR / "data"
-UPLOADS_DIR     = DATA_DIR / "uploads"
-LETTRES_PDF_DIR = BASE_DIR / "lettres_pdf"
+def _dossier(variable: str, defaut: Path) -> Path:
+    """Dossier lu dans l'environnement (D139) ; chemin relatif : depuis la
+    racine du projet ; absent ou vide : le défaut."""
+    valeur = os.getenv(variable, "").strip()
+    if not valeur:
+        return defaut
+    chemin = Path(valeur).expanduser()
+    return chemin if chemin.is_absolute() else BASE_DIR / chemin
+
+
+# Données hors dépôt, réglables pour l'hébergement ou des essais (D139)
+DATA_DIR        = _dossier("DATA_DIR", BASE_DIR / "data")
+UPLOADS_DIR     = _dossier("UPLOADS_DIR", DATA_DIR / "uploads")
+LETTRES_PDF_DIR = _dossier("LETTRES_PDF_DIR", BASE_DIR / "lettres_pdf")
 TEMPLATES_DIR   = BASE_DIR / "templates"
 STATIC_DIR      = BASE_DIR / "static"
 
@@ -50,9 +61,11 @@ def chemin_lettre_pdf(relatif: str) -> Path | None:
     None si le chemin est vide ou sort du dossier des lettres."""
     return _chemin_sous(LETTRES_PDF_DIR, relatif)
 
-# Base de données : DATABASE_URL du .env si présente, sinon SQLite local
-# (une ligne "DATABASE_URL=" vide dans le .env vaut absence)
-DATABASE_URL = os.getenv("DATABASE_URL") or f"sqlite:///{DATA_DIR / 'chasseur.db'}"
+# Base de données : DATABASE_URL du .env si présente, sinon la base SQLite
+# conseillée par le README, DATA_DIR/chasseur_v2.db (une ligne
+# "DATABASE_URL=" vide vaut absence). data/chasseur.db est l'ancienne base
+# de la version mono-utilisateur : plus jamais prise par défaut (D139).
+DATABASE_URL = os.getenv("DATABASE_URL") or f"sqlite:///{DATA_DIR / 'chasseur_v2.db'}"
 
 # Fuseau dans lequel les dates sont AFFICHÉES (elles sont stockées en UTC).
 # Le fuseau du serveur n'intervient jamais.

@@ -94,7 +94,8 @@ Toutes sont décrites dans `.env.example`, qui est complet. L'essentiel :
 |---|---|
 | `SECRET_KEY` | **obligatoire**, 32 caractères au moins : `venv/bin/python -c "import secrets; print(secrets.token_urlsafe(48))"` |
 | `CLE_CHIFFREMENT` | chiffrement des mots de passe SMTP ; sans elle, l'envoi de mails est désactivé : `venv/bin/python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. Ne plus la changer ensuite. |
-| `DATABASE_URL` | chemin absolu, quatre barres obliques : `sqlite:////chemin/absolu/vers/chasseur_alternance/data/chasseur_v2.db` |
+| `DATABASE_URL` | chemin absolu, quatre barres obliques : `sqlite:////chemin/absolu/vers/chasseur_alternance/data/chasseur_v2.db` (vide : `DATA_DIR/chasseur_v2.db`) |
+| `DATA_DIR`, `UPLOADS_DIR`, `LETTRES_PDF_DIR` | dossiers des données, pièces jointes et PDF de lettres (vides : `data/`, `data/uploads/`, `lettres_pdf/`) ; à sauvegarder avec la base |
 | `CODE_INVITATION` | code à saisir sur `/register` (vide : inscriptions fermées) |
 | `COOKIE_SECURE` | `true` derrière HTTPS, `false` en local |
 | `FT_CLIENT_ID`, `FT_CLIENT_SECRET`, `LBA_API_KEY`, `INSEE_API_KEY` | identifiants des sources |
