@@ -15,7 +15,11 @@ Critères de recherche du profil (profils.recherche, colonne JSON) :
   - departements : départements d'Île-de-France des candidatures
     spontanées (Sirene), [] pour tous ;
   - tous_secteurs : candidatures spontanées sans filtre de secteur (Sirene,
-    toutes activités), faux par défaut : choix explicite (phase 6b).
+    toutes activités), faux par défaut : choix explicite (phase 6b) ;
+  - domaines_indifferent : « indifférent » coché par la personne elle-même
+    (domaines vides par choix, pas par oubli), pour la complétude du
+    profil (D144) ; sans effet sur la recherche ;
+  - rythme : rythme de l'alternance (texte libre), pour la complétude.
 
 normaliser_recherche les remet en forme à l'enregistrement (valeurs
 inconnues retirées, types fixés) ; les autres clés (disponibilité, champs
@@ -71,6 +75,11 @@ def normaliser_recherche(recherche) -> dict:
         out["departements"] = sorted(_liste(out["departements"], DEPTS_IDF))
     if "tous_secteurs" in out:
         out["tous_secteurs"] = out["tous_secteurs"] is True
+    if "domaines_indifferent" in out:
+        # Indifférent et des domaines cochés ne vont pas ensemble
+        out["domaines_indifferent"] = out["domaines_indifferent"] is True and not out.get("domaines")
+    if "rythme" in out:
+        out["rythme"] = str(out["rythme"] or "").strip()[:200]
     return out
 
 
