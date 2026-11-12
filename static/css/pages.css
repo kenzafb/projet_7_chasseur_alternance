@@ -817,3 +817,71 @@
   .profil-save .btn { flex: 1 1 100%; min-height: 44px; }
   .profil-save { position: static; }
 }
+
+/* ════════════ ENTREPRISES À CONTACTER (D148) ════════════ */
+.entreprises.is-active { display: flex; flex-direction: column; gap: 22px; max-width: 1120px; margin: 0 auto; }
+.bandeau-essai {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px;
+  padding: 12px 16px; border-radius: var(--r-carte); background: var(--attention-fond); color: var(--attention); font-size: 14px;
+}
+.bandeau-attention { padding: 12px 16px; border-radius: var(--r-carte); background: var(--attention-fond); color: var(--attention); font-size: 14px; }
+.etapes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; list-style: none; }
+.etape {
+  display: flex; flex-direction: column; gap: 8px; padding: 20px;
+  background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--r-panneau);
+}
+.etape.is-active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.etape__num { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 700; color: var(--accent-survol); }
+.etape__badge { display: none; padding: 1px 8px; border-radius: var(--r-pill); background: var(--accent-doux); }
+.etape.is-active .etape__badge { display: inline; }
+.etape__titre { font-size: 18px; font-weight: 700; }
+.etape__etat { font-size: 15px; color: var(--texte); }
+.etape__aide { font-size: 13px; color: var(--texte-2); }
+.etape__msg { font-size: 13px; color: var(--accent-survol); }
+.etape__msg:empty { display: none; }
+.etape__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 6px; }
+.etape .pipe__stop { display: none; }
+.etape.is-active .pipe__stop { display: inline-flex; }
+.etape .pipe__progress { display: none; }
+.etape.is-active .pipe__progress { display: flex; }
+.carte-verif {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 18px 20px;
+  background: var(--surface); border: 1px solid var(--bordure); border-left: 4px solid var(--attention); border-radius: var(--r-carte);
+}
+.carte-verif__titre { font-size: 16px; font-weight: 700; }
+.carte-verif__aide { font-size: 13px; color: var(--texte-2); }
+.carte-verif__liste { width: 100%; display: flex; flex-direction: column; }
+.a-valider__ligne { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 16px; padding: 12px 0; border-top: 1px solid var(--fond-neutre); }
+.a-valider__ligne > div:first-child { flex: 1 1 180px; }
+.a-valider__adresses { flex: 2 1 280px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; overflow-wrap: anywhere; }
+.ent-liste {
+  display: flex; flex-direction: column; gap: 12px; padding: 16px;
+  background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--r-panneau);
+}
+.ent-liste__barre { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 0 4px; }
+.ent-liste__aide { flex: 1 1 280px; font-size: 14px; color: var(--texte-2); }
+.ent-liste__items { display: flex; flex-direction: column; }
+.ent-liste__vide { padding: 24px 12px; text-align: center; color: var(--texte-2); }
+.ent { display: flex; align-items: flex-start; gap: 14px; padding: 14px 4px; border-top: 1px solid var(--fond-neutre); }
+.ent__initiale {
+  flex: none; width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+  background: var(--fond-neutre); color: var(--texte-3); font-weight: 700;
+}
+.ent__corps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.ent__nom { font-weight: 700; }
+.ent__detail { font-size: 14px; color: var(--texte-2); overflow-wrap: anywhere; }
+.ent__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
+.ent__lien { font-size: 14px; font-weight: 600; }
+.ent__adresses summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--texte-3); }
+.ent-chiffres { padding: 14px 18px; background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--r-carte); }
+.ent-chiffres summary { cursor: pointer; font-weight: 700; }
+.ent-chiffres .sp-taux { margin: 12px 0; }
+.ent-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 8px; }
+.ent-table th, .ent-table td { padding: 8px; text-align: left; border-bottom: 1px solid var(--fond-neutre); }
+.ent-table thead th { font-size: 13px; color: var(--texte-2); }
+.reglages__sous-titre { margin: 18px 0 10px; font-size: 15px; font-weight: 700; }
+@media (max-width: 900px) { .etapes { grid-template-columns: 1fr; } }
+@media (max-width: 640px) {
+  .ent-table { display: block; overflow-x: auto; }
+  .etape__actions .btn, .ent__actions .btn { min-height: 44px; }
+}

@@ -47,10 +47,10 @@ export function limite(cle) {
 const LANCEMENTS = {
   offres:      { champ: "max_offres",      texte: n => `Recherche lancée : ${n} offres ajoutées au plus, sans analyse` },
   analyses:    { champ: "max_analyses",    texte: n => `Analyse lancée : ${n} offres au plus, les plus récentes d'abord` },
-  entreprises: { champ: "max_entreprises", texte: n => `Récupération lancée : ${n} nouvelles entreprises au plus` },
-  scrapees:    { champ: "max_scrapees",    texte: n => `Scraping lancé : ${n} entreprises au plus` },
+  entreprises: { champ: "max_entreprises", texte: n => `Recherche d'entreprises lancée : ${n} nouvelles au plus` },
+  scrapees:    { champ: "max_scrapees",    texte: n => `Recherche des emails lancée : ${n} entreprises au plus` },
   mails:       { champ: "limite",          texte: n => `Envoi lancé : ${n} mails au plus` },
-  revalidations: { champ: "max_revalidations", texte: n => `Validation IA lancée : ${n} entreprises au plus` },
+  revalidations: { champ: "max_revalidations", texte: n => `Vérification par l'IA lancée : ${n} entreprises au plus` },
 };
 
 export function confirmerLancement(cle, demandee, reponse) {
@@ -59,7 +59,7 @@ export function confirmerLancement(cle, demandee, reponse) {
   if (appliquee === undefined) return;
   let texte = regle.texte(appliquee);
   if (demandee !== undefined && demandee !== appliquee) texte += ` (demandé : ${demandee}, ramené à ${appliquee})`;
-  if (reponse.mode_test) texte += ". 🧪 Mode test : tout part vers ton adresse d'expédition";
+  if (reponse.mode_test) texte += ". Mode essai : tout part vers ton adresse d'expédition";
   if (reponse.avertissement) texte += ". ⚠️ " + reponse.avertissement.replace(/\.$/, "");
   const champ = document.querySelector(`[data-limite="${cle}"]`);
   if (champ) champ.value = appliquee;

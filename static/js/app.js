@@ -28,7 +28,7 @@ const TOPBAR = {
   spontanees:   { title: "Entreprises à contacter",
                   phrase: "Des entreprises de ton domaine qui ne publient pas forcément d'offre. "
                     + "Le Chasseur les trouve, cherche leur email et leur envoie ta candidature.",
-                  action: "Trouver des entreprises", run: () => Spontanees.action("fetch") },
+                  action: null },   // chaque étape a son bouton
   profil:       { title: "Mon profil", phrase: "Ce que le Chasseur sait de toi pour noter les offres et écrire tes lettres.",
                   action: null },   // « Enregistrer » est sous la partie affichée
   parametres:   { title: "Paramètres", phrase: "Ton compte, l'envoi de tes mails et les réglages avancés de ce mode.",
@@ -340,7 +340,7 @@ async function sauvegarderProfil() {
 const LISTES_RECHERCHE = {
   offres:             { liste: '[data-list="offres"]',        ligne: ".offres__item" },
   candidatures:       { liste: '[data-list="candidatures"]',  ligne: ".carte-cand" },
-  spontanees:         { liste: '[data-list="spontanees"]',    ligne: ".trow:not(.thead)" },
+  spontanees:         { liste: '[data-list="spontanees"]',    ligne: ".ent" },
 };
 
 function rechercher(texte) {
@@ -392,15 +392,10 @@ function brancher() {
   document.addEventListener("offres:montrer", e => Offres.montrer(e.detail));
 
   // filtres
-  document.querySelectorAll("[data-filters]").forEach(grp => {
-    grp.addEventListener("click", e => {
-      const btn = e.target.closest("[data-filter]");
-      if (!btn) return;
-      grp.querySelectorAll(".filter").forEach(f => f.classList.remove("is-active"));
-      btn.classList.add("is-active");
-      const f = btn.dataset.filter;
-      if (grp.dataset.filters === "spontanees") Spontanees.setFiltre(f);
-    });
+  // Onglets des entreprises à contacter
+  document.querySelector('[data-filters="spontanees"]')?.addEventListener("click", e => {
+    const btn = e.target.closest("[data-filter]");
+    if (btn) Spontanees.setFiltre(btn.dataset.filter);
   });
 
   // actions pipeline spontanées

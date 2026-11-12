@@ -187,7 +187,7 @@ def api_spontanees_scraper(request: Request, body: Scraper | None = None,
     from database.entreprises_db import compter_a_scraper
     disponibles = compter_a_scraper(user_id, mode)
     if not disponibles:
-        raise ErreurUtilisateur("Aucune entreprise à scraper : lance d'abord « Récupérer ».")
+        raise ErreurUtilisateur("Aucune entreprise dont chercher les emails : lance d'abord « Trouver des entreprises ».")
     maximum, note = limite_appliquee("scrapees", body.max_scrapees if body else None, disponibles, user_id=user.id, mode=mode)
 
     def travail(arret, log, on_progress):

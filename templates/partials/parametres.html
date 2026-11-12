@@ -142,6 +142,7 @@
         <p class="profil-card__sub">Propres à ce mode, et retrouvés sur tous tes appareils. Les valeurs par défaut conviennent la plupart du temps.</p>
       </div>
     </div>
+    <h3 class="reglages__sous-titre">Offres</h3>
     <div class="reglages__grille">
       {% set cle_offres = "offres" if analyse_ia|default(true) else "offres_sans_ia" %}
       <label class="field">
@@ -159,6 +160,34 @@
       </label>
       {% endif %}
     </div>
+    <h3 class="reglages__sous-titre">Entreprises à contacter</h3>
+    <div class="reglages__grille">
+      <label class="field">
+        <span class="field__label">Nouvelles entreprises au plus par recherche</span>
+        <input class="field__input" type="number" data-limite="entreprises" data-reglage="entreprises"
+               value="{{ reglages.entreprises }}" min="1" max="{{ limites.entreprises.max }}" inputmode="numeric">
+        <span class="field__hint">Entre 1 et {{ limites.entreprises.max }} (défaut : {{ limites.entreprises.defaut }}).</span>
+      </label>
+      <label class="field">
+        <span class="field__label">Entreprises dont chercher les emails à chaque fois</span>
+        <input class="field__input" type="number" data-limite="scrapees" data-reglage="scrapees"
+               value="{{ reglages.scrapees }}" min="1" max="{{ limites.scrapees.max }}" data-plafond="{{ limites.scrapees.max }}" inputmode="numeric">
+        <span class="field__hint">Entre 1 et <span data-limite-max="scrapees">max {{ limites.scrapees.max }}</span> (défaut : {{ limites.scrapees.defaut }}).</span>
+      </label>
+      <label class="field">
+        <span class="field__label">Mails envoyés au plus à chaque fois</span>
+        <input class="field__input" type="number" data-limite="mails" data-reglage="mails"
+               value="{{ reglages.mails }}" min="1" max="{{ limites.mails.max }}" data-plafond="{{ limites.mails.max }}" inputmode="numeric">
+        <span class="field__hint">Entre 1 et <span data-limite-max="mails">max {{ limites.mails.max }}</span> (défaut : {{ limites.mails.defaut }}), dans la limite du jour.</span>
+      </label>
+      <label class="field">
+        <span class="field__label">Entreprises revues par l'IA à chaque fois</span>
+        <input class="field__input" type="number" data-limite="revalidations" data-reglage="revalidations"
+               value="{{ reglages.revalidations }}" min="1" max="{{ limites.revalidations.max }}" inputmode="numeric">
+        <span class="field__hint">Adresses à vérifier : entre 1 et {{ limites.revalidations.max }} (défaut : {{ limites.revalidations.defaut }}).</span>
+      </label>
+    </div>
+
     {% if analyse_ia|default(true) %}
     <div class="reglages__cases">
       <label class="case">
