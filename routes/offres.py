@@ -36,8 +36,8 @@ router = routeur_prive()
 
 # Valeurs autorisées (cf. database/models.py)
 # « gardee » : gardée pour plus tard (D145) ; écartée = « archive », raison « manuel »
-StatutCandidature = Literal["nouveau", "en_cours", "gardee", "envoye", "a_relancer", "reponse", "entretien", "refus",
-                            "archive"]
+StatutCandidature = Literal["nouveau", "en_cours", "gardee", "envoye", "a_relancer", "relancee", "entretien",
+                            "reponse", "acceptee", "refus", "archive"]
 # « a_relancer » : statut de suivi commun aux offres et aux spontanées (D107)
 RaisonArchivage = Literal["manuel", "note_basse", "ineligible", "ecole_cfa", "hors_domaine", "public_specifique",
                           "stage"]
@@ -226,7 +226,7 @@ def api_maj_statut(body: MajStatut, request: Request, user: User = Depends(utili
 
 # Statuts d'une offre où la personne a postulé (D105) : « envoye » (affiché
 # « Postulée »), puis le suivi de la page Mes candidatures
-STATUTS_POSTULEE = ("envoye", "a_relancer", "reponse", "entretien", "refus")
+STATUTS_POSTULEE = ("envoye", "a_relancer", "relancee", "entretien", "reponse", "acceptee", "refus")
 
 
 @router.post("/api/offre/postuler")

@@ -77,9 +77,12 @@ def test_interface_une_seule_page():
     base = (config.TEMPLATES_DIR / "base.html").read_text(encoding="utf-8")
     assert 'data-page="spontanees-suivi"' not in base and 'data-page="candidatures"' in base
     page = (config.TEMPLATES_DIR / "partials" / "candidatures.html").read_text(encoding="utf-8")
-    for colonne in ("Entreprise", "Poste", "Type", "Candidature", "Statut", "Offre ou contact"):
-        assert f"<span>{colonne}</span>" in page
+    assert 'data-list="candidatures"' in page and "data-suivi-type" in page
     js = (config.STATIC_DIR / "js" / "candidatures.js").read_text(encoding="utf-8")
+    # Tableau en colonnes (D146) : une étape suivante par carte, pas de glisser-déposer
+    for colonne in ("Envoyée", "Relancée", "Entretien", "Réponse"):
+        assert f'titre: "{colonne}"' in js
+    assert "Revenir à l'étape d'avant" in js and "draggable" not in js
     assert "api.suivi()" in js and "api.suiviStatut(" in js
     assert not (config.STATIC_DIR / "js" / "suivi.js").exists()
     offres = (config.STATIC_DIR / "js" / "offres.js").read_text(encoding="utf-8")
@@ -91,3 +94,22 @@ def test_options_du_statut_neutres():
     css = (config.STATIC_DIR / "css" / "pages.css").read_text(encoding="utf-8")
     assert ".suivi-statut option { color: var(--txt); background-color: var(--surface);" in css
     assert ".st-refus      { color: var(--rouge);" in css               # le menu fermé garde sa couleur
+
+
+def test_etapes_relancee_et_acceptee(alice):
+    """D146 : Relancée et Acceptée, pour les offres comme pour les spontanées."""
+    client, uid = alice
+    client.post("/api/offre/postuler", json={"id": "O1"})
+    sp = str(lire_entreprises(uid)[0]["_id"])
+    for type_, ident in (("offre", "O1"), ("spontanee", sp)):
+        for statut in ("relancee", "entretien", "reponse", "acceptee", "refus", "envoye"):
+            r = client.post("/api/suivi/statut", json={"type": type_, "id": ident, "statut": statut})
+            assert r.json() == {"ok": True}, (type_, statut)
+            lu = next(l for l in client.get("/api/suivi").json() if l["id"] == ident)["statut"]
+            # « envoye » depuis plus de 7 jours s'affiche à relancer
+            assert lu == statut or (statut, lu) == ("envoye", "a_relancer"), (type_, statut, lu)
+    # Adresse invalide : spontanées seulement
+    assert client.post("/api/suivi/statut", json={"type": "offre", "id": "O1", "statut": "bounce"}).status_code == 404
+    # Postuler à nouveau (changer la date) garde l'étape atteinte
+    client.post("/api/suivi/statut", json={"type": "offre", "id": "O1", "statut": "relancee"})
+    assert client.post("/api/offre/postuler", json={"id": "O1", "date": "2026-09-02"}).json()["statut"] == "relancee"

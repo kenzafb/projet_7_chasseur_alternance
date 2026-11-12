@@ -22,8 +22,9 @@ const TOPBAR = {
     const demandee = limite("offres");
     confirmerLancement("offres", demandee, await api.recherche(demandee));
   } },
-  candidatures: { title: "Candidatures", phrase: "Où en est chaque candidature envoyée.",
-                  action: "Actualiser", run: () => Candidatures.charger() },
+  candidatures: { title: "Candidatures",
+                  phrase: "Où en est chaque candidature envoyée. Clique sur le bouton d'une carte pour la faire avancer.",
+                  action: null },   // rechargée à chaque ouverture de la page
   spontanees:   { title: "Entreprises à contacter",
                   phrase: "Des entreprises de ton domaine qui ne publient pas forcément d'offre. "
                     + "Le Chasseur les trouve, cherche leur email et leur envoie ta candidature.",
@@ -336,7 +337,7 @@ async function sauvegarderProfil() {
 /* ── Recherche contextuelle (filtre les lignes de la page courante) ──────── */
 const LISTES_RECHERCHE = {
   offres:             { liste: '[data-list="offres"]',        ligne: ".offres__item" },
-  candidatures:       { liste: '[data-list="candidatures"]',  ligne: ".suivi-row" },
+  candidatures:       { liste: '[data-list="candidatures"]',  ligne: ".carte-cand" },
   spontanees:         { liste: '[data-list="spontanees"]',    ligne: ".trow:not(.thead)" },
 };
 

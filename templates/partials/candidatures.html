@@ -1,34 +1,16 @@
-<!-- ════════════ PAGE CANDIDATURES : suivi unique (offres postulées et spontanées, D107) ════════════ -->
+<!-- ════════════ PAGE CANDIDATURES : tableau de suivi en colonnes (D107, D146) ════════════ -->
 <section class="page" data-page-content="candidatures">
-
-  <div class="section-bar">
-    <div class="filters" data-filters="candidatures">
-      <button class="filter is-active" data-filter="all">Toutes</button>
-      <button class="filter" data-filter="envoye">Envoyée</button>
-      <button class="filter" data-filter="a_relancer">À relancer</button>
-      <button class="filter" data-filter="reponse">Réponse</button>
-      <button class="filter" data-filter="entretien">Entretien</button>
-      <button class="filter" data-filter="refus">Refus</button>
-      <button class="filter" data-filter="bounce">Bounce</button>
-    </div>
-    <select class="filtre-menu" data-suivi-type>
-      <option value="all">Offres et spontanées</option>
-      <option value="offre">Offres</option>
-      <option value="spontanee">Spontanées</option>
-    </select>
+  <div class="cand-barre">
+    <label class="filtre filtre--ligne"><span>Afficher</span>
+      <select class="filtre-menu" data-suivi-type>
+        <option value="all">Offres et entreprises</option>
+        <option value="offre">Offres seulement</option>
+        <option value="spontanee">Entreprises seulement</option>
+      </select></label>
+    <p class="cand-barre__aide">Sans réponse 7 jours après l'envoi, une candidature passe <strong>à relancer</strong>.</p>
   </div>
-
-  <div class="suivi-table">
-    <div class="suivi-row suivi-head suivi-row--cand">
-      <span>Entreprise</span>
-      <span>Poste</span>
-      <span>Type</span>
-      <span>Candidature</span>
-      <span>Statut</span>
-      <span>Offre ou contact</span>
-    </div>
-    <div data-list="candidatures">
-      <!-- lignes injectées par candidatures.js -->
-    </div>
+  <p class="cand-message" data-cand-message role="status"></p>
+  <div class="tableau" data-list="candidatures">
+    <!-- colonnes injectées par candidatures.js -->
   </div>
 </section>
