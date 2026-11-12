@@ -1,10 +1,11 @@
 /* ============================================================================
    app.js — orchestrateur de l'interface
-   Navigation par onglets · topbar contextuelle · modale lettre ·
+   Navigation par ancres · tête de page contextuelle · menu du compte ·
    polling de l'état des pipelines. Tout le reste vit dans les modules dédiés.
    ============================================================================ */
 import { api, limite, confirmerLancement, MODE } from "./api.js";
 import { Accueil }       from "./accueil.js";
+import { Lettre }        from "./lettre.js";
 import { Offres }        from "./offres.js";
 import { Candidatures }  from "./candidatures.js";
 import { Spontanees }    from "./spontanees.js";
@@ -17,6 +18,7 @@ const CE_QUE_TU_CHERCHES = { alternance: "ton alternance", job: "ton job", stage
 /* Tête de chaque page : titre, phrase courte, action principale (D143) */
 const TOPBAR = {
   accueil:      { title: "Accueil", action: null },   // la page a sa propre tête (salutation)
+  lettre:       { title: "Ma lettre", action: null },  // sa barre : retour, enregistrer, PDF
   offres:       { title: "Offres", phrase: `Les offres trouvées pour ${CE_QUE_TU_CHERCHES}, les mieux notées en haut.`,
                   action: "Chercher de nouvelles offres", run: async () => {
     const demandee = limite("offres");
@@ -36,13 +38,15 @@ const TOPBAR = {
 };
 
 let pageCourante = "accueil";
-const PAGES_VALIDES = ["accueil", "offres", "candidatures", "spontanees", "profil", "parametres"];
+const PAGES_VALIDES = ["accueil", "offres", "candidatures", "spontanees", "profil", "parametres", "lettre"];
 
 /* Page désignée par l'ancre de l'URL ; « spontanees-suivi » : ancienne page
    fondue dans le suivi unique (D107) ; inconnue : Accueil (D144) */
 function pageDeLAncre() {
   const ancre = location.hash.replace("#", "");
   const page = ancre === "spontanees-suivi" ? "candidatures" : ancre;
+  // Ma lettre sans offre ouverte (page rechargée) : retour aux offres
+  if (page === "lettre" && !Lettre.id()) return "offres";
   return PAGES_VALIDES.includes(page) ? page : "accueil";
 }
 
@@ -62,9 +66,11 @@ function aller(page, { focus = false } = {}) {
   }
   document.querySelectorAll("[data-page-content]").forEach(s =>
     s.classList.toggle("is-active", s.dataset.pageContent === page));
-  // Lien de la page ouverte : aria-current (menu principal et menu du compte)
+  // Lien de la page ouverte : aria-current (menu principal et menu du compte) ;
+  // la lettre fait partie des offres
+  const courante = page === "lettre" ? "offres" : page;
   document.querySelectorAll(".menu__lien[data-page], .compte__lien[data-page]").forEach(n => {
-    if (n.dataset.page === page) n.setAttribute("aria-current", "page");
+    if (n.dataset.page === courante) n.setAttribute("aria-current", "page");
     else n.removeAttribute("aria-current");
   });
 
@@ -73,7 +79,7 @@ function aller(page, { focus = false } = {}) {
   if (page === "parametres") Parametres.charger();
   if (page === "accueil") Accueil.charger();
   // L'Accueil a sa propre tête (salutation) : pas de titre de page en plus
-  document.querySelector("[data-page-tete]").hidden = page === "accueil";
+  document.querySelector("[data-page-tete]").hidden = page === "accueil" || page === "lettre";
   // Pages au contenu étroit (1120 px, comme leurs maquettes) : la tête s'aligne dessus
   document.getElementById("contenu").classList.toggle("main--etroit", ["profil", "spontanees"].includes(page));
   const t = TOPBAR[page];
@@ -85,7 +91,8 @@ function aller(page, { focus = false } = {}) {
   // Recherche dans la page : seulement là où il y a une liste à filtrer
   document.querySelector("[data-search-zone]").hidden = !LISTES_RECHERCHE[page];
   // Page choisie dans le menu : le lecteur d'écran repart du contenu
-  if (focus) document.getElementById("contenu").focus({ preventScroll: true });
+  if (focus) (page === "lettre" ? document.getElementById("lettre-titre")
+    : document.getElementById("contenu")).focus({ preventScroll: true });
 }
 
 /* ── Mon compte : menu du rond aux initiales ─────────────────────────────── */
@@ -112,124 +119,6 @@ function brancherCompte() {
   });
   menu.querySelectorAll("a").forEach(a => a.addEventListener("click", () => ouvrir(false)));
 }
-
-/* ── Modale lettre ───────────────────────────────────────────────────────── */
-/* Balise restée dans la lettre (portfolio vide, D125) : aperçu surligné */
-const A_COMPLETER = { "{portfolio}": "Portfolio vide dans le profil (carte Identité), à compléter" };
-/* Entreprise inconnue (D138) : formulations neutres déjà dans la lettre, et
-   une simple information (mêmes textes que shared/offres.py) */
-const INFO_DESTINATAIRE = "Contact de l'entreprise inconnu : la lettre est adressée au service recrutement. "
-  + "Tu peux modifier cette ligne.";
-const INFO_ENTREPRISE = "Nom de l'entreprise inconnu : la lettre parle de « votre entreprise ». Tu peux modifier ce passage.";
-function infosLettre(infos) {
-  const el = document.querySelector("[data-modal-info]");
-  el.textContent = (infos || []).join(" ");
-  el.hidden = !(infos || []).length;
-}
-/* Lettre déjà enregistrée : informations d'après l'offre et le texte */
-function infosDeLaLettre(offre, texte) {
-  if (!offre || offre.entreprise_connue !== false || !texte) return [];
-  return [texte.includes("À l'attention du service recrutement") ? INFO_DESTINATAIRE : null,
-          texte.includes("votre entreprise") ? INFO_ENTREPRISE : null].filter(Boolean);
-}
-function apercuLettre() {
-  const texte = document.querySelector("[data-modal-letter]").value;
-  const restes = Object.keys(A_COMPLETER).filter(b => texte.includes(b));
-  const alerte = document.querySelector("[data-modal-alerte]");
-  const apercu = document.querySelector("[data-modal-apercu]");
-  alerte.hidden = apercu.hidden = !restes.length;
-  if (!restes.length) return;
-  alerte.textContent = [...new Set(restes.map(b => A_COMPLETER[b]))].join(" ; ") + " : remplace la balise surlignée.";
-  const esc = t => t.replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m]));
-  apercu.innerHTML = restes.reduce((html, b) => html.split(esc(b)).join(`<mark>${esc(b)}</mark>`), esc(texte));
-}
-
-const modal = {
-  el:    () => document.querySelector("[data-modal]"),
-  area:  () => document.querySelector("[data-modal-letter]"),
-  para:  () => document.querySelector("[data-modal-paragraphe]"),
-  etat:  () => document.querySelector("[data-modal-para-etat]"),
-  id:    null,
-  /* Lettre déjà prête : affichée ; sinon le paragraphe est rédigé tout de
-     suite (IA active), à relire avant de l'insérer dans la lettre type */
-  async ouvrir(id) {
-    this.id = id;
-    const offre = Offres.data().find(o => o.id === id);
-    this.area().value = offre?.lettre || "";
-    apercuLettre();
-    infosLettre(infosDeLaLettre(offre, offre?.lettre));
-    this.para().value = "";
-    this.etat().textContent = "";
-    this.el().classList.add("is-open");
-    if (!offre?.lettre && document.documentElement.dataset.analyseIa !== "non") await this.rediger();
-  },
-  /* IA locale : environ une minute, davantage si une analyse occupe déjà l'IA */
-  async rediger() {
-    const id = this.id;
-    const debut = Date.now();
-    let minuteur = null;
-    const tic = () => {
-      const s = Math.round((Date.now() - debut) / 1000);
-      this.etat().textContent = `Rédaction par l'IA locale… ${s} s (environ une minute, davantage si une `
-        + "analyse d'offres est en cours : l'IA traite une demande à la fois).";
-      minuteur = setTimeout(tic, 1000);
-    };
-    tic();
-    this.attendre(true);
-    try {
-      const { paragraphe, avertissement } = await api.paragrapheLettre(id);
-      if (this.id !== id) return;
-      this.para().value = paragraphe;
-      // Plus de 80 mots même après un second essai : gardé, avec un avertissement (D109)
-      this.etat().textContent = avertissement
-        ? "⚠️ " + avertissement : "Relis et modifie le paragraphe, puis insère-le dans ta lettre type.";
-    } catch (e) {
-      // Lettre type absente, sans {paragraphe}, IA indisponible : message, rien d'inventé
-      this.etat().textContent = "";
-      alert("Paragraphe non rédigé : " + e.message);
-    } finally {
-      clearTimeout(minuteur);
-      this.attendre(false);
-    }
-  },
-  async assembler() {
-    if (!this.id) return;
-    try {
-      const r = await api.assemblerLettre(this.id, this.para().value);
-      this.area().value = r.lettre;
-      apercuLettre();
-      infosLettre(r.infos);
-      this.etat().textContent = "Paragraphe inséré : la lettre est enregistrée, modifiable ci-dessous.";
-      Offres.charger();
-    } catch (e) { alert(e.message); }
-  },
-  /* Pendant la rédaction : ni insertion, ni enregistrement, ni PDF */
-  attendre(oui) {
-    this.para().readOnly = oui;
-    document.querySelectorAll("[data-modal-save], [data-modal-pdf], [data-modal-assembler], [data-modal-regenerer]")
-      .forEach(b => { b.disabled = oui || (b.matches("[data-modal-regenerer]")
-        && document.documentElement.dataset.analyseIa === "non"); });
-  },
-  fermer() { this.el().classList.remove("is-open"); this.id = null; },
-  /* Échec : la fenêtre reste ouverte avec la lettre, et le message s'affiche (D133) */
-  async enregistrer() {
-    if (!this.id) return;
-    try {
-      await api.sauvegarder({ id: this.id, lettre: this.area().value });
-    } catch (e) {
-      alert(`Lettre non enregistrée : ${e.message}`);
-      return;
-    }
-    this.fermer();
-    recharger();
-  },
-  async pdf() {
-    if (!this.id) return;
-    try {
-      await api.telechargerPdf(this.id, this.area().value);
-    } catch (e) { alert(e.message); }
-  },
-};
 
 /* ── Chargement global ───────────────────────────────────────────────────── */
 async function recharger() {
@@ -387,7 +276,8 @@ function brancher() {
   });
 
   // Page Offres : liste, onglets, filtres et volet (offres.js) ; la lettre s'ouvre ici
-  Offres.brancher(id => modal.ouvrir(id));
+  Offres.brancher(id => Lettre.ouvrir(Offres.data().find(o => o.id === id), "offres"));
+  Lettre.brancher();
   // « Voir l'offre » depuis l'Accueil : l'offre s'ouvre dans le volet
   document.addEventListener("offres:montrer", e => Offres.montrer(e.detail));
 
@@ -401,17 +291,6 @@ function brancher() {
   // actions pipeline spontanées
   document.querySelectorAll("[data-action]").forEach(b =>
     b.addEventListener("click", async () => { await Spontanees.action(b.dataset.action); surveiller(); }));
-
-  // modale
-  document.querySelector("[data-modal-close]").addEventListener("click", () => modal.fermer());
-  document.querySelector("[data-modal-save]").addEventListener("click", () => modal.enregistrer());
-  document.querySelector("[data-modal-pdf]").addEventListener("click", () => modal.pdf());
-  document.querySelector("[data-modal-regenerer]").addEventListener("click", () => modal.rediger());
-  document.querySelector("[data-modal-letter]").addEventListener("input", apercuLettre);
-  document.querySelector("[data-modal-assembler]").addEventListener("click", () => modal.assembler());
-  document.querySelector("[data-modal]").addEventListener("click", e => {
-    if (e.target.matches("[data-modal]")) modal.fermer();
-  });
 
   // bouton arrêter du runbar : l'analyse en cours, sinon le pipeline spontané
   document.querySelector("[data-runbar-stop]").addEventListener("click", async () => {
@@ -449,7 +328,7 @@ function brancher() {
   document.addEventListener("candidatures:maj", () => Candidatures.charger());
   // « Annuler la candidature » depuis le tableau : l'offre revient dans la page Offres
   document.addEventListener("offres:maj", () => Offres.charger());
-  Candidatures.onOuvrir(id => modal.ouvrir(id));
+  Candidatures.onOuvrir(id => Lettre.ouvrir(Offres.data().find(o => o.id === id), "candidatures"));
 }
 
 /* ── Démarrage ───────────────────────────────────────────────────────────── */

@@ -885,3 +885,39 @@
   .ent-table { display: block; overflow-x: auto; }
   .etape__actions .btn, .ent__actions .btn { min-height: 44px; }
 }
+
+/* ════════════ MA LETTRE (D149) ════════════ */
+.lettre.is-active { display: flex; flex-direction: column; gap: 16px; }
+.lettre__barre {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 14px 18px;
+  background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--r-carte);
+}
+.lettre__retour { display: inline-flex; align-items: center; gap: 8px; color: var(--texte); font-weight: 600; text-decoration: none; min-height: 40px; }
+.lettre__retour:hover { color: var(--accent-survol); }
+.lettre__pour { flex: 1 1 300px; min-width: 0; color: var(--texte-2); font-size: 14px; }
+.lettre__pour strong { color: var(--texte); }
+.lettre__etat { font-size: 14px; font-weight: 600; }
+.lettre__etat:empty { display: none; }
+.lettre__etat.is-ok { color: var(--accent-survol); }
+.lettre__etat.is-ko { color: var(--refus); }
+.lettre__corps { display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; }
+.lettre__gauche { flex: 1 1 360px; max-width: 460px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
+.lettre__titre { font-size: 24px; font-weight: 700; letter-spacing: -0.015em; }
+.lettre__titre:focus { outline: none; }
+.lettre__aide { margin-top: 4px; font-size: 14px; color: var(--texte-2); }
+.lettre__para { min-height: 200px; }
+.lettre__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.lettre__redaction { font-size: 13px; color: var(--texte-2); }
+.lettre__info { padding: 12px 14px; border-radius: var(--r-liste); background: var(--fond-neutre); color: var(--texte-3); font-size: 14px; }
+.lettre__alerte { padding: 12px 14px; border-radius: var(--r-liste); background: var(--attention-fond); color: var(--attention); font-size: 14px; }
+.lettre__entiere summary { cursor: pointer; font-weight: 600; font-size: 14px; color: var(--texte-3); }
+.lettre__entiere[open] { display: flex; flex-direction: column; gap: 10px; }
+.lettre__lien { font-weight: 600; font-size: 14px; }
+.lettre__droite { flex: 999 1 560px; min-width: 0; }
+.lettre__papier { position: relative; width: 100%; max-width: 794px; margin: 0 auto; overflow: hidden;
+  border-radius: 6px; box-shadow: 0 1px 3px rgba(23,32,31,.12), 0 8px 28px rgba(23,32,31,.08); }
+.lettre__apercu { display: block; width: 794px; height: 1123px; border: 0; transform-origin: top left; background: #FFFFFF; }
+@media (max-width: 720px) {
+  .lettre__barre .btn { flex: 1 1 100%; min-height: 44px; }
+  .lettre__gauche { max-width: none; }
+}

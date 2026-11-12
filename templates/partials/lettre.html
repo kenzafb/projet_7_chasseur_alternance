@@ -1,0 +1,53 @@
+<!-- ════════════ PAGE MA LETTRE (D149) ════════════
+     Paragraphe modifiable à gauche, aperçu fidèle au PDF à droite (même
+     HTML que le PDF, police Carlito livrée), paragraphe surligné. -->
+<section class="page lettre" data-page-content="lettre" aria-labelledby="lettre-titre">
+  <div class="lettre__barre">
+    <a class="lettre__retour" href="#offres" data-lettre-retour>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+      <span data-lettre-retour-texte>Retour à l'offre</span></a>
+    <p class="lettre__pour">Ta lettre pour <strong data-lettre-poste>…</strong></p>
+    <button type="button" class="btn" data-lettre-enregistrer>Enregistrer</button>
+    <button type="button" class="btn btn--primary" data-lettre-pdf>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg>
+      Télécharger le PDF</button>
+  </div>
+  <p class="lettre__etat" data-lettre-etat role="status"></p>
+
+  <div class="lettre__corps">
+    <section class="lettre__gauche" aria-labelledby="lettre-titre">
+      <div>
+        <h1 class="lettre__titre" id="lettre-titre" tabindex="-1">Le paragraphe pour cette offre</h1>
+        <p class="lettre__aide" data-lettre-aide>Le Chasseur l'écrit à partir de l'offre et de ton profil. Relis-le et change ce que tu veux : le reste de la lettre est ta lettre type.</p>
+      </div>
+      <label class="field">
+        <span class="visuellement-cache">Paragraphe personnalisé</span>
+        <textarea class="field__area lettre__para" data-lettre-paragraphe rows="9" spellcheck="true"
+          placeholder="Le paragraphe rédigé pour cette offre apparaît ici. Tu peux aussi l'écrire toi-même."></textarea>
+      </label>
+      <div class="lettre__actions">
+        <button type="button" class="btn" data-lettre-regenerer {% if not analyse_ia|default(true) %}disabled{% endif %}>Proposer une autre version</button>
+        <span class="lettre__redaction" data-lettre-redaction aria-live="polite">{% if not analyse_ia|default(true) %}IA désactivée : écris le paragraphe toi-même.{% endif %}</span>
+      </div>
+      <!-- Entreprise inconnue : simple information (D138) ; portfolio vide : à compléter (D125) -->
+      <p class="lettre__info" data-lettre-info hidden></p>
+      <p class="lettre__alerte" data-lettre-alerte hidden></p>
+      <details class="lettre__entiere" data-lettre-entiere>
+        <summary>Modifier toute la lettre</summary>
+        <p class="lettre__aide">Pour changer une phrase de ta lettre type pour cette offre seulement. Une fois modifiée ici, c'est cette lettre qui est enregistrée et mise en PDF.</p>
+        <label class="field">
+          <span class="visuellement-cache">Lettre entière</span>
+          <textarea class="field__area" data-lettre-texte rows="16" spellcheck="true"></textarea>
+        </label>
+        <button type="button" class="lien-bouton" data-lettre-reprendre hidden>Revenir à ma lettre type avec le paragraphe</button>
+      </details>
+      <a class="lettre__lien" href="#profil" data-lettre-type>Modifier ma lettre type</a>
+    </section>
+
+    <section class="lettre__droite" aria-label="Aperçu de la lettre">
+      <div class="lettre__papier" data-lettre-papier>
+        <iframe class="lettre__apercu" data-lettre-apercu title="Aperçu de la lettre, tel que dans le PDF" sandbox="allow-same-origin"></iframe>
+      </div>
+    </section>
+  </div>
+</section>

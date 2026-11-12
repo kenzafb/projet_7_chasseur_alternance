@@ -350,5 +350,6 @@ def test_route_donne_l_information_neutre(utilisateur, ia):
     assert r["a_completer"] == [] and r["message"] == ""
     assert r["infos"][0].startswith("Contact de l'entreprise inconnu")
     assert client.get("/api/candidatures").json()[0]["entreprise_connue"] is False
-    js = (config.STATIC_DIR / "js" / "app.js").read_text(encoding="utf-8")
+    # Page Ma lettre (D149)
+    js = (config.STATIC_DIR / "js" / "lettre.js").read_text(encoding="utf-8")
     assert "la lettre est adressée au service recrutement" in js and "à compléter" not in js.split("A_COMPLETER")[0]

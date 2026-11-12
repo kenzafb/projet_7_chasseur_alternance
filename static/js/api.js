@@ -141,6 +141,7 @@ export const api = {
   analyser:          (id)      => post("/api/analyser", { id }),
   paragrapheLettre:  (id)      => post("/api/lettre/paragraphe", { id }),
   assemblerLettre:   (id, paragraphe) => post("/api/lettre/assembler", { id, paragraphe }),
+  apercuLettre:      (id, paragraphe, lettre) => post("/api/lettre/apercu", lettre === null ? { id, paragraphe } : { id, paragraphe, lettre }),
   majStatut:         (id, s)   => post("/api/maj_statut", { id, statut: s }),
   offreVue:          (id)      => post("/api/offre/vue", { id }),
   archiver:          (id)      => post("/api/archiver", { id }),

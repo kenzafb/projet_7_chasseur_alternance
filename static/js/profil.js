@@ -134,6 +134,9 @@ async function afficherCompletude() {
   }
 }
 
+// « Modifier ma lettre type » depuis la page de la lettre : partie Tes documents
+document.addEventListener("profil:partie", e => montrerPartie(e.detail));
+
 function brancherParties() {
   document.querySelectorAll("[data-partie-lien]").forEach(b =>
     b.addEventListener("click", () => montrerPartie(b.dataset.partieLien, { focus: true })));

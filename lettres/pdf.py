@@ -121,18 +121,54 @@ def _bloc(texte: str, classe: str = "") -> str:
     return f"<p{attribut}>{_e(texte).replace(chr(10), '<br>')}</p>\n"
 
 
-def construire_html(offre: dict, lettre: str, profil: dict) -> str:
+# Aperçu dans la page (D149) : Carlito livrée dans static/fonts (licence
+# OFL), pour un rendu fidèle même sans la police installée ; le PDF, lui,
+# prend toujours la police du système
+_STYLES_FONTE = (("Regular", 400, "normal"), ("Bold", 700, "normal"), ("Italic", 400, "italic"),
+                 ("BoldItalic", 700, "italic"))
+
+
+def police_web() -> str:
+    """CSS de l'aperçu : @font-face de Carlito (URL versionnées), page A4,
+    paragraphe surligné."""
+    from shared.statique import url_statique
+    fontes = "".join(
+        f"\n  @font-face {{ font-family: 'Carlito'; src: url('{url_statique(f'fonts/carlito/Carlito-{nom}.ttf')}'); "
+        f"font-weight: {graisse}; font-style: {style}; }}" for nom, graisse, style in _STYLES_FONTE)
+    return fontes + """
+  html { background: #EEF1F0; }
+  body { width: 21cm; min-height: 29.7cm; margin: 0 auto; padding: 2.5cm; background: #FFFFFF; }
+  .surligne { background: #E3F1EF; box-shadow: 0 0 0 4pt #E3F1EF; border-radius: 2pt; }
+"""
+
+
+def _bloc_apercu(texte: str, surligner: str) -> str:
+    """Bloc de l'aperçu : surligné s'il est le paragraphe personnalisé, ou
+    paragraphe surligné dans le bloc qui le contient."""
+    cible = " ".join((surligner or "").split())
+    if not cible:
+        return _bloc(texte)
+    if " ".join(texte.split()) == cible:
+        return _bloc(texte, "surligne")
+    bloc = _bloc(texte)
+    marque = _e(cible)
+    return bloc.replace(marque, f'<span class="surligne">{marque}</span>', 1) if marque in bloc else bloc
+
+
+def construire_html(offre: dict, lettre: str, profil: dict, apercu: bool = False, surligner: str = "") -> str:
     """HTML de la lettre, mise en page d'une lettre Word (D138, D141) : nom,
     ville, téléphone et email en haut à gauche, destinataire en dessous à
     droite, date puis objet en gras de même taille, corps aligné à gauche,
-    Carlito 11 pt. Chaque valeur variable est échappée."""
+    Carlito 11 pt. Chaque valeur variable est échappée. apercu : page A4
+    dessinée à l'écran avec la police livrée, et le paragraphe surligner
+    (s'il est dans la lettre) surligné (D149) ; le PDF ne s'en sert pas."""
     parties = decouper_lettre(offre, lettre, profil)
     nom = " ".join(x for x in ((profil.get("prenom") or "").strip(), (profil.get("nom") or "").strip()) if x)
     # En-tête : nom, ville, téléphone, email seulement (D141) ; liens et
     # portfolio s'écrivent dans le texte de la lettre si on le souhaite
     coordonnees = [(profil.get(c) or "").strip() for c in ("ville", "telephone", "email")]
     lignes = "".join(f"<div>{_e(c)}</div>" for c in coordonnees if c)
-    corps = "".join(_bloc(p) for p in parties["autres"] + parties["corps"])
+    corps = "".join(_bloc_apercu(p, surligner) if apercu else _bloc(p) for p in parties["autres"] + parties["corps"])
     return f"""<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -145,7 +181,7 @@ def construire_html(offre: dict, lettre: str, profil: dict) -> str:
   .coordonnees {{ margin-bottom: 18pt; }}
   .coordonnees .nom {{ font-weight: bold; }}
   .destinataire {{ margin-left: 55%; margin-bottom: 18pt; }}
-  .objet {{ font-size: 11pt; font-weight: bold; margin-bottom: 14pt; }}
+  .objet {{ font-size: 11pt; font-weight: bold; margin-bottom: 14pt; }}{police_web() if apercu else ""}
 </style>
 </head>
 <body>
