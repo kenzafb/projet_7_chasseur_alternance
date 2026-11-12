@@ -310,11 +310,6 @@ def rediger_paragraphe_verifie(offre, profil, mode="alternance", modele=None, es
                    "raccourcis-le avant de l'insérer, ou régénère-le.")
 
 
-def rediger_paragraphe(offre, profil, mode="alternance", modele=None, essais=2, lettre_type=None) -> str:
-    """Le paragraphe seul (rediger_paragraphe_verifie, sans l'avertissement)."""
-    return rediger_paragraphe_verifie(offre, profil, mode, modele, essais, lettre_type)[0]
-
-
 def assembler_lettre(offre, profil, paragraphe: str) -> str:
     """Lettre type du profil, balises remplacées en Python, avec le
     paragraphe validé par la personne. Sans IA."""

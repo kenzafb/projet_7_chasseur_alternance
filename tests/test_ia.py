@@ -15,13 +15,22 @@ import shared.ia
 from database.candidatures_db import ajouter_candidature, lire_candidature, lire_candidatures
 from database.dedup_db import lire_offres_vues
 from france_travail.analyseur import analyser_offre
-from france_travail.generateur import rediger_paragraphe
+from france_travail.generateur import rediger_paragraphe_verifie
 from shared import config
 from shared.ia import (ErreurIABloquante, ErreurIAPassagere, IAInjoignable, ReponseInvalide, appeler_ia,
                        appeler_structure)
-from shared.schemas_ia import AnalyseOffre, LettreIA
+from pydantic import Field
+
+from shared.schemas_ia import AnalyseOffre, _Reponse
 from tests.conftest import erreur_http, reponse_chat
 from tests.test_envoyeur import attendre
+
+
+class LettreIA(_Reponse):
+    """Schéma à deux champs pour éprouver shared.ia (ancien format de lettre,
+    plus utilisé par l'application depuis D106)."""
+    contact_entreprise: str = Field(description="Nom de l'entreprise puis ville")
+    paragraphe_entreprise: str = Field(min_length=1, description="2 à 3 phrases sur l'entreprise")
 
 ANALYSE = '{"score": 8, "eligible": true, "points_forts": ["a"], "points_faibles": [], "domaine": "Dev", "resume": "ok", "niveau_requis": "non_precise", "duree_mois": null, "date_debut_offre": null, "alternance_seulement": false, "niveau_exigence": "non_precise"}'
 INTROUVABLE = 'model "ministral-3:8b" not found, try pulling it first'
@@ -136,7 +145,7 @@ def test_chaque_usage_appelle_son_modele(ia, monkeypatch):
     ia.reponse = ANALYSE
     analyser_offre({"titre": "Dev", "description": "..."}, profil)
     ia.reponse = '{"paragraphe": "ACME me parle."}'
-    rediger_paragraphe({"titre": "Dev", "entreprise": "ACME"}, profil, lettre_type="{paragraphe}")
+    rediger_paragraphe_verifie({"titre": "Dev", "entreprise": "ACME"}, profil, lettre_type="{paragraphe}")
     from shared.validation_emails import avis_ia
     ia.reponse = '{"valides": ["x@gmail.com"], "meilleur_contact": null}'
     avis_ia("ACME", "acme.fr", ["x@gmail.com"], [])
@@ -242,7 +251,6 @@ def test_reflexion_gardee_sur_demande(ia, monkeypatch):
 @pytest.mark.parametrize("texte", ['```json\n{"contact_entreprise": "A", "paragraphe_entreprise": "p"}\n```',
                                    'Voici : {"contact_entreprise": "A", "paragraphe_entreprise": "p"} !'])
 def test_json_entoure_accepte(ia, texte):
-    from shared.schemas_ia import LettreIA
     ia.reponse = texte
     assert appeler_structure(MESSAGE, LettreIA).paragraphe_entreprise == "p"
 

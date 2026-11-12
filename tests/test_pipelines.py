@@ -82,8 +82,8 @@ def test_deux_recherches_en_parallele_isolees(a_et_b, faux_travaux):
     _demarre(demarres, ("recherche", id_b))
 
     # Chacun voit son état et ses logs, pas ceux de l'autre
-    assert client_a.get("/api/statut_recherche").json()["en_cours"] is True
-    assert client_b.get("/api/statut_recherche").json()["en_cours"] is True
+    assert client_a.get("/api/statut_pipelines").json()["recherche"]["en_cours"] is True
+    assert client_b.get("/api/statut_pipelines").json()["recherche"]["en_cours"] is True
     logs_a = [l["msg"] for l in client_a.get("/api/logs").json()]
     logs_b = [l["msg"] for l in client_b.get("/api/logs").json()]
     assert f"recherche de {id_a}" in logs_a and f"recherche de {id_b}" not in logs_a
@@ -94,9 +94,9 @@ def test_deux_recherches_en_parallele_isolees(a_et_b, faux_travaux):
     assert r.status_code == 400 and "déjà en cours" in r.json()["erreur"]
 
     liberer.set()
-    attendre(lambda: not client_a.get("/api/statut_recherche").json()["en_cours"])
-    attendre(lambda: not client_b.get("/api/statut_recherche").json()["en_cours"])
-    assert client_a.get("/api/statut_recherche").json()["message"] == "Terminé !"
+    attendre(lambda: not client_a.get("/api/statut_pipelines").json()["recherche"]["en_cours"])
+    attendre(lambda: not client_b.get("/api/statut_pipelines").json()["recherche"]["en_cours"])
+    assert client_a.get("/api/statut_pipelines").json()["recherche"]["message"] == "Terminé !"
     assert client_a.post("/api/recherche").status_code == 200   # de nouveau permis
 
 
@@ -113,11 +113,11 @@ def test_a_ne_peut_pas_arreter_b(a_et_b, faux_travaux):
 
     assert client_a.post("/api/spontanees/stop").json() == {"ok": True, "en_cours": True}
     attendre(lambda: id_a in arretes)
-    attendre(lambda: not client_a.get("/api/spontanees/statut").json()["en_cours"])
-    assert client_a.get("/api/spontanees/statut").json()["message"] == "Arrêté — données sauvegardées"
+    attendre(lambda: not client_a.get("/api/statut_pipelines").json()["spontanees"]["en_cours"])
+    assert client_a.get("/api/statut_pipelines").json()["spontanees"]["message"] == "Arrêté — données sauvegardées"
 
     # B tourne toujours, avec son propre message, et n'a pas vu l'arrêt de A
-    etat_b = client_b.get("/api/spontanees/statut").json()
+    etat_b = client_b.get("/api/statut_pipelines").json()["spontanees"]
     assert etat_b["en_cours"] is True and etat_b["message"] == f"progression de {id_b}"
     assert id_b not in arretes
     assert client_b.get("/api/spontanees/stats").json()["en_cours"] is True
@@ -127,14 +127,14 @@ def test_a_ne_peut_pas_arreter_b(a_et_b, faux_travaux):
     assert not any(str(id_a) in m for m in logs_b if "scraper de" in m)
 
     liberer.set()
-    attendre(lambda: not client_b.get("/api/spontanees/statut").json()["en_cours"])
+    attendre(lambda: not client_b.get("/api/statut_pipelines").json()["spontanees"]["en_cours"])
     assert id_b not in arretes
 
 
 def test_arret_sans_pipeline_en_cours(a_et_b):
     client_a, _, _, _ = a_et_b
     assert client_a.post("/api/spontanees/stop").json() == {"ok": True, "en_cours": False}
-    assert client_a.get("/api/spontanees/statut").json()["message"] == "Prêt"
+    assert client_a.get("/api/statut_pipelines").json()["spontanees"]["message"] == "Prêt"
 
 
 def test_recherche_et_spontanees_peuvent_tourner_ensemble(a_et_b, faux_travaux):

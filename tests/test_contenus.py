@@ -45,7 +45,7 @@ def _sans_mention_reelle(texte, quoi):
 
 def _paragraphe(profil, mode="alternance"):
     """Paragraphe rédigé avec l'exemple de lettre type du mode (D106)."""
-    return generateur.rediger_paragraphe(OFFRE, profil, mode, lettre_type=generateur.lettre_par_defaut(mode))
+    return generateur.rediger_paragraphe_verifie(OFFRE, profil, mode, lettre_type=generateur.lettre_par_defaut(mode))[0]
 
 
 def _prompts(ia):
@@ -165,7 +165,7 @@ def test_paragraphe_par_le_modele_de_lettre(ia, mode):
 def test_prompt_du_paragraphe(ia):
     """D109 : paragraphe IPv6 impersonnel, qui reprenait des projets de la lettre type et inventait des liens."""
     lettre_type = LETTRE_TYPE.replace("J'aime {entreprise}.", "J'ai installé Arch Linux et créé le Chasseur.")
-    generateur.rediger_paragraphe(OFFRE, {**PROFIL, "missions": "MISSIONS-VISEES"}, "stage", lettre_type=lettre_type)
+    generateur.rediger_paragraphe_verifie(OFFRE, {**PROFIL, "missions": "MISSIONS-VISEES"}, "stage", lettre_type=lettre_type)
     texte = ia.textes(0)
     for attendu in ("=== CE QUE LA PERSONNE VISE ===\n- Missions visées : MISSIONS-VISEES", "Vente en magasin",
                     "=== SA LETTRE TYPE, DÉJÀ ÉCRITE ===", "J'ai installé Arch Linux et créé le Chasseur.",
@@ -230,7 +230,7 @@ def test_assemblage_en_python():
 def test_sans_lettre_type_ni_paragraphe_rien_n_est_genere(ia, lettre_type, message):
     profil = {**PROFIL, "lettre_type": lettre_type}
     with pytest.raises(generateur.LettreTypeInvalide, match=message):
-        generateur.rediger_paragraphe(OFFRE, profil, "alternance")
+        generateur.rediger_paragraphe_verifie(OFFRE, profil, "alternance")
     with pytest.raises(generateur.LettreTypeInvalide, match="Lettre de motivation type"):
         generateur.assembler_lettre(OFFRE, profil, "P.")
     assert ia.appels == []

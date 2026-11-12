@@ -213,7 +213,7 @@ def test_erreur_d_authentification_via_la_route(a_et_b, smtp_simule, pipelines_n
     smtp_simule.comptes["alice@gmail.com"] = "autre"
     assert client_a.post("/api/spontanees/envoyer", json={"limite": 3}).status_code == 200
     attendre(lambda: not pipelines_neufs.etat("spontanees", id_a)["en_cours"])
-    etat = client_a.get("/api/spontanees/statut").json()
+    etat = client_a.get("/api/statut_pipelines").json()["spontanees"]
     assert etat["message"].startswith("Erreur envoi : Authentification refusée")
     logs = client_a.get("/api/logs").text
     assert "Vérifie le compte d'envoi" in logs and mdp not in logs

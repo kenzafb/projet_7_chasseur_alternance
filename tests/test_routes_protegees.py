@@ -46,8 +46,7 @@ def test_inventaire_complet():
     """Garde-fou : la liste couvre bien l'app (dont les 4 routes autrefois ouvertes)."""
     chemins = {c for _, c in ROUTES_PRIVEES}
     assert len(ROUTES_PRIVEES) >= 30
-    for ancienne_ouverte in ("/api/logs", "/api/statut_recherche",
-                             "/api/spontanees/statut", "/api/spontanees/stop"):
+    for ancienne_ouverte in ("/api/logs", "/api/statut_pipelines", "/api/spontanees/stop"):
         assert ancienne_ouverte in chemins
     assert {"/", "/alternance", "/job", "/stage", "/docs", "/openapi.json"} <= chemins
 
@@ -98,14 +97,14 @@ def test_inventaire_des_routes_du_mode():
     """Garde-fou : toute route qui lit ou écrit des données d'un mode le reçoit."""
     chemins = {c for _, c in ROUTES_DU_MODE}
     assert {"/api/candidatures", "/api/profil", "/api/profil/upload", "/api/profil/piece",
-            "/api/recherche", "/api/lettre_pdf/1", "/api/spontanees/stats", "/api/spontanees/suivi",
+            "/api/recherche", "/api/lettre_pdf/1", "/api/spontanees/stats", "/api/suivi",
             "/api/spontanees/fetch", "/api/spontanees/envoyer", "/api/mode", "/api/analyse",
             "/api/analyse/statut"} <= chemins
     assert all(c.startswith("/api/") for c in chemins)
     # Routes sans mode : compte, état des pipelines, logs, référentiels
     sans = {re.sub(r"\{[^}]+\}", "1", r.path) for r in ROUTES_APP
             if isinstance(r, APIRoute) and r.path.startswith("/api/")} - chemins
-    assert sans == {"/api/logs", "/api/statut_recherche", "/api/statut_pipelines", "/api/spontanees/statut",
+    assert sans == {"/api/logs", "/api/statut_pipelines",
                     "/api/spontanees/stop", "/api/spontanees/valider", "/api/analyse/stop",
                     "/api/spontanees/valider_adresse", "/api/domaines", "/api/criteres_options",
                     "/api/compte_envoi", "/api/compte_envoi/supprimer", "/api/compte_envoi/tester",

@@ -110,7 +110,8 @@ def test_isolation_du_suivi_entre_utilisateurs(utilisateur):
     client_b, id_b = utilisateur("b@test.fr", prenom="Bob")
     ajouter_entreprises(id_a, [{"siret": "S1"}])
     eid = lire_entreprises(id_a)[0]["_id"]
-    assert client_b.post("/api/spontanees/suivi/statut", json={"id": eid, "statut": "refus"}).json() == {"ok": False}
+    r = client_b.post("/api/suivi/statut", json={"type": "spontanee", "id": str(eid), "statut": "refus"})
+    assert r.status_code == 404
     assert ajouter_entreprises(id_b, [{"siret": "S1"}]) == 1          # même SIRET, autre utilisateur
     assert _compter(Entreprise) == 2
 

@@ -16,8 +16,7 @@ def _ligne_acces(chemin, methode="GET"):
                              '%s - "%s %s HTTP/%s" %d', ("127.0.0.1:5000", methode, chemin, "1.1", 200), None)
 
 
-@pytest.mark.parametrize("chemin", ["/api/statut_pipelines", "/api/statut_recherche",
-                                    "/api/spontanees/statut", "/api/statut_pipelines?t=1"])
+@pytest.mark.parametrize("chemin", ["/api/statut_pipelines", "/api/analyse/statut", "/api/statut_pipelines?t=1"])
 def test_requetes_de_statut_filtrees(chemin):
     assert main.FILTRE_STATUT.filter(_ligne_acces(chemin)) is False
 

@@ -65,9 +65,9 @@ def test_candidature_de_b_introuvable_pour_a(a_et_b, ia, chemin):
 def test_suivi_spontanees_de_b_inaccessible(a_et_b):
     client_a, _, _, id_b = a_et_b
     entreprise_b = lire_entreprises(id_b)[0]
-    assert client_a.get("/api/spontanees/suivi").json() == []
-    r = client_a.post("/api/spontanees/suivi/statut", json={"id": entreprise_b["_id"], "statut": "refus"})
-    assert r.json() == {"ok": False}
+    assert client_a.get("/api/suivi").json() == []
+    r = client_a.post("/api/suivi/statut", json={"type": "spontanee", "id": str(entreprise_b["_id"]), "statut": "refus"})
+    assert r.status_code == 404
     assert lire_entreprises(id_b)[0].get("statut_suivi") != "refus"
     assert client_a.get("/api/spontanees/stats").json()["raw"] == 0
 

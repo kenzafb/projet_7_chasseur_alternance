@@ -36,7 +36,7 @@ from database.candidatures_db import (lire_candidatures, lire_candidature, modif
                                      lire_lettre_pdf, enregistrer_lettre_pdf, compter_en_attente)
 from database.profil_db import (lire_profil, sauvegarder_profil, ajouter_piece_jointe, supprimer_piece_jointe,
                                 fichiers_references)
-from database.entreprises_db import calculer_stats, lire_entreprises_envoyees, modifier_statut_suivi
+from database.entreprises_db import calculer_stats
 from typing import Literal
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -146,8 +146,7 @@ if raison_indisponible():
 # ─── Journal d'accès : sans les requêtes de statut ───────────────────────────
 # Le front interroge l'état des pipelines toutes les quelques secondes tant
 # qu'ils tournent : ces lignes noieraient le journal d'accès d'uvicorn.
-ROUTES_DE_STATUT = frozenset({"/api/statut_pipelines", "/api/statut_recherche", "/api/spontanees/statut",
-                              "/api/analyse/statut"})
+ROUTES_DE_STATUT = frozenset({"/api/statut_pipelines", "/api/analyse/statut"})
 
 
 class SansRequetesDeStatut(logging.Filter):
@@ -662,10 +661,6 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
             reponse["avertissement"] = avertissement
     return reponse
 
-@prive.get("/api/statut_recherche")
-def api_statut_recherche(user: User = Depends(utilisateur_requis)):
-    return pipelines.etat(RECHERCHE, user.id)
-
 @prive.get("/api/statut_pipelines")
 def api_statut_pipelines(user: User = Depends(utilisateur_requis)):
     """État des pipelines de l'utilisateur en une requête (polling du front)."""
@@ -947,20 +942,6 @@ def api_suivi_statut(body: StatutSuivi, user: User = Depends(utilisateur_requis)
     return {"ok": True}
 
 
-# ─── Spontanées — Suivi des candidatures (API gardée ; l'interface passe par /api/suivi) ─
-@prive.get("/api/spontanees/suivi")
-def api_spontanees_suivi(request: Request, user: User = Depends(utilisateur_requis),
-                         mode: str = Depends(mode_requis)):
-    return lire_entreprises_envoyees(user.id, mode)
-
-
-@prive.post("/api/spontanees/suivi/statut")
-def api_spontanees_statut(request: Request, body: dict = Body(...), user: User = Depends(utilisateur_requis),
-                          mode: str = Depends(mode_requis)):
-    ok = modifier_statut_suivi(user.id, body.get("id"), body.get("statut", ""), mode)
-    return {"ok": ok}
-
-
 # ─── Spontanées — Stats ───────────────────────────────────────────────────────
 
 @prive.post("/api/spontanees/postule_lba")
@@ -1190,10 +1171,6 @@ def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends
                                  "Envoi de test terminé !" if test else "Envoi terminé !",
                                  "✅ Envoi terminé", "envoi", mode_test=test, mode=mode)
     return _avec_limite(reponse, limite=limite, mode_test=test)
-
-@prive.get("/api/spontanees/statut")
-def api_spontanees_etat(user: User = Depends(utilisateur_requis)):
-    return pipelines.etat(SPONTANEES, user.id)
 
 
 # ─── Documentation de l'API (connecté uniquement) ─────────────────────────────

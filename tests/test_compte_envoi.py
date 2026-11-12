@@ -364,7 +364,7 @@ def test_mot_de_passe_absent_de_toute_reponse_log_et_erreur(ada, smtp_simule, ca
     while pipelines_neufs.etat("spontanees", user_id)["en_cours"] and time.monotonic() < fin:
         time.sleep(0.01)
     appel("get", "/api/logs")
-    appel("get", "/api/spontanees/statut")
+    appel("get", "/api/statut_pipelines")
     appel("get", "/api/compte_envoi")
 
     sortie = capsys.readouterr()

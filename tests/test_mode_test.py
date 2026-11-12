@@ -168,7 +168,7 @@ def test_mode_test_par_la_route_affiche_et_journalise(alice, smtp_simule, pipeli
     r = client.post("/api/spontanees/envoyer", json={"limite": 1})
     assert r.status_code == 200 and r.json()["mode_test"] is True
     attendre(lambda: not pipelines_neufs.etat("spontanees", user_id)["en_cours"])
-    etat = client.get("/api/spontanees/statut").json()
+    etat = client.get("/api/statut_pipelines").json()["spontanees"]
     assert etat["mode_test"] is True and etat["message"] == "Envoi de test terminé !"
     assert client.get("/api/spontanees/stats").json()["mode_test"] is True
     logs = client.get("/api/logs").text

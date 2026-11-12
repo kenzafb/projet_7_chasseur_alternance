@@ -58,13 +58,6 @@ class AnalyseOffre(_Reponse):
         return [v.strip() for v in valeurs if isinstance(v, str) and v.strip()]
 
 
-class LettreIA(_Reponse):
-    """Ancien format (bloc destinataire et paragraphe) : gardé pour les tests
-    de shared.ia ; la lettre n'utilise plus que ParagrapheIA (D106)."""
-    contact_entreprise: str = Field(description="Nom de l'entreprise puis ville, 2 à 3 lignes")
-    paragraphe_entreprise: str = Field(min_length=1, description="2 à 3 phrases sur l'entreprise")
-
-
 class ParagrapheIA(_Reponse):
     """Le seul paragraphe personnalisé de la lettre, rédigé par l'IA (D106)."""
     paragraphe: str = Field(min_length=1, description="3 à 5 phrases à la première personne")
