@@ -681,6 +681,52 @@ def completer_codes_naf(user_id: int, par_siret: dict) -> int:
         db.close()
 
 
+def _fusionner_lba(e: Entreprise, infos_lba: dict, email: str) -> bool:
+    """Entreprise déjà en base retrouvée par LBA : identifiants LBA notés,
+    source « lba » ajoutée, email fourni par LBA ajouté s'il est nouveau et
+    qu'elle n'a été contactée dans aucun mode. True si elle avait déjà une
+    autre source (comptée « deux sources »)."""
+    extra = dict(e.extra or {})
+    extra["lba"] = infos_lba
+    deux_sources = _avec_source(e, SOURCE_LBA)
+    envoyee = any(m.mail_envoye for m in e.modes)
+    if email and not envoyee and email not in (e.emails_trouves or []):
+        e.emails_trouves = list(e.emails_trouves or []) + [email]
+    if email:
+        extra["emails_lba"] = sorted(set(extra.get("emails_lba") or []) | {email})
+    e.extra = extra
+    return deux_sources
+
+
+def _nouvelle_entreprise_lba(user_id: int, d: dict, infos_lba: dict, email: str) -> Entreprise:
+    """Entreprise à fort potentiel de LBA pas encore en base, source « lba »."""
+    extra = {
+        "siret":       d.get("siret", ""),
+        "nom":         d.get("nom", ""),
+        "code_naf":    d.get("code_naf", ""),
+        "adresse":     d.get("adresse", ""),
+        "departement": d.get("departement", ""),
+        "taille":      d.get("taille", ""),
+        "lba":         infos_lba,
+    }
+    if email:
+        extra["emails_lba"] = [email]
+    return Entreprise(
+        user_id        = user_id,
+        sources        = [SOURCE_LBA],
+        nom_commercial = d.get("nom_commercial") or d.get("nom", ""),
+        ville          = d.get("ville", ""),
+        code_postal    = d.get("code_postal", ""),
+        siren          = d.get("siren", ""),
+        site_web       = d.get("site_web") or "",
+        secteur        = d.get("code_naf", ""),
+        **_codes_naf(d),
+        emails_trouves = [email] if email else [],
+        telephones     = [d["telephone"]] if d.get("telephone") else [],
+        extra          = extra,
+    )
+
+
 def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None = None,
                             mode: str = MODE_DEFAUT) -> dict:
     """Entreprises à fort potentiel de La Bonne Alternance (normalisées par
@@ -718,46 +764,15 @@ def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None
                     bilan["ajoutees"] += 1
                 else:
                     bilan["deja_connues"] += 1
-                extra = dict(e.extra or {})
-                extra["lba"] = infos_lba
-                if _avec_source(e, SOURCE_LBA):
+                if _fusionner_lba(e, infos_lba, email):
                     bilan["deux_sources"] += 1
-                envoyee = any(m.mail_envoye for m in e.modes)
-                if email and not envoyee and email not in (e.emails_trouves or []):
-                    e.emails_trouves = list(e.emails_trouves or []) + [email]
-                if email:
-                    extra["emails_lba"] = sorted(set(extra.get("emails_lba") or []) | {email})
-                e.extra = extra
                 continue
             if maximum is not None and bilan["ajoutees"] >= maximum:
                 bilan["non_ajoutees"] += 1
                 continue
-            extra = {
-                "siret":       d.get("siret", ""),
-                "nom":         d.get("nom", ""),
-                "code_naf":    d.get("code_naf", ""),
-                "adresse":     d.get("adresse", ""),
-                "departement": d.get("departement", ""),
-                "taille":      d.get("taille", ""),
-                "lba":         infos_lba,
-            }
             if email:
-                extra["emails_lba"] = [email]
                 bilan["avec_email"] += 1
-            e = Entreprise(
-                user_id        = user_id,
-                sources        = [SOURCE_LBA],
-                nom_commercial = d.get("nom_commercial") or d.get("nom", ""),
-                ville          = d.get("ville", ""),
-                code_postal    = d.get("code_postal", ""),
-                siren          = d.get("siren", ""),
-                site_web       = d.get("site_web") or "",
-                secteur        = d.get("code_naf", ""),
-                **_codes_naf(d),
-                emails_trouves = [email] if email else [],
-                telephones     = [d["telephone"]] if d.get("telephone") else [],
-                extra          = extra,
-            )
+            e = _nouvelle_entreprise_lba(user_id, d, infos_lba, email)
             db.add(e)
             _selectionner(db, e, mode)
             if d.get("siret"):

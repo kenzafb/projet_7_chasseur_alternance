@@ -87,6 +87,40 @@ def api_candidatures(user: User = Depends(utilisateur_requis), mode: str = Depen
 
 # ─── France Travail + La Bonne Alternance ────────────────────────────────────
 
+def _rechercher_lba(cfg_mode: dict, profil: dict, reste: int, max_offres: int, etat, log) -> dict | None:
+    """LBA (mode alternance) : offres seulement, les entreprises à fort
+    potentiel n'entrent que par l'étape « Récupérer » (D46). None : LBA
+    ignorée, raison déjà écrite (pas de « Aucune offre LBA » en plus)."""
+    if "lba" not in cfg_mode["sources"]:
+        log("ℹ️  LBA ignorée (mode sans alternance)")
+        return None
+    if reste <= 0:
+        log(f"ℹ️  LBA ignorée : limite de {max_offres} offres atteinte")
+        return None
+    etat(message="Recherche La Bonne Alternance...", pourcentage=50)
+    log("🔍 Recherche La Bonne Alternance démarrée")
+    return rechercher_lba(profil, log=log)
+
+
+def _ajouter_offres_lba(user_id: int, mode: str, offres_lba: list, reste: int, log):
+    """Offres LBA d'une recherche écrites en base, au plus reste, sans celles
+    déjà présentes (France Travail les relaie parfois)."""
+    # Déduplication : refs déjà présentes en base pour cet utilisateur
+    ids_existants = {c["id"] for c in lire_candidatures(user_id, mode=mode)}
+    nouvelles_lba = [o for o in offres_lba if o["id"] not in ids_existants]
+    log(f"  {len(nouvelles_lba)} nouvelles offres LBA (hors doublons FT)")
+    if len(nouvelles_lba) > reste:
+        # Les suivantes ne sont pas en base : proposées au prochain lancement
+        log(f"  Limite : {reste} offres LBA sur {len(nouvelles_lba)}")
+        nouvelles_lba = nouvelles_lba[:reste]
+    # Écrites « non analysées », archivage par mots-clés seulement
+    for offre in nouvelles_lba:
+        marquer_non_analysee(offre, verbeux=False)
+        ajouter_candidature(user_id, offre, mode=mode)
+    if nouvelles_lba:
+        log(f"✅ {len(nouvelles_lba)} offres LBA ajoutées")
+
+
 @router.post("/api/recherche")
 def api_recherche(request: Request, body: Recherche | None = None, user: User = Depends(utilisateur_requis),
                   mode: str = Depends(mode_requis)):
@@ -126,35 +160,11 @@ def api_recherche(request: Request, body: Recherche | None = None, user: User = 
             reste = max_offres - len(ajoutees)
             log(f"✅ France Travail terminé : {len(ajoutees)} offres ajoutées")
 
-            # LBA (mode alternance) : offres seulement, les entreprises à fort
-            # potentiel n'entrent que par l'étape « Récupérer » (D46). None :
-            # LBA ignorée, raison déjà écrite (pas de « Aucune offre LBA » en plus).
-            lba = None
-            if "lba" not in cfg_mode["sources"]:
-                log("ℹ️  LBA ignorée (mode sans alternance)")
-            elif reste <= 0:
-                log(f"ℹ️  LBA ignorée : limite de {max_offres} offres atteinte")
-            else:
-                etat(message="Recherche La Bonne Alternance...", pourcentage=50)
-                log("🔍 Recherche La Bonne Alternance démarrée")
-                lba = rechercher_lba(profil, log=log)
+            lba = _rechercher_lba(cfg_mode, profil, reste, max_offres, etat, log)
             offres_lba = lba["offres"] if lba else []
 
             if offres_lba:
-                # Déduplication : refs déjà présentes en base pour cet utilisateur
-                ids_existants = {c["id"] for c in lire_candidatures(user_id, mode=mode)}
-                nouvelles_lba = [o for o in offres_lba if o["id"] not in ids_existants]
-                log(f"  {len(nouvelles_lba)} nouvelles offres LBA (hors doublons FT)")
-                if len(nouvelles_lba) > reste:
-                    # Les suivantes ne sont pas en base : proposées au prochain lancement
-                    log(f"  Limite : {reste} offres LBA sur {len(nouvelles_lba)}")
-                    nouvelles_lba = nouvelles_lba[:reste]
-                # Écrites « non analysées », archivage par mots-clés seulement
-                for offre in nouvelles_lba:
-                    marquer_non_analysee(offre, verbeux=False)
-                    ajouter_candidature(user_id, offre, mode=mode)
-                if nouvelles_lba:
-                    log(f"✅ {len(nouvelles_lba)} offres LBA ajoutées")
+                _ajouter_offres_lba(user_id, mode, offres_lba, reste, log)
             elif lba is not None:
                 log("ℹ️  Aucune offre LBA récupérée")
 
