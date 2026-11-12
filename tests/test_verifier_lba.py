@@ -90,3 +90,24 @@ def test_sans_cle_ou_cle_refusee(monkeypatch, tmp_path):
     api.get = lambda *a, **k: Reponse(401, {"error": f"clé {CLE} inconnue"})
     code, sortie, res, _ = lancer(api, tmp_path)
     assert code == 1 and "clé LBA refusée" in sortie and CLE not in sortie
+
+
+# ─── 9. Pages de candidature à ouvrir (phase 11, D127) ────────────────────────
+def test_pages_de_candidature_avec_et_sans_recipient_id(cle, tmp_path):
+    api = jeu()
+    for i, e in enumerate(api.entreprises):
+        if i % 2:
+            del e["apply"]["recipient_id"]
+    del api.offres[5]["apply"]                     # code M1805, cherché
+    code, sortie, res, _ = lancer(api, tmp_path)
+    pages = res["pages_candidature"]
+    avec, sans = pages["entreprises_avec_recipient_id"], pages["entreprises_sans_recipient_id"]
+    assert len(avec) == 3 and len(sans) == 3
+    assert len({e["url"] for e in avec + sans}) == 6
+    assert all(e["url"].startswith("https://lba.example/recruteur/") and e["nom"] for e in avec + sans)
+    assert "La bonne alternance" in pages["offres_par_partenaire"]
+    assert all(len(u) <= 3 for u in pages["offres_par_partenaire"].values())
+    assert pages["offres_sans_apply_url"] >= 1
+    assert "Pages à ouvrir : formulaire de candidature" in sortie
+    assert "Entreprises AVEC apply.recipient_id" in sortie and avec[0]["url"] in sortie
+    assert "Entreprises SANS apply.recipient_id" in sortie and sans[0]["url"] in sortie

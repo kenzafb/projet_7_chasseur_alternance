@@ -29,6 +29,10 @@ Vérifie sur la vraie API de La Bonne Alternance les points encore ouverts
    téléphone, identifiant de candidature.
 8. Offres relayées depuis France Travail : offres par partenaire avec et
    sans les paramètres d'exclusion de parametres_lba.py.
+9. Pages de candidature à ouvrir (phase 11, D127) : 3 pages d'entreprises
+   avec apply.recipient_id et 3 sans, et jusqu'à 3 apply.url d'offres par
+   partenaire. Aucune requête de plus : lues dans les réponses déjà reçues.
+   À ouvrir dans un navigateur pour voir lesquelles ont un formulaire.
 
 Résultat détaillé dans docs/referentiels/lba/verification_api.json
 (--sortie pour un autre dossier), sans clé ni email ni téléphone. À la fin,
@@ -342,6 +346,37 @@ class Verificateur:
                 "exclusion_efficace": bool(relayees) and not restantes}
 
 
+    # ── 9. Pages de candidature à ouvrir (D127) ──
+    def pages_candidature(self, n=3) -> dict:
+        """Entreprises avec et sans apply.recipient_id (une par SIRET), et
+        apply.url des offres par partenaire, tirées des réponses déjà lues."""
+        avec, sans, vus = [], [], set()
+        for ent in self.entreprises_vues:
+            url = P.lire(ent, "apply.url")
+            siret = P.lire(ent, "workplace.siret")
+            if not url or siret in vus:
+                continue
+            vus.add(siret)
+            ligne = {"nom": P.premier(ent, P.CHAMPS_ENTREPRISE["nom"]), "url": url}
+            if P.lire(ent, "apply.recipient_id"):
+                if len(avec) < n:
+                    avec.append(ligne)
+            elif len(sans) < n:
+                sans.append(ligne)
+        offres = {}
+        for o in self.offres_vues:
+            url = P.lire(o, "apply.url")
+            source = str(P.lire(o, P.CHAMP_PARTENAIRE))
+            if url and url not in offres.setdefault(source, []) and len(offres[source]) < n:
+                offres[source].append(url)
+        sans_url = sum(1 for o in self.offres_vues if not P.lire(o, "apply.url"))
+        self.afficher(f"  entreprises avec recipient_id : {len(avec)}, sans : {len(sans)} ; "
+                      f"offres sans apply.url : {sans_url}/{len(self.offres_vues)}")
+        return {"entreprises_avec_recipient_id": avec, "entreprises_sans_recipient_id": sans,
+                "offres_par_partenaire": offres, "offres_sans_apply_url": sans_url,
+                "offres_lues": len(self.offres_vues)}
+
+
 def propositions(res: dict) -> dict:
     """Valeurs proposées pour france_travail/parametres_lba.py (valeur actuelle si non tranché)."""
     prop = {}
@@ -379,6 +414,20 @@ def resume(res: dict, afficher=print):
         if not ent["champs_par_nom"].get(nom):
             afficher(f"ℹ️  Entreprises à fort potentiel : aucun champ « {nom} » trouvé.")
     afficher("Chemins des champs d'entreprise (CHAMPS_ENTREPRISE) : voir « entreprises » dans le fichier.")
+    pages = res.get("pages_candidature")
+    if pages:
+        afficher("")
+        afficher("══ Pages à ouvrir : formulaire de candidature ou « pas de contact » ? ══")
+        for cle, titre in (("entreprises_avec_recipient_id", "Entreprises AVEC apply.recipient_id"),
+                           ("entreprises_sans_recipient_id", "Entreprises SANS apply.recipient_id")):
+            afficher(f"{titre} :")
+            for e in pages[cle] or [{"nom": "(aucune)", "url": ""}]:
+                afficher(f"  {e['nom']} : {e['url']}")
+        afficher(f"Offres (apply.url par partenaire ; {pages['offres_sans_apply_url']} offres sur "
+                 f"{pages['offres_lues']} sans apply.url) :")
+        for source, urls in pages["offres_par_partenaire"].items():
+            for url in urls:
+                afficher(f"  {source} : {url}")
 
 
 def main(session=None, sortie=DOSSIER_SORTIE, pause=PAUSE_S, afficher=print) -> int:
@@ -405,12 +454,15 @@ def main(session=None, sortie=DOSSIER_SORTIE, pause=PAUSE_S, afficher=print) -> 
         entreprises = v.entreprises()
         afficher("8. Offres relayées depuis France Travail :")
         ft = v.france_travail()
+        afficher("9. Pages de candidature à ouvrir :")
+        pages = v.pages_candidature()
     except ErreurCle as e:
         afficher(f"❌ {e}")
         return 1
     res = {"verifie_le": datetime.now(timezone.utc).isoformat(timespec="seconds"), "requetes": v.requetes,
            "reference": reference, "codes": codes, "rayon": rayon, "coordonnees": coordonnees,
-           "niveau": niveau, "plafond": plafond, "entreprises": entreprises, "france_travail": ft}
+           "niveau": niveau, "plafond": plafond, "entreprises": entreprises, "france_travail": ft,
+           "pages_candidature": pages}
     res["propositions"] = propositions(res)
     sortie = Path(sortie)
     sortie.mkdir(parents=True, exist_ok=True)
