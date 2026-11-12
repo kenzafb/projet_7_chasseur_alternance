@@ -13,6 +13,9 @@ donc les hashs créés hier restent valides.
 
 import hashlib
 import hmac
+import math
+import threading
+import time
 
 from fastapi import Request
 from fastapi_users.password import PasswordHelper
@@ -38,6 +41,18 @@ def hacher_mot_de_passe(mot_de_passe: str) -> str:
     return _pwd.hash(mot_de_passe)
 
 
+_hash_factice = None
+
+
+def _hash_pour_email_inconnu() -> str:
+    """Hash vérifié quand l'email n'existe pas : même durée de réponse qu'un
+    mauvais mot de passe, rien ne dit si le compte existe (D134)."""
+    global _hash_factice
+    if _hash_factice is None:
+        _hash_factice = hacher_mot_de_passe("email-inconnu-" + "x" * 20)
+    return _hash_factice
+
+
 def authentifier(email: str, mot_de_passe: str):
     """
     Vérifie email + mot de passe.
@@ -46,11 +61,48 @@ def authentifier(email: str, mot_de_passe: str):
     db = SessionLocal()
     try:
         user = db.query(User).filter_by(email=email.lower().strip()).first()
-        if user and verifier_mot_de_passe(mot_de_passe, user.mot_de_passe_hash):
-            return user
-        return None
+        if user is None:
+            verifier_mot_de_passe(mot_de_passe, _hash_pour_email_inconnu())
+            return None
+        return user if verifier_mot_de_passe(mot_de_passe, user.mot_de_passe_hash) else None
     finally:
         db.close()
+
+
+# ─── Échecs de connexion (D134) ───────────────────────────────────────────────
+# Au plus ESSAIS_MAX échecs par email et adresse IP sur FENETRE_S secondes ;
+# au-delà, la connexion est refusée jusqu'à ce que le plus ancien échec sorte
+# de la fenêtre. En mémoire : un redémarrage remet les compteurs à zéro.
+ESSAIS_MAX = 5
+FENETRE_S = 15 * 60
+_echecs: dict[str, list[float]] = {}
+_verrou_echecs = threading.Lock()
+
+
+def _recents(cle: str, maintenant: float) -> list[float]:
+    return [t for t in _echecs.get(cle, []) if maintenant - t < FENETRE_S]
+
+
+def attente_connexion(cle: str, maintenant: float | None = None) -> int:
+    """Secondes à attendre avant un nouvel essai (0 : essai permis)."""
+    maintenant = time.monotonic() if maintenant is None else maintenant
+    with _verrou_echecs:
+        recents = _recents(cle, maintenant)
+        _echecs[cle] = recents
+        if len(recents) < ESSAIS_MAX:
+            return 0
+        return math.ceil(FENETRE_S - (maintenant - recents[0]))
+
+
+def noter_echec(cle: str, maintenant: float | None = None):
+    maintenant = time.monotonic() if maintenant is None else maintenant
+    with _verrou_echecs:
+        _echecs[cle] = _recents(cle, maintenant) + [maintenant]
+
+
+def effacer_echecs(cle: str):
+    with _verrou_echecs:
+        _echecs.pop(cle, None)
 
 
 def verifier_nouveau_mot_de_passe(mot_de_passe: str) -> str | None:

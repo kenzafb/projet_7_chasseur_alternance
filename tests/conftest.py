@@ -58,6 +58,16 @@ class _ReseauInterdit(Exception):
 
 
 @pytest.fixture(autouse=True)
+def echecs_de_connexion_effaces():
+    """Compteurs d'échecs de connexion (D134) remis à zéro : les tests
+    réutilisent les mêmes emails."""
+    from auth import securite
+    securite._echecs.clear()
+    yield
+    securite._echecs.clear()
+
+
+@pytest.fixture(autouse=True)
 def pas_de_reseau(monkeypatch):
     """Toute connexion socket, résolution DNS ou connexion SMTP lève une
     erreur (le TestClient n'en ouvre pas)."""

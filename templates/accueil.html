@@ -33,7 +33,9 @@
     .mode__badge { display: inline-block; margin-top: 8px; font-size: 11px; font-weight: 600; color: #9A6406;
                    background: #FDF3DD; border-radius: 6px; padding: 2px 7px; }
     .alt { text-align: center; margin-top: 20px; font-size: 13px; }
-    .alt a { color: #6B7682; text-decoration: none; }
+    .alt a, .alt__bouton { color: #6B7682; text-decoration: none; }
+    .alt__bouton { background: none; border: 0; font: inherit; cursor: pointer; padding: 0; }
+    .alt__bouton:hover { background: none; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -49,7 +51,7 @@
       </a>
       {% endfor %}
     </div>
-    <p class="alt"><a href="/logout">Déconnexion</a></p>
+    <form class="alt" method="post" action="/logout"><button type="submit" class="alt__bouton">Déconnexion</button></form>
   </div>
 </body>
 </html>

@@ -98,7 +98,7 @@ def test_connexion_puis_deconnexion(client, utilisateur):
     assert client.get("/", follow_redirects=False).status_code == 200          # choix du mode
     assert client.get("/alternance", follow_redirects=False).status_code == 200
 
-    r = client.get("/logout", follow_redirects=False)
+    r = client.post("/logout", follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"] == "/login"
     assert client.get("/api/profil").status_code == 401
 

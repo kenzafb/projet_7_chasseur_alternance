@@ -4,7 +4,7 @@ auth/routes.py
 Routes d'authentification : affichage des pages + traitement des formulaires.
   GET  /login     → page de connexion
   POST /login     → vérifie, ouvre la session, redirige vers l'accueil
-  GET  /logout    → ferme la session
+  POST /logout    → ferme la session (POST seulement, D134)
   GET  /register  → page d'inscription
   POST /register  → crée le compte + son profil vide, connecte, redirige
   GET/POST /mot-de-passe-temporaire → changement obligatoire du mot de passe
@@ -24,8 +24,9 @@ from fastapi.templating import Jinja2Templates
 from shared.config import TEMPLATES_DIR, code_invitation
 from database.connexion import SessionLocal
 from database.models import User, Profil
-from auth.securite import (authentifier, hacher_mot_de_passe, LONGUEUR_MIN_MOT_DE_PASSE, ouvrir_session,
-                           utilisateur_courant, verifier_nouveau_mot_de_passe)
+from auth.securite import (attente_connexion, authentifier, effacer_echecs, hacher_mot_de_passe,
+                           LONGUEUR_MIN_MOT_DE_PASSE, noter_echec, ouvrir_session, utilisateur_courant,
+                           verifier_nouveau_mot_de_passe)
 
 router = APIRouter()
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
@@ -39,12 +40,20 @@ def page_login(request: Request):
 
 @router.post("/login")
 def traiter_login(request: Request, email: str = Form(...), mot_de_passe: str = Form(...)):
+    # Échecs comptés par email et adresse IP (D134)
+    cle = f"{email.lower().strip()}|{request.client.host if request.client else ''}"
+    if attente := attente_connexion(cle):
+        return templates.TemplateResponse(
+            request, "login.html",
+            {"erreur": f"Trop d'essais : réessaie dans {max(1, -(-attente // 60))} min."}, status_code=429)
     user = authentifier(email, mot_de_passe)
     if not user:
+        noter_echec(cle)
         return templates.TemplateResponse(
             request, "login.html",
             {"erreur": "Email ou mot de passe incorrect."},
         )
+    effacer_echecs(cle)
     # Ouvre la session : l'id et l'empreinte du mot de passe, jamais le mot de passe
     request.session.clear()
     ouvrir_session(request, user)
@@ -96,7 +105,7 @@ def page_mot_de_passe_oublie(request: Request):
 
 
 # ─── Déconnexion ───────────────────────────────────────────────────────────────
-@router.get("/logout")
+@router.post("/logout")
 def logout(request: Request):
     request.session.clear()
     return RedirectResponse(url="/login", status_code=303)

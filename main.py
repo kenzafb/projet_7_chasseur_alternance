@@ -28,6 +28,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 from auth.routes import router as auth_router
+from auth.origine import ControleOrigine
 from auth.securite import LONGUEUR_MIN_MOT_DE_PASSE, MotDePasseTemporaire, NonConnecte, utilisateur_requis
 from database.models import User
 from shared.erreurs import CHAMPS_IDENTITE, ErreurUtilisateur, exiger_profil
@@ -77,6 +78,8 @@ app.add_middleware(
     same_site="lax",
     https_only=COOKIE_SECURE,
 )
+# Requêtes non sûres d'une autre origine refusées (D134)
+app.add_middleware(ControleOrigine)
 app.include_router(auth_router)   # /login, /logout, /register : publiques
 
 # Toutes les autres routes passent par ce routeur : utilisateur_requis
@@ -376,6 +379,7 @@ def api_post_profil(request: Request, body: dict = Body(...), user: User = Depen
 # ─── Pièces jointes du profil ─────────────────────────────────────────────────
 TAILLE_MAX_PJ = 5 * 1024 * 1024  # 5 Mo
 LONGUEUR_MAX_NOM_PJ = 60          # caractères, hors suffixe unique et extension
+LONGUEUR_MAX_NOM_AFFICHE_PJ = 100  # nom donné à la pièce dans le profil (D134)
 
 
 def _base_nom_fichier(nom: str) -> str:
@@ -429,9 +433,13 @@ async def api_profil_upload(request: Request,
         return JSONResponse({"erreur": "Seuls les fichiers PDF sont acceptés"}, status_code=400)
     # Si pas de nom fourni : utiliser le nom du fichier (sans extension)
     nom = (nom or "").strip()
-    if not nom:
-        nom = os.path.splitext(fichier.filename or "Document")[0]
-    contenu = await fichier.read()
+    if not nom:   # tiré du nom du fichier, raccourci au besoin
+        nom = os.path.splitext(fichier.filename or "Document")[0][:LONGUEUR_MAX_NOM_AFFICHE_PJ]
+    if len(nom) > LONGUEUR_MAX_NOM_AFFICHE_PJ:
+        return JSONResponse({"erreur": f"Nom trop long ({LONGUEUR_MAX_NOM_AFFICHE_PJ} caractères au plus)"},
+                            status_code=400)
+    # Lecture bornée : jamais plus que la limite + 1 octet en mémoire (D134)
+    contenu = await fichier.read(TAILLE_MAX_PJ + 1)
     if len(contenu) > TAILLE_MAX_PJ:
         return JSONResponse({"erreur": "Fichier trop volumineux (max 5 Mo)"}, status_code=400)
     # Stockage dans le dossier de l'utilisateur ; en base, chemin relatif à UPLOADS_DIR

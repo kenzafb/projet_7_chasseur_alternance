@@ -90,12 +90,15 @@
       <div class="sidefoot__row"><span>Envoyés</span><span data-stat="envoyes">—</span></div>
       <div class="sidefoot__bar"><div class="sidefoot__fill" data-stat="taux-bar" style="width:0%"></div></div>
       <p class="sidefoot__pct" data-stat="taux">— de taux d'envoi</p>
-      <a href="/logout" class="sidefoot__logout">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-        </svg>
-        Déconnexion
-      </a>
+      <!-- Déconnexion en POST (D134) : un lien ou une image d'une autre page ne peut pas la déclencher -->
+      <form method="post" action="/logout" class="sidefoot__deconnexion">
+        <button type="submit" class="sidefoot__logout">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          Déconnexion
+        </button>
+      </form>
     </div>
   </aside>
 
