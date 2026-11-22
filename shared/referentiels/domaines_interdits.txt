@@ -80,6 +80,7 @@ bible-marques.fr
 1001salles.com
 actusduweb.com
 certif-icpf.org
+siteindices.com
 
 # ── Annonces légales, journaux officiels ──
 bodacc.fr
@@ -181,3 +182,4 @@ wixsite.com
 jimdo.com
 webnode.fr
 e-monsite.com
+home.blog
