@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 import spontanees.recherche_emails as scraper_emails
+from shared import config
 from database.connexion import SessionLocal
 from database.entreprises_db import (ajouter_entreprises, calculer_stats, lire_entreprises,
                                      lire_entreprises_envoyees, normaliser_contact_rh,
@@ -28,50 +29,79 @@ def _brut(user_id, colonne):
         db.close()
 
 
-# ─── Bug 5 : le scraper garde site, page scrapée, source et tentatives ───────
-def _resultat(url, fiable=True, emails=("rh@acme.fr",), contact=None):
+# ─── Bug 5 : le scraper garde site, page scrapée, source ; site vérifié (D160) ─
+def _resultat(verification, emails=("rh@acme.fr",), contact=None, formulaires=()):
     return {"emails": list(emails), "telephones": ["01 23 45 67 89"], "contact_rh": contact,
-            "url_finale": url + "/contact", "fiable": fiable}
+            "url_finale": verification.url + "/contact", "formulaires": list(formulaires)}
+
+
+def _identifier(url, source="recherche"):
+    """identifier() simulé : site vérifié url."""
+    from spontanees.site_officiel import Verification
+
+    def faux(e, sites, recherche=None, log=None, **_):
+        if url is None:
+            return None, [{"url": "https://faux.fr", "source": source, "verifie": False, "detail": "ni SIREN ni nom"}]
+        v = Verification(url=url, source=source, verifie=True, preuve="siren", detail="SIREN dans les mentions légales")
+        return v, [v.resume()]
+    return faux
 
 
 def test_scraper_conserve_site_page_et_source(user_id, monkeypatch):
     ajouter_entreprises(user_id, [{"siret": "S1", "nom": "ACME"}])
-    monkeypatch.setattr(scraper_emails, "chercher_site", lambda e, url_exclue=None: ("https://acme.fr", "ddg"))
-    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda url, nom, dirigeant=None, **_: _resultat(url))
+    monkeypatch.setattr(scraper_emails, "identifier", _identifier("https://acme.fr"))
+    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda v, nom, dirigeant=None, **_: _resultat(v))
     scraper_emails.main(user_id, log_fn=lambda m: None)
 
     e = lire_entreprises(user_id)[0]
     assert e["site_web"] == "https://acme.fr"
     assert e["url_scrapee"] == "https://acme.fr/contact"
-    assert e["source_recherche"] == "ddg"
-    assert e["tentatives_site"] == 0
+    assert e["source_recherche"] == "recherche"
+    assert e["site_verifie"]["domaine"] == "acme.fr" and e["site_verifie"]["preuve"] == "siren"
     assert e["emails_trouves"] == ["rh@acme.fr"] and e["traite"] is True
 
 
-def test_scraper_conserve_les_tentatives_apres_un_site_non_fiable(user_id, monkeypatch):
+def test_site_non_verifie_rien_garde(user_id, monkeypatch):
     ajouter_entreprises(user_id, [{"siret": "S1", "nom": "ACME"}])
-    sites = iter([("https://faux-acme.fr", "ddg"), ("https://acme.fr", "ddg")])
-    monkeypatch.setattr(scraper_emails, "chercher_site", lambda e, url_exclue=None: next(sites))
-    monkeypatch.setattr(scraper_emails, "scraper_et_extraire",
-                        lambda url, nom, dirigeant=None, **_: _resultat(url, fiable="faux" not in url))
-    scraper_emails.main(user_id, log_fn=lambda m: None)
-
+    monkeypatch.setattr(scraper_emails, "identifier", _identifier(None))
+    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda *a, **k: pytest.fail("rien à lire"))
+    logs = []
+    scraper_emails.main(user_id, log_fn=logs.append)
     e = lire_entreprises(user_id)[0]
-    assert e["site_web"] == "https://acme.fr" and e["tentatives_site"] == 1
-    assert e["url_scrapee"] == "https://acme.fr/contact"
+    assert e["emails_trouves"] == [] and e["traite"] is True and e["site_verifie"]["verifie"] is False
+    assert any("Site non vérifié" in m for m in logs)
+    from database.entreprises_db import calculer_stats
+    assert calculer_stats(user_id)["prochaines"][0]["site_non_verifie"] is True
+    js = (config.STATIC_DIR / "js" / "spontanees.js").read_text(encoding="utf-8")
+    assert "Site non vérifié" in js and "formulaire de contact" in js
 
 
-def test_site_connu_reutilise_sans_nouvelle_recherche(user_id, monkeypatch):
-    """Le site enregistré sert au lancement suivant : plus de recherche DuckDuckGo."""
+def test_formulaire_de_contact_enregistre(user_id, monkeypatch, utilisateur):
+    """Sans email, le formulaire de contact du site vérifié est gardé et montré (D161)."""
     ajouter_entreprises(user_id, [{"siret": "S1", "nom": "ACME"}])
-    liste = lire_entreprises(user_id)
-    liste[0]["site_web"] = "https://acme.fr"
-    sauvegarder_enrichissement(user_id, liste)
-    monkeypatch.setattr(scraper_emails, "chercher_site",
-                        lambda e, url_exclue=None: pytest.fail("recherche du site inutile"))
-    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda url, nom, dirigeant=None, **_: _resultat(url))
+    formulaire = {"page": "https://acme.fr/contact", "action": "https://acme.fr/envoi", "candidature": False}
+    monkeypatch.setattr(scraper_emails, "identifier", _identifier("https://acme.fr"))
+    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda v, nom, dirigeant=None, **_: _resultat(
+        v, emails=(), formulaires=[formulaire]))
     scraper_emails.main(user_id, log_fn=lambda m: None)
-    assert lire_entreprises(user_id)[0]["source_recherche"] == "existant"
+    assert lire_entreprises(user_id)[0]["formulaires_contact"] == [formulaire]
+    from database.entreprises_db import calculer_stats
+    prochaine = calculer_stats(user_id)["prochaines"][0]
+    assert prochaine["formulaire"] == "https://acme.fr/contact" and prochaine["site"] == "https://acme.fr"
+
+
+def test_site_deja_verifie_reutilise_sans_nouvelle_recherche(user_id, monkeypatch):
+    """Le site vérifié enregistré sert au lancement suivant : plus de recherche web."""
+    from tests.faux_web import FauxWeb, brancher, site
+    ajouter_entreprises(user_id, [{"siret": "S1", "nom": "ACME", "siren": "123456789"}])
+    liste = lire_entreprises(user_id)
+    liste[0]["site_verifie"] = {"url": "https://acme.fr", "domaine": "acme.fr", "preuve": "siren"}
+    sauvegarder_enrichissement(user_id, liste)
+    brancher(monkeypatch, FauxWeb(site()))
+    monkeypatch.setattr(scraper_emails, "urls_recherche", lambda e: pytest.fail("recherche du site inutile"))
+    scraper_emails.main(user_id, log_fn=lambda m: None)
+    e = lire_entreprises(user_id)[0]
+    assert e["source_recherche"] == "deja_verifie" and e["emails_trouves"] == ["contact@acme.fr"]
 
 
 def test_sauvegarde_n_ajoute_pas_de_cles_vides(user_id):
@@ -173,8 +203,8 @@ def test_ancien_json_relu_comme_texte(user_id):
 
 def test_scraper_ecrit_le_contact_normalise(user_id, monkeypatch):
     ajouter_entreprises(user_id, [{"siret": "S1", "nom": "ACME"}])
-    monkeypatch.setattr(scraper_emails, "chercher_site", lambda e, url_exclue=None: ("https://acme.fr", "ddg"))
-    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda url, nom, dirigeant=None, **_: _resultat(
-        url, contact=[{"prenom": "Ana", "nom": "Lopez", "poste": "DRH"}]))
+    monkeypatch.setattr(scraper_emails, "identifier", _identifier("https://acme.fr"))
+    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda v, nom, dirigeant=None, **_: _resultat(
+        v, contact=[{"prenom": "Ana", "nom": "Lopez", "poste": "DRH"}]))
     scraper_emails.main(user_id, log_fn=lambda m: None)
     assert _brut(user_id, "contact_rh") == ["Ana Lopez (DRH)"]

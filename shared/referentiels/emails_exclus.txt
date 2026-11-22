@@ -60,6 +60,26 @@
 @test.fr
 @email.tld
 @domain.tld
+# Gabarits de site vus en base (audit du 22 novembre 2026, D162)
+@monentreprise.fr
+@monentreprise.com
+@mon-entreprise.fr
+@votreentreprise.fr
+@votreentreprise.com
+@votre-entreprise.fr
+@votre-entreprise.com
+@masociete.fr
+@masociete.com
+@votresociete.fr
+@votresociete.com
+@votre-societe.fr
+@nomdedomaine.fr
+@nomdedomaine.com
+@mon-domaine.fr
+@votre-domaine.fr
+@votre-domaine.com
+@exemple.org
+@exemple.net
 
 # ── Parties locales de formulaire ou d'exemple ────────────────────────────────
 votre@

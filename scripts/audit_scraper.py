@@ -12,16 +12,19 @@ règles : C2 les mesure.
 
     CHASSEUR_ENV_FILE=/dev/null venv/bin/python scripts/audit_scraper.py echantillon --base sqlite:///data/chasseur_v2.db
 
-C2, réseau (à lancer par l'humain) : rejoue scraper_et_extraire, la fonction
-de l'application, sur l'échantillon (ou --fichier), en notant chaque requête
-HTTP : URL, statut, durée, taille, type, redirection, erreur, et si
-robots.txt l'interdit ; le temps passé en pauses ; puis, pour chaque page
-HTML reçue, les signes d'une page rendue en JavaScript (peu de texte, beaucoup
-de scripts, racine d'application vide, <noscript>), les formulaires de
-contact (textarea, champ email) et les liens mailto. Les entreprises sans
-site passent par la recherche DuckDuckGo de l'application (--sans-ddg pour
-l'éviter). IA coupée par défaut (--ia pour la validation des douteuses).
-Rien n'est écrit en base.
+C2, réseau : rejoue les fonctions de l'application sur l'échantillon (ou
+--fichier) : identification du site (spontanees/site_officiel.identifier :
+site LBA, sites donnés par les offres de la base en lecture seule, recherche
+web ; vérification par SIREN ou nom, D160 ; le site en base, trouvé par
+l'ancienne recherche, n'est pas repris), puis scraper_et_extraire sur le
+site vérifié (D161), en notant chaque requête HTTP : URL, statut, durée,
+taille, type, redirection, erreur, et si robots.txt l'interdit ; le temps
+passé en pauses ; puis, pour chaque page HTML reçue, les signes d'une page
+rendue en JavaScript, les formulaires de contact et les liens mailto.
+--sans-ddg : sans recherche web. IA coupée par défaut (--ia pour la
+validation des douteuses). Avec audit_exports/scraper_reference.json (ou
+--reference), chaque site retenu est comparé au site officiel : juste,
+faux, manqué, non tranché. Rien n'est écrit en base.
 
     venv/bin/python scripts/audit_scraper.py mesure                      # audit_exports/scraper_echantillon.json
     venv/bin/python scripts/audit_scraper.py mesure --max 10 --sans-ddg
@@ -164,38 +167,61 @@ def analyser_html(html: str) -> dict:
         "emails_visibles_regex": len(set(re.findall(r"[\w.%+-]+@[\w.-]+\.[a-z]{2,}", html, re.I)))}
 
 
-def mesurer(entreprises: list[dict], ddg=True, ia=False) -> dict:
+def sites_des_offres_lecture(base, user_id) -> dict:
+    """Sites donnés par les offres (France Travail, LBA) de l'utilisateur, base en lecture seule."""
+    from database.candidatures_db import sites_des_offres
+    if not user_id:
+        return {}
+    with session_lecture(base) as db:
+        return sites_des_offres(user_id, db)
+
+
+def mesurer(entreprises: list[dict], ddg=True, ia=False, base=None, reference=None) -> dict:
+    """Phase 15 (D160, D161) : identification du site (sources, vérification
+    par SIREN ou nom), puis lecture du site vérifié, chaque requête notée."""
+    from spontanees import lecture_site as L
     from spontanees import recherche_emails as S
-    journal = Journal(S.requests, S.time.sleep)
-    S.requests = journal
-    S.time.sleep = journal.pause            # time est partagé : pauses DDG comprises
+    from spontanees import site_officiel as O
+    journal = Journal(L.requests, S.time.sleep)
+    L.requests = journal
+    S.time.sleep = journal.pause            # time est partagé : pauses DDG et entre pages comprises
     sites, candidats = [], []
+    offres = {}
     try:
         for i, e in enumerate(entreprises, 1):
             journal.requetes, journal.html, journal.pauses = [], {}, 0.0
             chrono = Chrono()
             ligne = {"id": e["id"], "nom": e["nom"], "taille": e.get("taille"), "naf": e.get("naf"),
                      "site_en_base": e.get("site_web"), "emails_en_base": e.get("emails_trouves")}
-            url = e.get("site_web")
-            if not url and ddg:
-                ent = {"nom_commercial": e["nom"], "nom": e.get("raison_sociale"), "ville": e.get("ville"),
-                       "code_postal": e.get("code_postal"), "siren": e.get("siren")}
-                url, _ = S.chercher_site(ent)
-                ligne["site_trouve_ddg"] = url
-                ligne["secondes_recherche_site"] = chrono.s
-            if not url:
-                ligne["resultat"] = "site introuvable" if ddg else "pas de site (DDG non lancé)"
+            if e.get("user_id") not in offres:
+                offres[e.get("user_id")] = sites_des_offres_lecture(base, e.get("user_id"))
+            # Le site en base vient de l'ancienne recherche : il n'est pas repris (seulement LBA, offres, recherche)
+            ent = {"nom_commercial": e["nom"], "nom": e.get("raison_sociale"), "ville": e.get("ville"),
+                   "code_postal": e.get("code_postal"), "siren": e.get("siren"),
+                   "_extra": {"lba": {"site_web": e.get("site_lba") or ""}}}
+            verification, essais = O.identifier(ent, offres[e.get("user_id")], S.urls_recherche if ddg else None)
+            ligne.update(site_verifie=verification.resume() if verification else None, essais_site=essais,
+                         secondes_identification=chrono.s, requetes_identification=len(journal.requetes))
+            if reference is not None:
+                ligne["reference"] = comparer_a_la_reference(verification, reference.get(e["id"]))
+            if not verification:
+                ligne["resultat"] = "site non vérifié"
+                ligne.update(secondes=chrono.s, secondes_en_pause=round(journal.pauses, 1),
+                             requetes=len(journal.requetes), requetes_detail=journal.requetes)
                 sites.append(ligne)
-                print(f"[{i}/{len(entreprises)}] {e['nom'][:40]} : {ligne['resultat']}")
+                print(f"[{i}/{len(entreprises)}] {e['nom'][:40]} : site non vérifié ({len(essais)} essayés)"
+                      + (f" [{ligne['reference']['verdict']}]" if reference is not None else ""))
                 continue
+            url = verification.url
             try:
-                r = S.scraper_et_extraire(url, e["nom"], ia=ia)
+                r = S.scraper_et_extraire(verification, e["nom"], ia=ia)
             except Exception as err:  # noqa: BLE001
                 r = {"emails": [], "erreur": f"{type(err).__name__}: {err}"}
             pages = {u: analyser_html(h) for u, h in journal.html.items()}
             statuts = Counter(str(x.get("statut") or x.get("erreur")) for x in journal.requetes)
             ligne.update({
-                "site": url, "secondes": chrono.s, "secondes_en_pause": round(journal.pauses, 1),
+                "site": url, "formulaires": r.get("formulaires"), "robots": r.get("robots"),
+                "secondes": chrono.s, "secondes_en_pause": round(journal.pauses, 1),
                 "requetes": len(journal.requetes), "statuts": dict(statuts),
                 "pages_html_lues": len(journal.html),
                 "interdites_par_robots": [x["url"] for x in journal.requetes if x.get("interdit_par_robots")],
@@ -210,6 +236,7 @@ def mesurer(entreprises: list[dict], ddg=True, ia=False) -> dict:
                 "url_finale": r.get("url_finale"), "erreur": r.get("erreur")})
             for a in r.get("emails") or []:
                 candidats.append({"entreprise_id": e["id"], "entreprise": e["nom"], "site_web": url,
+                                  "site_verifie": verification.domaine,
                                   "url_scrapee": r.get("url_finale") or url, "email": a,
                                   "etat_app": "douteuse" if a in (r.get("douteux") or []) else "validee_regle",
                                   "contexte": (r.get("contextes") or {}).get(a, ""), "attendu_valide": None,
@@ -220,16 +247,23 @@ def mesurer(entreprises: list[dict], ddg=True, ia=False) -> dict:
                                   "etat_app": f"ecartee ({raison})", "contexte": "", "attendu_valide": None,
                                   "commentaire": ""})
             sites.append(ligne)
-            print(f"[{i}/{len(entreprises)}] {e['nom'][:40]} : {ligne['requetes']} requêtes, {ligne['secondes']} s "
+            print(f"[{i}/{len(entreprises)}] {e['nom'][:40]} : {url} ({verification.detail})"
+                  + (f" [{ligne['reference']['verdict']}]" if reference is not None else "")
+                  + f", {ligne['requetes']} requêtes, {ligne['secondes']} s "
                   f"(pauses {ligne['secondes_en_pause']} s), emails {len(r.get('emails') or [])}, JS "
                   f"{len(ligne['pages_js_probables'])}, formulaires {len(ligne['pages_avec_formulaire'])}, robots "
                   f"{len(ligne['interdites_par_robots'])}")
     finally:
-        S.requests, S.time.sleep = journal.requests, journal.sleep_reel
-    lus = [s for s in sites if "requetes" in s]
+        L.requests, S.time.sleep = journal.requests, journal.sleep_reel
+    lus = [s for s in sites if s.get("site_verifie")]
     synthese = {
-        "entreprises": len(sites), "sites_lus": len(lus),
-        "sites_introuvables": sum(1 for s in sites if "requetes" not in s),
+        "entreprises": len(sites), "sites_verifies_et_lus": len(lus),
+        "sites_non_verifies": sum(1 for s in sites if not s.get("site_verifie")),
+        "preuves": dict(Counter(s["site_verifie"]["preuve"] for s in lus)),
+        "sources": dict(Counter(s["site_verifie"]["source"] for s in lus)),
+        "requetes_par_entreprise_moyen": round(sum(s["requetes"] for s in sites) / len(sites), 1) if sites else None,
+        "secondes_par_entreprise_moyen": round(sum(s["secondes"] for s in sites) / len(sites), 1) if sites else None,
+        "sites_avec_formulaire": sum(1 for s in lus if s.get("formulaires")),
         "avec_au_moins_un_email": pourcentage(sum(1 for s in lus if s["emails"]), len(lus)),
         "requetes_par_site_moyen": round(sum(s["requetes"] for s in lus) / len(lus), 1) if lus else None,
         "secondes_par_site_moyen": round(sum(s["secondes"] for s in lus) / len(lus), 1) if lus else None,
@@ -242,7 +276,44 @@ def mesurer(entreprises: list[dict], ddg=True, ia=False) -> dict:
         "sites_sans_email_et_js": sum(1 for s in lus if not s["emails"] and s["pages_js_probables"]),
         "sites_sans_aucune_page_html": sum(1 for s in lus if not s["pages_html_lues"]),
     }
+    if reference is not None:
+        synthese["identification_contre_la_reference"] = bilan_reference(sites)
     return {"le": maintenant(), "ia": ia, "ddg": ddg, "synthese": synthese, "sites": sites}, candidats
+
+
+def _parent(domaine: str) -> str:
+    d = (domaine or "").lower().removeprefix("www.")
+    return ".".join(d.split(".")[-2:])
+
+
+def comparer_a_la_reference(verification, ref: dict | None) -> dict:
+    """juste, faux (autre site retenu), manqué (site officiel connu, rien
+    retenu), ou non tranché (référence à vérifier)."""
+    if not ref:
+        return {"verdict": "hors référence"}
+    officiel = ref.get("site_officiel")
+    retenu = verification.domaine if verification else None
+    tranche = ref.get("confiance") in ("haute", "moyenne")
+    if not tranche:
+        verdict = "non tranché"
+    elif officiel and retenu:
+        verdict = "juste" if _parent(retenu) == _parent(officiel) else "faux"
+    elif officiel:
+        verdict = "manqué"
+    else:
+        verdict = "faux" if retenu else "juste"
+    return {"verdict": verdict, "officiel": officiel, "retenu": retenu, "confiance": ref.get("confiance")}
+
+
+def bilan_reference(sites) -> dict:
+    verdicts = Counter(s["reference"]["verdict"] for s in sites if "reference" in s)
+    tranches = sum(n for v, n in verdicts.items() if v in ("juste", "faux", "manqué"))
+    return {"tranches": tranches, "justes": verdicts["juste"], "faux": verdicts["faux"],
+            "manques": verdicts["manqué"], "non_tranches": verdicts["non tranché"],
+            "faux_detail": [(s["nom"], s["reference"]["retenu"], s["reference"]["officiel"]) for s in sites
+                            if s.get("reference", {}).get("verdict") == "faux"],
+            "manques_detail": [(s["nom"], s["reference"]["officiel"]) for s in sites
+                               if s.get("reference", {}).get("verdict") == "manqué"]}
 
 
 def main(argv=None) -> int:
@@ -257,13 +328,19 @@ def main(argv=None) -> int:
     m.add_argument("--max", type=int)
     m.add_argument("--sans-ddg", action="store_true")
     m.add_argument("--ia", action="store_true")
+    m.add_argument("--base", help="URL SQLite (lecture seule) pour les sites donnés par les offres")
+    m.add_argument("--reference", default=str(SORTIE / "scraper_reference.json"),
+                   help="sites officiels de référence (absent : pas de comparaison)")
     args = ap.parse_args(argv)
     if args.action == "echantillon":
         res = echantillon(args.base, args.user, args.taille)
         print(res["repartition_echantillon"], "->", ecrire_json("scraper_echantillon", res))
         return 0
     entreprises = lire_json(args.fichier)["entreprises"][:args.max]
-    res, candidats = mesurer(entreprises, ddg=not args.sans_ddg, ia=args.ia)
+    from pathlib import Path
+    reference = ({x["id"]: x for x in lire_json(args.reference)["entreprises"]} if Path(args.reference).exists()
+                 else None)
+    res, candidats = mesurer(entreprises, ddg=not args.sans_ddg, ia=args.ia, base=args.base, reference=reference)
     print(res["synthese"])
     print("->", ecrire_json("scraper_mesure", res))
     print("->", ecrire_json("emails_candidats", {"version": 1, "exporte_le": maintenant(), "emails": candidats}))

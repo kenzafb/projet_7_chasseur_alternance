@@ -219,6 +219,10 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
                 "adresses":  adresses(e),
                 "contacts_autres_modes": ailleurs.get(e.id, []),
                 "lba":       candidature_lba(e),
+                # Phase 15 : site vérifié (D160), formulaire de contact du site (D161)
+                "site":      ((e.extra or {}).get("site_verifie") or {}).get("url") or "",
+                "site_non_verifie": bool(e.traite) and ((e.extra or {}).get("site_verifie") or {}).get("verifie") is False,
+                "formulaire": (((e.extra or {}).get("formulaires_contact") or [{}])[0]).get("page", ""),
             }
             for e, m in prochaines_paires
         ]
@@ -248,7 +252,9 @@ _CHAMPS_EXTRA_REMONTES = ["nom", "url_scrapee", "source_recherche"]
 # (shared/validation_emails.py)
 _CHAMPS_EXTRA_SCRAPER = ("telephone", "url_scrapee", "source_recherche", "tentatives_site",
                          "emails_non_valides", "emails_douteux", "contextes_emails", "meilleur_contact",
-                         "validation_emails", "emails_ecartes_ia")
+                         "validation_emails", "emails_ecartes_ia",
+                         # Phase 15 : site vérifié (D160) et essais, formulaires de contact (D161)
+                         "site_verifie", "essais_site", "formulaires_contact")
 
 
 def _codes_naf(d: dict) -> dict:
@@ -340,6 +346,8 @@ def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
     d["meilleur_contact"] = extra.get("meilleur_contact")
     d["validation_emails"] = dict(extra.get("validation_emails") or {})
     d["emails_ecartes_ia"] = list(extra.get("emails_ecartes_ia") or [])
+    d["site_verifie"] = extra.get("site_verifie")          # None : pas (encore) vérifié (D160)
+    d["formulaires_contact"] = list(extra.get("formulaires_contact") or [])   # D161
     # On garde extra complet aussi, au cas où
     d["_extra"] = extra
     d["_id"] = e.id   # id technique en base, pour réécrire précisément
@@ -751,7 +759,8 @@ def ajouter_entreprises_lba(user_id: int, liste: list[dict], maximum: int | None
     try:
         par_siret, par_siren, par_identifiant = _index_entreprises(db, user_id)
         for d in liste:
-            infos_lba = {k: d.get(k, "") for k in ("identifiant", "candidature_id", "candidature_url", "libelle_naf")}
+            infos_lba = {k: d.get(k, "") for k in ("identifiant", "candidature_id", "candidature_url", "libelle_naf",
+                                                   "site_web")}   # site_web : source du scraper (D160)
             email = d.get("email") or ""
             email = "" if email_exclu(email) else email
             e = ((par_siret.get(d["siret"]) if d.get("siret") else None)

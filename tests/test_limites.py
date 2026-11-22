@@ -191,9 +191,10 @@ def test_route_fetch_borne_la_limite(utilisateur, monkeypatch, pipelines_neufs):
 def test_scraper_traite_au_plus_la_limite(utilisateur, monkeypatch):
     _, user_id = utilisateur("a@test.fr", prenom="Alice")
     ajouter_entreprises(user_id, [{"siret": f"S{i}", "nom": f"Ent {i}"} for i in range(5)])
-    monkeypatch.setattr(scraper_emails, "chercher_site", lambda e, url_exclue=None: ("https://ent.fr", "ddg"))
-    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda url, nom, dirigeant=None, **_: {
-        "emails": ["rh@ent.fr"], "telephones": [], "contact_rh": None, "url_finale": url, "fiable": True})
+    from tests.test_entreprises import _identifier
+    monkeypatch.setattr(scraper_emails, "identifier", _identifier("https://ent.fr"))
+    monkeypatch.setattr(scraper_emails, "scraper_et_extraire", lambda v, nom, dirigeant=None, **_: {
+        "emails": ["rh@ent.fr"], "telephones": [], "contact_rh": None, "url_finale": v.url})
     scraper_emails.main(user_id, max_scrapees=2, log_fn=lambda m: None)
     assert sum(e["traite"] for e in lire_entreprises(user_id)) == 2
     scraper_emails.main(user_id, max_scrapees=2, log_fn=lambda m: None)

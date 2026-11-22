@@ -32,7 +32,7 @@ from shared.criteres import criteres_france_travail
 from shared.liens import lien_http
 from shared.domaines import domaines_du_grand_domaine, est_grand_domaine
 from shared.intitules_stage import designe_un_stage
-from shared.offres import detecter_zone, generer_id
+from shared.offres import LIGNE_SITE, detecter_zone, generer_id
 from shared.tailles import garder_selon_taille, taille_depuis_tranche
 from shared.journal import journaliser
 
@@ -332,6 +332,9 @@ def _normaliser_une(offre: dict) -> dict | None:
     desc_entreprise = offre.get("entreprise", {}).get("description", "")
     if desc_entreprise:
         desc += f"\n\nEntreprise : {desc_entreprise}"
+    # Site de l'entreprise : source du scraper des spontanées (D160)
+    if site := lien_http((offre.get("entreprise") or {}).get("url")):
+        desc += f"\n{LIGNE_SITE}{site}"
 
     # Infos contrat
     exp     = offre.get("experienceLibelle", "")

@@ -9,6 +9,11 @@ import unicodedata
 
 from shared.config import DEPTS_IDF, DEPTS_PETITE_COURONNE
 
+# Ligne ajoutée à la description d'une offre qui donne le site de
+# l'entreprise (France Travail entreprise.url, LBA workplace.website), lue
+# par le scraper des candidatures spontanées (D160)
+LIGNE_SITE = "Site de l'entreprise : "
+
 # Offre rattachée à la région sans département : « Île-de-France »,
 # « Ile-de-France », « Île-de-France - Télétravail à 100% »... (680 offres
 # job sur 19719 le 22 novembre 2026, rejetées « hors IDF » avant D153)

@@ -34,6 +34,16 @@ def alice(utilisateur, smtp_simule):
     return client, user_id, [e["_id"] for e in liste]
 
 
+def nominatives(user_id):
+    """Entreprises 1 et 2 : site vérifié (D160), adresse nominative du même
+    domaine, douteuse : c'est l'IA qui tranche (D162)."""
+    liste = lire_entreprises(user_id)
+    for i in (1, 2):
+        liste[i].update(emails_trouves=[f"camille{i}@ent{i}.fr"], emails_douteux=[f"camille{i}@ent{i}.fr"],
+                        site_verifie={"url": f"https://ent{i}.fr", "domaine": f"ent{i}.fr", "preuve": "siren"})
+    sauvegarder_enrichissement(user_id, liste)
+
+
 def test_jamais_envoyes_automatiquement(alice, smtp_simule):
     _, user_id, _ = alice
     logs = []
@@ -96,46 +106,58 @@ def _revalider(client, user_id, pipelines, **corps):
 
 def test_relance_ia_valide_ou_ecarte_sans_relire_le_site(alice, ia, pipelines_neufs, monkeypatch):
     client, user_id, _ = alice
-    monkeypatch.setattr(se, "get_page", lambda *a, **k: pytest.fail("le site ne doit pas être relu"))
-    ia.file = ['{"valides": ["rh1@ent1.fr"], "meilleur_contact": "rh1@ent1.fr"}',
+    nominatives(user_id)
+    monkeypatch.setattr(se, "scraper_et_extraire", lambda *a, **k: pytest.fail("le site ne doit pas être relu"))
+    ia.file = ['{"valides": ["camille1@ent1.fr"], "meilleur_contact": "camille1@ent1.fr"}',
                '{"valides": [], "meilleur_contact": null}']
     r = _revalider(client, user_id, pipelines_neufs)
     assert r.json()["max_revalidations"] == 2
     e1, e2 = lire_entreprises(user_id)[1:]
-    assert e1["emails_trouves"] == ["rh1@ent1.fr"] and e1["emails_non_valides"] is False
+    assert e1["emails_trouves"] == ["camille1@ent1.fr"] and e1["emails_non_valides"] is False
     assert e2["emails_trouves"] == [] and e2["emails_non_valides"] is False   # écartée par l'IA
-    assert "acme1.fr" in ia.textes(0) and "rh1@ent1.fr" in ia.textes(0)
+    assert "ent1.fr" in ia.textes(0) and "camille1@ent1.fr" in ia.textes(0)   # domaine du site vérifié
     assert "Validation IA terminée : 2/2" in client.get("/api/logs").text
 
 
 def test_relance_regles_d_abord(alice, ia, pipelines_neufs):
-    """Une adresse validée d'office par les règles n'est pas soumise à l'IA."""
+    """Règles d'abord (D162) : adresse de contact du site vérifié validée,
+    autre domaine écarté, sans IA ; l'IA ne juge que la messagerie grand public."""
     client, user_id, _ = alice
     liste = lire_entreprises(user_id)
-    liste[1].update(site_web="https://ent1.fr", emails_trouves=["recrutement@ent1.fr", "x@agence.fr"],
-                    emails_douteux=["recrutement@ent1.fr", "x@agence.fr"],
-                    contextes_emails={"x@agence.fr": "Site réalisé par l'agence"})
+    liste[1].update(site_web="https://ent1.fr", emails_trouves=["recrutement@ent1.fr", "x@agence.fr", "gerant@gmail.com"],
+                    emails_douteux=["recrutement@ent1.fr", "x@agence.fr", "gerant@gmail.com"],
+                    contextes_emails={"gerant@gmail.com": "Écrivez au gérant"},
+                    site_verifie={"url": "https://ent1.fr", "domaine": "ent1.fr", "preuve": "siren"})
     sauvegarder_enrichissement(user_id, liste)
     ia.reponse = '{"valides": [], "meilleur_contact": "recrutement@ent1.fr"}'
     _revalider(client, user_id, pipelines_neufs, max_revalidations=1)
-    assert len(ia.appels) == 1 and "Site réalisé par l'agence" in ia.textes(0)
+    assert len(ia.appels) == 1 and "Écrivez au gérant" in ia.textes(0) and "x@agence.fr" not in ia.textes(0)
     e = lire_entreprises(user_id)[1]
     assert e["emails_trouves"] == ["recrutement@ent1.fr"] and e["emails_non_valides"] is False
     assert e["meilleur_contact"] == "recrutement@ent1.fr"      # adresse validée par les règles
     assert e["validation_emails"] == {"recrutement@ent1.fr": "regle"}
 
 
+def test_relance_sans_site_verifie_tout_ecarte(alice, ia, pipelines_neufs):
+    """Entreprise sans site vérifié (D160) : ses adresses douteuses sont écartées, sans IA."""
+    client, user_id, _ = alice
+    _revalider(client, user_id, pipelines_neufs)
+    assert ia.appels == []
+    assert [e["emails_trouves"] for e in lire_entreprises(user_id)] == [["rh0@ent0.fr"], [], []]
+    assert "site de l'entreprise non vérifié" in client.get("/api/logs").text
 def test_relance_ia_en_echec_passager_reste_a_valider(alice, ia, pipelines_neufs):
     client, user_id, _ = alice
+    nominatives(user_id)
     echouer(ia, erreur_http(503))
     _revalider(client, user_id, pipelines_neufs)
     assert [e["emails_non_valides"] for e in lire_entreprises(user_id)] == [False, True, True]
-    assert lire_entreprises(user_id)[1]["emails_trouves"] == ["rh1@ent1.fr"]
+    assert lire_entreprises(user_id)[1]["emails_trouves"] == ["camille1@ent1.fr"]
     assert len(client.get("/api/spontanees/a_valider").json()) == 2
 
 
 def test_relance_ia_bloquante_un_message_et_arret(alice, ia, pipelines_neufs):
     client, user_id, _ = alice
+    nominatives(user_id)
     echouer(ia, erreur_http(404, INTROUVABLE))
     _revalider(client, user_id, pipelines_neufs)
     assert len(ia.demarrages) == 1 and ia.appels == []   # arrêté au test de démarrage
@@ -177,16 +199,17 @@ def test_maazi_ne_declenche_plus_l_archivage():
 
 def test_provenance_affichee_par_adresse(alice, ia, pipelines_neufs):
     client, user_id, ids = alice
+    nominatives(user_id)
     liste = lire_entreprises(user_id)
     liste[0]["validation_emails"] = {"rh0@ent0.fr": "regle"}
     sauvegarder_enrichissement(user_id, liste)
-    ia.file = ['{"valides": ["rh1@ent1.fr"], "meilleur_contact": "rh1@ent1.fr"}']
+    ia.file = ['{"valides": ["camille1@ent1.fr"], "meilleur_contact": "camille1@ent1.fr"}']
     _revalider(client, user_id, pipelines_neufs, max_revalidations=1)
     client.post("/api/spontanees/valider", json={"id": ids[2]})
     lignes = {e["id"]: e["adresses"] for e in client.get("/api/spontanees/stats").json()["prochaines"]}
     assert lignes[ids[0]] == [{"adresse": "rh0@ent0.fr", "validation": "regle", "meilleur": False}]
-    assert lignes[ids[1]] == [{"adresse": "rh1@ent1.fr", "validation": "ia", "meilleur": True}]
-    assert lignes[ids[2]] == [{"adresse": "rh2@ent2.fr", "validation": "manuelle", "meilleur": False}]
+    assert lignes[ids[1]] == [{"adresse": "camille1@ent1.fr", "validation": "ia", "meilleur": True}]
+    assert lignes[ids[2]] == [{"adresse": "camille2@ent2.fr", "validation": "manuelle", "meilleur": False}]
     js = (config.STATIC_DIR / "js" / "spontanees.js").read_text(encoding="utf-8")
     assert "validée par règle" in js and "validée par l'IA" in js and "validée à la main" in js
 
@@ -194,25 +217,26 @@ def test_provenance_affichee_par_adresse(alice, ia, pipelines_neufs):
 # ─── Adresses écartées par l'IA : visibles, validables quand même ────────────
 def test_ecartee_par_l_ia_visible_et_validable(alice, ia, pipelines_neufs, smtp_simule, utilisateur):
     client, user_id, ids = alice
-    ia.file = ['{"valides": [], "meilleur_contact": null}', '{"valides": ["rh2@ent2.fr"], "meilleur_contact": null}']
+    nominatives(user_id)
+    ia.file = ['{"valides": [], "meilleur_contact": null}', '{"valides": ["camille2@ent2.fr"], "meilleur_contact": null}']
     _revalider(client, user_id, pipelines_neufs)
     e1 = lire_entreprises(user_id)[1]
-    assert e1["emails_trouves"] == [] and e1["emails_ecartes_ia"] == ["rh1@ent1.fr"]
+    assert e1["emails_trouves"] == [] and e1["emails_ecartes_ia"] == ["camille1@ent1.fr"]
     a_valider = {e["id"]: e for e in client.get("/api/spontanees/a_valider").json()}
     assert list(a_valider) == [ids[1]]                                  # plus de douteuse, mais visible
-    assert a_valider[ids[1]]["adresses"] == [{"adresse": "rh1@ent1.fr", "validation": "ecartee_ia", "meilleur": False}]
+    assert a_valider[ids[1]]["adresses"] == [{"adresse": "camille1@ent1.fr", "validation": "ecartee_ia", "meilleur": False}]
     assert client.get("/api/spontanees/stats").json()["a_valider"] == 0   # rien à repasser à l'IA
     assert envoyeur.compter_a_envoyer(user_id, "alternance") == 2         # écartée : jamais envoyée
     # Une autre personne ne peut pas la valider
     client_b, _ = utilisateur("b@test.fr")
-    assert client_b.post("/api/spontanees/valider_adresse", json={"id": ids[1], "adresse": "rh1@ent1.fr"}).status_code == 404
+    assert client_b.post("/api/spontanees/valider_adresse", json={"id": ids[1], "adresse": "camille1@ent1.fr"}).status_code == 404
     # Validée quand même, à la main
-    assert client.post("/api/spontanees/valider_adresse", json={"id": ids[1], "adresse": "rh1@ent1.fr"}).json() == {"ok": True}
+    assert client.post("/api/spontanees/valider_adresse", json={"id": ids[1], "adresse": "camille1@ent1.fr"}).json() == {"ok": True}
     e1 = lire_entreprises(user_id)[1]
-    assert e1["emails_trouves"] == ["rh1@ent1.fr"] and e1["validation_emails"]["rh1@ent1.fr"] == "manuelle"
+    assert e1["emails_trouves"] == ["camille1@ent1.fr"] and e1["validation_emails"]["camille1@ent1.fr"] == "manuelle"
     assert client.get("/api/spontanees/a_valider").json() == []
     assert envoyeur.compter_a_envoyer(user_id, "alternance") == 3
-    assert client.post("/api/spontanees/valider_adresse", json={"id": ids[1], "adresse": "rh1@ent1.fr"}).status_code == 404
+    assert client.post("/api/spontanees/valider_adresse", json={"id": ids[1], "adresse": "camille1@ent1.fr"}).status_code == 404
     js = (config.STATIC_DIR / "js" / "spontanees.js").read_text(encoding="utf-8")
     assert "écartée par l'IA" in js and "Valider quand même" in js and "api.spValiderAdresse" in js
 

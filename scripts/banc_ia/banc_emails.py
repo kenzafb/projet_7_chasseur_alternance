@@ -20,6 +20,14 @@ Pour chaque essai : décision des règles seules (valide / écartée /
 douteuse), puis finale après l'IA. Une adresse douteuse restante compte
 comme non envoyée (D15). Résultat : matrice par étape, liste des erreurs,
 variance d'un essai à l'autre, temps par entreprise.
+
+Site de l'entreprise (D160, D162) : les règles exigent un site vérifié.
+--sites FICHIER (sortie de scripts/audit_scraper.py mesure, champ
+site_verifie par entreprise) le donne ; --verifier-sites le cherche et le
+vérifie maintenant (réseau, recherche web comprise). Sans l'un ni l'autre,
+aucune entreprise n'a de site vérifié : toutes les adresses sont écartées.
+
+    venv/bin/python scripts/banc_ia/banc_emails.py audit_exports/banc_emails_reference.json --sites audit_exports/scraper_mesure.json
 """
 
 import argparse
@@ -38,6 +46,25 @@ def domaine(url: str) -> str | None:
     return extraire_domaine(url if "://" in url else "https://" + url) or None
 
 
+def sites_verifies(args, groupes) -> dict:
+    """{entreprise: domaine du site vérifié} (absente : pas de site vérifié)."""
+    out = {}
+    if args.sites:
+        for x in lire_json(args.sites).get("sites", []):
+            if (x.get("site_verifie") or {}).get("domaine"):
+                out[x["id"]] = x["site_verifie"]["domaine"]
+    if args.verifier_sites:
+        from spontanees.recherche_emails import urls_recherche
+        from spontanees.site_officiel import identifier
+        for cle, g in groupes.items():
+            if cle not in out:
+                v, _ = identifier({"nom": g[0]["entreprise"], "nom_commercial": g[0]["entreprise"],
+                                   "siren": g[0].get("siren", "")}, {}, urls_recherche, log=print)
+                if v:
+                    out[cle] = v.domaine
+    return {k: v for k, v in out.items() if k in groupes}
+
+
 def matrice(decisions: dict, attendu: dict) -> dict:
     vp = [a for a, v in decisions.items() if v and attendu[a]]
     fp = [a for a, v in decisions.items() if v and not attendu[a]]
@@ -54,8 +81,10 @@ def main(argv=None) -> int:
     ap.add_argument("--modele", help="modèle (défaut : IA_MODELE_EXTRACTION)")
     ap.add_argument("--essais", type=int, default=3)
     ap.add_argument("--sans-ia", action="store_true", help="règles seules")
+    ap.add_argument("--sites", help="sites vérifiés : sortie de scripts/audit_scraper.py mesure")
+    ap.add_argument("--verifier-sites", action="store_true", help="chercher et vérifier les sites (réseau)")
     args = ap.parse_args(argv)
-    from shared.validation_emails import ECARTE, VALIDE, classer, site_fiable
+    from shared.validation_emails import ECARTE, VALIDE, classer
     ref = lire_json(args.reference)
     lignes = [x for x in ref.get("emails", []) if x.get("attendu_valide") is not None]
     if not lignes:
@@ -65,20 +94,21 @@ def main(argv=None) -> int:
         groupes[x.get("entreprise_id") or f"{x['entreprise']}|{x.get('site_web')}"].append(x)
     attendu = {x["email"].lower(): bool(x["attendu_valide"]) for x in lignes}
 
+    verifies = sites_verifies(args, groupes)
     regles, a_juger = {}, []
-    for g in groupes.values():
-        site = domaine(g[0].get("url_scrapee") or g[0].get("site_web"))
+    for cle, g in groupes.items():
+        site = verifies.get(cle)
         nom = g[0]["entreprise"]
-        fiable = site_fiable(site, nom)
         douteuses = []
         for x in g:
-            decision, raison = classer(x["email"], site, fiable)
+            decision, raison = classer(x["email"], site, verifie=bool(site))
             regles[x["email"].lower()] = {"decision": decision, "raison": raison}
             if decision not in (VALIDE, ECARTE):
                 douteuses.append(x)
         if douteuses:
             a_juger.append((nom, site, douteuses, [x["email"] for x in g if regles[x["email"].lower()]["decision"] == VALIDE]))
     sortie = {"le": maintenant(), "adresses": len(lignes), "entreprises": len(groupes),
+              "sites_verifies": {str(k): v for k, v in verifies.items()},
               "regles": {"detail": regles,
                          "matrice_regles_seules": matrice({a: r["decision"] == VALIDE for a, r in regles.items()}, attendu)},
               "essais": []}

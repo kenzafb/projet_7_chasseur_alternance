@@ -257,8 +257,11 @@ def test_analyse_automatique_apres_la_recherche(recherche, ia):
     assert recherche.client.get("/api/profil").json()["analyse_auto"] is True
     ia.reponse = analyse(9)
     recherche.lancer()
-    attendre(lambda: not commun.pipelines.etat("analyse", recherche.user_id)["en_cours"])
-    assert compter_en_attente(recherche.user_id, "alternance") == 0
+    # L'analyse démarre à la fin de la recherche, dans son propre fil : attendre
+    # qu'elle ait vidé la file, pas seulement qu'aucune ne tourne (elle peut
+    # ne pas avoir encore démarré)
+    attendre(lambda: compter_en_attente(recherche.user_id, "alternance") == 0
+             and not commun.pipelines.etat("analyse", recherche.user_id)["en_cours"])
     assert len(ia.appels) == 3
     assert "(automatique après la recherche)" in recherche.client.get("/api/logs").text
 

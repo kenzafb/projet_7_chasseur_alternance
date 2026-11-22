@@ -180,3 +180,28 @@ def enregistrer_lettre_pdf(user_id: int, ref_offre: str, fichier: str, mode: str
         return ancien
     finally:
         db.close()
+
+
+def sites_des_offres(user_id: int, db=None) -> dict[str, list[str]]:
+    """{nom d'entreprise normalisé: [sites]} lus dans les offres de
+    l'utilisateur (ligne « Site de l'entreprise : » des offres France
+    Travail et LBA), tous modes : source du scraper des spontanées (D160)."""
+    import re
+    from shared.offres import LIGNE_SITE
+    from spontanees.site_officiel import nom_normalise
+    motif = re.compile(re.escape(LIGNE_SITE) + r"(\S+)")
+    propre = db is None
+    db = db or SessionLocal()
+    try:
+        out = {}
+        for nom, description in (db.query(Candidature.entreprise, Candidature.description)
+                                 .filter(Candidature.user_id == user_id,
+                                         Candidature.description.contains(LIGNE_SITE))):
+            cle = nom_normalise(nom or "")
+            for url in motif.findall(description or ""):
+                if cle and lien_http(url) and url not in out.setdefault(cle, []):
+                    out[cle].append(url)
+        return out
+    finally:
+        if propre:
+            db.close()

@@ -1,37 +1,45 @@
 """
-scraper_emails.py v15
-=====================
-Corrections v15 :
-  - FIX 9 — Faux positifs déobfuscation : filtre les TLDs non standards
-    (He, His, Mr, She, With, In, As, You, The, Will, Here…) qui
-    apparaissaient quand la regex "at" attrapait du texte normal comme
-    "positions at Alcatel. He..." → positions@Alcatel.He.
-  - FIX 10 — Emails inutiles pour le recrutement : dpo@, gdpr@, ir@,
-    media@, press@, privacy@, legal@, webmaster@, investor@ sont désormais
-    scorés à 0 et exclus du résultat final.
-  - FIX 11 — Retry non fiable : si la deuxième recherche DDG retourne la
-    même URL que celle qui a échoué, on ne retente pas et on marque
-    l'entreprise comme non fiable directement.
-  - FIX 12 — Troncature texte IA à 2000 chars et HTML contact à
-    3000 chars pour éviter les dépassements de rate limit.
-  - Tous les correctifs v14 conservés.
+spontanees/recherche_emails.py
+==============================
+Étape « Trouver leurs emails » des candidatures spontanées (phase 15) :
+
+  1. site de l'entreprise identifié et vérifié (spontanees/site_officiel.py,
+     D160) : site fourni par La Bonne Alternance, site donné par une offre
+     France Travail ou LBA, puis recherche web (DuckDuckGo) ; retenu
+     seulement si le SIREN ou le nom de l'entreprise y figure, sinon « site
+     non vérifié » et aucun email gardé ;
+  2. lecture du site vérifié (spontanees/lecture_site.py, D161) : pages
+     choisies parmi les liens réels de l'accueil et du sitemap (contact,
+     mentions légales, recrutement, carrières, à propos), robots.txt
+     respecté, au plus lecture_site.MAX_PAGES pages ; formulaires de contact
+     relevés ;
+  3. adresses lues dans les pages (regex, déobfuscation), puis triées
+     (shared/validation_emails.py, D162) : domaine du site vérifié exigé,
+     sauf messagerie grand public trouvée sur le site ; IA seulement pour
+     les douteuses.
+
+Corrections reprises des versions précédentes : faux TLD de la
+déobfuscation (FIX 9), adresses inutiles au recrutement (FIX 10).
 """
 
 import re
 import time
 import os
 import random
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urlparse
 
-import requests
 
 from shared.emails_exclus import email_exclu
 from bs4 import BeautifulSoup
 from ddgs import DDGS
 from ddgs.exceptions import RatelimitException
 from shared.config import MESSAGE_IA_DESACTIVEE, analyse_ia_active, modele_ia
-from shared.validation_emails import emails_douteux, emails_valides, trier
+from shared.validation_emails import emails_douteux, emails_valides, site_verifie, trier
+from database.candidatures_db import sites_des_offres
+from database.dates import maintenant_utc
 from database.entreprises_db import a_scraper, lire_entreprises, sauvegarder_enrichissement
+from spontanees.lecture_site import MAX_PAGES, categorie, formulaires, liens_du_sitemap, liens_utiles
+from spontanees.site_officiel import SOURCES, domaine_interdit, identifier
 from shared.journal import journaliser
 from shared.modes import MODE_DEFAUT
 
@@ -46,35 +54,6 @@ PAUSE_LONGUE_N   = 15
 PAUSE_LONGUE     = 45
 PAUSE_RATELIMIT  = 90
 
-PAGES_CONTACT = [
-    "/contact", "/contact/",
-    "/contacts", "/contacts/",
-    "/nous-contacter", "/nous-contacter/",
-    "/contactez-nous", "/contactez-nous/",
-    "/recrutement", "/recrutement/",
-    "/recrutements", "/recrutements/",
-    "/rejoindre-nous", "/rejoindre-nous/",
-    "/nous-rejoindre", "/nous-rejoindre/",
-    "/carrieres", "/carrieres/",
-    "/carrières", "/carrières/",
-    "/careers", "/careers/",
-    "/career", "/career/",
-    "/jobs", "/jobs/",
-    "/offres", "/offres/",
-    "/offres-emploi", "/offres-emploi/",
-    "/offres-d-emploi", "/offres-d-emploi/",
-    "/rh", "/rh/",
-    "/ressources-humaines", "/ressources-humaines/",
-    "/equipe", "/equipe/",
-    "/team", "/team/",
-    "/about", "/about/",
-    "/a-propos", "/a-propos/",
-    "/qui-sommes-nous", "/qui-sommes-nous/",
-    "/apropos", "/apropos/",
-    "/footer", "/footer/",
-    "/mentions-legales", "/mentions-legales/",
-]
-
 PREFIXES_RH      = ["recrutement", "rh", "alternance", "stage", "emploi", "jobs", "career", "cv"]
 PREFIXES_CONTACT = ["contact", "info", "accueil", "administration", "bonjour", "hello"]
 
@@ -88,57 +67,6 @@ DOMAINES_IGNORES = {
     "example.com", "test.com", "sentry.io", "github.com", "w3.org",
     "google.com", "linkedin.com", "facebook.com", "twitter.com",
     "societe.com", "pappers.fr", "infogreffe.fr", "verif.com",
-}
-
-DOMAINES_ANNUAIRES = {
-    # ── Registres légaux / financiers ──────────────────────────────────────
-    "societe.com", "pappers.fr", "infogreffe.fr", "verif.com",
-    "manageo.fr", "sirene.fr", "annuaire-entreprises.data.gouv.fr",
-    "kompass.com", "europages.fr", "infonet.fr", "societe.ninja",
-    "dirigeant.fr", "corporama.com", "annuairefrancais.fr",
-    "societe-info.com", "bilan-gratuit.fr", "kaspr.io",
-    "francebilan.fr",
-    "bodacc.fr", "legifrance.gouv.fr", "journal-officiel.gouv.fr",
-    "data.gouv.fr", "echanges.dila.gouv.fr",
-    "juripresse.fr", "mesinfos.fr", "repreneurs.com",
-    "infranat.fr", "annonces-legales.fr", "societe-juridique.fr",
-    # ── Réseaux sociaux / pro ───────────────────────────────────────────────
-    "linkedin.com", "viadeo.com", "xing.com",
-    "youtube.com", "instagram.com", "twitter.com", "facebook.com", "tiktok.com",
-    "wikipedia.org", "wikimedia.org",
-    # ── Emploi / recrutement ────────────────────────────────────────────────
-    "leboncoin.fr", "indeed.fr", "indeed.com", "welcometothejungle.com",
-    "francetravail.fr", "pole-emploi.fr", "apec.fr",
-    "cadremploi.fr", "meteojob.com", "jobijoba.com", "monster.fr",
-    "regionsjob.com", "hellowork.com", "l-expert-comptable.com",
-    "studyrama.com", "letudiant.fr", "alternance.emploi.gouv.fr",
-    "jobteaser.com", "stagefr.com", "choosemycompany.com",
-    "glassdoor.com", "glassdoor.fr", "jobboard.io",
-    "optioncarriere.com", "emploi-collectivites.fr",
-    "talent.io", "welcomejungle.com",
-    # ── Sites éducatifs / formation ─────────────────────────────────────────
-    "axamformation.fr", "ecoleinformatiqueinfo.com",
-    "polytech-angers.fr", "education.gouv.fr", "onisep.fr",
-    # ── Cartographie / annuaires locaux ────────────────────────────────────
-    "mappy.com", "mappy.fr", "pages-jaunes.fr", "pagesjaunes.fr",
-    "yelp.com", "tripadvisor.fr",
-    "annuaire.laposte.fr", "118000.fr", "118712.fr",
-    "association.tel", "fr.mappy.com",
-    # ── Médias / divers ────────────────────────────────────────────────────
-    "lefigaro.fr", "capital.fr", "bfmtv.com", "lemonde.fr",
-    "ameli.fr", "baidu.com", "ecdc.europa.eu",
-    "rs-online.com", "skybet.com",
-    "calameo.com", "hal.science", "pastel.hal.science",
-    "scribd.com", "slideshare.net", "issuu.com",
-    # ── Sites collectivités / services publics ──────────────────────────────
-    "gagny.fr", "ville-sevran.fr", "plainecommune.fr", "seine-et-marne.fr",
-    # ── Hébergeurs de blogs / sites génériques ─────────────────────────────
-    "blogspot.com", "wordpress.com", "over-blog.com", "overblog.com",
-    "wixsite.com", "jimdo.com", "webnode.fr", "e-monsite.com",
-    "cataloxy.org", "b2bhint.com", "cylex-locale.fr", "infobel.com",
-    "northdata.de", "rubypayeur.com", "entreprises.lefigaro.fr",
-    # ── Divers catch-all ────────────────────────────────────────────────────
-    "informatique.e-pro.fr",
 }
 
 # FIX 9 — TLDs qui ne sont pas de vrais TLDs (mots anglais courants)
@@ -226,13 +154,8 @@ def meme_site(url1, url2):
 
 
 def est_annuaire(domaine):
-    parent = domaine_parent(domaine)
-    for annuaire in DOMAINES_ANNUAIRES:
-        if annuaire == domaine or annuaire == parent:
-            return True
-        if domaine.endswith("." + annuaire):
-            return True
-    return False
+    """Domaine interdit comme site d'entreprise (shared/referentiels/domaines_interdits.txt, D160)."""
+    return domaine_interdit(domaine)
 
 
 # ─── Validation / scoring emails ─────────────────────────────────────────────
@@ -441,248 +364,111 @@ def construire_requetes(entreprise, analyse):
 
 # ─── DuckDuckGo ──────────────────────────────────────────────────────────────
 
-def chercher_site_duckduckgo(entreprise, url_exclue=None):
-    """FIX 11 : url_exclue permet d'ignorer une URL déjà échouée au retry."""
-    nom      = entreprise.get("nom_commercial") or entreprise.get("nom", "")
-    analyse  = analyser_nom(nom)
-    requetes = construire_requetes(entreprise, analyse)
-
-    if DEBUG:
-        journaliser(f"    🔎 Analyse nom : mots={analyse['mots']} | acronyme={analyse['acronyme']} | ambigu={'oui' if (len(analyse['mots']) <= 1 or all(len(m) < 5 for m in analyse['mots'])) else 'non'}")
-        if url_exclue:
-            journaliser(f"    🚫 URL exclue (déjà non fiable) : {url_exclue}")
-
-    for i, requete in enumerate(requetes, 1):
-        dbg(f"┌─ Requête DDG [{i}/{len(requetes)}] : {requete}")
+def _resultats_ddg(requete):
+    """Résultats d'une requête DuckDuckGo ({href, title, body}), une nouvelle
+    tentative après un refus pour excès de requêtes."""
+    for essai in (1, 2):
         try:
             pause_ddg()
             with DDGS() as ddg:
-                resultats = list(ddg.text(requete, max_results=10))
-
-            if not resultats:
-                dbg("│  (aucun résultat DDG)")
-                continue
-
-            for r in resultats:
-                url = r.get("href", "")
-                if not url:
-                    continue
-                # FIX 11 — ignorer l'URL qui a déjà échoué
-                if url_exclue and extraire_domaine(url) == extraire_domaine(url_exclue):
-                    dbg(f"│  🚫 {url[:80]}  [même domaine que l'URL exclue]")
-                    continue
-                valide, raison = est_url_valide(url, nom, analyse, strict=True)
-                dbg(f"│  {'✅' if valide else '✗ '} {url[:80]}  [{raison}]")
-                if valide:
-                    dbg("└─ → SÉLECTIONNÉ")
-                    return url
-
-            dbg("└─ (aucune URL valide)")
-
+                return [r for r in ddg.text(requete, max_results=10) if r.get("href")]
         except RatelimitException:
+            if essai == 2:
+                return []
             journaliser(f"  [⚠️  Rate limit DDG — attente {PAUSE_RATELIMIT}s...]")
             time.sleep(PAUSE_RATELIMIT)
-            try:
-                with DDGS() as ddg:
-                    resultats = list(ddg.text(requete, max_results=10))
-                for r in resultats:
-                    url = r.get("href", "")
-                    if not url:
-                        continue
-                    if url_exclue and extraire_domaine(url) == extraire_domaine(url_exclue):
-                        continue
-                    if est_url_valide(url, nom, analyse, strict=True)[0]:
-                        return url
-            except Exception:
-                pass
         except Exception as e:
             dbg(f"DDG erreur : {e}")
-
-    return None
-
-
-def chercher_site(entreprise, url_exclue=None):
-    url = chercher_site_duckduckgo(entreprise, url_exclue=url_exclue)
-    if url:
-        dbg(f"Site via DDG : {url}")
-        return url, "ddg"
-    return None, None
+            return []
+    return []
 
 
-# ─── Scraping HTTP ────────────────────────────────────────────────────────────
-
-def get_page(url, timeout=8):
-    try:
-        r = requests.get(url, headers=HEADERS, timeout=timeout, allow_redirects=True)
-        if r.status_code < 400 and "text/html" in r.headers.get("content-type", ""):
-            return r.text, r.url
-    except Exception:
-        pass
-    return None, None
-
-
-def html_vers_texte(html):
-    soup = BeautifulSoup(html, "html.parser")
-    for tag in soup(["script", "style", "nav", "footer", "header"]):
-        tag.decompose()
-    return soup.get_text(separator="\n", strip=True)
+def resultat_pertinent(resultat: dict, entreprise: dict, analyse: dict) -> bool:
+    """Un résultat de recherche vaut d'être vérifié si son domaine ressemble au
+    nom, ou si son titre ou son extrait cite le nom (ou le SIREN) : les
+    résultats sans rapport (moteur dégradé : jeux, paroles, films) ne coûtent
+    pas de vérification."""
+    if domaine_correspond(extraire_domaine(resultat.get("href", "")), analyse)[0]:
+        return True
+    from spontanees.site_officiel import simplifier, variantes_du_nom
+    texte = f" {simplifier(resultat.get('title', '') + ' ' + resultat.get('body', ''))} "
+    siren = entreprise.get("siren") or ""
+    return any(f" {v} " in texte for v in variantes_du_nom(entreprise)) or bool(siren and siren in texte.replace(" ", ""))
 
 
-def trouver_liens_contact(soup, base_url):
-    liens = set()
-    mots_cles = [
-        "contact", "recrutement", "carriere", "carrieres", "emploi",
-        "job", "jobs", "rejoindre", "rh", "about", "equipe", "team",
-        "alternance", "stage", "nous-rejoindre",
-    ]
-    for a in soup.find_all("a", href=True):
-        href       = a["href"].strip()
-        texte      = a.get_text(strip=True).lower()
-        href_lower = href.lower()
-        if href.startswith(("#", "mailto:", "tel:", "javascript:")):
-            continue
-        if any(href_lower.endswith(ext) for ext in (".pdf", ".jpg", ".png", ".zip")):
-            continue
-        if any(m in href_lower for m in mots_cles) or any(m in texte for m in mots_cles):
-            lien = urljoin(base_url, href)
-            if meme_site(lien, base_url):
-                liens.add(lien)
-    return list(liens)[:8]
+def urls_recherche(entreprise):
+    """URLs candidates proposées par la recherche web, requête après requête
+    (générateur : les requêtes suivantes ne partent que si besoin), seulement
+    les résultats pertinents (resultat_pertinent), ceux dont le domaine
+    ressemble au nom d'abord. Le site n'est retenu qu'après vérification
+    (spontanees/site_officiel.py)."""
+    nom = entreprise.get("nom_commercial") or entreprise.get("nom", "")
+    analyse = analyser_nom(nom)
+    for requete in construire_requetes(entreprise, analyse):
+        dbg(f"Requête DDG : {requete}")
+        resultats = [r for r in _resultats_ddg(requete) if est_url_valide(r["href"], nom, analyse, strict=False)[0]
+                     and resultat_pertinent(r, entreprise, analyse)]
+        resultats.sort(key=lambda r: not domaine_correspond(extraire_domaine(r["href"]), analyse)[0])
+        yield from (r["href"] for r in resultats)
 
 
-def lire_sitemap(url_racine):
-    mots_contact  = ["contact", "recrutement", "rh", "carriere", "emploi", "rejoindre", "alternance"]
-    urls_trouvees = []
-    for chemin in ["/sitemap.xml", "/sitemap_index.xml", "/sitemap/"]:
-        try:
-            r = requests.get(urljoin(url_racine, chemin), headers=HEADERS, timeout=5, allow_redirects=True)
-            if r.status_code != 200:
-                continue
-            locs = re.findall(r'<loc>(.*?)</loc>', r.text, re.IGNORECASE)
-            for loc in locs:
-                loc = loc.strip()
-                if meme_site(loc, url_racine) and any(m in loc.lower() for m in mots_contact):
-                    urls_trouvees.append(loc)
-            if urls_trouvees:
-                dbg(f"Sitemap → {len(urls_trouvees)} pages contact")
-                break
-        except Exception:
-            pass
-    return urls_trouvees[:5]
+# ─── Lecture du site vérifié ──────────────────────────────────────────────────
 
-
-def meilleurs_emails(emails):
-    """Emails valides et utiles au recrutement, les 5 mieux notés."""
+def meilleurs_emails(emails, domaine=None):
+    """Emails valides et utiles au recrutement, les 5 meilleurs : ceux du
+    domaine du site d'abord, puis par préfixe (recrutement, contact...)."""
     valides = [e for e in emails if est_email_valide(e)]
     # FIX 10 — exclure les emails scorés à 0 (inutiles pour le recrutement)
     valides = [e for e in valides if scorer_email(e) > 0]
-    return sorted(dict.fromkeys(valides), key=scorer_email, reverse=True)[:5]
+    parent = domaine_parent(domaine) if domaine else None
+    return sorted(dict.fromkeys(valides),
+                  key=lambda e: (domaine_parent(e.split("@")[-1]) == parent, scorer_email(e)), reverse=True)[:5]
 
 
-def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
-    """Emails d'une entreprise, lus directement dans ses pages (regex,
-    déobfuscation), puis triés (shared/validation_emails.py) : règles
-    d'abord, l'IA (ia=True) seulement pour les adresses douteuses. Retourne
-    "emails" (validées puis douteuses), "douteux", "contextes" (texte autour
-    des douteuses), "ecartes" ; une erreur de l'IA est signalée dans
-    "ia_bloquee" ou "erreur_ia" (message) au lieu d'être levée, les adresses
-    concernées restent douteuses."""
-    url_site = url_site.strip().rstrip("/")
-    if not url_site.startswith("http"):
-        url_site = "https://" + url_site
+ORDRE_PAGES = ("contact", "recrutement", "mentions", "a_propos")
 
-    parsed     = urlparse(url_site)
-    url_racine = f"{parsed.scheme}://{parsed.netloc}"
-    domaine    = extraire_domaine(url_site)
 
-    tous_emails_bruts = []
-    pages_texte       = []
-    mots_prio         = ["contact", "recrutement", "rh", "emploi", "carriere", "alternance"]
+def pages_a_lire(verification) -> list[str]:
+    """Pages utiles du site, liens réels de l'accueil puis du sitemap, par
+    catégorie (contact, recrutement et carrières, mentions légales, à propos)."""
+    accueil, html = next(iter(verification.pages.items()))
+    liens = liens_utiles(html, accueil)
+    plan = liens_du_sitemap(verification.lecteur)
+    ordre = []
+    for cat in ORDRE_PAGES:
+        for url in liens[cat][:2] + plan[cat][:2]:
+            if url not in ordre and url not in verification.pages:
+                ordre.append(url)
+    return ordre
 
-    if url_racine != url_site:
-        dbg(f"Sous-page → scrape racine : {url_racine}")
-        html_r, _ = get_page(url_racine)
-        if html_r:
-            tous_emails_bruts.extend(extraire_emails_html(html_r, domaine))
-            pages_texte.append(html_vers_texte(html_r))
 
-    if est_sous_domaine(domaine):
-        parent_domaine = domaine_parent(domaine)
-        url_parent     = f"{parsed.scheme}://{parent_domaine}"
-        dbg(f"Sous-domaine → scrape parent : {url_parent}")
-        html_parent, _ = get_page(url_parent)
-        if html_parent:
-            tous_emails_bruts.extend(extraire_emails_html(html_parent, parent_domaine))
-            pages_texte.append(html_vers_texte(html_parent))
-            soup_parent  = BeautifulSoup(html_parent, "html.parser")
-            liens_parent = trouver_liens_contact(soup_parent, url_parent)
-            for lien in liens_parent[:4]:
-                time.sleep(random.uniform(0.5, 1.0))
-                html_lp, _ = get_page(lien)
-                if html_lp:
-                    tous_emails_bruts.extend(extraire_emails_html(html_lp, parent_domaine))
-                    if any(m in lien.lower() for m in mots_prio):
-                        pages_texte.insert(0, html_vers_texte(html_lp))
-
-    html, url_finale = get_page(url_site)
-    if not html:
-        alt = url_site.replace("://www.", "://") if "://www." in url_site \
-              else url_site.replace("://", "://www.")
-        html, url_finale = get_page(alt)
-
-    if not html and not pages_texte:
-        return {"emails": [], "douteux": [], "contextes": {}, "ecartes": [], "telephones": [],
-                "contact_rh": None, "url_finale": None, "fiable": True}
-
-    vus = {url_racine, url_site, url_finale or url_site}
-
-    if html:
-        soup  = BeautifulSoup(html, "html.parser")
-        tous_emails_bruts.extend(extraire_emails_html(html, domaine))
-        base  = url_finale or url_site
-        liens = list(set(trouver_liens_contact(soup, base) + lire_sitemap(url_racine)))
-        pages_texte.insert(0, html_vers_texte(html))
-    else:
-        dbg("URL principale sans HTML → sitemap seulement")
-        liens = lire_sitemap(url_racine)
-
-    for chemin in PAGES_CONTACT:
-        liens.append(urljoin(url_racine, chemin))
-
-    for lien in liens[:20]:
-        if lien in vus:
-            continue
-        vus.add(lien)
-        time.sleep(random.uniform(0.6, 1.5))
-        html_page, _ = get_page(lien)
-        if html_page:
-            e_page = extraire_emails_html(html_page, domaine)
-            tous_emails_bruts.extend(e_page)
-            if any(m in lien.lower() for m in mots_prio):
-                pages_texte.insert(0, html_vers_texte(html_page))
-
-    for chemin_ml in ["/mentions-legales", "/mentions-legales/",
-                       "/mentions-legales.html", "/legal", "/legal/"]:
-        lien_ml = urljoin(url_racine, chemin_ml)
-        if lien_ml in vus:
-            continue
-        vus.add(lien_ml)
-        time.sleep(random.uniform(0.6, 1.5))
-        html_ml, _ = get_page(lien_ml)
-        if html_ml:
-            emails_ml = extraire_emails_html(html_ml, domaine)
-            if emails_ml:
-                dbg(f"Emails mentions-légales : {emails_ml}")
-                tous_emails_bruts.extend(emails_ml)
-            pages_texte.insert(0, html_vers_texte(html_ml))
+def scraper_et_extraire(verification, nom_entreprise, dirigeant=None, ia=True):
+    """Emails d'une entreprise au site vérifié (spontanees/site_officiel.py) :
+    pages déjà lues pour la vérification, puis pages utiles du site dans la
+    limite du lecteur (robots.txt, MAX_PAGES), adresses triées
+    (shared/validation_emails.py) : règles d'abord, l'IA (ia=True) seulement
+    pour les douteuses. Retourne "emails" (validées puis douteuses),
+    "douteux", "contextes", "ecartes", "formulaires" (contact ou
+    candidature), le journal de lecture ; une erreur de l'IA est signalée
+    dans "ia_bloquee" ou "erreur_ia" au lieu d'être levée."""
+    lecteur, pages = verification.lecteur, dict(verification.pages)
+    for url in pages_a_lire(verification):
+        if lecteur.reste <= 0:
             break
-
-    emails_bruts_uniques = list(set(tous_emails_bruts))
-    dbg(f"Emails bruts : {emails_bruts_uniques}")
-
-    # Règles d'abord, IA pour les seules adresses douteuses
-    tri = trier(meilleurs_emails(emails_bruts_uniques), extraire_domaine(url_finale or url_site),
-                nom_entreprise, "\n\n".join(pages_texte), ia=ia, log=dbg)
+        html, finale = lecteur.lire(url)
+        if html:
+            pages[finale or url] = html
+    domaine = verification.domaine
+    bruts, textes, formes = [], [], {}
+    for url, html in pages.items():
+        bruts.extend(extraire_emails_html(html, domaine))
+        texte = html_vers_texte(html)
+        textes.insert(0, texte) if categorie(url) in ("contact", "recrutement") else textes.append(texte)
+        for f in formulaires(html, url):
+            formes.setdefault(f["page"], f)
+    dbg(f"Emails bruts : {sorted(set(bruts))}")
+    tri = trier(meilleurs_emails(list(set(bruts)), domaine), domaine, nom_entreprise, "\n\n".join(textes),
+                ia=ia, log=dbg, verifie=True)
     resultat = {
         "emails":     tri["valides"] + tri["douteux"],
         "douteux":    tri["douteux"],
@@ -693,8 +479,11 @@ def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
         "ecartes_ia": tri["ecartes_ia"],
         "telephones": [],
         "contact_rh": None,
-        "url_finale": url_finale or url_racine,
-        "fiable":     True,
+        "url_finale": next(iter(pages)),
+        "formulaires": list(formes.values()),
+        "pages_lues": [u for u, _ in lecteur.lues],
+        "interdites_robots": list(lecteur.interdites),
+        "robots": lecteur.robots,
     }
     for cle in ("ia_bloquee", "erreur_ia"):
         if cle in tri:
@@ -702,12 +491,22 @@ def scraper_et_extraire(url_site, nom_entreprise, dirigeant=None, ia=True):
     return resultat
 
 
+def html_vers_texte(html):
+    soup = BeautifulSoup(html, "html.parser")
+    for tag in soup(["script", "style", "nav", "footer", "header"]):
+        tag.decompose()
+    return soup.get_text(separator="\n", strip=True)
+
+
 # ─── Chargement / sauvegarde ──────────────────────────────────────────────────
 
 def _sans_resultat(e: dict):
-    """Entreprise dont aucun site fiable n'a été trouvé : rien de gardé,
-    traitée (le scraper n'y revient pas)."""
+    """Entreprise sans site vérifié : rien de gardé, traitée (le scraper n'y
+    revient pas)."""
     e["emails_trouves"] = []
+    e["emails_douteux"] = []
+    e["emails_non_valides"] = False
+    e["formulaires_contact"] = []
     e["telephones"] = []
     e["telephone"] = None
     e["contact_rh"] = None
@@ -736,7 +535,8 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
     _log = log_fn or journaliser
     ia_configuree = analyse_ia_active()   # ANALYSE_IA=false : lecture directe seulement
     modele = modele_ia("extraction") if ia_configuree else "désactivée"
-    _log(f"Scraper Emails v15 | IA pour les emails douteux = {modele} | Moteur = DDG")
+    _log(f"Trouver leurs emails | IA pour les emails douteux = {modele} | site vérifié (SIREN ou nom) exigé "
+         f"| au plus {MAX_PAGES} pages par site, robots.txt respecté")
     if DEBUG:
         _log("  [Mode DEBUG activé — logs DDG détaillés]")
 
@@ -760,14 +560,15 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
         return
 
     traites_ce_run = 0
+    sites_offres = sites_des_offres(user_id)   # sites donnés par les offres France Travail et LBA
     # Coupée pour tout le lancement sur une erreur bloquante de l'IA, ou d'emblée sans IA
     ia_active = ia_configuree
     if not ia_configuree:
         _log(f"ℹ️  {MESSAGE_IA_DESACTIVEE} Emails validés par les règles seules, les douteux restent non validés.")
 
-    def extraire(url, nom, dirigeant):
+    def extraire(verification, nom, dirigeant):
         nonlocal ia_active
-        resultat = scraper_et_extraire(url, nom, dirigeant=dirigeant, ia=ia_active)
+        resultat = scraper_et_extraire(verification, nom, dirigeant=dirigeant, ia=ia_active)
         if resultat.get("ia_bloquee") and ia_active:
             ia_active = False   # un seul message, pas un par entreprise
             _log(f"❌ IA indisponible : {resultat['ia_bloquee']} Suite du lancement sans IA : "
@@ -795,53 +596,22 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
                 pct = round(fait / len(a_traiter) * 100)
                 on_progress(min(pct, 100), f"{fait}/{len(a_traiter)} entreprises analysées")
 
-            url         = e.get("site_web")
-            source_site = "existant"
-
-            if not url:
-                url, source_site = chercher_site(e)
-                if url:
-                    e["site_web"] = url
-                    _log(f"  🌐 {url} [{source_site}]")
-                else:
-                    _log("  ❌ Site introuvable")
-                    e["emails_trouves"] = []
-                    e["telephones"]     = []
-                    e["telephone"]      = None
-                    e["contact_rh"]     = None
-                    e["traite"]         = True
-                    traites_ce_run += 1
-                    continue
-
-            resultat = extraire(url, nom, dirigeant)
-
-            if not resultat.get("fiable", True):
-                tentatives = e.get("tentatives_site", 0)
-                if tentatives < 2:
-                    _log(f"  ⚠️  Site non fiable — retry ({tentatives + 1}/2)")
-                    url_echouee = url   # FIX 11 — mémoriser l'URL qui a échoué
-                    e["site_web"]        = None
-                    e["tentatives_site"] = tentatives + 1
-                    # FIX 11 — passer url_echouee pour l'exclure de la recherche
-                    url, source_site = chercher_site(e, url_exclue=url_echouee)
-                    if url:
-                        e["site_web"] = url
-                        resultat = extraire(url, nom, dirigeant)
-                        if not resultat.get("fiable", True):
-                            _log("  ❌ Toujours non fiable")
-                            _sans_resultat(e)
-                            traites_ce_run += 1
-                            continue
-                    else:
-                        _log("  ❌ Aucune nouvelle URL")
-                        _sans_resultat(e)
-                        traites_ce_run += 1
-                        continue
-                else:
-                    _log(f"  ❌ Non fiable après {tentatives} tentatives")
-                    _sans_resultat(e)
-                    traites_ce_run += 1
-                    continue
+            verification, essais = identifier(e, sites_offres, recherche=urls_recherche,
+                                              log=_log if DEBUG else None)
+            e["essais_site"] = essais[-6:]
+            if verification is None:
+                _log(f"  ❌ Site non vérifié ({len(essais)} essayé(s)) : aucun email gardé")
+                _sans_resultat(e)
+                # Écrit même vide (une valeur None ne le serait pas) : l'interface dit « site non vérifié »
+                e["site_verifie"] = {"verifie": False, "essais": len(essais),
+                                     "le": maintenant_utc().isoformat(timespec="seconds")}
+                traites_ce_run += 1
+                continue
+            e["site_web"] = verification.url
+            e["site_verifie"] = {**verification.resume(), "le": maintenant_utc().isoformat(timespec="seconds")}
+            _log(f"  🌐 {verification.url} [{SOURCES[verification.source]}, {verification.detail}]")
+            resultat = extraire(verification, nom, dirigeant)
+            source_site = verification.source
 
             emails     = resultat["emails"]
             douteux    = resultat.get("douteux", [])
@@ -868,8 +638,11 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
             e["meilleur_contact"] = resultat.get("meilleur_contact")
             e["validation_emails"] = resultat.get("provenance", {})
             e["emails_ecartes_ia"] = resultat.get("ecartes_ia", [])
-            e["url_scrapee"]      = resultat.get("url_finale") or url
+            e["url_scrapee"]      = resultat.get("url_finale") or verification.url
             e["source_recherche"] = source_site
+            e["formulaires_contact"] = resultat.get("formulaires", [])
+            if e["formulaires_contact"] and not emails:
+                _log(f"  📝 Formulaire de contact : {e['formulaires_contact'][0]['page']}")
             e["traite"]           = True
             traites_ce_run += 1
 
@@ -886,7 +659,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
     sauvegarder(user_id, entreprises)
     avec_email = sum(1 for e in entreprises if e.get("emails_trouves"))
     _log(f"✅ Scraping terminé — {avec_email}/{total} avec email")
-    _log(f"   DDG : {_compteur_ddg} requêtes")
+    _log(f"   Recherche web : {_compteur_ddg} requêtes")
 
 
 def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=None, mode=MODE_DEFAUT):
@@ -912,12 +685,10 @@ def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=Non
         nom = (e.get("nom_commercial") or e.get("nom", "?"))[:50]
         if on_progress:
             on_progress(round(i / len(cibles) * 100), f"{i}/{len(cibles)} entreprises revalidées")
-        site = e.get("site_web") or e.get("url_scrapee") or ""
-        if site and "://" not in site:
-            site = "https://" + site
+        site = site_verifie(e)   # domaine du site vérifié (D160), None sinon : tout est écarté
         deja = emails_valides(e)
-        tri = trier(emails_douteux(e), extraire_domaine(site) if site else None, nom, ia=True,
-                    contextes=e.get("contextes_emails"), deja_valides=deja)
+        tri = trier(emails_douteux(e), site, nom, ia=True,
+                    contextes=e.get("contextes_emails"), deja_valides=deja, verifie=bool(site))
         e["emails_trouves"]     = deja + tri["valides"] + tri["douteux"]
         e["emails_douteux"]     = tri["douteux"]
         e["contextes_emails"]   = tri["contextes"]

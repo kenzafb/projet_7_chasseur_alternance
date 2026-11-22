@@ -48,7 +48,7 @@ from shared.config import DEPTS_IDF, DEPTS_PETITE_COURONNE, LBA_CENTRES, LBA_RAY
 from shared.criteres import normaliser_recherche
 from shared.domaines import codes_metiers, domaines_du_profil
 from shared.niveaux import NIVEAUX, niveau_europeen
-from shared.offres import detecter_zone, generer_id
+from shared.offres import LIGNE_SITE, detecter_zone, generer_id
 from shared.tailles import SANS_SALARIE, garder_selon_taille, taille_depuis_tranche
 from shared.journal import journaliser
 
@@ -119,7 +119,8 @@ def _normaliser_offre_lba(offre: dict) -> dict | None:
         "domaine":      "Non analysé",
         "lien":         lien,
         "source":       "La Bonne Alternance",
-        "description":  (offer.get("description") or "")[:5000],
+        "description":  ((offer.get("description") or "")[:5000]
+                         + (f"\n{LIGNE_SITE}{site}" if (site := lien_http(workplace.get("website"))) else "")),
         "date_trouvee": instant_depuis_api((offer.get("publication") or {}).get("creation")),
         "score":        0,
         "lettre":       "",
