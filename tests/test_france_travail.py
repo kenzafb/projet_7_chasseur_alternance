@@ -313,3 +313,30 @@ def test_secteurs_par_paquets_de_deux(api):
     api.offres = [offre(1, secteur="62"), offre(2, secteur="68"), offre(3, secteur="86"), offre(4, secteur="47")]
     offres, log = recuperer(secteurs=["62", "68", "86"])
     assert sorted(o["id"] for o in offres) == ["FT1", "FT2", "FT3"] and "⚠️" not in log.texte()
+
+
+# ─── Lieu : région sans département (D153) ────────────────────────────────────
+@pytest.mark.parametrize("libelle, zone", [
+    ("75 - Paris 10e", "Paris"),
+    ("93 - Bobigny", "Petite couronne"),
+    ("77 - Meaux", "Grande couronne"),
+    ("Île-de-France", "Île-de-France (non précisé)"),
+    ("Ile-de-France", "Île-de-France (non précisé)"),
+    ("ILE-DE-FRANCE", "Île-de-France (non précisé)"),
+    ("Île-de-France - Télétravail à 100%", "Île-de-France (non précisé)"),
+    ("69 - Lyon", None),
+    ("Auvergne-Rhône-Alpes", None),
+    ("France", None),
+    ("", None),
+])
+def test_zone_du_lieu(libelle, zone):
+    from shared.offres import detecter_zone
+    assert detecter_zone(libelle) == zone
+
+
+def test_offre_de_la_region_sans_departement_gardee():
+    from tests.faux_france_travail import offre
+    o = offre(1)
+    o["lieuTravail"] = {"libelle": "Ile-de-France"}
+    n = scraper._normaliser_une(o)
+    assert (n["lieu"], n["zone"]) == ("Ile-de-France", "Île-de-France (non précisé)")
