@@ -26,7 +26,10 @@ secteurs choisis et transverses) et ses départements :
      l'information ;
   5. pagination : la plus grosse requête du plan est lue jusqu'au bout par
      la classe Collecte de l'application (curseur), puis par une boucle
-     indépendante ; total annoncé, lus, distincts, pages, condition d'arrêt.
+     indépendante ; total annoncé, lus, distincts, pages, condition d'arrêt ;
+  6. avant / après D159 : entreprises distinctes (SIREN) du plan avec
+     l'ancien filtre (sièges) et le nouveau (établissements actifs d'IDF),
+     part des administrations (catégorie juridique 7xxx), exemples gagnés.
 
 Documentation : API Sirene 3.11 sur portail-api.insee.fr (catalogue « API
 Sirene », pages « Requêtes multicritères », « Pagination par curseur ») ;
@@ -217,8 +220,42 @@ def auditer(args) -> dict:
                              "independant_distincts": len(vus), "doublons": sum(v - 1 for v in vus.values() if v > 1),
                              "pages": pages, "arret": fin}
         print(f"  pagination : annoncé {cible['total']}, application {n}, indépendant {len(vus)} ({fin})")
+    # 6. Avant / après D159 : sièges seulement contre établissements actifs d'IDF
+    res["avant_apres_D159"] = avant_apres(cle, plan, args.max_pagination)
     res["requetes"], res["duree_s"] = s.requetes, chrono.s
     return res
+
+
+def avant_apres(cle: str, plan, plafond_lecture: int) -> dict:
+    """Entreprises distinctes (SIREN) du plan de l'application, avec l'ancien
+    filtre (etablissementSiege:true) et le nouveau (D159), lues jusqu'au bout
+    par la Collecte de l'application ; part des administrations (7xxx)."""
+    avant_sirens, apres = set(), {}
+    lignes, collecte_apres = [], R.Collecte(cle, print)
+    for groupe, q in plan:
+        ancien = q.replace(P.FILTRE_ETABLISSEMENT, "etablissementSiege:true")
+        avant_c, avant_e = R.Collecte(cle, print), {}
+        avant_c.recuperer(ancien, avant_e, plafond_lecture)
+        avant_sirens |= {e["siren"] for e in avant_e.values()}
+        n = collecte_apres.recuperer(q, apres, len(apres) + plafond_lecture)
+        lignes.append({"groupe": groupe, "annonce_avant": avant_c.annonce, "entreprises_avant": len(avant_e),
+                       "etablissements_annonces_apres": collecte_apres.annonce, "nouvelles_apres": n})
+        print(f"  {groupe} : avant {len(avant_e)} entreprises, après {n} (établissements annoncés "
+              f"{collecte_apres.annonce})")
+    apres_sirens = {e["siren"] for e in apres.values()}
+    publiques = [e for e in apres.values() if R.est_administration(e)]
+    return {
+        "recherches": lignes, "plafond_de_lecture_par_recherche": plafond_lecture,
+        "entreprises_avant": len(avant_sirens), "entreprises_apres": len(apres_sirens),
+        "gagnees": len(apres_sirens - avant_sirens), "perdues": len(avant_sirens - apres_sirens),
+        "apres_par_un_etablissement_non_siege": sum(1 for e in apres.values() if not e.get("siege")),
+        "autres_etablissements_ignores": collecte_apres.autres_etablissements,
+        "fermes_ecartes": collecte_apres.fermes,
+        "administrations_7xxx": pourcentage(len(publiques), len(apres)),
+        "categories_juridiques": Counter(e.get("categorie_juridique", "")[:2] for e in apres.values()).most_common(15),
+        "exemples_administrations": [e["nom"] for e in publiques[:15]],
+        "exemples_gagnees": [f"{e['nom']} ({e['code_postal']})" for e in apres.values()
+                             if e["siren"] not in avant_sirens][:20]}
 
 
 def main(argv=None) -> int:

@@ -22,7 +22,11 @@ Sirene (SPEC_SOURCES section 4, phase 5d) :
   - la limite se remplit dans l'ordre du plan : cœurs, secteurs choisis,
     transverses seulement pour compléter, puis tous les secteurs ;
     répartition dans les logs ;
-  - sièges actifs ; nomenclature NAF de shared.config.nomenclature_naf ;
+  - établissements actifs situés dans les départements choisis, sièges ou
+    non (D159), une seule entrée par entreprise (SIREN) avec l'adresse de
+    l'établissement francilien (le siège s'il en est un) ; NAF, taille et
+    catégorie juridique de l'unité légale ; nomenclature NAF de
+    shared.config.nomenclature_naf ;
   - pagination par curseur, sans plafond de résultats ;
   - une entreprise déjà en base (même SIRET, LBA comprise) n'est pas
     dupliquée : Sirene ajoute seulement sa source.
@@ -105,7 +109,7 @@ def construire_query(codes, departements, variable_naf: str, filtre: str | None 
     (« tous les secteurs »), sauf exclus, exclusion en ET (jamais dans un OU)."""
     activite = _ou(variable_naf, codes) if codes is not None else (
         f"-{_ou(variable_naf, sorted(exclus))}" if exclus else None)
-    clauses = ["etablissementSiege:true", "etatAdministratifUniteLegale:A", activite,
+    clauses = [P.FILTRE_ETABLISSEMENT, "etatAdministratifUniteLegale:A", activite,
                _ou(P.VARIABLE_CODE_POSTAL, [f"{d}*" for d in departements])]
     return " AND ".join([c for c in clauses if c] + ([filtre] if filtre else []))
 
@@ -205,6 +209,9 @@ class Collecte:
         self.sirens_connus = sirens_connus   # entreprises déjà en base (D59)
         self.sirens_vus = set()
         self.annonce = None                  # total annoncé par la dernière requête
+        self.siret_par_siren = {}            # une entrée par entreprise dans ce lancement (D159)
+        self.fermes = 0                      # établissements fermés aujourd'hui, actifs autrefois
+        self.autres_etablissements = 0       # entreprises déjà reçues par un autre établissement
 
     def _page(self, q: str, curseur: str) -> dict | None:
         """Corps d'une page, None si aucun résultat (404)."""
@@ -249,14 +256,27 @@ class Collecte:
                 if plafond is not None and len(entreprises) >= plafond:
                     return nouvelles
                 infos = extraire_infos(etab)
-                siret = infos["siret"]
-                if siret and (entreprises.get(siret) or {}).get("_deja_en_base"):
+                siret, siren = infos["siret"], infos["siren"]
+                if infos["etat_etablissement"] not in ("A", None):
+                    self.fermes += 1                        # trouvé par periode(), fermé aujourd'hui
+                elif siret and (entreprises.get(siret) or {}).get("_deja_en_base"):
                     entreprises[siret]["_vue_par_sirene"] = True
                     entreprises[siret]["_naf"] = {k: infos[k] for k in ("naf_rev2", "naf_2025")}
-                elif infos["siren"] and infos["siren"] in self.sirens_connus:
-                    self.sirens_vus.add(infos["siren"])     # autre établissement déjà en base (D59)
+                elif siren and siren in self.sirens_connus:
+                    self.sirens_vus.add(siren)              # autre établissement déjà en base (D59)
+                elif siren and siren in self.siret_par_siren:
+                    # Même entreprise par un autre établissement francilien :
+                    # une seule entrée, celle du siège s'il est en IDF (D159)
+                    self.autres_etablissements += 1
+                    ancien = self.siret_par_siren[siren]
+                    if infos["siege"] and not entreprises[ancien].get("siege") and siret not in entreprises:
+                        del entreprises[ancien]
+                        entreprises[siret] = infos
+                        self.siret_par_siren[siren] = siret
                 elif siret and siret not in entreprises:
                     entreprises[siret] = infos
+                    if siren:
+                        self.siret_par_siren[siren] = siret
                     nouvelles += 1
             suivant = (corps.get("header") or {}).get("curseurSuivant")
             if not suivant or suivant == curseur or (plafond is not None and len(entreprises) >= plafond):
@@ -302,6 +322,10 @@ def extraire_infos(etab):
     )
     taille = TRANCHES_EFFECTIF.get(code_effectif, code_effectif)
 
+    # État de la période courante : « periode(etat:A) » trouve aussi un
+    # établissement fermé aujourd'hui, actif autrefois (D159)
+    etat = periode.get("etatAdministratifEtablissement") if periode else None
+
     # NAF de la période courante, et les deux nomenclatures (D112) : le code
     # de la période est en NAF rév. 2 jusqu'à la bascule, en NAF 2025 après
     # (nomenclatureActivitePrincipaleEtablissement) ; deux_codes les classe.
@@ -328,11 +352,20 @@ def extraire_infos(etab):
         "site_web":       None,
         "taille":         taille,
         "categorie":      ul.get("categorieEntreprise", ""),
+        "categorie_juridique": str(ul.get(P.VARIABLE_CATEGORIE_JURIDIQUE) or ""),
+        "siege":          etab.get("etablissementSiege") is True,
+        "etat_etablissement": etat,
         "ca":             None,   # Non disponible dans l'API Sirene
         "dirigeant":      "",     # Non disponible dans l'API Sirene
         "traite":         False,
         "emails_trouves": [],
     }
+
+
+def est_administration(entreprise: dict) -> bool:
+    """Personne morale de droit public (catégorie juridique 7xxx), comptée
+    sans être exclue (D159)."""
+    return str(entreprise.get("categorie_juridique") or "").startswith(P.PREFIXE_ADMINISTRATION)
 
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
@@ -481,8 +514,16 @@ def main(user_id, stop_event=None, on_progress=None, max_entreprises=None, log_f
     nb_ajoutees = enregistrer(user_id, entreprises, collecte.sirens_vus, mode)
     deja = sum(1 for e in entreprises.values() if e.get("_vue_par_sirene")) + len(collecte.sirens_vus)
     duree = time.monotonic() - debut
+    nouvelles = [e for e in entreprises.values() if not e.get("_deja_en_base")]
+    publiques = sum(1 for e in nouvelles if est_administration(e))
+    hors_siege = sum(1 for e in nouvelles if not e.get("siege"))
     _log(f"🏢 Sirene : {nb_ajoutees} nouvelles entreprises ("
          + ", ".join(f"{n} {g}" for g, n in par_groupe.items()) + ")"
+         + (f", dont {hors_siege} par un établissement d'IDF qui n'est pas le siège" if hors_siege else "")
+         + (f", dont {publiques} administrations publiques (catégorie juridique 7…)" if publiques else "")
+         + (f" ; {collecte.autres_etablissements} autres établissements des mêmes entreprises ignorés"
+            if collecte.autres_etablissements else "")
+         + (f" ; {collecte.fermes} établissements fermés écartés" if collecte.fermes else "")
          + (f", {deja} déjà en base retrouvées" if deja else "")
          + f" ; {collecte.requetes} requêtes en {int(duree) // 60} min {int(duree) % 60:02d} s"
          + (f", {collecte.erreurs} en erreur" if collecte.erreurs else "")

@@ -602,6 +602,9 @@ def ajouter_entreprises(user_id: int, liste: list[dict], mode: str = MODE_DEFAUT
                 "taille":      d.get("taille", ""),
                 "categorie":   d.get("categorie", ""),
                 "dirigeant":   d.get("dirigeant", ""),
+                # Sirene (D159) : catégorie juridique (7xxx : public), établissement siège ou non
+                "categorie_juridique": d.get("categorie_juridique", ""),
+                "siege":       d.get("siege"),
             }
             e = Entreprise(
                 user_id        = user_id,

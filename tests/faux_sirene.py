@@ -31,11 +31,16 @@ def siret_sirene(n):
 
 
 def etablissement(n, naf="62.01Z", cp="75011", tranche="12", categorie="PME", naf25="62.10Y",
-                  tranche_etab=None, siege=True, actif=True, nom=None):
-    """Établissement simulé ; tranche None : unité légale sans tranche."""
-    return {"siret": siret_sirene(n), "cp": cp, "naf": naf, "naf25": naf25, "tranche": tranche,
-            "tranche_etab": tranche_etab if tranche_etab is not None else tranche,
-            "categorie": categorie, "siege": siege, "actif": actif, "nom": nom or f"Société {n}"}
+                  tranche_etab=None, siege=True, actif=True, nom=None, nic=None, etats=("A",),
+                  categorie_juridique="5710"):
+    """Établissement simulé ; tranche None : unité légale sans tranche.
+    nic : autre établissement de l'unité légale n (SIRET n + nic) ; etats :
+    état de chaque période, la courante d'abord (« F », « A » : fermé
+    aujourd'hui, actif autrefois)."""
+    return {"siret": f"{n:09d}{nic}" if nic else siret_sirene(n), "cp": cp, "naf": naf, "naf25": naf25,
+            "tranche": tranche, "tranche_etab": tranche_etab if tranche_etab is not None else tranche,
+            "categorie": categorie, "siege": siege, "actif": actif, "nom": nom or f"Société {n}",
+            "etats": list(etats), "categorie_juridique": categorie_juridique}
 
 
 def _decouper(texte: str, separateur: str) -> list[str]:
@@ -91,6 +96,16 @@ class FausseSirene:
 
     def _clause(self, texte):
         texte = texte.strip()
+        # periode(variable:valeur) : vrai si une période de l'établissement
+        # la vérifie (pas seulement la courante, comme l'API)
+        for prefixe in ("periode(", "-periode("):
+            if texte.startswith(prefixe) and texte.endswith(")"):
+                variable, _, valeur = texte[len(prefixe):-1].partition(":")
+                if variable != "etatAdministratifEtablissement":
+                    raise ErreurRequete(f"Variable non historisée : {variable}")
+                if prefixe.startswith("-"):
+                    return lambda e, v=valeur: v not in e["etats"]
+                return lambda e, v=valeur: v in e["etats"]
         if texte.startswith("(") and texte.endswith(")") and len(_decouper(texte[1:-1], " OR ")) > 1:
             # Sémantique Lucene : dans un OU, une clause « -x » est exclusive
             # (MUST_NOT), pas une alternative. « (a OR -b) » garde ce qui
@@ -132,15 +147,21 @@ class FausseSirene:
     def _json(self, e):
         ul = {"siren": e["siret"][:9], "denominationUniteLegale": e["nom"], "categorieEntreprise": e["categorie"],
               "trancheEffectifsUniteLegale": e["tranche"], "activitePrincipaleUniteLegale": e["naf"],
-              "nomenclatureActivitePrincipaleUniteLegale": self.nomenclature}
+              "nomenclatureActivitePrincipaleUniteLegale": self.nomenclature,
+              "categorieJuridiqueUniteLegale": e["categorie_juridique"],
+              "etatAdministratifUniteLegale": "A" if e["actif"] else "C"}
         if self.variable_naf25:
             ul[self.variable_naf25] = "" if self.naf25_vide else e["naf25"]
         etab = {"siret": e["siret"], "trancheEffectifsEtablissement": e["tranche_etab"], "uniteLegale": ul,
+                "etablissementSiege": e["siege"],
                 "adresseEtablissement": {"codePostalEtablissement": e["cp"], "libelleCommuneEtablissement": "PARIS",
                                          "numeroVoieEtablissement": "1", "typeVoieEtablissement": "RUE",
                                          "libelleVoieEtablissement": "TEST"},
-                "periodesEtablissement": [{"dateFin": None, "activitePrincipaleEtablissement": e["naf"],
-                                           "nomenclatureActivitePrincipaleEtablissement": self.nomenclature}]}
+                "periodesEtablissement": [{"dateFin": None if i == 0 else "2020-01-01",
+                                           "etatAdministratifEtablissement": etat,
+                                           "activitePrincipaleEtablissement": e["naf"],
+                                           "nomenclatureActivitePrincipaleEtablissement": self.nomenclature}
+                                          for i, etat in enumerate(e["etats"])]}
         if self.variable_naf25:
             etab["activitePrincipaleNAF25Etablissement"] = "" if self.naf25_vide else e["naf25"]
         return etab
