@@ -279,6 +279,25 @@ def test_pdf_sans_lieu_ni_objet_en_dur():
 
 
 # ─── Code actif ───────────────────────────────────────────────────────────────
+DEPOT = "github.com/kenzafb/projet_7_chasseur_alternance"
+
+
+def _readme_sans_autrice(texte: str) -> str:
+    """README sans ce qui nomme l'autrice volontairement : la section
+    « Autrice » (jusqu'au titre suivant) et l'adresse du dépôt à cloner."""
+    avant, titre, apres = texte.partition("\n## autrice\n")
+    if titre:
+        _, titre_suivant, reste = apres.partition("\n## ")
+        texte = avant + ("\n## " + reste if titre_suivant else "\n")
+    return texte.replace(DEPOT, "")
+
+
+def test_readme_sans_autrice_ne_retire_que_la_signature():
+    texte = "# x\nkenza ici\n## autrice\nkenza filali\n## suite\ngit clone https://" + DEPOT + ".git\n"
+    assert _readme_sans_autrice(texte) == "# x\nkenza ici\n## suite\ngit clone https://.git\n"
+    assert "kenza" not in _readme_sans_autrice(pathlib.Path(config.BASE_DIR, "README.md").read_text().lower())
+
+
 def test_code_actif_sans_mention_d_un_utilisateur_reel():
     racine = pathlib.Path(config.BASE_DIR)
     fichiers = [racine / "main.py", racine / "README.md", racine / ".env.example"]
@@ -289,6 +308,8 @@ def test_code_actif_sans_mention_d_un_utilisateur_reel():
     noms = ["kenza", "filali", "bouami", "zeinab", "fofana", "garage numérique", "deust", "iosi", "cnam"]
     for chemin in fichiers:
         texte = chemin.read_text(encoding="utf-8").lower()
+        if chemin.name == "README.md":
+            texte = _readme_sans_autrice(texte)
         for nom in noms:
             assert nom not in texte, f"{chemin.relative_to(racine)} : « {nom} »"
 
