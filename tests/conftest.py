@@ -58,6 +58,54 @@ class _ReseauInterdit(Exception):
     pass
 
 
+# ─── Garde-fou : la suite ne touche jamais data/ ──────────────────────────────
+# Incident de la phase 15 : un test a écrit un fichier dans le vrai data/ (un
+# chemin figé à la définition d'une fonction). Empreinte de data/ (et de
+# DATA_DIR s'il est ailleurs) au début et à la fin de la session : un fichier
+# créé, modifié ou supprimé fait échouer la suite, avec la liste.
+def dossiers_proteges() -> list[Path]:
+    dossiers = [Path(__file__).resolve().parent.parent / "data", Path(config.DATA_DIR).resolve()]
+    return list(dict.fromkeys(d.resolve() for d in dossiers))
+
+
+def empreinte(dossier: Path) -> dict[str, tuple[int, int]]:
+    """{chemin relatif: (taille, date de modification en ns)} de tout le dossier."""
+    if not dossier.exists():
+        return {}
+    out = {}
+    for f in sorted(dossier.rglob("*")):
+        if f.is_file() or f.is_symlink():
+            st = f.lstat()
+            out[str(f.relative_to(dossier))] = (st.st_size, st.st_mtime_ns)
+    return out
+
+
+def differences(avant: dict, apres: dict) -> list[str]:
+    return ([f"créé : {c}" for c in sorted(apres.keys() - avant.keys())]
+            + [f"supprimé : {c}" for c in sorted(avant.keys() - apres.keys())]
+            + [f"modifié : {c}" for c in sorted(avant.keys() & apres.keys()) if avant[c] != apres[c]])
+
+
+def pytest_sessionstart(session):
+    session.config._empreintes_data = {d: empreinte(d) for d in dossiers_proteges()}
+
+
+def pytest_sessionfinish(session, exitstatus):
+    avant = getattr(session.config, "_empreintes_data", {})
+    ecarts = [f"{d}/ {x}" for d, e in avant.items() for x in differences(e, empreinte(d))]
+    if ecarts:
+        session.config._ecarts_data = ecarts
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    ecarts = getattr(config, "_ecarts_data", None)
+    if ecarts:
+        terminalreporter.section("data/ modifié par les tests", red=True)
+        for ligne in ecarts:
+            terminalreporter.line(ligne, red=True)
+
+
 @pytest.fixture(autouse=True)
 def pipelines_termines(monkeypatch):
     """Les pipelines lancés pendant un test (threads « lancer » de main.py)
