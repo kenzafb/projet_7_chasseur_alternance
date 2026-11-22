@@ -50,3 +50,22 @@ def test_annuaire_lu_une_fois():
     assert N.completer({"siren": "123456789", "_extra": {"autres_noms": ["X"]}}) == ["X"]   # déjà connus
     e = {"siren": "123456789"}
     assert N.completer(e) == [] and "autres_noms" not in e   # annuaire injoignable : redemandé plus tard
+
+
+# ─── A3 : domaines devinés (D168) ─────────────────────────────────────────────
+def test_domaines_devines():
+    # « et » retiré : puceplume.fr, le vrai site de Groupe Puce et Plume
+    assert S.domaines_devines({"nom": "PUCE ET PLUME"})[:4] == [
+        "https://puceplume.fr", "https://puceplume.com", "https://puceplume.eu", "https://puceplume.io"]
+    assert "https://puce-plume.fr" in S.domaines_devines({"nom": "PUCE ET PLUME"})
+    assert len(S.domaines_devines({"nom": "GROUPE PUCE ET PLUME SAS", "nom_commercial": "PUCE ET PLUME"})) == 8
+    assert S.domaines_devines({"nom": "LE JU"}) == []               # aucun mot distinctif
+    assert S.domaines_devines({"nom": "CARTADIS"})[0] == "https://cartadis.fr"
+
+
+def test_domaine_devine_verifie_avant_la_recherche(monkeypatch):
+    brancher(monkeypatch, FauxWeb(site(racine="https://www.cartadis.com", nom="CARTADIS")))
+    e = {"nom": "CARTADIS", "siren": "123456789"}
+    v, essais = S.identifier(e, {}, lambda e: iter(["https://www.societe.com/x"]), sites_export={})
+    assert v.source == S.DEVINE and v.url == "https://www.cartadis.com" and v.preuve == "siren"
+    assert all(x["source"] == S.DEVINE for x in essais)            # domaines inexistants non notés

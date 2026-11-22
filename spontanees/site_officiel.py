@@ -34,8 +34,12 @@ from spontanees import lecture_site as L
 FICHIER_INTERDITS = Path(__file__).resolve().parent.parent / "shared" / "referentiels" / "domaines_interdits.txt"
 
 LBA, FRANCE_TRAVAIL, RECHERCHE, VERIFIE = "lba", "france_travail", "recherche", "deja_verifie"
+DEVINE = "domaine_devine"
 SOURCES = {LBA: "La Bonne Alternance", FRANCE_TRAVAIL: "offre France Travail", RECHERCHE: "recherche web",
-           VERIFIE: "site déjà vérifié"}
+           VERIFIE: "site déjà vérifié", DEVINE: "domaine deviné d'après le nom"}
+# Domaines devinés (D168) : nom simplifié + extension, avant toute recherche
+EXTENSIONS_DEVINEES = (".fr", ".com", ".eu", ".io")
+MAX_DOMAINES_DEVINES = 8
 PREUVES = {"siren": "SIREN", "siret": "SIRET", "tva": "numéro de TVA", "nom_titre": "nom dans le titre du site",
            "nom_mentions": "nom dans les mentions légales"}
 MAX_CANDIDATS_RECHERCHE = 4      # domaines de la recherche web essayés au plus
@@ -235,8 +239,30 @@ def site_deja_verifie(entreprise: dict) -> str:
     return str(v.get("url") or "") if v.get("verifie", True) else ""
 
 
+def domaines_devines(entreprise: dict) -> list[str]:
+    """Accueils devinés d'après le nom (D168) : nom simplifié, mots collés
+    puis séparés d'un tiret, avec .fr, .com, .eu, .io ; sigle et autres noms
+    ensuite. Seulement des noms d'au moins 4 caractères qui ont un mot
+    distinctif (« groupe-services.fr » n'est pas deviné). Sans moteur de
+    recherche : aucune limite de requêtes, un domaine qui n'existe pas
+    échoue tout de suite."""
+    formes = []
+    for nom in variantes_du_nom(entreprise) + [simplifier(n) for n in autres_noms(entreprise)]:
+        mots = [m for m in nom.split() if m not in FORMES]
+        for forme in ("".join(mots), "-".join(mots)):
+            if 4 <= len(forme) <= 40 and forme not in formes:
+                formes.append(forme)
+    out = []
+    for forme in formes:
+        for ext in EXTENSIONS_DEVINEES:
+            if len(out) < MAX_DOMAINES_DEVINES:
+                out.append(f"https://{forme}{ext}")
+    return out
+
+
 def candidats(entreprise: dict, sites_france_travail: dict, recherche=None, sites_export=None):
-    """(url, source) dans l'ordre : déjà vérifié, LBA, France Travail, recherche web (générateur)."""
+    """(url, source) dans l'ordre : déjà vérifié, LBA, France Travail, domaines
+    devinés (D168), recherche web (générateur)."""
     vus = set()
 
     def nouveau(url):
@@ -253,6 +279,9 @@ def candidats(entreprise: dict, sites_france_travail: dict, recherche=None, site
         for url in sites_france_travail.get(nom, []):
             if nouveau(url):
                 yield url, FRANCE_TRAVAIL
+    for url in domaines_devines(entreprise):
+        if not domaine_interdit(url) and nouveau(url):
+            yield url, DEVINE
     if recherche:
         essayes = 0
         for url in recherche(entreprise):
@@ -268,10 +297,14 @@ def identifier(entreprise: dict, sites_france_travail: dict | None = None, reche
     """(vérification retenue ou None, toutes les vérifications essayées)."""
     essais = []
     for url, source in candidats(entreprise, sites_france_travail or {}, recherche, sites_export):
-        for racine in racines(url):
+        # Domaine deviné : aussi avec « www. » (certains n'existent que sous ce nom)
+        a_essayer = racines(url) + ([url.replace("https://", "https://www.", 1)] if source == DEVINE else [])
+        for racine in a_essayer:
             if domaine_interdit(racine):
                 continue
             v = verifier(racine, entreprise, source, lecteur_cls)
+            if source == DEVINE and not v.verifie and v.detail.startswith(("accueil illisible", "accueil interdit")):
+                continue          # domaine inexistant : pas noté parmi les essais, il y en a beaucoup
             essais.append(v.resume())
             if log:
                 log(f"    {'✔' if v.verifie else '✗'} {racine} ({SOURCES[source]}) : {v.detail}")

@@ -118,6 +118,8 @@ def test_emails_non_valides_relus_et_effaces_au_besoin(user_id):
 def test_site_non_verifie_aucun_email(sites, user_id, ia, monkeypatch):
     """Un site sans le SIREN ni le nom de l'entreprise : rien n'est gardé (D160)."""
     monkeypatch.setattr(se, "urls_recherche", lambda e: iter(["https://bora-bora.fr"]))
+    import spontanees.site_officiel as S
+    monkeypatch.setattr(S, "domaines_devines", lambda e: [])   # sinon acme1.fr, deviné, est le bon (D168)
     entreprises, logs = _lancer(user_id, max_scrapees=1)
     e = entreprises["ACME 1"]
     assert e["emails_trouves"] == [] and e["traite"] is True and e["site_verifie"]["verifie"] is False

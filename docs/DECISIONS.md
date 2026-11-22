@@ -859,3 +859,8 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
   - expérience exigée : en job, si elle dépasse celle du profil (non renseignée : ne bloque pas) ; en alternance, deux ans ou plus, ce n'est pas une alternance ;
   - certification exigée (CACES, SSIAP, carte professionnelle de sécurité, BAFA, PSC1, SST, habilitation électrique, HACCP, FIMO/FCO ; « CASES », coquille vue en base, compte pour CACES), absente du profil : inéligible. Rapprochement par famille de certification, pas par catégorie.
 - Le modèle n'en décide pas : il n'extrait que ce que Python ne lit pas (niveau, durée et dates écrits en texte libre). Une offre d'avant D169, sans ces lignes, garde les règles d'avant.
+
+### D168. Scraper : domaines devinés d'après le nom, avant toute recherche web (phase 15, étape 3)
+- Après les sources sûres (D166) et avant la recherche web, le scraper essaie jusqu'à 8 domaines devinés : le nom simplifié (sans forme juridique ni mots de liaison : « Groupe Puce et Plume » donne puceplume), mots collés puis séparés d'un tiret, avec .fr, .com, .eu et .io, puis le sigle et les autres noms (D167). Chacun est essayé aussi avec « www. ».
+- Ils sont vérifiés comme les autres candidats : SIREN, SIRET ou numéro de TVA, sinon nom dans le titre ou les mentions légales (avec, pour un nom d'un seul mot, le SIREN obligatoire : D172).
+- Sans moteur de recherche, donc sans limite de requêtes. Un domaine qui n'existe pas échoue tout de suite et n'est pas noté parmi les essais. Seuls les noms d'au moins 4 caractères avec un mot distinctif sont devinés.
