@@ -13,7 +13,8 @@ D154) et indices affichés, sans effet sur l'archivage :
     lecture dans le titre et le nom de l'entreprise (D156).
 
 Les organismes vérifiés du même fichier (« + ») archivent une offre
-d'alternance (est_organisme_verifie).
+d'alternance ; les intermédiaires (« = », CAPIVISION) la marquent
+organisme_formation sans l'archiver (D156).
 """
 
 import re
@@ -39,20 +40,21 @@ def simplifier(texte) -> str:
 
 
 @lru_cache(maxsize=1)
-def liste() -> tuple[tuple[tuple[str, re.Pattern], ...], tuple[tuple[str, re.Pattern], ...]]:
-    """((nom, motif) des organismes vérifiés, (mot, motif) des indices)."""
-    verifies, indices = [], []
+def liste() -> tuple:
+    """((nom, motif) des organismes vérifiés, (mot, motif) des indices,
+    (nom, motif) des intermédiaires à marquer)."""
+    verifies, indices, a_marquer = [], [], []
     for ligne in FICHIER.read_text(encoding="utf-8").splitlines():
         ligne = ligne.strip()
         if not ligne or ligne.startswith("#"):
             continue
         signe, _, nom = ligne.partition(" ")
         nom = simplifier(nom.strip())
-        if signe not in ("+", "?") or not nom:
+        if signe not in ("+", "?", "=") or not nom:
             raise ValueError(f"{FICHIER.name} : ligne illisible « {ligne} »")
         motif = re.compile(r"(?<![\w])" + re.escape(nom).replace(r"\ ", r"[\s-]+") + r"(?![\w])")
-        (verifies if signe == "+" else indices).append((nom, motif))
-    return tuple(verifies), tuple(indices)
+        {"+": verifies, "?": indices, "=": a_marquer}[signe].append((nom, motif))
+    return tuple(verifies), tuple(indices), tuple(a_marquer)
 
 
 def _trouves(offre: dict, motifs, champs=CHAMPS) -> list[str]:
@@ -70,6 +72,19 @@ def indices_ecole(offre: dict) -> list[str]:
     l'entreprise (indices affichés ; dans la description, « école » et « CFA »
     sont dans presque toutes les offres d'alternance)."""
     return _trouves(offre, liste()[1], ("titre", "entreprise"))
+
+
+def intermediaires(offre: dict) -> list[str]:
+    """Intermédiaires d'écoles (« = » du fichier) nommés par l'offre."""
+    return _trouves(offre, liste()[2])
+
+
+def marquer_intermediaire(offre: dict) -> dict:
+    """Offre d'un intermédiaire d'école (CAPIVISION...) : marquée
+    organisme_formation, donc jamais écartée « École ou CFA » (D156)."""
+    if intermediaires(offre):
+        ajouter_marque(offre, ORGANISME_FORMATION)
+    return offre
 
 
 def ajouter_marque(offre: dict, cle: str) -> dict:

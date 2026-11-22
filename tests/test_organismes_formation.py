@@ -52,6 +52,18 @@ def test_marques_affichees():
 
 
 def test_fichier_lisible():
-    verifies, indices = liste()
+    verifies, indices, a_marquer = liste()
+    assert [n for n, _ in a_marquer] == ["capivision"]
     assert len(verifies) >= 20 and {"cfa", "ecole"} <= {n for n, _ in indices}
     assert organismes_verifies(_o(entreprise="Simplon.co")) == ["simplon"]
+
+
+def test_capivision_marquee_jamais_archivee():
+    """D156 : les offres CAPIVISION « IGF ... - ALT » recrutent pour l'école IGF :
+    marquées comme les offres déléguées, ni archivées ni mêlées aux autres."""
+    from offres.analyse import marquer_non_analysee
+    o = marquer_non_analysee(_o(titre="IGF Assistant(e) comptable - BTS CG - 75 - GROUPE LAVIALE - ALT F/H",
+                                entreprise="CAPIVISION", description="Formation au CFA IGF."), verbeux=False)
+    assert o["marques"] == ["organisme_formation"] and o.get("statut") != "archive" and o["raison_archivage"] == ""
+    assert etiquettes(o) == ["Offre déposée par un organisme de formation"]
+    assert marquer_non_analysee(_o(), verbeux=False).get("marques", []) == []

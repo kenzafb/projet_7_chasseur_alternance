@@ -430,6 +430,9 @@ def marquer_non_analysee(offre, mode="alternance", verbeux=True):
         "resume_analyse": "",
         "raison_archivage": "",
     })
+    # Intermédiaire d'école (CAPIVISION) : marqué, jamais archivé (D156)
+    from shared.marques import marquer_intermediaire
+    marquer_intermediaire(offre)
     raison = archivage_mots_cles(offre, mode)
     if raison:
         offre["statut"], offre["raison_archivage"] = "archive", raison
