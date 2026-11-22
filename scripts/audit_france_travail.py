@@ -51,7 +51,8 @@ verification_stage.json ; ce script enregistre les réponses réelles
 import argparse
 from collections import Counter
 
-from audit_commun import Chrono, ecrire_json, maintenant, mots_ecole_trouves, pourcentage, session_lecture  # noqa: E402
+from audit_commun import (Chrono, ecrire_json, maintenant, mots_ecole_trouves, organismes_trouves,  # noqa: E402
+                          pourcentage, session_lecture)
 
 from offres import france_travail as ft  # noqa: E402
 from offres import parametres_france_travail as P  # noqa: E402
@@ -203,7 +204,14 @@ def ecartees(collecte: CollecteNotee, criteres: dict) -> dict:
         "nombre": pourcentage(len(touchees), len(normalisees)),
         "par_mot": Counter(m for _, ms in touchees for m in ms).most_common(30),
         "exemples": [{"titre": o["titre"], "entreprise": o["entreprise"], "mots": m} for o, m in touchees[:EXEMPLES]],
-        "note": "appliqué en mode alternance seulement (archivage_mots_cles)"}
+        "note": "liste d'avant D156, appliquée en mode alternance seulement (archivage_mots_cles)"}
+    apres = [(o, organismes_trouves(o)) for o in normalisees]
+    apres = [(o, m) for o, m in apres if m]
+    res["archivage_ecole_cfa_apres_D156"] = {
+        "nombre": pourcentage(len(apres), len(normalisees)),
+        "par_organisme": Counter(m for _, ms in apres for m in ms).most_common(30),
+        "plus_archivees": [{"titre": o["titre"], "entreprise": o["entreprise"], "mots_d_avant": m}
+                           for o, m in touchees if not organismes_trouves(o)][:EXEMPLES]}
     if criteres.get("intitules_stage"):
         rejet = [o for o in normalisees if not designe_un_stage(o["titre"])]
         res["intitule_stage_rejete"] = {"nombre": len(rejet), "titres": [o["titre"] for o in rejet][:200]}

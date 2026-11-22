@@ -97,6 +97,7 @@ def test_centres_couvrent_l_ile_de_france(ville, point):
 # ─── Recherche ────────────────────────────────────────────────────────────────
 def test_recherche_codes_niveau_taille_et_exclusions(api):
     offres = ([offre(i, niveau=6) for i in range(3)] + [offre(10 + i, niveau=5) for i in range(2)]
+              + [offre(50 + i, niveau=4) for i in range(2)] + [offre(60, niveau=7)]
               + [offre(20 + i, niveau=None) for i in range(2)]
               + [offre(30 + i, partenaire="France Travail") for i in range(2)]
               + [offre(40, cp="60200")])                                   # Oise : hors IDF
@@ -105,8 +106,11 @@ def test_recherche_codes_niveau_taille_et_exclusions(api):
     log = Journal()
     res = lba.rechercher_pour_profil(profil(niveau="Licence pro (Bac+3)", tailles=["50_249"], inconnue=False),
                                      log=log)
+    # Niveau 6, sans niveau, ou adjacent (5 et 7) marqué « niveau différent » (D154) ; 4 écarté
     assert sorted(o["titre"] for o in res["offres"]) == sorted(
-        [f"Alternance {i}" for i in (0, 1, 2, 20, 21)])                  # niveau 6 ou sans niveau
+        [f"Alternance {i}" for i in (0, 1, 2, 10, 11, 20, 21, 60)])
+    assert sorted(o["titre"] for o in res["offres"] if o["marques"] == ["niveau_different"]) == [
+        "Alternance 10", "Alternance 11", "Alternance 60"]
     assert [e["siret"] for e in res["entreprises"]] == [siret_lba(2)]
     # Une requête par centre, les 96 codes M18 en un lot, jamais de niveau envoyé
     assert len(fausse.recherches) == len(LBA_CENTRES)
@@ -114,7 +118,8 @@ def test_recherche_codes_niveau_taille_et_exclusions(api):
     assert not any("target_diploma_level" in r for r in fausse.recherches)
     t = log.texte()
     assert "2 offres relayées de France Travail écartées" in t
-    assert "2 offres d'un autre niveau que le niveau 6 écartées" in t
+    assert "2 offres à plus de 1 niveau du niveau 6 écartées" in t
+    assert "3 offres d'un niveau adjacent gardées, marquées « niveau différent »" in t
     assert "2 entreprises écartées par la taille ou le département" in t   # « 0-0 » : sans salarié
     assert f"en {len(LBA_CENTRES)} requêtes" in t
 
@@ -268,3 +273,17 @@ def test_erreur_d_une_requete_n_arrete_pas_les_autres(api, monkeypatch):
     log = Journal()
     res = lba.rechercher_pour_profil(profil(), log=log)
     assert len(res["offres"]) == 1 and "1 requêtes en erreur" in log.texte()
+
+
+# ─── Offre déléguée à un organisme de formation (D155) ────────────────────────
+def test_offre_deleguee_gardee_et_marquee():
+    from offres.analyse import archivage_mots_cles
+    o = offre(1, titre="Alternance développeur")
+    o["workplace"]["name"] = "ISCOD"                     # organisme vérifié (D156)
+    o["is_delegated"] = True
+    n = lba._normaliser_offre_lba(o)
+    assert n["marques"] == ["organisme_formation"]
+    assert archivage_mots_cles(n, "alternance") is None   # gardée malgré le nom de l'organisme
+    o["is_delegated"] = False
+    n = lba._normaliser_offre_lba(o)
+    assert n["marques"] == [] and archivage_mots_cles(n, "alternance") == "ecole_cfa"

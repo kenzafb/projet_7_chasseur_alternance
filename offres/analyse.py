@@ -231,27 +231,18 @@ def analyser_offre(offre, profil, mode="alternance", modele=None, essais=2):
     return result
 
 
-# Détection écoles/CFA (mots-clés) → archivage automatique
-ECOLES_MOTS_CLES = [
-    "iscod", "scholia", "imc alternance", "mydigitalschool", "simplon",
-    "afpa", "cfa", "epitech", "openclassrooms", "studi", "ikigai",
-    "la plateforme", "digital campus", "m2i", "doranco", "efficom",
-    "ecole", "organisme de formation", "centre de formation",
-    "hitema", "h3", "igs", "isefac", "sup de vinci",
-    "aureis","nexa","Groupe IGF",
-]
-
-
+# Détection écoles/CFA : organismes vérifiés de
+# shared/referentiels/organismes_formation.txt, mots entiers (D156). Les mots
+# génériques (« cfa », « école ») ne sont plus que des indices affichés.
 def est_ecole_cfa(offre) -> bool:
-    """Vrai si l'offre semble publiée par une école ou un CFA (mots-clés
-    dans la description, l'entreprise ou le titre ; pas d'IA)."""
-    description_lower = (offre.get("description") or "").lower()
-    entreprise_lower = (offre.get("entreprise") or "").lower()
-    titre_lower = (offre.get("titre") or "").lower()
-    return any(
-        mot in description_lower or mot in entreprise_lower or mot in titre_lower
-        for mot in ECOLES_MOTS_CLES
-    )
+    """Vrai si l'offre nomme un organisme de formation vérifié (titre,
+    entreprise ou description ; pas d'IA). Une offre La Bonne Alternance
+    déléguée à un organisme (marque organisme_formation, D155) n'est jamais
+    écartée ainsi : elle est gardée et marquée."""
+    from shared.marques import ORGANISME_FORMATION, organismes_verifies
+    if ORGANISME_FORMATION in (offre.get("marques") or []):
+        return False
+    return bool(organismes_verifies(offre))
 
 
 def appliquer_eligibilite(result: dict, offre: dict, profil: dict, mode: str) -> dict:

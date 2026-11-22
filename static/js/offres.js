@@ -25,7 +25,7 @@ let erreurChargement = "";       // échec du chargement : affiché à la place 
 let onglet = "avoir";            // avoir | garde | ecarte
 let choisie = null;              // id de l'offre ouverte dans le volet
 let messageVolet = "";           // confirmation affichée dans le volet (J'ai postulé...)
-let filtres = { source: "all", zone: "all", score: "all", ecartees: "all" };
+let filtres = { source: "all", zone: "all", marque: "all", score: "all", ecartees: "all" };
 let ouvrirLettre = () => {};
 
 /* Onglet d'une offre : postulées ailleurs (Candidatures), sinon À voir,
@@ -70,6 +70,9 @@ function passeFiltres(o) {
   if (filtres.source === "ft" && estLba) return false;
   if (filtres.source === "lba" && !estLba) return false;
   if (filtres.zone !== "all" && (o.zone || "") !== filtres.zone) return false;
+  const marques = o.marques || [];
+  if (filtres.marque === "sans_organisme" && marques.includes("organisme_formation")) return false;
+  if (!["all", "sans_organisme"].includes(filtres.marque) && !marques.includes(filtres.marque)) return false;
   if (filtres.score !== "all") {
     if (o.verdict === NON_ANALYSEE) return false;
     const n = o.score ?? 0;
@@ -173,6 +176,8 @@ function rendreVolet() {
   contenu.innerHTML = `
     <p class="volet__qui">${esc([o.entreprise || "Entreprise non communiquée", o.lieu || o.zone].filter(Boolean).join(" · "))}</p>
     <h2 class="volet__titre" id="volet-titre" tabindex="-1">${esc(o.titre || "Offre sans titre")}</h2>
+    ${(o.etiquettes || []).length ? `<ul class="volet__etiquettes" aria-label="Particularités de l'offre">
+      ${o.etiquettes.map(e => `<li class="etiquette">${esc(e)}</li>`).join("")}</ul>` : ""}
 
     <div class="verdict verdict--${t.classe}">
       ${nonNotee ? "" : `<span class="verdict__note">${esc(o.score ?? 0)}<small>/10</small></span>`}

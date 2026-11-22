@@ -88,10 +88,31 @@ def pourcentage(n: int, total: int) -> str:
     return f"{n}/{total} ({100 * n / total:.1f} %)" if total else f"{n}/0"
 
 
+# Liste d'avant D156 (offres.analyse.ECOLES_MOTS_CLES), sous-chaînes : pour
+# mesurer avant et après
+ANCIENS_MOTS_ECOLE = [
+    "iscod", "scholia", "imc alternance", "mydigitalschool", "simplon",
+    "afpa", "cfa", "epitech", "openclassrooms", "studi", "ikigai",
+    "la plateforme", "digital campus", "m2i", "doranco", "efficom",
+    "ecole", "organisme de formation", "centre de formation",
+    "hitema", "h3", "igs", "isefac", "sup de vinci",
+    "aureis", "nexa", "Groupe IGF",
+]
+
+
+def _champs(offre: dict) -> dict:
+    return {"titre": offre.get("titre"), "entreprise": offre.get("entreprise"),
+            "description": offre.get("description")}
+
+
 def mots_ecole_trouves(offre: dict) -> list[str]:
-    """Mots-clés d'école ou de CFA (offres.analyse.ECOLES_MOTS_CLES) que
-    est_ecole_cfa trouve dans l'offre, avec le champ : « cfa@description »."""
-    from offres.analyse import ECOLES_MOTS_CLES
-    champs = {"titre": offre.get("titre"), "entreprise": offre.get("entreprise"),
-              "description": offre.get("description")}
-    return [f"{m}@{c}" for m in ECOLES_MOTS_CLES for c, t in champs.items() if m in (t or "").lower()]
+    """Mots de l'ancienne liste qui archivaient l'offre avant D156, avec le
+    champ : « cfa@description »."""
+    return [f"{m}@{c}" for m in ANCIENS_MOTS_ECOLE for c, t in _champs(offre).items() if m in (t or "").lower()]
+
+
+def organismes_trouves(offre: dict) -> list[str]:
+    """Organismes vérifiés (D156) qui archivent l'offre aujourd'hui, avec le champ."""
+    from shared.marques import liste, simplifier
+    return [f"{nom}@{c}" for nom, motif in liste()[0] for c, t in _champs(offre).items()
+            if motif.search(simplifier(t))]

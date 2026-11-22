@@ -38,6 +38,14 @@ RAYON_MAX_KM = 200
 # mais écarte les offres sans niveau indiqué : 1 offre sur 3 au niveau 6).
 # Filtre après récupération sur ce champ, offres sans niveau gardées (D38).
 CHAMP_NIVEAU_OFFRE = "offer.target_diploma.european"
+# Écart de niveau gardé (D154) : une offre « BTS à Master » n'est codée qu'à
+# un seul niveau ; visé ± 1 est gardé, marqué « niveau différent »
+ECART_NIVEAU_GARDE = 1
+
+# Offre gérée par un organisme de formation pour l'entreprise (OpenAPI :
+# « true if offer management is delegated to a partner school » ; nom, SIRET
+# et adresse sont alors ceux de l'organisme). Gardée et marquée (D155).
+CHAMP_DELEGUEE = "is_delegated"
 
 # Offres déjà relayées depuis France Travail : exclues à la source par ces
 # paramètres, puis par le libellé du partenaire (toute offre dont le
