@@ -28,6 +28,7 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlparse
 
+from shared.liens import est_preproduction, sans_preproduction
 from spontanees import lecture_site as L
 
 FICHIER_INTERDITS = Path(__file__).resolve().parent.parent / "shared" / "referentiels" / "domaines_interdits.txt"
@@ -98,8 +99,10 @@ def domaine_interdit(domaine_ou_url: str) -> bool:
 
 def racines(url: str) -> list[str]:
     """Accueil(s) à vérifier pour une URL : celui de son domaine, puis celui
-    du domaine parent pour un sous-domaine (support.lexmark.com -> lexmark.com)."""
-    p = urlparse(url if "://" in url else "https://" + url)
+    du domaine parent pour un sous-domaine (support.lexmark.com -> lexmark.com).
+    Jamais un sous-domaine de préproduction ou de test : la même adresse sur
+    le domaine principal à la place (D165)."""
+    p = urlparse(sans_preproduction(url if "://" in url else "https://" + url))
     if not p.netloc:
         return []
     out = [f"{p.scheme or 'https'}://{p.netloc}"]
@@ -168,6 +171,9 @@ def verifier(url: str, entreprise: dict, source: str, lecteur_cls=L.LecteurSite)
                     f"accueil illisible ({lecteur.lues[-1][1] if lecteur.lues else 'rien lu'})")
         return v
     finale = finale or url
+    if est_preproduction(L.domaine(finale)):
+        v.detail = f"redirigé vers un sous-domaine de préproduction ({L.domaine(finale)})"
+        return v
     if not L.meme_site(finale, url) and domaine_interdit(finale):
         v.detail = f"redirigé vers un domaine interdit ({L.domaine(finale)})"
         return v

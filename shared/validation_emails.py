@@ -36,6 +36,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from shared.emails_exclus import email_exclu
+from shared.liens import est_preproduction
 
 FICHIER = Path(__file__).resolve().parent / "referentiels" / "validation_emails.txt"
 
@@ -131,6 +132,8 @@ def classer(email: str, domaine_site: str | None, verifie: bool = False) -> tupl
         return ECARTE, "liste d'exclusion"
     if mal_formee(email):
         return ECARTE, "adresse mal formée"
+    if est_preproduction(domaine):
+        return ECARTE, "domaine de préproduction ou de test"
     if _a_le_prefixe(local, r["prefixes_ecartes"]):
         return ECARTE, "adresse qui ne sert pas à candidater"
     if not domaine_site or not verifie:
@@ -269,6 +272,10 @@ def emails_valides(entreprise: dict) -> list[str]:
 
 
 def site_verifie(entreprise: dict) -> str | None:
-    """Domaine du site vérifié d'une entreprise (format de lire_entreprises), None sinon (D160)."""
+    """Domaine du site vérifié d'une entreprise (format de lire_entreprises),
+    None sinon (D160) ; un site vérifié en préproduction compte sur son
+    domaine principal (D165)."""
+    from shared.liens import sans_preproduction
     v = (entreprise.get("_extra") or {}).get("site_verifie") or entreprise.get("site_verifie") or {}
-    return v.get("domaine") or None
+    d = v.get("domaine") or None
+    return sans_preproduction(d).split("://", 1)[-1] if d else None

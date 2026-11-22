@@ -12,7 +12,9 @@ Lecture d'un site d'entreprise par le scraper (phase 15, D161) :
     devinées (« /contact », « /careers »... donnaient 594 réponses 404 sur
     849 requêtes à l'audit du 22 novembre 2026) ;
   - au plus MAX_PAGES pages HTML par site, accueil compris ;
-  - formulaires de contact relevés (moyen de candidature à montrer).
+  - formulaires de contact relevés (moyen de candidature à montrer) ;
+  - jamais une page d'un sous-domaine de préproduction ou de test (preprod,
+    staging, recette...) : la même page sur le domaine principal (D165).
 
 Rien ici ne décide de l'identité du site (spontanees/site_officiel.py) ni de
 la validité des adresses (shared/validation_emails.py).
@@ -26,6 +28,8 @@ from urllib.robotparser import RobotFileParser
 
 import requests
 from bs4 import BeautifulSoup
+
+from shared.liens import est_preproduction, sans_preproduction
 
 MAX_PAGES = 8                  # pages HTML lues par site, accueil compris
 MAX_LIENS_SITEMAP = 200        # adresses du sitemap examinées
@@ -124,7 +128,8 @@ class LecteurSite:
     def lire(self, url: str) -> tuple[str | None, str | None]:
         """(html, url finale) d'une page du site ; (None, None) si hors du
         site, interdite, au-delà du plafond, déjà lue, ou pas du HTML."""
-        url = url.split("#")[0]
+        # Préproduction ou test : la même page sur le domaine principal (D165)
+        url = sans_preproduction(url.split("#")[0])
         if url in self._vues or not meme_site(url, self.racine) or self.reste <= 0:
             return None, None
         self._vues.add(url)
@@ -141,6 +146,9 @@ class LecteurSite:
             return None, None
         self.lues.append((url, r.status_code))
         if r.status_code >= 400 or "text/html" not in r.headers.get("content-type", ""):
+            return None, None
+        if est_preproduction(domaine(r.url or url)):        # redirigée vers une préproduction
+            self.erreurs.append((url, "redirigée vers une préproduction"))
             return None, None
         return r.text, r.url
 
@@ -174,7 +182,7 @@ def liens_utiles(html: str, base: str) -> dict[str, list[str]]:
         href = a["href"].strip()
         if href.startswith(("#", "mailto:", "tel:", "javascript:")):
             continue
-        url = urljoin(base, href).split("#")[0]
+        url = sans_preproduction(urljoin(base, href).split("#")[0])
         if not meme_site(url, base) or _EXT_NON_HTML.search(urlparse(url).path.lower()):
             continue
         cat = categorie(url, a.get_text(" ", strip=True) or a.get("title", ""))
@@ -200,6 +208,7 @@ def liens_du_sitemap(lecteur: LecteurSite) -> dict[str, list[str]]:
             vus += 1
             if vus > MAX_LIENS_SITEMAP:
                 return out
+            loc = sans_preproduction(loc)
             cat = categorie(loc)
             if cat and meme_site(loc, lecteur.racine) and loc not in out[cat]:
                 out[cat].append(loc)

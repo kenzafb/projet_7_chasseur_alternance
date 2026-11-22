@@ -297,7 +297,8 @@ def comparer_a_la_reference(verification, ref: dict | None) -> dict:
     if not tranche:
         verdict = "non tranché"
     elif officiel and retenu:
-        verdict = "juste" if _parent(retenu) == _parent(officiel) else "faux"
+        officiels = officiel if isinstance(officiel, list) else [officiel]   # plusieurs sites acceptés
+        verdict = "juste" if _parent(retenu) in {_parent(o) for o in officiels} else "faux"
     elif officiel:
         verdict = "manqué"
     else:
