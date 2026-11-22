@@ -262,7 +262,7 @@ def appliquer_eligibilite(result: dict, offre: dict, profil: dict, mode: str) ->
         if result["eligible"]:
             result["verdict"] = score_to_verdict(result["score"])
         result["points_faibles"] = [souhait] + result["points_faibles"][:2]
-    raisons = raisons_ineligibilite(result, profil, mode)
+    raisons = raisons_ineligibilite(result, profil, mode, offre)
     result["raison_ineligibilite"] = " ; ".join(raisons)
     if raisons:
         result["eligible"] = False

@@ -79,6 +79,11 @@ def _profil_vers_dict(p: Profil) -> dict:
         "competences": p.competences or [],
         "projets": p.projets or [],
         "recherche": p.recherche or {},
+        # Permis, expérience, certifications (D169) : rangés dans recherche,
+        # montrés à part pour la copie entre modes
+        "permis": list((p.recherche or {}).get("permis") or []),
+        "experience_mois": (p.recherche or {}).get("experience_mois"),
+        "certifications": list((p.recherche or {}).get("certifications") or []),
         "lettre_type": p.lettre_type or "",
         "email_objet": p.email_objet or "",
         "email_type": p.email_type or "",
@@ -194,6 +199,8 @@ def fichiers_references(user_id: int) -> set[str]:
 
 # Clé de lire_profil -> colonne de profils (copie entre modes, D117)
 _COLONNE = {"email": "email_contact"}
+# Champs copiés à l'intérieur de profils.recherche (D169)
+CHAMPS_DANS_RECHERCHE = ("permis", "experience_mois", "certifications")
 
 
 def copier_sections(user_id: int, source: str, cible: str, sections, ecraser=()) -> dict:
@@ -234,6 +241,11 @@ def copier_sections(user_id: int, source: str, cible: str, sections, ecraser=())
                 if champ == "pieces_jointes":
                     gardes = {pj.get("fichier") for pj in ligne["copie"]}
                     retires += [pj.get("fichier", "") for pj in ligne["actuel"] if pj.get("fichier") not in gardes]
+                if champ in CHAMPS_DANS_RECHERCHE:
+                    rech = dict(p_cible.recherche or {})
+                    rech[champ] = copy.deepcopy(ligne["copie"])
+                    p_cible.recherche = normaliser_recherche(rech)
+                    continue
                 setattr(p_cible, _COLONNE.get(champ, champ), copy.deepcopy(ligne["copie"]))
         db.commit()
         return {"copiees": [s["cle"] for s in plan], "fichiers_retires": [f for f in retires if f]}

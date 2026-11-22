@@ -120,7 +120,8 @@ def _normaliser_offre_lba(offre: dict) -> dict | None:
         "lien":         lien,
         "source":       "La Bonne Alternance",
         "description":  ((offer.get("description") or "")[:5000]
-                         + (f"\n{LIGNE_SITE}{site}" if (site := lien_http(workplace.get("website"))) else "")),
+                         + (f"\n{LIGNE_SITE}{site}" if (site := lien_http(workplace.get("website"))) else "")
+                         + "".join(f"\n{x}" for x in lignes_experience(offer.get("access_conditions")))),
         "date_trouvee": instant_depuis_api((offer.get("publication") or {}).get("creation")),
         "score":        0,
         "lettre":       "",
@@ -130,6 +131,22 @@ def _normaliser_offre_lba(offre: dict) -> dict | None:
         # gardée et marquée, jamais écartée « École ou CFA » (D155)
         "marques":      [ORGANISME_FORMATION] if P.lire(offre, P.CHAMP_DELEGUEE) is True else [],
     }
+
+
+_FOURCHETTE = re.compile(r"^\s*(d[ée]butant|\d+)\s*(?:-|à|a)\s*(\d+)\s*ans?\s*$", re.I)
+
+
+def lignes_experience(conditions) -> list[str]:
+    """Fourchette d'expérience de l'offre (access_conditions : « 1-2 ans »,
+    « 3-5 ans », « débutant à 1 an ») en ligne « Expérience : N An(s)
+    (exigée) », lue par shared/exigences.py (D169). Les textes génériques
+    du métier (« Cet emploi est accessible avec... ») ne sont pas repris."""
+    out = []
+    for c in conditions or []:
+        m = _FOURCHETTE.match(str(c))
+        if m and m.group(1).isdigit() and int(m.group(1)) > 0:
+            out.append(f"Expérience : {int(m.group(1))} An(s) (exigée)")
+    return out[:1]
 
 
 def _niveau(valeur) -> int | None:

@@ -327,6 +327,30 @@ function lireDomainesCoches(selecteur = "[data-domaines-choix]") {
    Rien de coché : aucun filtre (spontanées : tout sauf « sans salarié »).
    Taille des offres filtrée après récupération. Mode stage : intitulés
    filtrés, pas de taille des offres (peu d'offres, D74). */
+/* Permis (D169) : cases du référentiel France Travail, « Aucun permis » exclusif */
+async function rendrePermis(coches) {
+  const c = document.querySelector("[data-permis]");
+  if (!c) return;
+  let o;
+  try { o = await api.criteresOptions(); } catch (_) { c.innerHTML = ""; return; }
+  const choisis = new Set(coches);
+  const sugg = document.querySelector("[data-certifications-suggerees]");
+  if (sugg) sugg.innerHTML = (o.certifications || []).map(x => `<option value="${esc(x)}"></option>`).join("");
+  c.innerHTML = [{ code: "aucun", libelle: "Aucun permis" }, ...(o.permis || [])].map(p =>
+    `<label class="case"><input type="checkbox" value="${esc(p.code)}" ${choisis.has(p.code) ? "checked" : ""}>
+       <span>${p.code === "aucun" ? "Aucun permis" : `${esc(p.code)} <small>${esc(p.libelle)}</small>`}</span></label>`).join("");
+  if (!c.dataset.branche) {
+    c.dataset.branche = "1";
+    c.addEventListener("change", e => {
+      const box = e.target.closest("input[type=checkbox]");
+      if (!box?.checked) return;
+      c.querySelectorAll("input").forEach(x => {
+        if (box.value === "aucun" ? x.value !== "aucun" : x.value === "aucun") x.checked = false;
+      });
+    });
+  }
+}
+
 async function rendreOptions(rech, mode) {
   const c = document.querySelector(`[data-options-recherche="${mode}"]`);
   if (!c) return;
@@ -535,6 +559,9 @@ export const Profil = {
 
     _tags["competences"] = Array.isArray(p.competences) ? [...p.competences] : [];
     rendreTags("competences");
+    _tags["certifications"] = Array.isArray(p.recherche?.certifications) ? [...p.recherche.certifications] : [];
+    rendreTags("certifications");
+    await rendrePermis(p.recherche?.permis || []);
 
     _projets = Array.isArray(p.projets) ? p.projets.map(x => ({ nom: x.nom || "", url: x.url || "", description: x.description || "" })) : [];
     rendreProjets();
@@ -584,6 +611,7 @@ export const Profil = {
         if (champ && exemple && (!champ.value.trim() || confirm("Remplacer ta lettre type par l'exemple ?"))) champ.value = exemple;
       });
             brancherTags("competences");
+      brancherTags("certifications");
       brancherProjets();
       brancherPiecesJointes();
       brancherParties();
@@ -618,6 +646,9 @@ export const Profil = {
     const domainesC = document.querySelector(selecteurDomaines);
     rech.domaines_indifferent = !rech.domaines.length && domainesC?.dataset.indifferentChoisi === "1";
     Object.assign(rech, lireOptions(_modeProfilCourant));
+    // Permis et certifications (D169), communs aux trois modes
+    rech.permis = [...document.querySelectorAll("[data-permis] input:checked")].map(c => c.value);
+    rech.certifications = [...(_tags["certifications"] || [])];
     data.recherche = rech;
     return data;
   },

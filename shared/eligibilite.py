@@ -248,9 +248,14 @@ def lire_debut_offre(texte) -> tuple[date, bool] | None:
     return None
 
 
-def raisons_ineligibilite(extraits: dict, profil: dict, mode: str) -> list[str]:
-    """Raisons d'inéligibilité établies en Python ; vide si rien ne bloque."""
+def raisons_ineligibilite(extraits: dict, profil: dict, mode: str, offre: dict | None = None) -> list[str]:
+    """Raisons d'inéligibilité établies en Python ; vide si rien ne bloque.
+    offre : ses exigences structurées (permis, formation, expérience,
+    certifications, shared/exigences.py, D169) comptent aussi."""
     raisons = []
+    if offre is not None:
+        from shared.exigences import raisons as raisons_exigences
+        raisons += raisons_exigences(offre, profil, mode, niveau_du_profil(profil)["crans"])
     ecart = ecart_niveau(extraits, profil)
     if ecart and ecart[0] >= ECART_NIVEAU_BLOQUANT and extraits.get("niveau_exigence") == "exige":
         raisons.append(f"{LIBELLES[ecart[1]]} exigé, profil {LIBELLES[ecart[2]]}")

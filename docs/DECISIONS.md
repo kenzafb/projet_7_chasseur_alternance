@@ -837,3 +837,25 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 - Une entreprise qui ne les a pas (déjà en base, ou venue de LBA) les reçoit une fois de l'API publique Recherche d'entreprises (données Sirene, sans clé, seul le SIREN est envoyé), puis les garde ; si l'API ne répond pas, ils seront redemandés.
 - Ces noms servent à prouver le site (nom dans le titre ou les mentions légales) et ajoutent une requête de recherche chacun (trois au plus).
 - TIDF : ni sigle ni enseigne dans Sirene. « Toshiba Île-de-France » n'y figure pas, donc cette règle ne le trouve pas.
+
+### D169. Éligibilité par Python à partir des exigences structurées des offres (phase 15, étape 3)
+- **Constat** (banc de départ, 137 offres annotées) : 45 offres faussement éligibles, dont 34 en job sur 36 inéligibles attendues. Elles exigent un CACES, un diplôme d'État ou de l'expérience, ce qu'aucune règle Python ne regardait ; et un niveau « (indispensable) » restait souhaité à cause de « ou équivalents ».
+- **Offres France Travail.** Les champs structurés sont ajoutés en lignes à la fin de la description, jamais coupées (seule la description libre est raccourcie) :
+  - `Permis : B - Véhicule léger (exigé|souhaité)` ;
+  - `Expérience : 2 An(s) (exigée|souhaitée)`, d'après `experienceExige` (E, S, D) ;
+  - `Formation : … (indispensable|souhaitée)` ;
+  - `Compétence : … (indispensable|souhaitée)`.
+
+  Les noms et valeurs réels de ces champs restent à vérifier avec `scripts/audit_champs_france_travail.py` (clé France Travail). Déjà vus en base : les libellés d'expérience (« 2 An(s) », « 6 Mois », « Débutant accepté », « Expérience exigée »), les formations et les compétences avec leur exigence.
+- **Offres LBA.** Les fourchettes d'expérience de `access_conditions` (« 1-2 ans », « 3-5 ans ») deviennent la même ligne d'expérience exigée. Les textes génériques du métier (« Cet emploi est accessible avec un CAP… », 1 897 offres sur 12 507) ne sont pas repris : ils décrivent le métier, pas l'offre.
+- **Profil.** Nouveaux champs dans la partie « Ton parcours », communs aux trois modes et copiables (section « Permis, expérience en mois et certifications »), rangés dans `profils.recherche` (pas de migration) :
+  - permis en cases (référentiel France Travail, plus « Aucun permis ») ;
+  - expérience totale en mois ;
+  - certifications en étiquettes, avec suggestions (CACES R489, SSIAP 1, carte professionnelle de sécurité, BAFA, PSC1) et saisie libre.
+- **Règles** (`shared/exigences.py`, appelées par `raisons_ineligibilite`) :
+  - permis exigé que le profil n'a pas (« aucun » ou d'autres codes) : inéligible ; permis non renseigné : ne bloque pas ;
+  - formation exigée d'un niveau supérieur à celui du profil : inéligible ;
+  - diplôme d'État exigé (en toutes lettres ou par sigle, avec un mot d'exigence), absent de la formation et des certifications : inéligible, sauf en alternance où c'est souvent le diplôme préparé ;
+  - expérience exigée : en job, si elle dépasse celle du profil (non renseignée : ne bloque pas) ; en alternance, deux ans ou plus, ce n'est pas une alternance ;
+  - certification exigée (CACES, SSIAP, carte professionnelle de sécurité, BAFA, PSC1, SST, habilitation électrique, HACCP, FIMO/FCO ; « CASES », coquille vue en base, compte pour CACES), absente du profil : inéligible. Rapprochement par famille de certification, pas par catégorie.
+- Le modèle n'en décide pas : il n'extrait que ce que Python ne lit pas (niveau, durée et dates écrits en texte libre). Une offre d'avant D169, sans ces lignes, garde les règles d'avant.

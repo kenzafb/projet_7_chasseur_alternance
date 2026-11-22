@@ -45,6 +45,10 @@ ATTENTE_429_S = 5                              # une nouvelle tentative sur 429
 FORMAT_DATE = "%Y-%m-%dT%H:%M:%SZ"
 
 
+LONGUEUR_DESCRIPTION = 10000
+# experienceExige (API) -> mention ajoutée à la ligne « Expérience » (D169)
+EXIGENCE_EXPERIENCE = {"E": "exigée", "S": "souhaitée", "D": "débutant accepté"}
+
 _token_cache = {"token": None, "expire": 0}
 
 
@@ -336,17 +340,25 @@ def _normaliser_une(offre: dict) -> dict | None:
     if site := lien_http((offre.get("entreprise") or {}).get("url")):
         desc += f"\n{LIGNE_SITE}{site}"
 
-    # Infos contrat
-    exp     = offre.get("experienceLibelle", "")
-    duree   = offre.get("dureeTravailLibelleConverti", "")
-    salaire = offre.get("salaire", {}).get("libelle", "")
-    qualif  = offre.get("qualificationLibelle", "")
-    secteur = offre.get("secteurActiviteLibelle", "")
-
-    for libelle, valeur in (("Expérience", exp), ("Durée", duree), ("Salaire", salaire),
-                            ("Qualification", qualif), ("Secteur", secteur)):
+    # Infos contrat et exigences : lignes structurées, lues par
+    # shared/exigences.py pour l'éligibilité (D169). Gardées en entier :
+    # seule la description libre est raccourcie.
+    lignes = []
+    exp = offre.get("experienceLibelle", "")
+    if exp:
+        exige_exp = EXIGENCE_EXPERIENCE.get(offre.get("experienceExige") or "")
+        if exige_exp and exige_exp.lower() in exp.lower():
+            exige_exp = ""                 # « Débutant accepté (débutant accepté) »
+        lignes.append(f"Expérience : {exp}" + (f" ({exige_exp})" if exige_exp else ""))
+    for libelle, valeur in (("Durée", offre.get("dureeTravailLibelleConverti", "")),
+                            ("Salaire", (offre.get("salaire") or {}).get("libelle", "")),
+                            ("Qualification", offre.get("qualificationLibelle", "")),
+                            ("Secteur", offre.get("secteurActiviteLibelle", ""))):
         if valeur:
-            desc += f"\n{libelle} : {valeur}"
+            lignes.append(f"{libelle} : {valeur}")
+    for p in offre.get("permis") or []:
+        if p.get("libelle"):
+            lignes.append(f"Permis : {p['libelle']} ({'exigé' if p.get('exigence') == 'E' else 'souhaité'})")
 
     # Formations (~10% des offres mais critique pour détecter Bac+5)
     for f in offre.get("formations", []):
@@ -355,21 +367,23 @@ def _normaliser_une(offre: dict) -> dict | None:
         exige     = "indispensable" if f.get("exigence") == "E" else "souhaitée"
         label     = " - ".join(filter(None, [domaine_f, niv]))
         if label:
-            desc += f"\nFormation : {label} ({exige})"
+            lignes.append(f"Formation : {label} ({exige})")
 
     # Compétences (~10% des offres)
     for c in offre.get("competences", []):
         lib   = c.get("libelle", "")
         exige = "indispensable" if c.get("exigence") == "E" else "souhaitée"
         if lib:
-            desc += f"\nCompétence : {lib} ({exige})"
+            lignes.append(f"Compétence : {lib} ({exige})")
 
     # Langues (rare mais utile)
     for l in offre.get("langues", []):
         lib   = l.get("libelle", "")
         exige = "indispensable" if l.get("exigence") == "E" else "souhaitée"
         if lib:
-            desc += f"\nLangue : {lib} ({exige})"
+            lignes.append(f"Langue : {lib} ({exige})")
+    structure = "\n" + "\n".join(lignes) if lignes else ""
+    desc = desc[:max(0, LONGUEUR_DESCRIPTION - len(structure))] + structure
 
     return {
         "id":           generer_id(offre.get("id", lien)),
@@ -380,7 +394,7 @@ def _normaliser_une(offre: dict) -> dict | None:
         "domaine":      "Non analysé",
         "lien":         lien,
         "source":       "France Travail",
-        "description":  desc[:10000],
+        "description":  desc,
         "date_trouvee": instant_depuis_api(offre.get("dateCreation")),
         "score":        0,
         "lettre":       "",
