@@ -863,6 +863,7 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 ### D168. Scraper : domaines devinés d'après le nom, avant toute recherche web (phase 15, étape 3)
 - Après les sources sûres (D166) et avant la recherche web, le scraper essaie jusqu'à 8 domaines devinés : le nom simplifié (sans forme juridique ni mots de liaison : « Groupe Puce et Plume » donne puceplume), mots collés puis séparés d'un tiret, avec .fr, .com, .eu et .io, puis le sigle et les autres noms (D167). Chacun est essayé aussi avec « www. ».
 - Ils sont vérifiés comme les autres candidats : SIREN, SIRET ou numéro de TVA, sinon nom dans le titre ou les mentions légales (avec, pour un nom d'un seul mot, le SIREN obligatoire : D172).
+- **Redirection suivie** (complément, constaté à la mesure du groupe 2) : un domaine deviné qui redirige vers un autre domaine (cartadis.fr vers cartadis.com, prodware.fr vers prodwaregroup.com, theatredelaville.fr vers theatredelaville-paris.com) est vérifié, lu et retenu sur le domaine d'arrivée. Avant, le lecteur restait sur le domaine de départ : les mentions légales du vrai site n'étaient pas lues, et le site retenu ne correspondait pas au domaine des emails.
 - Sans moteur de recherche, donc sans limite de requêtes. Un domaine qui n'existe pas échoue tout de suite et n'est pas noté parmi les essais. Seuls les noms d'au moins 4 caractères avec un mot distinctif sont devinés.
 
 ### D171. Scraper, recherche web : 8 candidats, domaines interdits écartés avant de compter, requête sans ville (phase 15, étape 3)

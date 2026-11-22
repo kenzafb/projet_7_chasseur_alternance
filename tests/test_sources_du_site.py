@@ -69,3 +69,13 @@ def test_domaine_devine_verifie_avant_la_recherche(monkeypatch):
     v, essais = S.identifier(e, {}, lambda e: iter(["https://www.societe.com/x"]), sites_export={})
     assert v.source == S.DEVINE and v.url == "https://www.cartadis.com" and v.preuve == "siren"
     assert all(x["source"] == S.DEVINE for x in essais)            # domaines inexistants non notés
+
+
+def test_redirection_vers_un_autre_domaine_suivie(monkeypatch):
+    """cartadis.fr redirige vers cartadis.com : le site retenu est cartadis.com,
+    ses mentions légales sont lues (SIREN), ses emails sont du bon domaine."""
+    pages = site(racine="https://www.cartadis.com", nom="CARTADIS")
+    pages["https://cartadis.fr"] = ("redirection", "https://www.cartadis.com")
+    brancher(monkeypatch, FauxWeb(pages))
+    v = S.verifier("https://cartadis.fr", {"nom": "CARTADIS", "siren": "123456789"}, S.DEVINE)
+    assert v.verifie and v.preuve == "siren" and v.url == "https://www.cartadis.com" and v.domaine == "cartadis.com"

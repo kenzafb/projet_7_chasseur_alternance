@@ -191,6 +191,15 @@ def verifier(url: str, entreprise: dict, source: str, lecteur_cls=L.LecteurSite)
     if not L.meme_site(finale, url) and domaine_interdit(finale):
         v.detail = f"redirigé vers un domaine interdit ({L.domaine(finale)})"
         return v
+    if not L.meme_site(finale, url):
+        # Redirigé vers un autre domaine (cartadis.fr -> cartadis.com) : c'est
+        # lui qu'on vérifie, qu'on lit et qu'on retient (D168)
+        p = urlparse(finale)
+        v.url = f"{p.scheme}://{p.netloc}"
+        nouveau = lecteur_cls(v.url, max_pages=lecteur.reste + 1)
+        nouveau._vues.add(finale.split("#")[0])
+        nouveau.lues.append((finale, 200))
+        v.lecteur = lecteur = nouveau
     v.pages[finale] = html
     liens = L.liens_utiles(html, finale)
     mentions = liens["mentions"] or L.liens_du_sitemap(lecteur)["mentions"]
