@@ -43,6 +43,7 @@ MAX_DOMAINES_DEVINES = 8
 PREUVES = {"siren": "SIREN", "siret": "SIRET", "tva": "numéro de TVA", "nom_titre": "nom dans le titre du site",
            "nom_mentions": "nom dans les mentions légales"}
 MAX_CANDIDATS_RECHERCHE = 8      # domaines de la recherche web essayés au plus (4 avant D171)
+MOTS_DISTINCTIFS_MIN = 2         # preuve par le nom : au moins 2 mots distinctifs, sinon SIREN (D172)
 
 # Formes juridiques et mots trop généraux pour prouver un nom
 FORMES = {"sa", "sas", "sasu", "sarl", "eurl", "sci", "scop", "snc", "gie", "selarl", "selas", "scp", "sem",
@@ -218,7 +219,7 @@ def verifier(url: str, entreprise: dict, source: str, lecteur_cls=L.LecteurSite)
             return v
     # Nom d'un seul mot distinctif (Fermat, Bellon, Ithis) : il ne prouve rien,
     # trop d'autres sites le portent ; SIREN obligatoire (D172)
-    variantes = [x for x in variantes_du_nom(entreprise) if len(mots_distinctifs(x)) >= 2]
+    variantes = [x for x in variantes_du_nom(entreprise) if len(mots_distinctifs(x)) >= MOTS_DISTINCTIFS_MIN]
     if n := nom_present(L.titre_de(html), variantes):
         v.verifie, v.preuve, v.detail = True, "nom_titre", f"« {n} » dans le titre du site"
     elif "mentions" in textes and (n := nom_present(textes["mentions"], variantes)):

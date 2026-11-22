@@ -369,6 +369,8 @@ def main(argv=None) -> int:
     m.add_argument("--base", help="URL SQLite (lecture seule) pour les sites donnés par les offres")
     m.add_argument("--sites-export", help="JSON {SIREN: site} tiré de l'export LBA (défaut : celui de l'application)")
     m.add_argument("--cache-recherche", help="JSON des résultats de recherche par requête, partagé entre mesures")
+    m.add_argument("--nom-un-mot", action="store_true",
+                   help="accepter la preuve par un nom d'un seul mot distinctif (sans D172, pour comparer)")
     m.add_argument("--reference", default=str(SORTIE / "scraper_reference.json"),
                    help="sites officiels de référence (absent : pas de comparaison)")
     args = ap.parse_args(argv)
@@ -381,6 +383,9 @@ def main(argv=None) -> int:
     reference = ({x["id"]: x for x in lire_json(args.reference)["entreprises"]} if Path(args.reference).exists()
                  else None)
     sites_export = lire_json(args.sites_export) if args.sites_export else None
+    if args.nom_un_mot:
+        from spontanees import site_officiel
+        site_officiel.MOTS_DISTINCTIFS_MIN = 1
     res, candidats = mesurer(entreprises, ddg=not args.sans_ddg, ia=args.ia, base=args.base, reference=reference,
                              sites_export=sites_export, cache_recherche=args.cache_recherche)
     print(res["synthese"])
