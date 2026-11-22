@@ -864,3 +864,12 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 - Après les sources sûres (D166) et avant la recherche web, le scraper essaie jusqu'à 8 domaines devinés : le nom simplifié (sans forme juridique ni mots de liaison : « Groupe Puce et Plume » donne puceplume), mots collés puis séparés d'un tiret, avec .fr, .com, .eu et .io, puis le sigle et les autres noms (D167). Chacun est essayé aussi avec « www. ».
 - Ils sont vérifiés comme les autres candidats : SIREN, SIRET ou numéro de TVA, sinon nom dans le titre ou les mentions légales (avec, pour un nom d'un seul mot, le SIREN obligatoire : D172).
 - Sans moteur de recherche, donc sans limite de requêtes. Un domaine qui n'existe pas échoue tout de suite et n'est pas noté parmi les essais. Seuls les noms d'au moins 4 caractères avec un mot distinctif sont devinés.
+
+### D171. Scraper, recherche web : 8 candidats, domaines interdits écartés avant de compter, requête sans ville (phase 15, étape 3)
+- **Constat** (mesure de l'étape 2) : pour Murex, Cartadis, Prodware ou The Body Shop, le domaine officiel n'apparaissait jamais parmi les 4 candidats essayés ; les places étaient prises par des pages tierces qui citent le nom (doctrine.fr, jobted, usinenouvelle, infobel, xerfi, fusacq, clutch…).
+- **Règles.** Un domaine interdit est écarté avant d'être compté : seuls les candidats possibles prennent une place, et il y en a désormais 8 au lieu de 4. Une requête « "nom" site officiel », sans ville, s'ajoute après la première. Les agrégateurs vus à la mesure entrent dans `domaines_interdits.txt`.
+
+### D172. Nom d'un seul mot distinctif : SIREN obligatoire sur le site (phase 15, étape 3)
+- **Constat** : Fermat (olympic.fermat.edu.vn), Bellon (fondationpierrebellon.org) et Ithis (ithishospital.com) avaient été retenus sur leur seul nom dans un titre.
+- **Règle.** La preuve par le nom (titre du site ou mentions légales) n'est acceptée que pour un nom qui a au moins deux mots distinctifs (4 lettres ou plus, ni généraux, ni formes juridiques, ni nombres). Sinon il faut le SIREN, le SIRET ou le numéro de TVA. Cela vaut aussi pour les autres noms (D167) : « Toshiba Île-de-France » n'a qu'un mot distinctif.
+- **Effet attendu** : moins de faux, mais certains sites justes trouvés par le titre seul (Neurones, WeTradeLocal, Degetel…) exigent maintenant leur SIREN dans les mentions légales. La mesure le dira.

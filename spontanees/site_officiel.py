@@ -42,7 +42,7 @@ EXTENSIONS_DEVINEES = (".fr", ".com", ".eu", ".io")
 MAX_DOMAINES_DEVINES = 8
 PREUVES = {"siren": "SIREN", "siret": "SIRET", "tva": "numéro de TVA", "nom_titre": "nom dans le titre du site",
            "nom_mentions": "nom dans les mentions légales"}
-MAX_CANDIDATS_RECHERCHE = 4      # domaines de la recherche web essayés au plus
+MAX_CANDIDATS_RECHERCHE = 8      # domaines de la recherche web essayés au plus (4 avant D171)
 
 # Formes juridiques et mots trop généraux pour prouver un nom
 FORMES = {"sa", "sas", "sasu", "sarl", "eurl", "sci", "scop", "snc", "gie", "selarl", "selas", "scp", "sem",
@@ -207,15 +207,24 @@ def verifier(url: str, entreprise: dict, source: str, lecteur_cls=L.LecteurSite)
         if p := preuve_siren(texte, siren):
             v.verifie, v.preuve, v.detail = True, p, f"{PREUVES[p]} {siren} dans {'les mentions légales' if ou == 'mentions' else 'l’accueil'}"
             return v
-    variantes = variantes_du_nom(entreprise)
+    # Nom d'un seul mot distinctif (Fermat, Bellon, Ithis) : il ne prouve rien,
+    # trop d'autres sites le portent ; SIREN obligatoire (D172)
+    variantes = [x for x in variantes_du_nom(entreprise) if len(mots_distinctifs(x)) >= 2]
     if n := nom_present(L.titre_de(html), variantes):
         v.verifie, v.preuve, v.detail = True, "nom_titre", f"« {n} » dans le titre du site"
     elif "mentions" in textes and (n := nom_present(textes["mentions"], variantes)):
         v.verifie, v.preuve, v.detail = True, "nom_mentions", f"« {n} » dans les mentions légales"
+    elif not variantes and variantes_du_nom(entreprise):
+        v.detail = "nom d'un seul mot distinctif : SIREN exigé, absent de l'accueil et des mentions légales"
     else:
         v.detail = ("ni SIREN ni nom dans l'accueil et les mentions légales" if "mentions" in textes
                     else "ni SIREN dans l'accueil ni nom dans le titre, pas de lien vers des mentions légales")
     return v
+
+
+def mots_distinctifs(nom: str) -> list[str]:
+    """Mots d'au moins 4 lettres, ni généraux ni formes juridiques ni nombres."""
+    return [m for m in nom.split() if len(m) >= 4 and m not in GENERIQUES | FORMES and not m.isdigit()]
 
 
 # ─── Candidats ────────────────────────────────────────────────────────────────
@@ -283,13 +292,16 @@ def candidats(entreprise: dict, sites_france_travail: dict, recherche=None, site
         if not domaine_interdit(url) and nouveau(url):
             yield url, DEVINE
     if recherche:
+        # Domaines interdits écartés AVANT de compter : seuls les candidats
+        # possibles prennent une des MAX_CANDIDATS_RECHERCHE places (D171)
         essayes = 0
         for url in recherche(entreprise):
+            if domaine_interdit(url) or not nouveau(url):
+                continue
+            essayes += 1
+            yield url, RECHERCHE
             if essayes >= MAX_CANDIDATS_RECHERCHE:
                 return
-            if not domaine_interdit(url) and nouveau(url):
-                essayes += 1
-                yield url, RECHERCHE
 
 
 def identifier(entreprise: dict, sites_france_travail: dict | None = None, recherche=None,

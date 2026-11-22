@@ -176,12 +176,41 @@ def sites_des_offres_lecture(base, user_id) -> dict:
         return sites_des_offres(user_id, db)
 
 
-def mesurer(entreprises: list[dict], ddg=True, ia=False, base=None, reference=None, sites_export=None) -> dict:
+def brancher_cache_recherche(S, chemin):
+    """Résultats de recherche web gardés par requête dans chemin (JSON) :
+    plusieurs mesures rejouent exactement les mêmes résultats, et leurs
+    écarts ne viennent que du code (le moteur varie d'un passage à l'autre).
+    Une requête en échec n'est pas gardée : elle sera redemandée."""
+    import json
+    from pathlib import Path
+    chemin = Path(chemin)
+    cache = json.loads(chemin.read_text(encoding="utf-8")) if chemin.exists() else {}
+    vrai = S._resultats_ddg
+    compte = {"du_cache": 0, "demandees": 0}
+
+    def avec_cache(requete):
+        if requete in cache:
+            compte["du_cache"] += 1
+            return cache[requete]
+        echecs = S.erreurs_ddg
+        r = vrai(requete)
+        compte["demandees"] += 1
+        if S.erreurs_ddg == echecs:
+            cache[requete] = r
+            chemin.write_text(json.dumps(cache, ensure_ascii=False), encoding="utf-8")
+        return r
+    S._resultats_ddg = avec_cache
+    return compte
+
+
+def mesurer(entreprises: list[dict], ddg=True, ia=False, base=None, reference=None, sites_export=None,
+            cache_recherche=None) -> dict:
     """Phase 15 (D160, D161) : identification du site (sources, vérification
     par SIREN ou nom), puis lecture du site vérifié, chaque requête notée."""
     from spontanees import lecture_site as L
     from spontanees import recherche_emails as S
     from spontanees import site_officiel as O
+    compte_cache = brancher_cache_recherche(S, cache_recherche) if cache_recherche else None
     journal = Journal(L.requests, S.time.sleep)
     L.requests = journal
     S.time.sleep = journal.pause            # time est partagé : pauses DDG et entre pages comprises
@@ -282,6 +311,8 @@ def mesurer(entreprises: list[dict], ddg=True, ia=False, base=None, reference=No
     }
     if reference is not None:
         synthese["identification_contre_la_reference"] = bilan_reference(sites)
+    if compte_cache is not None:
+        synthese["recherches_du_cache"] = compte_cache
     return {"le": maintenant(), "ia": ia, "ddg": ddg, "synthese": synthese, "sites": sites}, candidats
 
 
@@ -337,6 +368,7 @@ def main(argv=None) -> int:
     m.add_argument("--ia", action="store_true")
     m.add_argument("--base", help="URL SQLite (lecture seule) pour les sites donnés par les offres")
     m.add_argument("--sites-export", help="JSON {SIREN: site} tiré de l'export LBA (défaut : celui de l'application)")
+    m.add_argument("--cache-recherche", help="JSON des résultats de recherche par requête, partagé entre mesures")
     m.add_argument("--reference", default=str(SORTIE / "scraper_reference.json"),
                    help="sites officiels de référence (absent : pas de comparaison)")
     args = ap.parse_args(argv)
@@ -350,7 +382,7 @@ def main(argv=None) -> int:
                  else None)
     sites_export = lire_json(args.sites_export) if args.sites_export else None
     res, candidats = mesurer(entreprises, ddg=not args.sans_ddg, ia=args.ia, base=args.base, reference=reference,
-                             sites_export=sites_export)
+                             sites_export=sites_export, cache_recherche=args.cache_recherche)
     print(res["synthese"])
     from spontanees import recherche_emails as S
     res["synthese"]["recherche_web_en_echec"] = S.erreurs_ddg

@@ -350,6 +350,7 @@ def construire_requetes(entreprise, analyse):
     if mots_recherche:
         mots_str = " ".join(mots_recherche[:4])
         requetes.append(f'"{mots_str}" {lieu}'.strip())
+        requetes.append(f'"{mots_str}" site officiel')           # sans ville (D171)
         requetes.append(f'"{mots_str}" {lieu} site officiel'.strip())
 
     if analyse["acronyme"]:

@@ -71,22 +71,46 @@ def test_verifie_par_le_siren_des_mentions_legales(web):
     assert set(v.pages) == {"https://acme.fr", "https://acme.fr/infos/mentions-legales"}
 
 
+ACME_ROBOTIQUE = {"nom": "ACME ROBOTIQUE", "nom_commercial": "ACME ROBOTIQUE", "siren": "123456789"}
+
+
 def test_verifie_par_le_nom_dans_le_titre(web):
-    web.pages.update(site(siren_dans_mentions=False))
-    v = S.verifier("https://acme.fr", ACME, S.RECHERCHE)
+    web.pages.update(site(nom="Acme Robotique", siren_dans_mentions=False))
+    v = S.verifier("https://acme.fr", ACME_ROBOTIQUE, S.RECHERCHE)
     assert v.verifie and v.preuve == "nom_titre"
 
 
 def test_verifie_par_le_nom_dans_les_mentions(web):
-    web.pages.update(site(titre="Accueil", siren_dans_mentions=False))
-    v = S.verifier("https://acme.fr", ACME, S.RECHERCHE)
+    web.pages.update(site(nom="Acme Robotique", titre="Accueil", siren_dans_mentions=False))
+    v = S.verifier("https://acme.fr", ACME_ROBOTIQUE, S.RECHERCHE)
     assert v.verifie and v.preuve == "nom_mentions"
 
 
 def test_non_verifie_sans_siren_ni_nom(web):
     web.pages.update(site(nom="Autre Société", titre="Restaurant Bora Bora", siren="987654321"))
-    v = S.verifier("https://acme.fr", ACME, S.RECHERCHE)
+    v = S.verifier("https://acme.fr", ACME_ROBOTIQUE, S.RECHERCHE)
     assert not v.verifie and "ni SIREN ni nom" in v.detail
+
+
+@pytest.mark.parametrize("nom", ["FERMAT", "BELLON SA", "ITHIS", "ACME"])
+def test_nom_d_un_seul_mot_exige_le_siren(web, nom):
+    """D172 : Fermat, Bellon, Ithis avaient été retenus sur leur seul nom dans un titre."""
+    web.pages.update(site(nom=nom.title(), siren_dans_mentions=False))
+    v = S.verifier("https://acme.fr", {"nom": nom, "siren": "123456789"}, S.RECHERCHE)
+    assert not v.verifie and "SIREN exigé" in v.detail
+    web.pages.update(site(nom=nom.title()))
+    assert S.verifier("https://acme.fr", {"nom": nom, "siren": "123456789"}, S.RECHERCHE).preuve == "siren"
+
+
+def test_interdits_ecartes_avant_de_compter(web):
+    """D171 : les domaines interdits ne prennent pas de place parmi les 8 candidats."""
+    def recherche(e):
+        for i in range(20):
+            yield f"https://www.doctrine.fr/{i}"
+        for i in range(12):
+            yield f"https://candidat{i}.fr"
+    _, essais = S.identifier({"nom": "LE JU"}, {}, recherche)
+    assert [x["url"] for x in essais] == [f"https://candidat{i}.fr" for i in range(8)]
 
 
 def test_nom_ambigu_exige_le_siren(web):
@@ -125,7 +149,7 @@ def test_sources_dans_l_ordre(web):
     assert [e["url"] for e in essais] == ["https://acme-lba.fr", "https://recherche-acme.fr"]
 
 
-def test_au_plus_quatre_domaines_de_la_recherche(web):
+def test_au_plus_huit_domaines_de_la_recherche(web):
     def recherche(e):
         for i in range(10):
             yield f"https://faux{i}.fr"

@@ -30,9 +30,9 @@ def test_autres_noms_de_sirene():
 
 
 def test_autres_noms_prouvent_le_site(monkeypatch):
-    brancher(monkeypatch, FauxWeb(site(nom="Toshiba Ile-de-France", siren_dans_mentions=False)))
-    e = {"nom": "TIDF", "siren": "123456789", "autres_noms": ["Toshiba Ile-de-France"]}
-    assert "toshiba ile de france" in S.variantes_du_nom(e)
+    brancher(monkeypatch, FauxWeb(site(nom="Toshiba Bureautique", siren_dans_mentions=False)))
+    e = {"nom": "TIDF", "siren": "123456789", "autres_noms": ["Toshiba Bureautique"]}
+    assert "toshiba bureautique" in S.variantes_du_nom(e)
     assert S.verifier("https://acme.fr", e, S.RECHERCHE).preuve == "nom_titre"
 
 

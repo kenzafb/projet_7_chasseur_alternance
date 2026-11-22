@@ -64,6 +64,23 @@ trustpilot.com
 avis-verifies.com
 association.tel
 
+# Agrégateurs vus à la mesure de l'étape 2 (D171)
+doctrine.fr
+jobted.com
+restaurantguru.com
+usinenouvelle.com
+infobel.fr
+infobel.com
+xerfi.com
+fusacq.com
+clutch.co
+kelest.fr
+edecideur.info
+bible-marques.fr
+1001salles.com
+actusduweb.com
+certif-icpf.org
+
 # ── Annonces légales, journaux officiels ──
 bodacc.fr
 bodacc.io
