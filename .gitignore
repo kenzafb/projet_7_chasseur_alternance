@@ -15,3 +15,4 @@ data/
 shared/profil.py
 code_projet.md
 .pytest_cache/
+audit_exports/
