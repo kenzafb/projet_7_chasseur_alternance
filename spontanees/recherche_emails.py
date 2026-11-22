@@ -32,7 +32,6 @@ from urllib.parse import urlparse
 from shared.emails_exclus import email_exclu
 from bs4 import BeautifulSoup
 from ddgs import DDGS
-from ddgs.exceptions import RatelimitException
 from shared.config import MESSAGE_IA_DESACTIVEE, analyse_ia_active, modele_ia
 from shared.validation_emails import emails_douteux, emails_valides, site_verifie, trier
 from database.candidatures_db import sites_des_offres
@@ -114,6 +113,7 @@ _EXTENSIONS_FICHIERS_NON_HTML = {
 }
 
 _compteur_ddg = 0
+erreurs_ddg = 0      # requêtes de recherche web en échec depuis le démarrage
 
 
 def dbg(msg):
@@ -367,19 +367,21 @@ def construire_requetes(entreprise, analyse):
 def _resultats_ddg(requete):
     """Résultats d'une requête DuckDuckGo ({href, title, body}), une nouvelle
     tentative après un refus pour excès de requêtes."""
+    global erreurs_ddg
     for essai in (1, 2):
         try:
             pause_ddg()
             with DDGS() as ddg:
                 return [r for r in ddg.text(requete, max_results=10) if r.get("href")]
-        except RatelimitException:
+        except Exception as e:   # refus pour excès de requêtes, moteur injoignable...
+            # Jamais en silence : à l'audit, une panne du moteur laissait 13
+            # entreprises de suite sans aucun candidat, comptées « sans site »
+            erreurs_ddg += 1
             if essai == 2:
+                journaliser(f"  [⚠️  Recherche web en échec ({type(e).__name__}), requête abandonnée : {requete}]")
                 return []
-            journaliser(f"  [⚠️  Rate limit DDG — attente {PAUSE_RATELIMIT}s...]")
+            journaliser(f"  [⚠️  Recherche web en échec ({type(e).__name__}) — attente {PAUSE_RATELIMIT}s...]")
             time.sleep(PAUSE_RATELIMIT)
-        except Exception as e:
-            dbg(f"DDG erreur : {e}")
-            return []
     return []
 
 
@@ -659,7 +661,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
     sauvegarder(user_id, entreprises)
     avec_email = sum(1 for e in entreprises if e.get("emails_trouves"))
     _log(f"✅ Scraping terminé — {avec_email}/{total} avec email")
-    _log(f"   Recherche web : {_compteur_ddg} requêtes")
+    _log(f"   Recherche web : {_compteur_ddg} requêtes" + (f", {erreurs_ddg} en échec" if erreurs_ddg else ""))
 
 
 def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=None, mode=MODE_DEFAUT):

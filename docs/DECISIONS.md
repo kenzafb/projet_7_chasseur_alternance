@@ -801,6 +801,7 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 - **Enregistré** dans `extra` : `site_verifie` (url, domaine, source, preuve, date ; `{"verifie": false}` sinon) et `essais_site` (candidats essayés, raison du refus).
 - **Recherche web filtrée** : un résultat n'est vérifié que si son domaine ressemble au nom ou si son titre ou son extrait cite le nom ou le SIREN ; un moteur dégradé renvoyait des sites sans rapport (jeux, paroles, films) qui épuisaient les candidats.
 - **Mesure** : `scripts/audit_scraper.py mesure` compare à `audit_exports/scraper_reference.json` (juste, faux, manqué) ; chiffres dans le rapport de l'étape 2.
+- **Échecs de la recherche web jamais silencieux** (complément) : toute erreur du moteur est journalisée, suivie de la même pause qu'un refus pour excès de requêtes et d'un nouvel essai, puis comptée (« N en échec » en fin de lancement, `recherche_web_en_echec` dans la mesure). À la mesure du 22 novembre, une panne silencieuse avait laissé 13 entreprises de suite sans aucun candidat.
 - La nouvelle tentative de site « non fiable » (FIX 11) disparaît : `fiable` valait toujours vrai, elle ne se déclenchait jamais.
 
 ### D161. Scraper : lecture par les liens réels, robots.txt, plafond de pages, formulaires de contact (phase 15)

@@ -326,6 +326,8 @@ def main(argv=None) -> int:
     m = sous.add_parser("mesure")
     m.add_argument("--fichier", default=str(SORTIE / "scraper_echantillon.json"))
     m.add_argument("--max", type=int)
+    m.add_argument("--debut", type=int, default=1, help="commencer à la N-ième entreprise de l'échantillon")
+    m.add_argument("--suffixe", default="", help="ajouté au nom des fichiers de sortie")
     m.add_argument("--sans-ddg", action="store_true")
     m.add_argument("--ia", action="store_true")
     m.add_argument("--base", help="URL SQLite (lecture seule) pour les sites donnés par les offres")
@@ -336,14 +338,17 @@ def main(argv=None) -> int:
         res = echantillon(args.base, args.user, args.taille)
         print(res["repartition_echantillon"], "->", ecrire_json("scraper_echantillon", res))
         return 0
-    entreprises = lire_json(args.fichier)["entreprises"][:args.max]
+    entreprises = lire_json(args.fichier)["entreprises"][args.debut - 1:][:args.max]
     from pathlib import Path
     reference = ({x["id"]: x for x in lire_json(args.reference)["entreprises"]} if Path(args.reference).exists()
                  else None)
     res, candidats = mesurer(entreprises, ddg=not args.sans_ddg, ia=args.ia, base=args.base, reference=reference)
     print(res["synthese"])
-    print("->", ecrire_json("scraper_mesure", res))
-    print("->", ecrire_json("emails_candidats", {"version": 1, "exporte_le": maintenant(), "emails": candidats}))
+    from spontanees import recherche_emails as S
+    res["synthese"]["recherche_web_en_echec"] = S.erreurs_ddg
+    print("->", ecrire_json("scraper_mesure" + args.suffixe, res))
+    print("->", ecrire_json("emails_candidats" + args.suffixe, {"version": 1, "exporte_le": maintenant(),
+                                                                "emails": candidats}))
     return 0
 
 
