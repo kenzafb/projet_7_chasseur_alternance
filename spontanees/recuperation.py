@@ -49,6 +49,7 @@ from shared.modes import MODE_DEFAUT
 from shared.naf import avertissement_sirene, deux_codes, exclusions, secteurs_sirene
 from shared.tailles import TAILLES_250_PLUS, tranches_insee
 from spontanees import parametres_sirene as P
+from spontanees.noms_entreprise import depuis_sirene
 from shared.journal import journaliser
 
 # Catégorie d'entreprise de chaque taille de 250 salariés et plus
@@ -354,6 +355,8 @@ def extraire_infos(etab):
         "taille":         taille,
         "categorie":      ul.get("categorieEntreprise", ""),
         "categorie_juridique": str(ul.get(P.VARIABLE_CATEGORIE_JURIDIQUE) or ""),
+        # Sigle, dénominations usuelles, enseignes : noms à chercher pour le site (D167)
+        "autres_noms":    depuis_sirene(ul, periode),
         "siege":          etab.get("etablissementSiege") is True,
         "etat_etablissement": etat,
         "ca":             None,   # Non disponible dans l'API Sirene

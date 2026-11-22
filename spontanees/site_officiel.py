@@ -66,10 +66,11 @@ def nom_normalise(nom: str) -> str:
 def variantes_du_nom(entreprise: dict) -> list[str]:
     """Noms qui prouvent le site : nom commercial et raison sociale, avec et
     sans le contenu des parenthèses et les mots généraux de fin (« France »).
+    Sigle, dénominations usuelles et enseignes de Sirene compris (D167).
     Seulement ceux qui ont un mot distinctif d'au moins 4 lettres (« LE JU »,
     « 1964 » ne prouvent rien : SIREN exigé)."""
     noms = [entreprise.get("nom_commercial"), entreprise.get("nom"), entreprise.get("raison_sociale"),
-            (entreprise.get("_extra") or {}).get("nom")]
+            (entreprise.get("_extra") or {}).get("nom"), *autres_noms(entreprise)]
     out = []
     for nom in filter(None, noms):
         for v in (nom_normalise(nom), simplifier(re.sub(r"\(.*?\)", " ", nom))):
@@ -81,6 +82,15 @@ def variantes_du_nom(entreprise: dict) -> list[str]:
                                               for m in x.split()):
                     out.append(x)
     return out
+
+
+def autres_noms(entreprise: dict) -> list[str]:
+    """Sigle, dénominations usuelles et enseignes (Sirene, D167), enregistrés
+    à la récupération ou complétés par spontanees/noms_entreprise.py."""
+    v = entreprise.get("autres_noms")
+    if v is None:
+        v = (entreprise.get("_extra") or {}).get("autres_noms")
+    return [str(x) for x in v or [] if x]
 
 
 # ─── Domaines interdits ───────────────────────────────────────────────────────
@@ -205,10 +215,18 @@ def verifier(url: str, entreprise: dict, source: str, lecteur_cls=L.LecteurSite)
 
 
 # ─── Candidats ────────────────────────────────────────────────────────────────
-def site_lba(entreprise: dict) -> str:
-    """Site fourni par La Bonne Alternance (workplace.website), vide sinon."""
+def site_lba(entreprise: dict, sites_export=None) -> str:
+    """Site fourni par La Bonne Alternance (workplace.website) : celui de
+    l'entreprise LBA, sinon celui de l'export pour son SIREN (D166) ; vide sinon."""
     extra = entreprise.get("_extra") or {}
-    return str((extra.get("lba") or {}).get("site_web") or "").strip()
+    site = str((extra.get("lba") or {}).get("site_web") or "").strip()
+    if site:
+        return site
+    siren = entreprise.get("siren") or str(extra.get("siret") or "")[:9]
+    if sites_export is None:
+        from offres.export_lba import sites_par_siren
+        sites_export = sites_par_siren()
+    return str(sites_export.get(siren) or "") if siren else ""
 
 
 def site_deja_verifie(entreprise: dict) -> str:
@@ -217,7 +235,7 @@ def site_deja_verifie(entreprise: dict) -> str:
     return str(v.get("url") or "") if v.get("verifie", True) else ""
 
 
-def candidats(entreprise: dict, sites_france_travail: dict, recherche=None):
+def candidats(entreprise: dict, sites_france_travail: dict, recherche=None, sites_export=None):
     """(url, source) dans l'ordre : déjà vérifié, LBA, France Travail, recherche web (générateur)."""
     vus = set()
 
@@ -228,7 +246,7 @@ def candidats(entreprise: dict, sites_france_travail: dict, recherche=None):
         vus.add(d)
         return True
 
-    for url, source in ((site_deja_verifie(entreprise), VERIFIE), (site_lba(entreprise), LBA)):
+    for url, source in ((site_deja_verifie(entreprise), VERIFIE), (site_lba(entreprise, sites_export), LBA)):
         if url and nouveau(url):
             yield (url if "://" in url else "https://" + url), source
     for nom in {nom_normalise(entreprise.get(c) or "") for c in ("nom_commercial", "nom")} - {""}:
@@ -246,10 +264,10 @@ def candidats(entreprise: dict, sites_france_travail: dict, recherche=None):
 
 
 def identifier(entreprise: dict, sites_france_travail: dict | None = None, recherche=None,
-               lecteur_cls=L.LecteurSite, log=None) -> tuple[Verification | None, list[dict]]:
+               lecteur_cls=L.LecteurSite, log=None, sites_export=None) -> tuple[Verification | None, list[dict]]:
     """(vérification retenue ou None, toutes les vérifications essayées)."""
     essais = []
-    for url, source in candidats(entreprise, sites_france_travail or {}, recherche):
+    for url, source in candidats(entreprise, sites_france_travail or {}, recherche, sites_export):
         for racine in racines(url):
             if domaine_interdit(racine):
                 continue

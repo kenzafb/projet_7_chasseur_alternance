@@ -230,6 +230,14 @@ def dossiers_temporaires(monkeypatch, tmp_path):
     from offres import export_lba
     monkeypatch.setattr(export_lba, "FICHIER", tmp_path / "lba_recruteurs_idf.jsonl.gz")
     monkeypatch.setattr(export_lba, "META", tmp_path / "lba_recruteurs_idf.json")
+    monkeypatch.setattr(export_lba, "SITES", tmp_path / "lba_sites_par_siren.json")
+    # Annuaire des entreprises (autres noms, D167) : jamais appelé par les tests
+    from spontanees import noms_entreprise
+    def hors_ligne(*a, **k):
+        raise noms_entreprise.requests.ConnectionError("annuaire non appelé pendant les tests")
+    monkeypatch.setattr(noms_entreprise, "requests", types.SimpleNamespace(
+        get=hors_ligne, RequestException=noms_entreprise.requests.RequestException,
+        ConnectionError=noms_entreprise.requests.ConnectionError))
 
 
 @pytest.fixture(autouse=True)

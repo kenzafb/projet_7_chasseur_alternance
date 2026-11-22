@@ -254,7 +254,8 @@ _CHAMPS_EXTRA_SCRAPER = ("telephone", "url_scrapee", "source_recherche", "tentat
                          "emails_non_valides", "emails_douteux", "contextes_emails", "meilleur_contact",
                          "validation_emails", "emails_ecartes_ia",
                          # Phase 15 : site vérifié (D160) et essais, formulaires de contact (D161)
-                         "site_verifie", "essais_site", "formulaires_contact")
+                         "site_verifie", "essais_site", "formulaires_contact",
+                         "autres_noms")   # D167 : sigle, dénominations usuelles, enseignes
 
 
 def _codes_naf(d: dict) -> dict:
@@ -613,6 +614,7 @@ def ajouter_entreprises(user_id: int, liste: list[dict], mode: str = MODE_DEFAUT
                 # Sirene (D159) : catégorie juridique (7xxx : public), établissement siège ou non
                 "categorie_juridique": d.get("categorie_juridique", ""),
                 "siege":       d.get("siege"),
+                "autres_noms": d.get("autres_noms") or [],   # D167
             }
             e = Entreprise(
                 user_id        = user_id,

@@ -28,6 +28,7 @@ import codecs
 import gzip
 import json
 import os
+import re
 import threading
 import time
 from datetime import datetime, timedelta, timezone
@@ -39,9 +40,14 @@ from offres import parametres_lba as P
 from shared.config import DATA_DIR
 from shared.domaines import codes_metiers, domaines_du_profil
 from shared.journal import journaliser
+from shared.liens import lien_http
 
 FICHIER = DATA_DIR / "lba_recruteurs_idf.jsonl.gz"
 META = DATA_DIR / "lba_recruteurs_idf.json"
+# Sites web de l'export (workplace.website, offres et recruteurs), par SIREN :
+# source sûre du scraper (D166) ; 328 offres et aucun recruteur en ont un
+# dans l'export du 22 novembre 2026
+SITES = DATA_DIR / "lba_sites_par_siren.json"
 FRAICHEUR_JOURS = 7
 PARTENAIRE_RECRUTEURS = "recruteurs_lba"
 BLOC = 1 << 20
@@ -107,16 +113,29 @@ def construire(objets, fichier=None) -> dict:
     fichier = fichier or FICHIER
     tmp = fichier.with_name(fichier.name + ".tmp")
     lus = recruteurs = idf = 0
+    sites = {}
     with gzip.open(tmp, "wt", encoding="utf-8") as sortie:
         for brut in objets:
             lus += 1
+            siren = re.sub(r"\D", "", str(P.lire(brut, "workplace.siret") or ""))[:9]
+            if len(siren) == 9 and (site := lien_http(P.lire(brut, "workplace.website"))):
+                sites.setdefault(siren, site)
             if str(P.lire(brut, P.CHAMP_PARTENAIRE) or "") == PARTENAIRE_RECRUTEURS:
                 recruteurs += 1
             if ent := recruteur_idf(brut):
                 idf += 1
                 sortie.write(json.dumps(ent, ensure_ascii=False, separators=(",", ":")) + "\n")
     os.replace(tmp, fichier)
-    return {"objets_lus": lus, "recruteurs": recruteurs, "recruteurs_idf": idf}
+    SITES.write_text(json.dumps(sites, ensure_ascii=False), encoding="utf-8")
+    return {"objets_lus": lus, "recruteurs": recruteurs, "recruteurs_idf": idf, "sites_par_siren": len(sites)}
+
+
+def sites_par_siren() -> dict[str, str]:
+    """{SIREN: site web} de l'export (vide si pas encore téléchargé)."""
+    try:
+        return json.loads(SITES.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
 
 
 # ─── Fraîcheur et téléchargement ──────────────────────────────────────────────

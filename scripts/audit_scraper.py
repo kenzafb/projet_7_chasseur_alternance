@@ -176,7 +176,7 @@ def sites_des_offres_lecture(base, user_id) -> dict:
         return sites_des_offres(user_id, db)
 
 
-def mesurer(entreprises: list[dict], ddg=True, ia=False, base=None, reference=None) -> dict:
+def mesurer(entreprises: list[dict], ddg=True, ia=False, base=None, reference=None, sites_export=None) -> dict:
     """Phase 15 (D160, D161) : identification du site (sources, vérification
     par SIREN ou nom), puis lecture du site vérifié, chaque requête notée."""
     from spontanees import lecture_site as L
@@ -199,7 +199,11 @@ def mesurer(entreprises: list[dict], ddg=True, ia=False, base=None, reference=No
             ent = {"nom_commercial": e["nom"], "nom": e.get("raison_sociale"), "ville": e.get("ville"),
                    "code_postal": e.get("code_postal"), "siren": e.get("siren"),
                    "_extra": {"lba": {"site_web": e.get("site_lba") or ""}}}
-            verification, essais = O.identifier(ent, offres[e.get("user_id")], S.urls_recherche if ddg else None)
+            from spontanees.noms_entreprise import completer
+            completer(ent)                      # sigle, dénominations usuelles, enseignes (D167)
+            ligne["autres_noms"] = ent.get("autres_noms")
+            verification, essais = O.identifier(ent, offres[e.get("user_id")], S.urls_recherche if ddg else None,
+                                                sites_export=sites_export)
             ligne.update(site_verifie=verification.resume() if verification else None, essais_site=essais,
                          secondes_identification=chrono.s, requetes_identification=len(journal.requetes))
             if reference is not None:
@@ -332,6 +336,7 @@ def main(argv=None) -> int:
     m.add_argument("--sans-ddg", action="store_true")
     m.add_argument("--ia", action="store_true")
     m.add_argument("--base", help="URL SQLite (lecture seule) pour les sites donnés par les offres")
+    m.add_argument("--sites-export", help="JSON {SIREN: site} tiré de l'export LBA (défaut : celui de l'application)")
     m.add_argument("--reference", default=str(SORTIE / "scraper_reference.json"),
                    help="sites officiels de référence (absent : pas de comparaison)")
     args = ap.parse_args(argv)
@@ -343,7 +348,9 @@ def main(argv=None) -> int:
     from pathlib import Path
     reference = ({x["id"]: x for x in lire_json(args.reference)["entreprises"]} if Path(args.reference).exists()
                  else None)
-    res, candidats = mesurer(entreprises, ddg=not args.sans_ddg, ia=args.ia, base=args.base, reference=reference)
+    sites_export = lire_json(args.sites_export) if args.sites_export else None
+    res, candidats = mesurer(entreprises, ddg=not args.sans_ddg, ia=args.ia, base=args.base, reference=reference,
+                             sites_export=sites_export)
     print(res["synthese"])
     from spontanees import recherche_emails as S
     res["synthese"]["recherche_web_en_echec"] = S.erreurs_ddg

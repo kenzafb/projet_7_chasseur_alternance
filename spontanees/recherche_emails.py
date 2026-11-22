@@ -38,7 +38,8 @@ from database.candidatures_db import sites_des_offres
 from database.dates import maintenant_utc
 from database.entreprises_db import a_scraper, lire_entreprises, sauvegarder_enrichissement
 from spontanees.lecture_site import MAX_PAGES, categorie, formulaires, liens_du_sitemap, liens_utiles
-from spontanees.site_officiel import SOURCES, domaine_interdit, identifier
+from spontanees.noms_entreprise import completer as completer_noms
+from spontanees.site_officiel import SOURCES, autres_noms, domaine_interdit, identifier
 from shared.journal import journaliser
 from shared.modes import MODE_DEFAUT
 
@@ -359,6 +360,10 @@ def construire_requetes(entreprise, analyse):
         requetes.append(f'SIREN {siren}')
 
     requetes.append(f'{nom_court} {lieu} recrutement contact')
+    # Sigle, dénominations usuelles, enseignes (D167)
+    for autre in autres_noms(entreprise)[:3]:
+        if autre.lower() != nom.lower():
+            requetes.append(f'"{autre}" {lieu} site officiel'.strip())
     return requetes
 
 
@@ -598,6 +603,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
                 pct = round(fait / len(a_traiter) * 100)
                 on_progress(min(pct, 100), f"{fait}/{len(a_traiter)} entreprises analysées")
 
+            completer_noms(e)   # sigle, dénominations usuelles, enseignes (D167)
             verification, essais = identifier(e, sites_offres, recherche=urls_recherche,
                                               log=_log if DEBUG else None)
             e["essais_site"] = essais[-6:]

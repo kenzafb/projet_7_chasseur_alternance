@@ -826,3 +826,14 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 ### D165. Jamais de page ni d'email d'un sous-domaine de préproduction ou de test (phase 15)
 - **Constat** : à la mesure du 22 novembre 2026, le site vérifié de France Université Numérique était `prepod.fun.luniversitenumerique.fr` (son SIRET y figure, mais c'est une préproduction).
 - **Règle** (`shared/liens.py`) : un sous-domaine dont une étiquette, hors domaine principal, vaut preprod, pre-prod, prepod, staging, dev, test, tests, recette, qa ou demo (suivi ou non d'un chiffre ou d'un tiret : staging2, recette-v2) est de préproduction. Jamais lu : un candidat, un lien de l'accueil ou du sitemap, une page à lire est remplacé par la même adresse sur le domaine principal (étiquettes jusqu'à la dernière de préproduction retirées : prepod.fun.x.fr devient fun.x.fr) ; une page redirigée vers une préproduction est refusée. Une adresse email d'un tel domaine est écartée (« domaine de préproduction ou de test ») ; un site vérifié enregistré en préproduction compte sur son domaine principal. « test.fr » ou « developpement.acme.fr » ne sont pas concernés.
+
+### D166. Scraper, sources sûres : site de l'export LBA par SIREN, site des offres France Travail (phase 15, étape 3)
+- Avant toute recherche, le scraper essaie, dans l'ordre : le site déjà vérifié, le site La Bonne Alternance (celui de l'entreprise LBA, sinon celui de l'export pour son SIREN), puis le site donné par une offre France Travail ou LBA au même nom (D160). Tous passent par la même vérification (SIREN ou nom).
+- L'export LBA garde désormais, en le lisant, `{SIREN: workplace.website}` de toutes ses entrées (`DATA_DIR/lba_sites_par_siren.json`). Constat sur l'export du 22 novembre 2026 : 328 offres et aucun recruteur ont un site, soit 140 SIREN, dont aucun dans l'échantillon de 40. Le gain attendu est donc faible ; la source coûte une lecture de fichier.
+- Pour France Travail, `entreprise.url` est déjà mis dans la description de l'offre (D160). Combien d'offres en donnent un : compté par `scripts/audit_champs_france_travail.py`, à lancer avec la clé.
+
+### D167. Scraper, autres noms de l'entreprise : sigle, dénominations usuelles, enseignes (phase 15, étape 3)
+- La récupération Sirene garde le sigle, les trois dénominations usuelles de l'unité légale, les enseignes et la dénomination usuelle de l'établissement (`extra.autres_noms`).
+- Une entreprise qui ne les a pas (déjà en base, ou venue de LBA) les reçoit une fois de l'API publique Recherche d'entreprises (données Sirene, sans clé, seul le SIREN est envoyé), puis les garde ; si l'API ne répond pas, ils seront redemandés.
+- Ces noms servent à prouver le site (nom dans le titre ou les mentions légales) et ajoutent une requête de recherche chacun (trois au plus).
+- TIDF : ni sigle ni enseigne dans Sirene. « Toshiba Île-de-France » n'y figure pas, donc cette règle ne le trouve pas.
