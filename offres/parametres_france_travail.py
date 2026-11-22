@@ -33,6 +33,7 @@ VALEURS_PAR_REQUETE = {
     "domaine":         1,   # liste refusée (400)
     "secteurActivite": 2,   # 62,68 : OU (1289 = 614 + 675) ; cinq refusées (« 2 chaînes »)
     "theme":           1,   # liste refusée (400)
+    "motsCles":        1,   # une requête par mot-clé (stage, stagiaire : D152)
 }
 
 # Champ d'une offre qui porte la tranche d'effectif de l'établissement,

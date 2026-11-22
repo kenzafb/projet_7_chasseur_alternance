@@ -97,7 +97,8 @@ def criteres_france_travail(profil: dict, mode: str) -> dict:
         filtres["theme"] = rech["themes"]
     return {
         "filtres": filtres,
-        "domaines": rech.get("domaines", []),
+        # Mode stage : domaines jugés par l'IA, pas filtrés à la source (D152)
+        "domaines": [] if cfg.get("ft_sans_domaine") else rech.get("domaines", []),
         "tailles": rech.get("tailles", []),
         "taille_inconnue": rech.get("taille_inconnue", True),
         "exclure_alternance": bool(cfg.get("ft_exclure_alternance")),

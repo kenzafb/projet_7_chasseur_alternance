@@ -143,7 +143,7 @@ def main(argv=None) -> int:
                 try:
                     final, brut, s = analyser(o, profil, o["mode"], modele, t, construire)
                 except ErreurIABloquante as e:
-                    raise SystemExit(f"IA bloquée : {e}")
+                    raise SystemExit(f"IA bloquée : {e}") from e
                 except ErreurIAPassagere as e:
                     ligne.update(erreur=str(e), secondes=None)
                 else:

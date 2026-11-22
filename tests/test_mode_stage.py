@@ -258,8 +258,9 @@ from tests.test_france_travail import api  # noqa: E402,F401  (fixture)
 def test_criteres_france_travail_du_stage():
     from shared.criteres import criteres_france_travail
     c = criteres_france_travail({"recherche": {"domaines": ["M18"], "secteurs": ["62"], "themes": ["13"]}}, "stage")
-    assert c["filtres"] == {"motsCles": ["stage"], "secteurActivite": ["62"]}     # pas de thème hors job
-    assert c["domaines"] == ["M18"] and c["exclure_alternance"] and c["intitules_stage"]
+    assert c["filtres"] == {"motsCles": ["stage", "stagiaire"], "secteurActivite": ["62"]}   # pas de thème hors job
+    # Domaines du profil jugés par l'IA, pas filtrés à la source (D152)
+    assert c["domaines"] == [] and c["exclure_alternance"] and c["intitules_stage"]
 
 
 def test_recherche_d_offres_de_stage(api, stagiaire):
@@ -277,9 +278,11 @@ def test_recherche_d_offres_de_stage(api, stagiaire):
     ecrites, logs = [], []
     lancer_recherche(uid, profil, max_offres=10, on_offre=ecrites.append, mode="stage",
                      log_fn=logs.append)
-    assert all(r.get("motsCles") == "stage" and r.get("domaine") == "M18" for r in api.recherches)
-    assert [o["titre"] for o in ecrites] == ["Stage - Assistant(e) RH H/F"]
-    o, = ecrites
+    # Une requête par mot-clé, sans domaine ; « Stagiaire juriste » (domaine K19) est gardée (D152)
+    assert {r.get("motsCles") for r in api.recherches} == {"stage", "stagiaire"}
+    assert not any("domaine" in r or "grandDomaine" in r for r in api.recherches)
+    assert sorted(o["titre"] for o in ecrites) == ["Stage - Assistant(e) RH H/F", "Stagiaire juriste"]
+    o = next(o for o in ecrites if o["titre"].startswith("Stage - "))
     assert (o["verdict"], o["score"], o["statut"], o["raison_archivage"]) == ("non_analysee", None, "nouveau", "")
     texte = "\n".join(logs)
     assert "2 offres d'alternance écartées (mode stage)" in texte

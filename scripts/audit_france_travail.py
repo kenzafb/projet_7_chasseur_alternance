@@ -141,7 +141,7 @@ def couverture(token, requetes, collecte: CollecteNotee) -> dict:
     doublons = sum(n - 1 for n in collecte.recus.values() if n > 1)
     feuilles = [p for p in collecte.pages if p["debut"] == 0 and p["total"] <= ft.PLAFOND_REQUETE]
     res = {
-        "requetes": [{"params": {k: v for k, v in q.items() if k != "sort"}, **t} for q, t in zip(requetes, totaux)],
+        "requetes": [{"params": {k: v for k, v in q.items() if k != "sort"}, **t} for q, t in zip(requetes, totaux, strict=True)],
         "total_annonce": annonce,
         "note_total": "somme des totaux des requêtes initiales : une offre trouvée par deux requêtes (deux paquets "
                       "de valeurs) y compte deux fois",
@@ -270,16 +270,46 @@ def stage(token) -> dict:
     return res
 
 
+def gardees(token, criteres: dict) -> dict:
+    """Offres que chercher_offres garderait pour ces critères (sans le filtre
+    « déjà vues ») : lieu, intitulé, taille, alternance, intitulé de stage."""
+    c = collecter(token, ft.requetes_initiales(criteres["filtres"], criteres["domaines"]))
+    norm = [n for n in map(ft._normaliser_une, c.offres.values()) if n]
+    res = [n for n in norm if n["titre"] != "Sans titre"
+           and garder_selon_taille(n["_taille"], criteres["tailles"], criteres["taille_inconnue"])
+           and not (criteres.get("exclure_alternance") and n["_alternance"])
+           and (not criteres.get("intitules_stage") or designe_un_stage(n["titre"]))]
+    return {"requetes": c.requetes, "recues": len(c.offres), "en_idf": len(norm), "gardees": len(res),
+            "ids": {n["id"]: n["titre"] for n in res}}
+
+
+def avant_apres_stage(token, criteres: dict, profil: dict) -> dict:
+    """D152 : avant, motsCles=stage et domaines du profil ; après, les critères
+    actuels (stage et stagiaire, sans domaine)."""
+    avant_c = {**criteres, "filtres": {**criteres["filtres"], "motsCles": ["stage"]},
+               "domaines": ((profil.get("recherche") or {}).get("domaines") or [])}
+    avant, apres = gardees(token, avant_c), gardees(token, criteres)
+    nouvelles = {i: t for i, t in apres["ids"].items() if i not in avant["ids"]}
+    perdues = {i: t for i, t in avant["ids"].items() if i not in apres["ids"]}
+    return {"avant": {k: v for k, v in avant.items() if k != "ids"} | {"domaines": avant_c["domaines"]},
+            "apres": {k: v for k, v in apres.items() if k != "ids"},
+            "ajoutees": len(nouvelles), "perdues": len(perdues),
+            "exemples_ajoutees": list(nouvelles.values())[:EXEMPLES], "exemples_perdues": list(perdues.values())}
+
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
+def profil_du_mode(mode: str, user: int | None, base: str | None) -> dict:
+    if not user:
+        return {}
+    from database.models import Profil
+    from database.profil_db import profil_vers_dict
+    with session_lecture(base) as db:
+        p = db.query(Profil).filter_by(user_id=user, mode=mode).first()
+        return profil_vers_dict(p) if p else {}
+
+
 def criteres_du_mode(mode: str, user: int | None, base: str | None) -> dict:
-    profil = {}
-    if user:
-        from database.models import Profil
-        from database.profil_db import profil_vers_dict
-        with session_lecture(base) as db:
-            p = db.query(Profil).filter_by(user_id=user, mode=mode).first()
-            profil = profil_vers_dict(p) if p else {}
-    return criteres_france_travail(profil, mode)
+    return criteres_france_travail(profil_du_mode(mode, user, base), mode)
 
 
 def auditer(mode: str, user, base, hors_ligne: bool) -> dict:
@@ -304,6 +334,9 @@ def auditer(mode: str, user, base, hors_ligne: bool) -> dict:
     res["domaines_et_secteurs"] = domaines_et_secteurs(token, requetes, collecte)
     if mode == "stage":
         res["stage"] = stage(token)
+        res["avant_apres_D152"] = a = avant_apres_stage(token, criteres, profil_du_mode(mode, user, base))
+        print(f"  stage, offres gardées : avant {a['avant']['gardees']}, après {a['apres']['gardees']} "
+              f"(+{a['ajoutees']}, -{a['perdues']})")
     res["duree_s"] = chrono.s
     c, e = res["couverture"], res["ecartees_apres_recuperation"]
     print(f"  annoncées {c['total_annonce']}, distinctes {c['distinctes_recuperees']}, écart {c['ecart']}, "
