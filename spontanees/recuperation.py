@@ -2,8 +2,9 @@
 spontanees/recuperation.py
 ===============================
 Étape « Récupérer » des candidatures spontanées : entreprises à fort
-potentiel de La Bonne Alternance, puis entreprises de l'API Sirene de
-l'INSEE (3.11), sans priorité de l'une sur l'autre (décision D44).
+potentiel de La Bonne Alternance (export complet, D163), puis entreprises
+de l'API Sirene de l'INSEE (3.11), sans priorité de l'une sur l'autre
+(décision D44).
 
 Sirene (SPEC_SOURCES section 4, phase 5d) :
   - codes NAF du profil (shared.naf) : secteurs cœurs des domaines, toutes
@@ -383,27 +384,32 @@ def enregistrer(user_id, entreprises: dict, sirens_vus=(), mode=MODE_DEFAUT) -> 
 
 def entreprises_lba(user_id, profil, max_entreprises=None, stop_event=None, log_fn=journaliser,
                     mode=MODE_DEFAUT) -> int:
-    """Entreprises à fort potentiel de La Bonne Alternance (SPEC_SOURCES
-    section 3). Retourne le nombre de nouvelles entreprises ajoutées (au
-    plus max_entreprises)."""
-    from offres.la_bonne_alternance import rechercher_pour_profil
-    from database.entreprises_db import ajouter_entreprises_lba, cles_connues
-    from shared.config import LBA_RAYON_MIN_KM, LBA_REQUETES_MAX
-    log_fn("🔍 La Bonne Alternance : entreprises à fort potentiel d'embauche d'alternants "
-           f"(rayon minimal {LBA_RAYON_MIN_KM:g} km, au plus {LBA_REQUETES_MAX} requêtes, "
-           "réglables dans shared/config.py)")
-    # Cercles au plafond de 150 entreprises redécoupés (D36), jusqu'à
-    # max_entreprises nouvelles
-    lba = rechercher_pour_profil(profil, log=log_fn, stop_event=stop_event, redecouper_entreprises=True,
-                                 objectif_entreprises=max_entreprises, connus=cles_connues(user_id, mode))
-    if lba is not None:
-        log_fn(f"⏱️  La Bonne Alternance terminée : {lba['requetes']} requêtes en "
-               f"{int(lba['duree_s']) // 60} min {int(lba['duree_s']) % 60:02d} s")
-    if not lba or not lba["entreprises"]:
-        if lba is not None:
-            log_fn("ℹ️  Aucune entreprise à fort potentiel trouvée sur LBA")
+    """Entreprises à fort potentiel de La Bonne Alternance, tirées de l'export
+    complet rafraîchi chaque semaine (D163, offres/export_lba.py) et non plus
+    de la recherche par cercles, plafonnée à 150 par cercle. Retourne le
+    nombre de nouvelles entreprises ajoutées (au plus max_entreprises)."""
+    from offres import export_lba
+    from database.entreprises_db import ajouter_entreprises_lba
+    log_fn("🔍 La Bonne Alternance : entreprises à fort potentiel d'embauche d'alternants (export complet, "
+           f"rafraîchi au plus une fois tous les {export_lba.FRAICHEUR_JOURS} jours)")
+    debut = time.monotonic()
+    liste = export_lba.entreprises_pour_profil(profil, log_fn)
+    if liste is None:
+        log_fn("ℹ️  Entreprises à fort potentiel de LBA indisponibles pour ce lancement")
         return 0
-    b = ajouter_entreprises_lba(user_id, lba["entreprises"], maximum=max_entreprises, mode=mode)
+
+    def jusqu_a_l_arret(entreprises):
+        for e in entreprises:
+            if stop_event and stop_event.is_set():
+                log_fn("  ⏹️  LBA : arrêt demandé")
+                return
+            yield e
+    b = ajouter_entreprises_lba(user_id, jusqu_a_l_arret(liste), maximum=max_entreprises, mode=mode)
+    duree = time.monotonic() - debut
+    log_fn(f"⏱️  La Bonne Alternance terminée en {int(duree) // 60} min {int(duree) % 60:02d} s")
+    if not (b["ajoutees"] or b["deja_connues"] or b["non_ajoutees"]):
+        log_fn("ℹ️  Aucune entreprise à fort potentiel trouvée sur LBA pour ce profil")
+        return 0
     log_fn(f"🏢 LBA : {b['ajoutees']} nouvelles entreprises à fort potentiel"
            + (f" (dont {b['avec_email']} avec un email fourni par LBA)" if b["avec_email"] else "")
            + (f", {b['deja_connues']} déjà connues" if b["deja_connues"] else "")

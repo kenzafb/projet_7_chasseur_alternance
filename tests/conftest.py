@@ -178,6 +178,10 @@ def dossiers_temporaires(monkeypatch, tmp_path):
     """PDF et pièces jointes dans tmp_path, jamais dans le projet."""
     monkeypatch.setattr(config, "LETTRES_PDF_DIR", tmp_path / "pdf")
     monkeypatch.setattr(config, "UPLOADS_DIR", tmp_path / "uploads")
+    # Export LBA compact (D163) : jamais le fichier de DATA_DIR
+    from offres import export_lba
+    monkeypatch.setattr(export_lba, "FICHIER", tmp_path / "lba_recruteurs_idf.jsonl.gz")
+    monkeypatch.setattr(export_lba, "META", tmp_path / "lba_recruteurs_idf.json")
 
 
 @pytest.fixture(autouse=True)

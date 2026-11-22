@@ -27,7 +27,6 @@ Sortie : audit_exports/audit_lba_export.json.
 """
 
 import argparse
-import json
 import sys
 import time
 from collections import Counter
@@ -47,30 +46,10 @@ EXEMPLES = 10
 RECRUTEURS = "recruteurs_lba"
 
 
-def lire_en_flux(chemin: Path, bloc: int = 1 << 22):
-    """Objets d'une liste JSON « [{...},{...}] », un à un."""
-    dec = json.JSONDecoder()
-    tampon, i, fin = "", 0, False
-    with open(chemin, encoding="utf-8") as f:
-        while True:
-            while i < len(tampon) and tampon[i] in " \t\r\n[,":
-                i += 1
-            if i < len(tampon) and tampon[i] == "]":
-                return
-            try:
-                if i >= len(tampon):
-                    raise json.JSONDecodeError("fin du tampon", tampon, i)
-                objet, i = dec.raw_decode(tampon, i)
-            except json.JSONDecodeError:
-                if fin:
-                    if i >= len(tampon):
-                        return
-                    raise
-                lu = f.read(bloc)       # objet coupé : le tampon garde la fin non lue
-                fin = not lu
-                tampon, i = tampon[i:] + lu, 0
-                continue
-            yield objet
+def lire_en_flux(chemin: Path):
+    """Objets de l'export, un à un (lecteur de l'application, D163)."""
+    from offres.export_lba import morceaux_de_fichier, objets_en_flux
+    return objets_en_flux(morceaux_de_fichier(chemin))
 
 
 def profil_alternance(user, base) -> dict:

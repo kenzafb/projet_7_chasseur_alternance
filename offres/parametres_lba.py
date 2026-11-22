@@ -16,6 +16,10 @@ docs/referentiels/lba/verification_api.json, décisions D36 à D42).
 """
 
 URL_RECHERCHE = "https://api.apprentissage.beta.gouv.fr/api/job/v1/search"
+# Export complet (OpenAPI : refait chaque nuit, deux appels par minute,
+# réponse {url, lastUpdate}, URL valable deux minutes) : source des
+# entreprises à fort potentiel (D163, offres/export_lba.py)
+URL_EXPORT = "https://api.apprentissage.beta.gouv.fr/api/job/v1/export"
 
 # ─── Paramètres de la recherche ───────────────────────────────────────────────
 PARAM_CODES = "romes"          # codes métiers (ROME, 5 caractères), séparés par des virgules
