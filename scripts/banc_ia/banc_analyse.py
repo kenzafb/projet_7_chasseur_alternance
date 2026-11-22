@@ -65,6 +65,15 @@ def analyser(offre, profil, mode, modele, temperature, construire):
     return res, brut.model_dump(), duree
 
 
+def analyser_v2(offre, profil, mode, modele, temperature, construire=None):
+    """Prompt v2 (D170) : extraction sans le profil, jugement en un mot."""
+    from offres.analyse_v2 import analyser_offre_v2
+    res = analyser_offre_v2(offre, profil, mode, modele=modele, essais=1, temperature=temperature)
+    res["score_modele"] = res["categorie"]
+    brut = {"extraction": res.pop("extraction"), "categorie": res["categorie"]}
+    return res, brut, res.pop("secondes")
+
+
 def mesurer(lignes: list[dict], ref) -> dict:
     """Métriques d'une température (lignes : un essai d'une offre chacune)."""
     ok = [x for x in lignes if x.get("final")]
@@ -116,6 +125,8 @@ def main(argv=None) -> int:
     ap.add_argument("--mode", help="seulement les offres de ce mode")
     ap.add_argument("--max", type=int, help="offres au plus")
     ap.add_argument("--annotees", action="store_true", help="seulement les offres annotées")
+    ap.add_argument("--version", choices=["v1", "v2"], default="v1",
+                    help="prompt d'analyse : v1 (un appel) ou v2 (extraction puis jugement, D170)")
     args = ap.parse_args(argv)
 
     activer_ia()
@@ -128,10 +139,12 @@ def main(argv=None) -> int:
     offres = [o for o in ref["offres"] if (not args.mode or o["mode"] == args.mode)
               and (not args.annotees or any(v not in (None, "") for v in (o.get("attendu") or {}).values()))]
     offres = offres[:args.max] if args.max else offres
-    print(f"Modèle {modele}, prompt {args.prompt or 'de l application'}, {len(offres)} offres")
+    print(f"Modèle {modele}, prompt {args.prompt or args.version}, {len(offres)} offres, IA_* du .env lus")
     print(f"Test de démarrage : {verifier_demarrage(modele):.1f} s")
 
-    resultats = {"le": maintenant(), "modele": modele, "prompt": args.prompt or "offres.analyse.construire_messages",
+    appel = analyser_v2 if args.version == "v2" else analyser
+    resultats = {"le": maintenant(), "modele": modele, "version": args.version,
+                 "prompt": args.prompt or ("offres.analyse_v2" if args.version == "v2" else "offres.analyse.construire_messages"),
                  "reference": args.reference, "essais": args.essais, "par_temperature": {}}
     for t in [float(x) for x in args.temperatures.split(",")]:
         lignes = []
@@ -141,14 +154,14 @@ def main(argv=None) -> int:
                 ligne = {"ref": o["ref"], "mode": o["mode"], "essai": essai, "attendu": o.get("attendu") or {},
                          "profil_crans": niveau_du_profil(profil)["crans"]}
                 try:
-                    final, brut, s = analyser(o, profil, o["mode"], modele, t, construire)
+                    final, brut, s = appel(o, profil, o["mode"], modele, t, construire)
                 except ErreurIABloquante as e:
                     raise SystemExit(f"IA bloquée : {e}") from e
                 except ErreurIAPassagere as e:
                     ligne.update(erreur=str(e), secondes=None)
                 else:
                     ligne.update(final=final, brut=brut, secondes=round(s, 2))
-                    print(f"  T={t} essai {essai} [{i}/{len(offres)}] {o['titre'][:50]} : modèle {brut['score']}, "
+                    print(f"  T={t} essai {essai} [{i}/{len(offres)}] {o['titre'][:50]} : modèle {brut.get('score', brut.get('categorie'))}, "
                           f"final {final['score']} {categorie_du_resultat(final)}"
                           f" (attendu {ligne['attendu'].get('categorie') or '?'}) {s:.1f} s")
                 lignes.append(ligne)
@@ -157,7 +170,8 @@ def main(argv=None) -> int:
         print(f"\nT={t} : éligibilité {m['eligibilite']['exactitude']}, faux positifs de niveau "
               f"{m['faux_positifs_niveau']['nombre']}, écart de catégorie {m['categorie']['ecart_moyen_rangs']}, "
               f"σ note {m['variance']['ecart_type_note_moyen']}, {m['temps_s']['moyen']} s/offre")
-    nom = f"banc_analyse_{modele.replace(':', '_').replace('/', '_')}_{time.strftime('%Y%m%d_%H%M%S')}"
+    nom = (f"banc_analyse_{args.version}_{modele.replace(':', '_').replace('/', '_')}_"
+           f"{time.strftime('%Y%m%d_%H%M%S')}")
     print("->", ecrire_json(nom, resultats))
     return 0
 

@@ -873,3 +873,16 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 - **Constat** : Fermat (olympic.fermat.edu.vn), Bellon (fondationpierrebellon.org) et Ithis (ithishospital.com) avaient été retenus sur leur seul nom dans un titre.
 - **Règle.** La preuve par le nom (titre du site ou mentions légales) n'est acceptée que pour un nom qui a au moins deux mots distinctifs (4 lettres ou plus, ni généraux, ni formes juridiques, ni nombres). Sinon il faut le SIREN, le SIRET ou le numéro de TVA. Cela vaut aussi pour les autres noms (D167) : « Toshiba Île-de-France » n'a qu'un mot distinctif.
 - **Effet attendu** : moins de faux, mais certains sites justes trouvés par le titre seul (Neurones, WeTradeLocal, Degetel…) exigent maintenant leur SIREN dans les mentions légales. La mesure le dira.
+
+### D170. Prompt d'analyse v2 : extraction sans le profil, jugement en un mot, Python note et plafonne (phase 15, étape 3)
+- **Constats** (banc de départ) : la catégorie n'est juste qu'à 36,7 % ; le modèle met rarement « Hors sujet » et sous-note les offres moyennes ; à l'étape 1, il recopiait le niveau du profil au lieu de celui de l'offre, et ne voyait que 2 000 caractères.
+- **Appel 1, extraction** (`offres/analyse_v2.py`) : il ne voit pas le profil et lit la description entière (jusqu'à 8 000 caractères). Il donne niveau et exigence, durée, date de début, alternance seulement, années d'expérience exigées, permis exigé, certifications exigées, diplôme d'État exigé. Python contrôle chaque valeur contre le texte (D98). Les exigences retrouvées dans le texte deviennent des lignes structurées, jugées par les mêmes règles que D169.
+- **Appel 2, jugement** : avec le profil, sur la description raccourcie (`IA_LONGUEUR_DESCRIPTION`), un mot parmi Très bien, Bien, Moyen, Faible et Hors sujet, chacun défini. L'arbre de décision est ordonné :
+  1. hors sujet (domaine, postes à éviter, ce n'est pas le bon contrat) ;
+  2. adéquation des missions ;
+  3. réserves, en descendant d'un cran une seule fois.
+
+  Niveau, durée, dates, permis et certifications ne comptent pas : ils sont vérifiés à part.
+- **Python** convertit le mot en note (Très bien 9, Bien 7, Moyen 5, Faible 3, Hors sujet 1), décide l'éligibilité (plafond 3 si inéligible) et plafonne : un niveau souhaité deux crans ou plus au-dessus du profil donne Moyen au plus, à la place du malus de 1 à 2 points de v1.
+- **Mesure** (D, `scripts/banc_ia/decouper.py`) : le jeu annoté est coupé en deux moitiés fixes (graine 15, réparties par mode), 69 offres de réglage et 68 de test. Le prompt ne s'ajuste que sur la moitié réglage. La moitié test sert à la mesure finale seulement : v1 contre v2 avec ministral-3:3b, puis v2 avec ministral-3:8b. Les bancs lisent les seules variables `IA_*` du `.env`. `banc_analyse.py --version v1|v2`.
+- L'application garde v1 tant que la mesure finale n'a pas tranché.

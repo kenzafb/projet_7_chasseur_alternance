@@ -58,6 +58,49 @@ class AnalyseOffre(_Reponse):
         return [v.strip() for v in valeurs if isinstance(v, str) and v.strip()]
 
 
+class ExtractionOffre(_Reponse):
+    """Prompt v2, premier appel (D170) : ce que dit le texte de l'offre, sans
+    le profil. Contrôlé contre le texte en Python avant de servir."""
+    niveau_requis: Literal["bac", "bac+2", "bac+3", "bac+4", "bac+5", "non_precise"] = Field(
+        description="Niveau d'études demandé par l'offre")
+    niveau_exigence: Literal["exige", "souhaite", "non_precise"] = Field(description="Exigé, souhaité ou non précisé")
+    duree_mois: float | None = Field(description="Durée du contrat ou du stage en mois, ou null")
+    date_debut_offre: str | None = Field(description="Début écrit dans l'offre, ou null")
+    alternance_seulement: bool = Field(description="Vrai si l'offre n'existe qu'en alternance ou apprentissage")
+    experience_exigee_annees: float | None = Field(description="Années d'expérience exigées, ou null")
+    permis_exige: str | None = Field(description="Code du permis exigé (B, C...), ou null")
+    certifications_exigees: list[str] = Field(description="Certifications exigées (CACES, SSIAP...)")
+    diplome_etat_exige: bool = Field(description="Vrai si un diplôme d'État est exigé")
+
+    @field_validator("duree_mois", "experience_exigee_annees")
+    @classmethod
+    def _positif(cls, v):
+        return v if v and v > 0 else None
+
+    @field_validator("certifications_exigees")
+    @classmethod
+    def _sans_vides(cls, valeurs):
+        return [v.strip() for v in valeurs if isinstance(v, str) and v.strip()]
+
+
+CATEGORIES_JUGEMENT = ("Très bien", "Bien", "Moyen", "Faible", "Hors sujet")
+
+
+class JugementOffre(_Reponse):
+    """Prompt v2, second appel (D170) : adéquation en un mot, convertie en
+    note par Python."""
+    categorie: Literal[CATEGORIES_JUGEMENT] = Field(description="Très bien, Bien, Moyen, Faible ou Hors sujet")
+    points_forts: list[str] = Field(description="3 au plus")
+    points_faibles: list[str] = Field(description="2 au plus")
+    domaine: str = Field(description="Catégorie métier en 2 à 4 mots")
+    resume: str = Field(description="12 mots au plus")
+
+    @field_validator("points_forts", "points_faibles")
+    @classmethod
+    def _sans_vides(cls, valeurs):
+        return [v.strip() for v in valeurs if isinstance(v, str) and v.strip()]
+
+
 class ParagrapheIA(_Reponse):
     """Le seul paragraphe personnalisé de la lettre, rédigé par l'IA (D106)."""
     paragraphe: str = Field(min_length=1, description="3 à 5 phrases à la première personne")

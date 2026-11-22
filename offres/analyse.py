@@ -245,7 +245,7 @@ def est_ecole_cfa(offre) -> bool:
     return bool(organismes_verifies(offre))
 
 
-def appliquer_eligibilite(result: dict, offre: dict, profil: dict, mode: str) -> dict:
+def appliquer_eligibilite(result: dict, offre: dict, profil: dict, mode: str, malus_souhait: bool = True) -> dict:
     """Critères bloquants décidés en Python (shared/eligibilite.py) à partir
     des champs extraits de l'offre, d'abord contrôlés contre son texte
     (une valeur absente du texte devient non précisée, extraits_ecartes) :
@@ -256,7 +256,7 @@ def appliquer_eligibilite(result: dict, offre: dict, profil: dict, mode: str) ->
     from shared.eligibilite import (PLAFOND_SCORE_INELIGIBLE, controler_extraits, penalite_souhait,
                                     raisons_ineligibilite)
     result["extraits_ecartes"] = controler_extraits(result, offre)
-    points, souhait = penalite_souhait(result, profil)
+    points, souhait = penalite_souhait(result, profil) if malus_souhait else (0, "")   # v2 : plafond (D170)
     if points:
         result["score"] = max(0, result["score"] - points)
         if result["eligible"]:

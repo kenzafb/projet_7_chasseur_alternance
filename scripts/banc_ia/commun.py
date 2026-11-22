@@ -44,8 +44,31 @@ def categorie_du_resultat(res: dict) -> str:
     return "Faible"
 
 
+def charger_ia_env(fichier: Path | None = None) -> dict:
+    """Variables IA_* du .env, et elles seules (lecture seule) : le banc mesure
+    la vraie configuration sans charger les autres réglages ni les secrets.
+    Une variable déjà dans l'environnement est gardée."""
+    fichier = fichier or (RACINE / ".env")
+    lues = {}
+    try:
+        lignes = fichier.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return lues
+    for ligne in lignes:
+        ligne = ligne.strip()
+        if not ligne.startswith("IA_") or "=" not in ligne:
+            continue
+        cle, _, valeur = ligne.partition("=")
+        valeur = valeur.split(" #", 1)[0].strip().strip('"').strip("'")
+        lues[cle.strip()] = valeur
+        os.environ.setdefault(cle.strip(), valeur)
+    return lues
+
+
 def activer_ia():
-    """ANALYSE_IA=false est ignoré pour le banc (rien n'est écrit en base)."""
+    """ANALYSE_IA=false est ignoré pour le banc (rien n'est écrit en base) ;
+    réglages IA_* lus dans le .env (charger_ia_env)."""
+    charger_ia_env()
     os.environ["ANALYSE_IA"] = "true"
 
 
