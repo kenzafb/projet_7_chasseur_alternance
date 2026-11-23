@@ -33,6 +33,9 @@ for _var in ("CODE_INVITATION", "FT_CLIENT_ID", "FT_CLIENT_SECRET", "LBA_API_KEY
              "IA_DELAI_S", "IA_LONGUEUR_DESCRIPTION", "IA_REFLEXION", "IA_API", "IA_NUM_CTX",
              "IA_KEEP_ALIVE"):
     os.environ.pop(_var, None)
+# Les tests de l'analyse simulent la réponse en un appel du prompt v1 ; v2
+# (D170, défaut de l'application) a ses propres tests (test_analyse_v2.py)
+os.environ["IA_VERSION_ANALYSE"] = "v1"
 
 import httpx  # noqa: E402
 import pytest  # noqa: E402

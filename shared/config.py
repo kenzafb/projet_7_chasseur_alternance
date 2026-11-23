@@ -195,6 +195,12 @@ def ia_delai_s() -> float:
 # Attente maximale de l'ouverture de la connexion : au-delà, serveur injoignable
 IA_DELAI_CONNEXION_S = 10
 
+def ia_version_analyse() -> str:
+    """Prompt d'analyse des offres : « v2 » (extraction puis jugement en un
+    mot, D170, par défaut) ou « v1 » (un appel)."""
+    return "v1" if os.getenv("IA_VERSION_ANALYSE", "").strip().lower() == "v1" else "v2"
+
+
 def ia_longueur_description() -> int:
     """Caractères de la description d'une offre envoyés à l'IA (défaut
     2000) : sur processeur, chaque millier de caractères coûte une dizaine

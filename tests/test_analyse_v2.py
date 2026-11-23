@@ -101,3 +101,16 @@ def test_hors_sujet_exige_une_phrase_du_profil(ia):
     assert analyser_offre_v2({"titre": "Déménageur", "description": "x"}, profil, "job")["categorie"] == "Hors sujet"
     ia.file = [_extraction(), _jugement("Hors sujet", "Idéalement des postes calmes")]   # pas un champ d'exclusion
     assert analyser_offre_v2({"titre": "Caissier", "description": "x"}, profil, "job")["categorie"] == "Faible"
+
+
+def test_v2_par_defaut_dans_l_application(ia, monkeypatch):
+    """analyser_offre (analyse différée, bouton « Noter ») passe par v2 par défaut."""
+    from offres.analyse import analyser_offre
+    from shared.config import ia_version_analyse
+    monkeypatch.delenv("IA_VERSION_ANALYSE")
+    assert ia_version_analyse() == "v2"
+    ia.file = [_extraction(), _jugement("Bien")]
+    r = analyser_offre({"titre": "Stage dev", "description": "Développement web en Python."}, PROFIL, "stage")
+    assert (r["categorie"], r["score"], len(ia.appels)) == ("Bien", 7, 2)
+    monkeypatch.setenv("IA_VERSION_ANALYSE", "v1")
+    assert ia_version_analyse() == "v1"

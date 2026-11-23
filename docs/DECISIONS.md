@@ -897,4 +897,17 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
   1. Arbre tel que conçu : le modèle met « Hors sujet » partout où le poste n'est pas dans les types de jobs qui conviennent.
   2. Étape 1 resserrée : Hors sujet seulement pour ce que le profil écarte explicitement ; en cas de doute, étape 2.
   3. Le modèle doit recopier la phrase du profil qui impose Hors sujet (`hors_sujet_car`) ; Python ne garde Hors sujet que si elle vient d'un champ d'exclusion (types de jobs à éviter, ce qu'il préfère éviter, domaines recherchés hors job), sinon Faible.
-- L'application garde v1 tant que la mesure finale sur la moitié test n'a pas tranché.
+- **Mesure finale** (moitié test, 68 offres jamais regardées avant, 1 essai, température 0, variables `IA_*` du `.env`) :
+
+  | | v1, 3b | v2, 3b | v2, 8b |
+  |---|---|---|---|
+  | Éligibilité juste | 60,3 % (26 faux éligibles) | 72,1 % (18) | 70,6 % (19) |
+  | Faux inéligibles | 1 | 1 | 1 |
+  | Niveau extrait juste | 86,8 % | 89,7 % | 86,8 % |
+  | Faux positifs de niveau | 0 | 0 | 0 |
+  | Catégorie exacte | 32,4 % | 51,5 % | 55,9 % |
+  | Écart moyen | 0,76 rang | 0,63 rang | 0,56 rang |
+  | Réponses à 2 rangs ou plus | 4 | 8 | 6 |
+  | Temps par offre | 23,3 s | 23,8 s | 50,2 s |
+  | Réponses invalides | 0 | 0 | 0 |
+- **Décision** : v2 devient le prompt de l'application (`IA_VERSION_ANALYSE`, défaut `v2`, `v1` pour revenir), avec ministral-3:3b. Le 8b gagne un peu en catégorie mais double le temps. Les tests d'avant restent épinglés sur v1, v2 a les siens.

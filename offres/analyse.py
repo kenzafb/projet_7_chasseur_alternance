@@ -221,10 +221,16 @@ def analyser_offre(offre, profil, mode="alternance", modele=None, essais=2):
     remontent : jamais de note inventée. En alternance, une offre d'école ou
     de CFA est marquée à archiver (statut_auto)."""
     exiger_profil(profil)   # plus de repli sur un utilisateur par défaut
-    analyse = appeler_structure(construire_messages(offre, profil, mode), AnalyseOffre,
-                                usage="analyse", modele=modele, essais=essais, temperature=0.1)
-    result = _valider_analyse(analyse)
-    appliquer_eligibilite(result, offre, profil, mode)
+    from shared.config import ia_version_analyse
+    if ia_version_analyse() == "v2":
+        # Prompt v2 (D170) : extraction sans le profil, puis jugement en un mot
+        from offres.analyse_v2 import analyser_offre_v2
+        result = analyser_offre_v2(offre, profil, mode, modele=modele, essais=essais)
+    else:
+        analyse = appeler_structure(construire_messages(offre, profil, mode), AnalyseOffre,
+                                    usage="analyse", modele=modele, essais=essais, temperature=0.1)
+        result = _valider_analyse(analyse)
+        appliquer_eligibilite(result, offre, profil, mode)
     # Mode stage : une école peut accueillir un stagiaire (D74), rien à archiver
     if mode == "alternance" and est_ecole_cfa(offre):
         result["statut_auto"] = "archive"
