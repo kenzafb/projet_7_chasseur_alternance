@@ -54,9 +54,14 @@ PLAFOND_SCORE_INELIGIBLE = 3
 # Bac+5 exigé sans mot d'exigence (D177) : stage de fin d'études, dernière année
 # d'école d'ingénieurs ou de master, M2
 BAC5_EXIGE = (r"stages? de fin d.[ée]tudes|derni[èe]re ann[ée]e (?:d.|de |du )(?:[ée]coles? d.ing[ée]nieurs?"
-              r"|cycle d.ing[ée]nieurs?|ing[ée]nieurs?|master)|\bm\s?2\b|master\s*2")
+              r"|cycle d.ing[ée]nieurs?|ing[ée]nieurs?|master)")
+M2 = r"\bm\s?2\b|master\s*2"
+# M2 ou Master 2 n'est exigé que précédé de « en », « de », « niveau »,
+# « étudiant(e) », « préparez », « préparant » (D180) : « dossiers d'entrée en
+# Master 1 et Master 2 » d'un poste de scolarité n'exige rien
+M2_EXIGE = re.compile(r"(?:\ben|\bde|\bniveau|[ée]tudiante?s?|pr[ée]parez|pr[ée]parant)\s+(?:(?:un|une|le|la|votre|son)\s+)?$")
 INDICES_NIVEAU = [
-    (BAC5_EXIGE + r"|bac\s*\+\s*5|[ée]coles? d.ing[ée]nieurs?|dipl[ôo]me d.ing[ée]nieurs?"
+    (BAC5_EXIGE + "|" + M2 + r"|bac\s*\+\s*5|[ée]coles? d.ing[ée]nieurs?|dipl[ôo]me d.ing[ée]nieurs?"
      r"|[ée]l[èe]ves?[- ]ing[ée]nieurs?|cycle (?:d.)?ing[ée]nieurs?|formation d.ing[ée]nieurs?", {"bac+5"}),
     (r"\bmasters?\b|\bmsc\b", {"bac+4", "bac+5"}),
     (r"bac\s*\+\s*4|\bm\s?1\b|master\s*1", {"bac+4"}),
@@ -104,9 +109,14 @@ def exigence_detectee(texte: str, positions) -> str:
     « souhaite » dans tous les autres cas."""
     if _pres(MARQUEURS_EXIGENCE, texte, positions) and not _pres(MARQUEURS_SOUHAIT, texte, positions):
         return "exige"
-    # Stage de fin d'études, dernière année d'école d'ingénieurs ou de master, M2 : exigé (D177)
-    if any(re.fullmatch(BAC5_EXIGE, texte[a:b].lower()) for a, b in positions):
-        return "exige"
+    # Stage de fin d'études, dernière année d'école d'ingénieurs ou de master : exigé (D177) ;
+    # M2 seulement après « en », « de », « niveau », « étudiant », « préparez » (D180)
+    bas = texte.lower()
+    for a, b in positions:
+        if re.fullmatch(BAC5_EXIGE, bas[a:b]):
+            return "exige"
+        if re.fullmatch(M2, bas[a:b]) and M2_EXIGE.search(bas[max(0, a - 40):a]):
+            return "exige"
     return "souhaite"
 
 

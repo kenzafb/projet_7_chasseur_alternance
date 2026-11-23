@@ -158,6 +158,9 @@ def test_experience_extraite_en_lettres_retenue():
     ("Vous êtes en dernière année d'école d'ingénieurs.", "exige"),
     ("Étudiant en dernière année de master informatique.", "exige"),
     ("Vous préparez un M2 en data science.", "exige"),
+    ("Étudiant en M2 informatique.", "exige"),
+    ("Profil : niveau Master 2.", "exige"),
+    ("Titulaire d'un diplôme de Master 2.", "exige"),
     ("Idéalement en école d'ingénieurs (Bac+5).", "souhaite"),            # pas de tournure de D177
 ])
 def test_bac5_exige_sans_mot_d_exigence(texte, exigence):
@@ -207,3 +210,10 @@ def test_poste_senior(titre, mode, senior):
 def test_poste_senior_d_un_organisme_de_formation_garde():
     o = {"titre": "Alternance Chef de projet confirmé", "description": "", "marques": ["organisme_formation"]}
     assert X.raisons(o, _profil(), "alternance", 0) == []
+
+
+def test_m2_cite_sans_contexte_n_est_pas_exige():
+    """D180 (cas Adjoint en scolarité) : « entrée en Master 1 et Master 2 » n'exige rien."""
+    from shared.eligibilite import niveau_detecte
+    assert niveau_detecte("Gérer les dossiers d'entrée en Master 1 et Master 2.")[1] == "souhaite"
+    assert niveau_detecte("Les étudiants de M1 et M2 suivent le cours.") == ("bac+4", "souhaite")

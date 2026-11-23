@@ -950,3 +950,7 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 - Choix à confirmer : la règle de l'alternance donnait une note basse (0 à 2) ; ici l'offre devient inéligible, ce qui revient à la même catégorie (« Hors sujet ») et suit l'annotation.
 
 **Point 8 de la remesure, métiers qualifiés sans exigence écrite** (frigoriste, technicien CVC, gestion locative) : aucune règle, décision de l'utilisatrice ; ils restent jugés par l'IA.
+
+### D180. M2 exigé seulement après « en », « de », « niveau », « étudiant(e) », « préparez » (phase 15, étape 3)
+- **Constat** (remesure après D177) : l'offre « Adjoint en scolarité », dont les missions citent les « dossiers d'entrée en Master 1 et Master 2 », devenait inéligible pour un profil Bac+1.
+- **Règle.** « M2 » ou « Master 2 » reste un indice de niveau Bac+5. Il ne vaut exigé que précédé, à quelques mots près, de « en », « de », « niveau », « étudiant(e) », « préparez » ou « préparant », un article pouvant s'intercaler (« préparez un M2 », « étudiant en M2 », « niveau Master 2 »). Sinon D103 s'applique. « Stage de fin d'études » et « dernière année d'école d'ingénieurs ou de master » restent exigés (D177).
