@@ -47,7 +47,20 @@ Méthode :
 - Emails : 4 validés, 19 douteux, chez 12 entreprises.
 - 36,4 s par entreprise.
 
-**À trancher**
+**Groupe 4 : A5 assouplie (D173)** : nom d'un seul mot accepté sans SIREN si le domaine principal est exactement le nom et que l'accueil, le contact ou les mentions légales portent le code postal ou la voie d'une adresse Sirene.
+- Sites : 14 justes, 2 faux, 11 non trouvés. Avec ta règle du SIRET : 15 justes, 1 faux (alliancesante.net).
+- Emails : 3 validés, 13 douteux, chez 9 entreprises.
+- 42,2 s par entreprise.
+- Retrouvés par l'adresse :
+  - Degetel (code postal 75015 sur l'accueil) ;
+  - Cartadis (94120 sur l'accueil) ;
+  - Regy (« boulevard de Grenelle » sur l'accueil ; non tranché dans la référence).
+- Fermat et Bellon ne reviennent pas.
+- Toujours manqués :
+  - Theatre de la Ville et AMUE : domaine différent du nom ;
+  - WeTradeLocal, Lexmark, Murex : ni code postal ni voie de leur adresse sur les pages lues.
+
+**À trancher (avant D173)**
 - A5 telle que demandée coûte 7 sites justes pour 2 faux évités.
 - Choix possibles :
   - garder A5 (précision maximale, 12 ou 13 justes) ;
@@ -81,6 +94,12 @@ Méthode :
   - le profil de référence n'a ni permis ni expérience renseignés.
 
   L'effet complet viendra des nouvelles offres et d'un profil rempli.
+
+**Audit des champs France Travail** (`audit_champs_france_travail.json`, 600 offres job, 56 alternance, 140 stage) :
+- `experienceExige` ne vaut que D (débutant accepté) ou E (exigée), jamais S : 30 % des offres job exigent de l'expérience (180 sur 600), surtout « N An(s) ».
+- `permis` est presque toujours absent (1 offre stage sur 796, souhaité) : le permis se lit surtout dans le texte libre, par l'extraction de v2.
+- Formations et compétences exigées sont rares (2 formations et 4 compétences exigées en job), et aucune certification n'est exigée dans les champs structurés.
+- `entreprise.url` est absent des 796 offres (l'API ne donne que nom, entrepriseAdaptee, logo, description) : la source « site donné par une offre France Travail » (D166) ne sert pas.
 
 ## C. Prompt d'analyse v2 (D170)
 

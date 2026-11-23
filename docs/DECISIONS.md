@@ -830,7 +830,7 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 ### D166. Scraper, sources sûres : site de l'export LBA par SIREN, site des offres France Travail (phase 15, étape 3)
 - Avant toute recherche, le scraper essaie, dans l'ordre : le site déjà vérifié, le site La Bonne Alternance (celui de l'entreprise LBA, sinon celui de l'export pour son SIREN), puis le site donné par une offre France Travail ou LBA au même nom (D160). Tous passent par la même vérification (SIREN ou nom).
 - L'export LBA garde désormais, en le lisant, `{SIREN: workplace.website}` de toutes ses entrées (`DATA_DIR/lba_sites_par_siren.json`). Constat sur l'export du 22 novembre 2026 : 328 offres et aucun recruteur ont un site, soit 140 SIREN, dont aucun dans l'échantillon de 40. Le gain attendu est donc faible ; la source coûte une lecture de fichier.
-- Pour France Travail, `entreprise.url` est déjà mis dans la description de l'offre (D160). Combien d'offres en donnent un : compté par `scripts/audit_champs_france_travail.py`, à lancer avec la clé.
+- Pour France Travail, `entreprise.url` est déjà mis dans la description de l'offre (D160). L'audit des champs du 23 novembre 2026 montre qu'aucune des 796 offres lues n'en donne : source sans effet aujourd'hui, gardée au cas où l'API le fournirait.
 
 ### D167. Scraper, autres noms de l'entreprise : sigle, dénominations usuelles, enseignes (phase 15, étape 3)
 - La récupération Sirene garde le sigle, les trois dénominations usuelles de l'unité légale, les enseignes et la dénomination usuelle de l'établissement (`extra.autres_noms`).
@@ -917,4 +917,9 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 - **Règle.** Un tel site est accepté sans SIREN aux deux conditions suivantes ; sinon, SIREN toujours obligatoire :
   1. le domaine principal (sans sous-domaine ni extension) est exactement le nom distinctif simplifié (cartadis.com pour CARTADIS, lexmark.com pour LEXMARK INTERNATIONAL) ;
   2. l'accueil, la page contact (lien réel de l'accueil, une page de plus) ou les mentions légales portent le code postal ou la voie (au moins 8 caractères) d'une adresse Sirene de l'entreprise : l'établissement francilien en base, ou le siège donné par l'API Recherche d'entreprises (gardé dans `extra.adresse_siege`, même appel que D167).
+- **Mesure** (groupe 4, mêmes recherches en cache) :
+  - 14 justes, 2 faux, 11 non trouvés, contre 12, 2 et 13 avec D172 strict ;
+  - Degetel et Cartadis retrouvés par leur code postal ;
+  - Fermat et Bellon ne reviennent pas ;
+  - 42,2 s par entreprise.
 - Preuve enregistrée : `domaine_adresse`, avec ce qui a été trouvé et où (« domaine au nom de l'entreprise et code postal 94120 dans la page contact »).
