@@ -40,7 +40,7 @@ Méthode :
 - Sites : 12 justes, 2 faux, 13 non trouvés. Avec ta règle du SIRET : 13 justes, 1 faux (alliancesante.net).
 - Emails : 2 validés, 8 douteux, chez 7 entreprises.
 - 66,0 s par entreprise.
-- A5 écarte Fermat et Bellon, mais fait perdre 6 sites justes : WeTradeLocal, Theatre de la Ville, Degetel, Cartadis, Lexmark, Murex. Leurs mentions légales n'affichent ni SIREN, ni RCS, ni TVA (vérifié à la main sur cartadis.com, degetel.com, wetradelocal.io et theatredelaville-paris.com).
+- A5 écarte Fermat et Bellon, mais fait perdre 7 sites justes : WeTradeLocal, AMUE, Theatre de la Ville, Degetel, Cartadis, Lexmark, Murex. Leurs mentions légales n'affichent ni SIREN, ni RCS, ni TVA (vérifié à la main sur cartadis.com, degetel.com, wetradelocal.io et theatredelaville-paris.com).
 
 **Même groupe 3, sans A5** (comparaison, sur les mêmes recherches)
 - Sites : 18 justes, 4 faux, 5 non trouvés. Avec ta règle du SIRET : 19 justes, 3 faux (Alliance Santé, Bellon, Fermat sur un site Mobirise ; mobirisesite.com est désormais interdit).
@@ -48,7 +48,7 @@ Méthode :
 - 36,4 s par entreprise.
 
 **À trancher**
-- A5 telle que demandée coûte 6 sites justes pour 2 faux évités.
+- A5 telle que demandée coûte 7 sites justes pour 2 faux évités.
 - Choix possibles :
   - garder A5 (précision maximale, 12 ou 13 justes) ;
   - la retirer (18 ou 19 justes, 3 ou 4 faux) ;
