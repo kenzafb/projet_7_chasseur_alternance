@@ -158,3 +158,21 @@ v2, ministral-3:3b, moitié test (68 offres), profils relus en base (`audit_expo
   - **Diplôme préparé trop haut en alternance (1)** : Product Owner ISCOD Bac+4/5 pour un DEUST Bac+2 ; seulement 1 an d'expérience extrait, sous le seuil de 2 ans.
   - **Métier qualifié sans exigence écrite (3)** : frigoriste, technicien CVC, gestion locative. Rien d'explicite à lire ; c'est un jugement de l'annotation. Le champ `qualificationLibelle` (« Ouvrier qualifié », « Technicien ») pourrait servir, si on le décide.
   - **Poste confirmé (1)** : « Responsable commercial » confirmé, rien d'extrait. Piste : étendre au job la règle « poste senior » de l'alternance.
+
+## Remesure après les règles D174 à D179 (23 novembre 2026)
+
+v2, ministral-3:3b, moitié test (68 offres), profils à jour. Annotation corrigée : l'offre job « Magasinier, préparateur de commande polyvalent », qui exige un CACES, est inéligible (point 2).
+
+- **Résultats** :
+  - éligibilité juste : 82,4 %, contre 72,1 % avant ces règles et 60,3 % pour v1 ;
+  - 10 faux éligibles (13 avant), 2 faux inéligibles (6 avant) ;
+  - catégorie exacte : 54,4 % (51,5 % avant), écart moyen 0,60 rang ;
+  - 25,6 s par offre.
+- **Faux éligibles restants** (10) :
+  - **Métiers qualifiés sans exigence écrite (4)** : métallier, frigoriste, technicien CVC, gestion locative. Sans règle, laissés à l'IA (point 8).
+  - **Permis (3, « Conducteur de bus »)** : la description stockée (moins de 1 000 caractères) ne contient pas le mot « permis » ; le « permis C » est une invention du modèle. D175 ne s'applique qu'à un permis écrit dans le texte.
+  - **Expérience (2, « Conseiller en gestion de patrimoine »)** : le texte n'écrit que « Expérience : Expérience exigée », sans durée ; les 3 ans du modèle ne sont pas dans le texte. Sans durée, la règle job ne s'applique pas.
+  - **Poste confirmé (1, « Responsable commercial Clients Directs Ouest »)** : ni le titre ni le texte ne disent « confirmé » (« Débutant accepté ») ; c'est un jugement de l'annotation.
+- **Faux inéligibles restants** (2) :
+  - « Assistant(e) administratif(ve) polyvalent(e) » : 2 ans exigés pour 3 mois d'expérience, soit 21 mois d'écart, au-delà des 12 de D174. Inéligible selon la règle, éligible selon l'annotation, que tu as choisi de garder.
+  - « Adjoint en scolarité » : effet de bord de D177. Les missions citent « Master 1 et Master 2 » (les dossiers des étudiants), et « M2 » vaut Bac+5 exigé. Piste si tu le souhaites : ne retenir « M2 » qu'avec « en », « de », « niveau », « étudiant » ou « préparez » devant.

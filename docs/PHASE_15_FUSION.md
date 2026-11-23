@@ -31,7 +31,16 @@
   - deux appels à l'IA au lieu d'un, pour le même temps (environ 24 s par offre) ;
   - le résultat est un mot (Très bien, Bien, Moyen, Faible, Hors sujet), traduit en note ;
   - les notes changent pour les offres notées à nouveau, pas pour celles déjà notées.
-- Offres écartées pour des exigences que le profil ne remplit pas (« Conditions non remplies ») : permis exigé, formation au-dessus du profil, diplôme d'État, expérience exigée supérieure à la sienne (job), deux ans ou plus en alternance, certification (CACES, SSIAP…) absente.
+- Offres écartées pour des exigences que le profil ne remplit pas (« Conditions non remplies ») :
+  - permis exigé, quelle que soit la catégorie pour un profil « Aucun permis » ;
+  - formation au-dessus du profil ;
+  - diplôme d'État ;
+  - Bac+5 exigé, y compris « stage de fin d'études », « dernière année d'école d'ingénieurs ou de master », « M2 » ;
+  - en alternance, diplôme préparé à plus d'un niveau au-dessus du niveau visé ;
+  - expérience exigée : en job, au-delà de 12 mois de plus que la sienne ; en alternance, deux ans ou plus ;
+  - certification (CACES, SSIAP…) absente ;
+  - en job et en alternance, poste « confirmé », « senior » ou « expérimenté ».
+- En job, une expérience demandée jusqu'à 12 mois au-dessus de la sienne n'écarte pas l'offre : note plafonnée à Moyen, « Expérience demandée : 1 an » dans Ce qui coince.
 
 **Mon profil**
 - Partie « Ton parcours », dans les trois modes : permis de conduire (cases, avec « Aucun permis »), expérience professionnelle en mois, certifications (étiquettes avec suggestions).
@@ -76,7 +85,9 @@ Dans le dossier du projet, sur la branche `phase-15-audit-backend`. Le compte d'
 8. **Note des offres (prompt v2).**
    - En job, ouvrir une offre non notée, puis « Noter cette offre ». La note arrive en une trentaine de secondes ; « Ce qui colle » et « Ce qui coince » sont remplis.
    - Bandeau « N nouvelles offres pas encore notées », « Les noter » sur quelques offres : la progression avance, sans erreur.
-   - Ouvrir une offre qui demande « 1 an » ou « 2 ans d'expérience » : elle affiche « Conditions non remplies : … d'expérience exigés, profil 3 mois ».
+   - Ouvrir une offre qui demande « 1 an d'expérience » : elle reste éligible, notée Moyen au plus, avec « Expérience demandée : 1 an » en tête de Ce qui coince.
+   - Une offre qui demande « 2 ans » ou plus affiche « Conditions non remplies : … d'expérience exigés, profil 3 mois ».
+   - Une offre « … confirmé » ou « … senior » affiche « Conditions non remplies : poste confirmé ou senior ».
    - Facultatif, pour comparer :
      - ajouter `IA_VERSION_ANALYSE=v1` dans `.env`, redémarrer (Ctrl+C puis la commande de l'étape 4), noter une offre ;
      - retirer la ligne et redémarrer.
