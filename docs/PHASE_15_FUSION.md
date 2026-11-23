@@ -32,10 +32,10 @@
   - le résultat est un mot (Très bien, Bien, Moyen, Faible, Hors sujet), traduit en note ;
   - les notes changent pour les offres notées à nouveau, pas pour celles déjà notées.
 - Offres écartées pour des exigences que le profil ne remplit pas (« Conditions non remplies ») :
-  - permis exigé, quelle que soit la catégorie pour un profil « Aucun permis » ;
+  - permis exigé, quelle que soit la catégorie pour un profil « Aucun permis », y compris le permis implicite des métiers de conduite (conducteur de bus ou de car, chauffeur, chauffeur-livreur, VTC, ambulancier, poids lourd ; liste dans `shared/referentiels/metiers_conduite.txt`) ;
   - formation au-dessus du profil ;
   - diplôme d'État ;
-  - Bac+5 exigé, y compris « stage de fin d'études », « dernière année d'école d'ingénieurs ou de master », « M2 » ;
+  - Bac+5 exigé, y compris « stage de fin d'études », « dernière année d'école d'ingénieurs ou de master », et « M2 » ou « Master 2 » après « en », « de », « niveau », « étudiant(e) » ou « préparez » ;
   - en alternance, diplôme préparé à plus d'un niveau au-dessus du niveau visé ;
   - expérience exigée : en job, au-delà de 12 mois de plus que la sienne ; en alternance, deux ans ou plus ;
   - certification (CACES, SSIAP…) absente ;
@@ -88,6 +88,7 @@ Dans le dossier du projet, sur la branche `phase-15-audit-backend`. Le compte d'
    - Ouvrir une offre qui demande « 1 an d'expérience » : elle reste éligible, notée Moyen au plus, avec « Expérience demandée : 1 an » en tête de Ce qui coince.
    - Une offre qui demande « 2 ans » ou plus affiche « Conditions non remplies : … d'expérience exigés, profil 3 mois ».
    - Une offre « … confirmé » ou « … senior » affiche « Conditions non remplies : poste confirmé ou senior ».
+   - Avec « Aucun permis », une offre « Chauffeur-livreur » ou « Conducteur de bus » affiche « Conditions non remplies : permis exigé, tu n'as pas de permis ».
    - Facultatif, pour comparer :
      - ajouter `IA_VERSION_ANALYSE=v1` dans `.env`, redémarrer (Ctrl+C puis la commande de l'étape 4), noter une offre ;
      - retirer la ligne et redémarrer.

@@ -176,3 +176,18 @@ v2, ministral-3:3b, moitié test (68 offres), profils à jour. Annotation corrig
 - **Faux inéligibles restants** (2) :
   - « Assistant(e) administratif(ve) polyvalent(e) » : 2 ans exigés pour 3 mois d'expérience, soit 21 mois d'écart, au-delà des 12 de D174. Inéligible selon la règle, éligible selon l'annotation, que tu as choisi de garder.
   - « Adjoint en scolarité » : effet de bord de D177. Les missions citent « Master 1 et Master 2 » (les dossiers des étudiants), et « M2 » vaut Bac+5 exigé. Piste si tu le souhaites : ne retenir « M2 » qu'avec « en », « de », « niveau », « étudiant » ou « préparez » devant.
+
+## Remesure après D180 à D183 (23 novembre 2026)
+
+v2, ministral-3:3b, moitié test (68 offres), profils à jour, annotation « Assistant(e) administratif(ve) polyvalent(e) » corrigée (D181).
+
+- **Résultats** :
+  - éligibilité juste : 89,7 % (82,4 % avant ces règles, 72,1 % avant D174, 60,3 % pour v1) ;
+  - 7 faux éligibles, aucun faux inéligible ;
+  - catégorie exacte : 54,4 %, écart moyen 0,57 rang ;
+  - 22,0 s par offre.
+- **Les 7 faux éligibles restants** sont ceux que tu as choisi de laisser :
+  - 4 métiers qualifiés sans exigence écrite (point 8) ;
+  - 2 « Conseiller en gestion de patrimoine » (expérience exigée sans durée, D183) ;
+  - 1 « Responsable commercial », débutant accepté (D183).
+- « Conducteur de bus » (permis implicite, D182) et « Adjoint en scolarité » (M2 cité sans être exigé, D180) sont maintenant bien classés.
