@@ -78,6 +78,9 @@ def test_diplome_d_etat():
 def test_experience_job_et_alternance():
     deux_ans = _ft(experienceExige="E", experienceLibelle="2 An(s)")
     assert X.raisons(deux_ans, _profil(experience_mois=6), "job", 0) == ["2 ans d'expérience exigés, profil 6 mois"]
+    # 12 mois d'écart ou moins : éligible, plafond Moyen (D174)
+    assert X.raisons(deux_ans, _profil(experience_mois=12), "job", 0) == []
+    assert X.reserves(deux_ans, _profil(experience_mois=12), "job") == ["Expérience demandée : 2 ans"]
     assert X.raisons(deux_ans, _profil(experience_mois=30), "job", 0) == []
     assert X.raisons(deux_ans, _profil(), "job", 0) == []        # non renseignée : ne bloque pas
     assert X.raisons(deux_ans, _profil(), "alternance", 0) == ["2 ans d'expérience exigés : ce n'est pas une alternance"]
@@ -105,3 +108,14 @@ def test_eligibilite_decidee_par_python():
     o = _ft(competences=[{"libelle": "CACES R489", "exigence": "E"}])
     r = appliquer_eligibilite(_analyse(9), o, _profil(), "job")
     assert r["eligible"] is False and r["score"] == 3 and r["raison_ineligibilite"] == "CACES exigé, absent du profil"
+
+
+def test_experience_un_peu_au_dessus_plafond_moyen():
+    """D174 : 1 an exigé, profil 3 mois : éligible, Moyen au plus, raison dans Ce qui coince."""
+    o = _ft(experienceExige="E", experienceLibelle="1 An(s)")
+    r = appliquer_eligibilite(_analyse(9), o, _profil(experience_mois=3), "job")
+    assert r["eligible"] is True and r["score"] == 5 and r["verdict"] == "moyen"
+    assert r["points_faibles"][0] == "Expérience demandée : 1 an"
+    r = appliquer_eligibilite(_analyse(9), _ft(experienceExige="E", experienceLibelle="3 An(s)"),
+                              _profil(experience_mois=3), "job")
+    assert r["eligible"] is False

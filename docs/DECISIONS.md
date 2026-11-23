@@ -923,3 +923,7 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
   - Fermat et Bellon ne reviennent pas ;
   - 42,2 s par entreprise.
 - Preuve enregistrée : `domaine_adresse`, avec ce qui a été trouvé et où (« domaine au nom de l'entreprise et code postal 94120 dans la page contact »).
+
+### D174. Job : expérience exigée inéligible seulement au-delà de 12 mois d'écart (phase 15, étape 3)
+- **Constat** (remesure avec le profil rempli) : 5 offres job exigeant 1 ou 2 ans d'expérience, annotées éligibles (« vente en magasin, accepté par le profil »), étaient écartées pour un profil de 3 mois.
+- **Règle.** En job, l'offre est inéligible seulement si l'expérience exigée dépasse celle du profil de plus de 12 mois. Sinon elle reste éligible, plafonnée à Moyen (5), avec « Expérience demandée : 1 an » en tête de Ce qui coince (`shared/exigences.reserves`, appliqué par `appliquer_eligibilite`, en v1 comme en v2). La règle de l'alternance (2 ans ou plus) ne change pas.

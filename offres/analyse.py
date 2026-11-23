@@ -275,6 +275,13 @@ def appliquer_eligibilite(result: dict, offre: dict, profil: dict, mode: str, ma
         result["score"] = min(result["score"], PLAFOND_SCORE_INELIGIBLE)
         result["verdict"] = "ineligible"
         result["points_faibles"] = [f"Inéligible : {r}" for r in raisons] + result["points_faibles"][:2]
+    else:
+        # Exigence un peu au-dessus du profil : éligible, plafond Moyen (D174)
+        from shared.exigences import PLAFOND_RESERVE, reserves
+        for message in reserves(offre, profil, mode):
+            result["score"] = min(result["score"], PLAFOND_RESERVE)
+            result["verdict"] = score_to_verdict(result["score"])
+            result["points_faibles"] = [message] + [x for x in result["points_faibles"] if x != message][:2]
     return result
 
 

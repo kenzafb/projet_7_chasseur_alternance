@@ -164,6 +164,22 @@ def du_profil(profil: dict) -> dict:
 
 # ─── Règles ───────────────────────────────────────────────────────────────────
 ANNEES_ALTERNANCE = 24     # alternance : « plusieurs années » d'expérience exigées (D169)
+# Job : inéligible seulement au-delà de 12 mois de plus que le profil ;
+# en deçà, éligible, plafond Moyen et « Expérience demandée » (D174)
+ECART_EXPERIENCE_JOB_MOIS = 12
+PLAFOND_RESERVE = 5        # note de « Moyen »
+
+
+def reserves(offre: dict, profil: dict, mode: str) -> list[str]:
+    """Exigences qui ne rendent pas inéligible mais plafonnent la note à
+    Moyen, avec leur message pour « Ce qui coince » (D174)."""
+    if mode != "job":
+        return []
+    mois = experience_exigee(offre.get("description") or "")
+    p = du_profil(profil)
+    if mois and p["experience_mois"] is not None and 0 < mois - p["experience_mois"] <= ECART_EXPERIENCE_JOB_MOIS:
+        return [f"Expérience demandée : {_duree(mois)}"]
+    return []
 
 
 def raisons(offre: dict, profil: dict, mode: str, crans_profil: int | None) -> list[str]:
@@ -186,7 +202,8 @@ def raisons(offre: dict, profil: dict, mode: str, crans_profil: int | None) -> l
     if mois is not None:
         if mode == "alternance" and mois >= ANNEES_ALTERNANCE:
             out.append(f"{mois // 12} ans d'expérience exigés : ce n'est pas une alternance")
-        elif mode == "job" and p["experience_mois"] is not None and mois > p["experience_mois"]:
+        elif (mode == "job" and p["experience_mois"] is not None
+              and mois - p["experience_mois"] > ECART_EXPERIENCE_JOB_MOIS):
             out.append(f"{_duree(mois)} d'expérience exigés, profil {_duree(p['experience_mois'])}")
     manquantes = [c for c in certifications_exigees(description, offre.get("conditions_acces") or ())
                   if c not in p["certifications"]]
