@@ -132,3 +132,22 @@ def test_aucun_permis_et_permis_exige_toute_categorie():
     assert X.raisons(vue, _profil(permis=["B"]), "job", 0) == []     # catégorie inconnue : ne bloque pas un titulaire
     assert X.raisons(vue, _profil(), "job", 0) == []                 # non renseigné
     assert lignes_extraites({"permis_exige": "C"}, {"description": "Poste sédentaire."}) == []
+
+
+@pytest.mark.parametrize("texte, annees", [
+    ("3 ans d'expérience exigés", {3}), ("trois ans d'expérience", {3}), ("de 3 à 5 ans en gestion de patrimoine", {3}),
+    ("3-5 ans", {3}), ("2 ans minimum", {2}), ("minimum 2 ans", {2}), ("au moins deux années", {2}),
+    ("une expérience de un an", {1}), ("Débutant accepté", set()), ("75012 Paris", set()),
+])
+def test_annees_dans_le_texte(texte, annees):
+    """D176 : années en chiffres, en lettres, en fourchettes (borne basse)."""
+    assert X.annees_dans_texte(texte) == annees
+
+
+def test_experience_extraite_en_lettres_retenue():
+    from offres.analyse_v2 import lignes_extraites
+    assert lignes_extraites({"experience_exigee_annees": 3},
+                            {"description": "Vous justifiez de trois ans d'expérience minimum."}) == [
+        "Expérience : 3 An(s) (exigée)"]
+    assert lignes_extraites({"experience_exigee_annees": 3}, {"description": "De 3 à 5 ans."}) == [
+        "Expérience : 3 An(s) (exigée)"]

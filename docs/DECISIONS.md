@@ -931,3 +931,7 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 ### D175. Aucun permis et permis exigé, toute catégorie : inéligible (phase 15, étape 3)
 - **Constat** (remesure) : pour 3 offres « Conducteur de bus », v2 extrayait « permis C » alors que le texte demande une autre catégorie ; le contrôle contre le texte rejetait la valeur, et l'offre restait éligible pour un profil sans permis.
 - **Règle.** Quand l'extraction donne un permis exigé dont la catégorie n'est pas retrouvée dans le texte, mais que le texte parle bien de permis, une ligne « Permis : * - catégorie non lue (exigé) » est ajoutée. Un profil « Aucun permis » est alors inéligible (« permis exigé, tu n'as pas de permis »), comme pour toute catégorie lue. Un profil qui a un permis n'est pas écarté sur une catégorie incertaine ; un permis non renseigné ne bloque jamais.
+
+### D176. Expérience écrite en lettres et en fourchettes (phase 15, étape 3)
+- **Constat** (remesure) : pour 2 offres « Conseiller en gestion de patrimoine », v2 extrayait 3 ans d'expérience, mais le contrôle contre le texte, qui cherchait « 3 ans », rejetait la valeur.
+- **Règle** (`shared/exigences.annees_dans_texte`) : le texte porte une durée d'expérience écrite en chiffres ou en lettres (un à dix), seule ou en fourchette (« 3 à 5 ans », « 3-5 ans » : la borne basse), avec ou sans « minimum » ou « au moins » (« 2 ans minimum », « au moins deux années »). L'extraction est gardée si son nombre d'années figure parmi celles-là.

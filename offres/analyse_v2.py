@@ -23,7 +23,7 @@ import time
 
 from offres.analyse import (POINTS_FORTS, REGLES, SYSTEME, _court, appliquer_eligibilite, score_to_verdict)
 from shared.erreurs import exiger_profil
-from shared.exigences import PERMIS_SANS_CATEGORIE
+from shared.exigences import PERMIS_SANS_CATEGORIE, annees_dans_texte
 from shared.ia import appeler_structure
 from shared.schemas_ia import ExtractionOffre, JugementOffre
 
@@ -134,7 +134,7 @@ def lignes_extraites(extraction: dict, offre: dict) -> list[str]:
     bas = texte.lower()
     out = []
     annees = extraction.get("experience_exigee_annees")
-    if annees and re.search(rf"\b{int(annees)}\s*(?:ans?|années?)\b", bas):
+    if annees and int(annees) in annees_dans_texte(texte):   # en chiffres, en lettres, en fourchette (D176)
         out.append(f"Expérience : {int(annees)} An(s) (exigée)")
     permis = (extraction.get("permis_exige") or "").strip().upper()
     if re.fullmatch(r"[A-Z][A-Z0-9]{0,2}", permis) and re.search(rf"permis\s*(?:de conduire\s*)?{permis.lower()}\b", bas):

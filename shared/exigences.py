@@ -154,6 +154,21 @@ def certifications_exigees(description: str, conditions=()) -> list[str]:
     return sorted(out)
 
 
+# ─── Années d'expérience écrites dans le texte libre (D176) ────────────────────
+NOMBRES = {"un": 1, "une": 1, "deux": 2, "trois": 3, "quatre": 4, "cinq": 5, "six": 6, "sept": 7, "huit": 8,
+           "neuf": 9, "dix": 10}
+_NOMBRE = r"(\d{1,2}|" + "|".join(NOMBRES) + r")"
+_ANNEES = re.compile(
+    rf"(?:minimum|au moins|plus de)?\s*{_NOMBRE}\s*(?:(?:à|a|-|–|ou)\s*{_NOMBRE}\s*)?(?:ans?|ann[ée]es?)\b(?:\s*minimum)?")
+
+
+def annees_dans_texte(texte: str) -> set[int]:
+    """Années écrites dans le texte : « 2 ans », « trois ans », « 3 à 5 ans »
+    et « 3-5 ans » (borne basse), « 2 ans minimum », « au moins deux années »."""
+    t = _simple(texte)
+    return {int(m.group(1)) if m.group(1).isdigit() else NOMBRES[m.group(1)] for m in _ANNEES.finditer(t)}
+
+
 # ─── Profil ───────────────────────────────────────────────────────────────────
 def du_profil(profil: dict) -> dict:
     """{permis: set | None (non renseigné), experience_mois: int | None,
