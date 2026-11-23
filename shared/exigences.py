@@ -89,11 +89,19 @@ def familles(texte: str) -> set[str]:
 
 
 # ─── Lecture de l'offre ───────────────────────────────────────────────────────
+PERMIS_SANS_CATEGORIE = "*"      # permis exigé, catégorie non lue dans le texte (D175)
+
+
 def permis_exiges(description: str) -> list[str]:
-    """Codes des permis exigés (« B - Véhicule léger (exigé) » -> « B »)."""
+    """Codes des permis exigés (« B - Véhicule léger (exigé) » -> « B » ;
+    « * » : un permis exigé dont la catégorie n'a pas été lue)."""
     out = []
     for ligne in _lignes(description, "Permis : "):
-        if _exigee(ligne) and (m := re.match(r"([A-Z][A-Z0-9]*)\b", ligne)):
+        if not _exigee(ligne):
+            continue
+        if ligne.startswith(PERMIS_SANS_CATEGORIE):
+            out.append(PERMIS_SANS_CATEGORIE)
+        elif m := re.match(r"([A-Z][A-Z0-9]*)\b", ligne):
             out.append(m.group(1))
     return out
 
@@ -188,9 +196,13 @@ def raisons(offre: dict, profil: dict, mode: str, crans_profil: int | None) -> l
     p = du_profil(profil)
     out = []
     exiges = permis_exiges(description)
-    if exiges and p["permis"] is not None and not set(exiges) & p["permis"]:
-        out.append(f"permis {' ou '.join(exiges)} exigé" + (", tu n'as pas de permis" if not p["permis"]
-                                                             else f", ton permis : {', '.join(sorted(p['permis']))}"))
+    categories = [c for c in exiges if c != PERMIS_SANS_CATEGORIE]
+    if p["permis"] is not None and not p["permis"] and exiges:
+        # « Aucun permis » : tout permis exigé écarte l'offre, catégorie lue ou non (D175)
+        out.append(f"permis {' ou '.join(categories)} exigé, tu n'as pas de permis" if categories
+                   else "permis exigé, tu n'as pas de permis")
+    elif categories and p["permis"] and not set(categories) & p["permis"]:
+        out.append(f"permis {' ou '.join(categories)} exigé, ton permis : {', '.join(sorted(p['permis']))}")
     for crans, libelle in formations_exigees(description):
         if crans_profil is not None and crans > crans_profil:
             out.append(f"formation exigée : {libelle}, profil {LIBELLES_CRANS.get(crans_profil, crans_profil)}")

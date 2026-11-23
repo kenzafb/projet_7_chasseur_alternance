@@ -927,3 +927,7 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 ### D174. Job : expérience exigée inéligible seulement au-delà de 12 mois d'écart (phase 15, étape 3)
 - **Constat** (remesure avec le profil rempli) : 5 offres job exigeant 1 ou 2 ans d'expérience, annotées éligibles (« vente en magasin, accepté par le profil »), étaient écartées pour un profil de 3 mois.
 - **Règle.** En job, l'offre est inéligible seulement si l'expérience exigée dépasse celle du profil de plus de 12 mois. Sinon elle reste éligible, plafonnée à Moyen (5), avec « Expérience demandée : 1 an » en tête de Ce qui coince (`shared/exigences.reserves`, appliqué par `appliquer_eligibilite`, en v1 comme en v2). La règle de l'alternance (2 ans ou plus) ne change pas.
+
+### D175. Aucun permis et permis exigé, toute catégorie : inéligible (phase 15, étape 3)
+- **Constat** (remesure) : pour 3 offres « Conducteur de bus », v2 extrayait « permis C » alors que le texte demande une autre catégorie ; le contrôle contre le texte rejetait la valeur, et l'offre restait éligible pour un profil sans permis.
+- **Règle.** Quand l'extraction donne un permis exigé dont la catégorie n'est pas retrouvée dans le texte, mais que le texte parle bien de permis, une ligne « Permis : * - catégorie non lue (exigé) » est ajoutée. Un profil « Aucun permis » est alors inéligible (« permis exigé, tu n'as pas de permis »), comme pour toute catégorie lue. Un profil qui a un permis n'est pas écarté sur une catégorie incertaine ; un permis non renseigné ne bloque jamais.

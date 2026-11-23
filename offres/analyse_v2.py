@@ -23,6 +23,7 @@ import time
 
 from offres.analyse import (POINTS_FORTS, REGLES, SYSTEME, _court, appliquer_eligibilite, score_to_verdict)
 from shared.erreurs import exiger_profil
+from shared.exigences import PERMIS_SANS_CATEGORIE
 from shared.ia import appeler_structure
 from shared.schemas_ia import ExtractionOffre, JugementOffre
 
@@ -138,6 +139,11 @@ def lignes_extraites(extraction: dict, offre: dict) -> list[str]:
     permis = (extraction.get("permis_exige") or "").strip().upper()
     if re.fullmatch(r"[A-Z][A-Z0-9]{0,2}", permis) and re.search(rf"permis\s*(?:de conduire\s*)?{permis.lower()}\b", bas):
         out.append(f"Permis : {permis} (exigé)")
+    elif permis and re.search(r"\bpermis\b", bas):
+        # Catégorie non retrouvée dans le texte (« permis C » extrait, « permis D »
+        # ou « permis transport en commun » écrit) : un permis est exigé, sans
+        # catégorie sûre (D175)
+        out.append(f"Permis : {PERMIS_SANS_CATEGORIE} - catégorie non lue (exigé)")
     for c in extraction.get("certifications_exigees") or []:
         for famille in familles(c):
             if famille in familles(texte):

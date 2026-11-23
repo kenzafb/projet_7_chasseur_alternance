@@ -119,3 +119,16 @@ def test_experience_un_peu_au_dessus_plafond_moyen():
     r = appliquer_eligibilite(_analyse(9), _ft(experienceExige="E", experienceLibelle="3 An(s)"),
                               _profil(experience_mois=3), "job")
     assert r["eligible"] is False
+
+
+def test_aucun_permis_et_permis_exige_toute_categorie():
+    """D175 : permis exigé lu dans le texte sans catégorie sûre."""
+    from offres.analyse_v2 import lignes_extraites
+    offre = {"description": "Conducteur de bus. Permis D obligatoire, FIMO voyageurs."}
+    lignes = lignes_extraites({"permis_exige": "C"}, offre)            # le modèle se trompe de catégorie
+    assert lignes == ["Permis : * - catégorie non lue (exigé)"]
+    vue = {"description": offre["description"] + "\n" + lignes[0]}
+    assert X.raisons(vue, _profil(permis=["aucun"]), "job", 0) == ["permis exigé, tu n'as pas de permis"]
+    assert X.raisons(vue, _profil(permis=["B"]), "job", 0) == []     # catégorie inconnue : ne bloque pas un titulaire
+    assert X.raisons(vue, _profil(), "job", 0) == []                 # non renseigné
+    assert lignes_extraites({"permis_exige": "C"}, {"description": "Poste sédentaire."}) == []
