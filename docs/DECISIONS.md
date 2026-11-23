@@ -943,3 +943,10 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 ### D178. Alternance : diplôme préparé à plus d'un niveau au-dessus du niveau visé, inéligible (phase 15, étape 3)
 - **Constat** (remesure) : une alternance Product Owner préparant un Bac+4/5 (ISCOD) restait éligible pour un profil qui vise un DEUST (Bac+2).
 - **Règle.** En alternance, le niveau de l'offre (extrait puis contrôlé contre le texte) est celui du diplôme préparé. S'il dépasse de plus d'un cran le niveau visé du profil (champ « Niveau visé »), l'offre est inéligible (« diplôme préparé Bac+5, niveau visé Bac+2 »), qu'il soit exigé ou souhaité. Un cran au-dessus reste toléré (comme le niveau adjacent de D154). Un niveau visé non renseigné ne bloque pas.
+
+### D179. Job : poste confirmé, senior ou expérimenté, traité comme le poste senior de l'alternance (phase 15, étape 3)
+- **Constat** (remesure) : « Responsable commercial confirmé » restait éligible en job ; la règle « poste senior » n'existait que dans le prompt de l'alternance. Avec v2, un « Hors sujet » sans phrase du profil redescend à Faible, donc elle ne tenait plus non plus en alternance.
+- **Règle** (`shared/exigences.poste_senior`, appliquée par Python) : en job et en alternance, un intitulé qui contient « confirmé », « senior » ou « expérimenté » (et leurs accords) rend l'offre inéligible (« poste confirmé ou senior »), comme l'annotation la classe. « Responsable » seul ne compte pas. Exception reprise de l'alternance : une offre déposée par un organisme de formation (marque `organisme_formation`) n'est pas concernée.
+- Choix à confirmer : la règle de l'alternance donnait une note basse (0 à 2) ; ici l'offre devient inéligible, ce qui revient à la même catégorie (« Hors sujet ») et suit l'annotation.
+
+**Point 8 de la remesure, métiers qualifiés sans exigence écrite** (frigoriste, technicien CVC, gestion locative) : aucune règle, décision de l'utilisatrice ; ils restent jugés par l'IA.

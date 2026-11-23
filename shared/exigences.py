@@ -205,11 +205,27 @@ def reserves(offre: dict, profil: dict, mode: str) -> list[str]:
     return []
 
 
+# Poste confirmé, senior ou expérimenté (D179), dans l'intitulé ; pas « responsable » seul
+POSTE_SENIOR = re.compile(r"\b(?:confirm[ée]e?s?|senior|seniors|exp[ée]riment[ée]e?s?)\b", re.I)
+
+
+def poste_senior(offre: dict, mode: str) -> bool:
+    """Job et alternance : intitulé « confirmé », « senior » ou « expérimenté »,
+    sauf offre déposée par un organisme de formation (D179)."""
+    if mode not in ("job", "alternance"):
+        return False
+    if "organisme_formation" in (offre.get("marques") or []):
+        return False
+    return bool(POSTE_SENIOR.search(offre.get("titre") or ""))
+
+
 def raisons(offre: dict, profil: dict, mode: str, crans_profil: int | None) -> list[str]:
     """Raisons d'inéligibilité tirées des exigences structurées de l'offre."""
     description = offre.get("description") or ""
     p = du_profil(profil)
     out = []
+    if poste_senior(offre, mode):
+        out.append("poste confirmé ou senior")
     exiges = permis_exiges(description)
     categories = [c for c in exiges if c != PERMIS_SANS_CATEGORIE]
     if p["permis"] is not None and not p["permis"] and exiges:

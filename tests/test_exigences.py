@@ -188,3 +188,22 @@ def test_alternance_diplome_prepare_trop_haut(vise, requis, raison):
     from shared.eligibilite import raisons_ineligibilite
     ext = {"niveau_requis": requis, "niveau_exigence": "souhaite"}
     assert raisons_ineligibilite(ext, {"niveau_vise": vise}, "alternance") == raison
+
+
+@pytest.mark.parametrize("titre, mode, senior", [
+    ("Responsable commercial confirmé H/F", "job", True),
+    ("Développeur Senior Python", "alternance", True),
+    ("Cuisinier expérimenté (H/F)", "job", True),
+    ("Responsable de rayon (H/F)", "job", False),              # « responsable » seul : non
+    ("Stage - Ingénieur confirmé", "stage", False),           # le stage n'est pas concerné
+    ("Vendeuse confirmée", "job", True),
+])
+def test_poste_senior(titre, mode, senior):
+    """D179 : confirmé, senior, expérimenté, en job comme en alternance."""
+    assert X.poste_senior({"titre": titre}, mode) is senior
+    assert ("poste confirmé ou senior" in X.raisons({"titre": titre, "description": ""}, _profil(), mode, 0)) is senior
+
+
+def test_poste_senior_d_un_organisme_de_formation_garde():
+    o = {"titre": "Alternance Chef de projet confirmé", "description": "", "marques": ["organisme_formation"]}
+    assert X.raisons(o, _profil(), "alternance", 0) == []
