@@ -48,31 +48,63 @@
 
 ## À tester dans l'application avant de fusionner
 
-Avec ton compte, dans l'ordre ; rien n'envoie de mail tant que le compte d'envoi est en mode essai.
+Dans le dossier du projet, sur la branche `phase-15-audit-backend`. Le compte d'envoi reste en mode essai jusqu'à l'étape 11 : aucun mail ne part ailleurs que dans ta boîte.
 
-1. **Démarrage** : l'application démarre, les trois modes s'ouvrent, aucune erreur dans les logs.
-2. **Mon profil**, en job puis en stage :
-   - remplir permis, expérience et certifications, enregistrer, recharger : les valeurs restent ;
-   - « Aucun permis » décoche les autres cases ;
-   - copie de la section « Permis, expérience en mois et certifications » d'un mode vers un autre.
-3. **Recherche d'offres**, dans chaque mode :
-   - le stage ramène des offres « stagiaire » ;
-   - une offre « Île-de-France (non précisé) » apparaît et se filtre par le menu Lieu ;
-   - en alternance, les étiquettes « Niveau différent du tien » et « Offre déposée par un organisme de formation » et le filtre « Particularités » fonctionnent.
-4. **Noter des offres** (bouton « Noter cette offre », puis « Les noter » sur quelques offres) :
-   - les notes arrivent, sans erreur ;
-   - une offre qui exige un CACES ou de l'expérience au-delà de la tienne passe en « Conditions non remplies » avec la raison ;
-   - si besoin, `IA_VERSION_ANALYSE=v1` dans `.env` et redémarrage pour comparer.
-5. **Trouver des entreprises** (mode alternance) :
-   - le premier lancement télécharge l'export LBA (quelques minutes, message dans les logs), le second ne le refait pas ;
-   - des entreprises LBA et Sirene arrivent ;
-   - la mémoire reste raisonnable pendant le téléchargement.
-6. **Trouver leurs emails** sur 5 à 10 entreprises :
-   - logs « 🌐 site [source, preuve] » ou « Site non vérifié » ;
-   - des formulaires de contact affichés ;
-   - aucune adresse d'annuaire ni d'un autre domaine retenue.
-7. **Adresses déjà en base** :
-   - `venv/bin/python scripts/revalider_emails_en_base.py --verifier-sites --recherche` (lecture seule), puis, si le rapport te convient, `--appliquer` ;
-   - les 2 entreprises aux adresses fausses ne sont plus envoyables.
-8. **Envoi en mode essai** d'une candidature spontanée vers ta propre boîte : seules les adresses validées partent.
-9. **Suite de tests** : `systemd-run --user --scope -p MemoryMax=2G venv/bin/python -m pytest -q`. Elle passe, et le garde-fou de `data/` ne signale rien.
+1. **Branche et état.**
+   - `git switch phase-15-audit-backend && git status --short` : rien à commiter.
+   - `venv/bin/alembic current` : affiche `0017 (head)`.
+2. **Suite de tests.**
+   - `systemd-run --user --scope -p MemoryMax=2G venv/bin/python -m pytest -q`
+   - Attendu : tout passe, sans section « data/ modifié par les tests » à la fin.
+3. **Réglage du prompt.**
+   - `grep -n "^IA_VERSION_ANALYSE" .env || echo "absent : v2 par défaut"`
+4. **Démarrer l'application.**
+   - `venv/bin/uvicorn main:app --port 5002`, puis ouvrir http://localhost:5002 et se connecter.
+   - Les trois modes (alternance, stage, job) s'ouvrent, aucune erreur dans le terminal.
+5. **Mon profil, en mode job.**
+   - Partie « Ton parcours » : les cases du permis, l'expérience en mois et les certifications montrent tes valeurs (aucun permis, 3, aucune certification).
+   - Cocher B : « Aucun permis » se décoche. Recocher « Aucun permis » : B se décoche.
+   - Ajouter « CACES R489 » par la liste suggérée, enregistrer, recharger la page (F5) : les valeurs restent.
+   - Remettre tes vraies valeurs et enregistrer.
+6. **Copie entre modes.**
+   - En mode alternance : « Copier depuis un autre mode », source job, section « Permis, expérience en mois et certifications ». Confirmer.
+   - Partie « Ton parcours » : les trois champs sont recopiés ; les domaines de recherche de l'alternance n'ont pas changé.
+7. **Recherche d'offres.**
+   - **Stage** : lancer « Chercher des offres ». Le terminal affiche deux requêtes France Travail (`motsCles=stage`, `motsCles=stagiaire`), sans domaine. Des offres « Stagiaire … » apparaissent.
+   - **Job** : lancer une recherche. Dans Offres, « Filtrer », menu Lieu, choisir « Île-de-France, lieu non précisé » : des offres apparaissent (sinon aucune ce jour-là, sans erreur).
+   - **Alternance** : lancer une recherche, puis « Filtrer », menu Particularités. Essayer « Niveau différent du tien » et « Déposées par un organisme de formation ». L'étiquette apparaît sous le titre dans le détail de l'offre.
+8. **Note des offres (prompt v2).**
+   - En job, ouvrir une offre non notée, puis « Noter cette offre ». La note arrive en une trentaine de secondes ; « Ce qui colle » et « Ce qui coince » sont remplis.
+   - Bandeau « N nouvelles offres pas encore notées », « Les noter » sur quelques offres : la progression avance, sans erreur.
+   - Ouvrir une offre qui demande « 1 an » ou « 2 ans d'expérience » : elle affiche « Conditions non remplies : … d'expérience exigés, profil 3 mois ».
+   - Facultatif, pour comparer :
+     - ajouter `IA_VERSION_ANALYSE=v1` dans `.env`, redémarrer (Ctrl+C puis la commande de l'étape 4), noter une offre ;
+     - retirer la ligne et redémarrer.
+9. **Trouver des entreprises (export LBA).**
+   - En alternance, page « Entreprises à contacter », « Trouver des entreprises » avec un petit plafond (10).
+   - Le premier lancement télécharge l'export : quelques minutes, ligne « export du … en cours de lecture (en flux, IDF seulement) » dans les logs.
+   - Pendant ce temps, dans un autre terminal : `free -h` (la mémoire disponible ne s'effondre pas).
+   - Ensuite : `ls -lh data/lba_recruteurs_idf.jsonl.gz data/lba_recruteurs_idf.json data/lba_sites_par_siren.json`
+   - Relancer « Trouver des entreprises » : il ne retélécharge pas (pas de ligne « en cours de lecture »).
+10. **Trouver leurs emails.**
+    - Sur la même page, « Trouver leurs emails » avec un plafond de 5.
+    - Dans les logs, pour chaque entreprise : « 🌐 https://… [source, preuve] », ou « ❌ Site non vérifié ».
+    - Onglet « Sans contact » : « Site non vérifié… » ou « Ouvrir le formulaire de contact » (le lien s'ouvre dans un nouvel onglet).
+    - Aucune adresse d'annuaire (companyfrance, societe.com…) dans les adresses gardées.
+11. **Adresses déjà en base.**
+    - Lecture seule : `venv/bin/python scripts/revalider_emails_en_base.py --verifier-sites --recherche`. Lire le bilan : 2 entreprises avant, 1 après, 1 adresse gardée (contact@health-data-hub.fr).
+    - S'il te convient : arrêter l'application (Ctrl+C), puis `venv/bin/python scripts/revalider_emails_en_base.py --verifier-sites --recherche --appliquer`, puis la relancer (étape 4).
+    - « Entreprises à contacter » : France Université Numérique n'est plus prête à envoyer.
+12. **Envoi en mode essai.**
+    - Le bandeau « Mode essai : les mails arrivent dans ta propre boîte » est affiché.
+    - « Envoyer ta candidature » à 1 entreprise : le mail arrive dans ta boîte, à une adresse validée seulement.
+13. **Arrêt.**
+    - Ctrl+C dans le terminal de l'application.
+
+## Fusion, une fois les tests passés
+
+```bash
+git switch main
+git merge --no-ff phase-15-audit-backend -m "Merge branch 'phase-15-audit-backend'"
+systemd-run --user --scope -p MemoryMax=2G venv/bin/python -m pytest -q
+```
