@@ -170,13 +170,14 @@ def test_ohana_niveau_souhaite_eligible(ia):
     assert a["score"] == 6 and a["points_faibles"][0] == "Bac+5 souhaité, profil Bac+2"   # 3 crans : -2
 
 
-def test_moss_sans_marqueur_d_exigence_souhaite_eligible(ia):
-    """D103 : le texte de MOSS n'a aucun mot d'exigence ; le modèle a beau
-    répondre « exige », le niveau n'est que souhaité : éligible, note baissée."""
-    ia.reponse = reponse(8, niveau_requis="bac+5", niveau_exigence="exige")
+def test_moss_derniere_annee_d_ecole_d_ingenieurs_exige(ia):
+    """D177 (remplace D103 pour ces tournures) : « dernière année d'école
+    d'ingénieurs ou Master 2 » vaut Bac+5 exigé, sans mot d'exigence :
+    inéligible pour un BUT2."""
+    ia.reponse = reponse(8, niveau_requis="bac+5", niveau_exigence="souhaite")
     a = analyser_offre({"titre": "Stage réseau", "description": MOSS}, BUT2, mode="stage")
-    assert (a["eligible"], a["niveau_exigence"], a["score"]) == (True, "souhaite", 6)
-    assert a["raison_ineligibilite"] == "" and a["points_faibles"][0] == "Bac+5 souhaité, profil Bac+2"
+    assert (a["eligible"], a["niveau_exigence"], a["score"]) == (False, "exige", 3)
+    assert a["raison_ineligibilite"] == "Bac+5 exigé, profil Bac+2"
 
 
 @pytest.mark.parametrize("phrase", ["Bac+5 exigé.", "Diplôme Bac+5 obligatoire.", "Master 2 impératif.",
@@ -274,15 +275,16 @@ def test_ohana_non_precise_par_le_modele_bac5_souhaite(ia):
     assert "remplacé par bac+5 (souhaite)" in a["extraits_ecartes"][0]
 
 
-def test_moss_non_precise_par_le_modele_bac5_souhaite(ia):
+def test_moss_non_precise_par_le_modele_bac5_exige(ia):
+    """Secours D100 : le modèle ne lit rien, Python lit Bac+5, exigé (D177)."""
     ia.reponse = reponse(8)
     a = analyser_offre({"titre": "Stage réseau", "description": MOSS}, BUT2, mode="stage")
-    assert (a["niveau_requis"], a["niveau_exigence"], a["eligible"]) == ("bac+5", "souhaite", True)
+    assert (a["niveau_requis"], a["niveau_exigence"], a["eligible"]) == ("bac+5", "exige", False)
 
 
 @pytest.mark.parametrize("texte, attendu", [
     (OHANA, ("bac+5", "souhaite")),
-    (MOSS, ("bac+5", "souhaite")),
+    (MOSS, ("bac+5", "exige")),                  # dernière année d'école d'ingénieurs, Master 2 (D177)
     (MOSS + " Bac+5 exigé.", ("bac+5", "exige")),
     ("Titulaire d'un BTS ou d'une licence.", ("bac+2", "souhaite")),
     ("BTS ou licence obligatoire.", ("bac+2", "exige")),

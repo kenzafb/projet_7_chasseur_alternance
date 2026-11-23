@@ -51,8 +51,12 @@ PLAFOND_SCORE_INELIGIBLE = 3
 # Indices de niveau dans la description (jamais l'intitulé du poste : « Stage
 # Ingénieur/e Système » ne dit rien du niveau ; le mot « ingénieur » seul non
 # plus). Chaque indice autorise un ou plusieurs niveaux de l'énumération.
+# Bac+5 exigé sans mot d'exigence (D177) : stage de fin d'études, dernière année
+# d'école d'ingénieurs ou de master, M2
+BAC5_EXIGE = (r"stages? de fin d.[ée]tudes|derni[èe]re ann[ée]e (?:d.|de |du )(?:[ée]coles? d.ing[ée]nieurs?"
+              r"|cycle d.ing[ée]nieurs?|ing[ée]nieurs?|master)|\bm\s?2\b|master\s*2")
 INDICES_NIVEAU = [
-    (r"bac\s*\+\s*5|\bm\s?2\b|master\s*2|[ée]coles? d.ing[ée]nieurs?|dipl[ôo]me d.ing[ée]nieurs?"
+    (BAC5_EXIGE + r"|bac\s*\+\s*5|[ée]coles? d.ing[ée]nieurs?|dipl[ôo]me d.ing[ée]nieurs?"
      r"|[ée]l[èe]ves?[- ]ing[ée]nieurs?|cycle (?:d.)?ing[ée]nieurs?|formation d.ing[ée]nieurs?", {"bac+5"}),
     (r"\bmasters?\b|\bmsc\b", {"bac+4", "bac+5"}),
     (r"bac\s*\+\s*4|\bm\s?1\b|master\s*1", {"bac+4"}),
@@ -99,6 +103,9 @@ def exigence_detectee(texte: str, positions) -> str:
     qu'aucun marqueur de souhait (« ou équivalent »...) ne l'adoucit ;
     « souhaite » dans tous les autres cas."""
     if _pres(MARQUEURS_EXIGENCE, texte, positions) and not _pres(MARQUEURS_SOUHAIT, texte, positions):
+        return "exige"
+    # Stage de fin d'études, dernière année d'école d'ingénieurs ou de master, M2 : exigé (D177)
+    if any(re.fullmatch(BAC5_EXIGE, texte[a:b].lower()) for a, b in positions):
         return "exige"
     return "souhaite"
 

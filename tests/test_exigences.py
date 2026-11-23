@@ -151,3 +151,26 @@ def test_experience_extraite_en_lettres_retenue():
         "Expérience : 3 An(s) (exigée)"]
     assert lignes_extraites({"experience_exigee_annees": 3}, {"description": "De 3 à 5 ans."}) == [
         "Expérience : 3 An(s) (exigée)"]
+
+
+@pytest.mark.parametrize("texte, exigence", [
+    ("Stage de fin d'études (6 mois), au sein de l'équipe R&D.", "exige"),
+    ("Vous êtes en dernière année d'école d'ingénieurs.", "exige"),
+    ("Étudiant en dernière année de master informatique.", "exige"),
+    ("Vous préparez un M2 en data science.", "exige"),
+    ("Idéalement en école d'ingénieurs (Bac+5).", "souhaite"),            # pas de tournure de D177
+])
+def test_bac5_exige_sans_mot_d_exigence(texte, exigence):
+    """D177 : stage de fin d'études, dernière année d'école d'ingénieurs ou de master, M2."""
+    from shared.eligibilite import niveau_detecte
+    assert niveau_detecte(texte) == ("bac+5", exigence)
+
+
+def test_stage_de_fin_d_etudes_ineligible_pour_un_bac2():
+    from shared.eligibilite import controler_extraits, raisons_ineligibilite
+    ext = {"niveau_requis": "bac+5", "niveau_exigence": "souhaite", "duree_mois": None, "date_debut_offre": None,
+           "alternance_seulement": False}
+    offre = {"description": "Stage de fin d'études : développement d'un code de calcul."}
+    controler_extraits(ext, offre)
+    assert ext["niveau_exigence"] == "exige"
+    assert raisons_ineligibilite(ext, _profil("Bac+2"), "stage") == ["Bac+5 exigé, profil Bac+2"]
