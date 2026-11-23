@@ -174,3 +174,17 @@ def test_stage_de_fin_d_etudes_ineligible_pour_un_bac2():
     controler_extraits(ext, offre)
     assert ext["niveau_exigence"] == "exige"
     assert raisons_ineligibilite(ext, _profil("Bac+2"), "stage") == ["Bac+5 exigé, profil Bac+2"]
+
+
+@pytest.mark.parametrize("vise, requis, raison", [
+    ("Bac+2 (DEUST)", "bac+5", ["diplôme préparé Bac+5, niveau visé Bac+2"]),
+    ("Bac+2", "bac+4", ["diplôme préparé Bac+4, niveau visé Bac+2"]),
+    ("Bac+2", "bac+3", []),                                 # un niveau au-dessus : toléré
+    ("Bac+3", "bac+3", []),
+    ("", "bac+5", []),                                      # niveau visé non renseigné : ne bloque pas
+])
+def test_alternance_diplome_prepare_trop_haut(vise, requis, raison):
+    """D178 : diplôme préparé à plus d'un niveau au-dessus du niveau visé."""
+    from shared.eligibilite import raisons_ineligibilite
+    ext = {"niveau_requis": requis, "niveau_exigence": "souhaite"}
+    assert raisons_ineligibilite(ext, {"niveau_vise": vise}, "alternance") == raison

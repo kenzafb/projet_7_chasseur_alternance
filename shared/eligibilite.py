@@ -255,6 +255,9 @@ def lire_debut_offre(texte) -> tuple[date, bool] | None:
     return None
 
 
+ECART_ALTERNANCE_PREPARE = 1      # crans au-dessus du niveau visé tolérés en alternance (D178)
+
+
 def raisons_ineligibilite(extraits: dict, profil: dict, mode: str, offre: dict | None = None) -> list[str]:
     """Raisons d'inéligibilité établies en Python ; vide si rien ne bloque.
     offre : ses exigences structurées (permis, formation, expérience,
@@ -264,8 +267,15 @@ def raisons_ineligibilite(extraits: dict, profil: dict, mode: str, offre: dict |
         from shared.exigences import raisons as raisons_exigences
         raisons += raisons_exigences(offre, profil, mode, niveau_du_profil(profil)["crans"])
     ecart = ecart_niveau(extraits, profil)
-    if ecart and ecart[0] >= ECART_NIVEAU_BLOQUANT and extraits.get("niveau_exigence") == "exige":
+    niveau_bloque = bool(ecart and ecart[0] >= ECART_NIVEAU_BLOQUANT and extraits.get("niveau_exigence") == "exige")
+    if niveau_bloque:
         raisons.append(f"{LIBELLES[ecart[1]]} exigé, profil {LIBELLES[ecart[2]]}")
+    # Alternance : diplôme préparé à plus d'un niveau au-dessus du niveau visé (D178)
+    if mode == "alternance" and not niveau_bloque:
+        vise = crans_texte(profil.get("niveau_vise") or "")
+        requis = CRANS.get(extraits.get("niveau_requis") or "non_precise")
+        if requis is not None and vise and requis - max(vise) > ECART_ALTERNANCE_PREPARE:
+            raisons.append(f"diplôme préparé {LIBELLES[requis]}, niveau visé {LIBELLES[max(vise)]}")
     if mode in ("stage", "job") and extraits.get("alternance_seulement"):
         raisons.append("offre en alternance seulement")
     if mode == "stage":
