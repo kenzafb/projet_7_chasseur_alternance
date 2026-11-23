@@ -23,6 +23,8 @@ exigées absentes du profil bloquent : le profil les liste toutes.
 
 import re
 import unicodedata
+from functools import lru_cache
+from pathlib import Path
 
 # Niveaux des formations France Travail (référentiel niveauxFormations) -> crans (bac = 0)
 NIVEAUX_FORMATION = {
@@ -205,6 +207,23 @@ def reserves(offre: dict, profil: dict, mode: str) -> list[str]:
     return []
 
 
+# Métiers de conduite : permis exigé d'après l'intitulé (D182)
+FICHIER_CONDUITE = Path(__file__).resolve().parent / "referentiels" / "metiers_conduite.txt"
+
+
+@lru_cache(maxsize=1)
+def _metiers_conduite() -> re.Pattern:
+    noms = [_simple(x.split("#", 1)[0]).strip() for x in FICHIER_CONDUITE.read_text(encoding="utf-8").splitlines()]
+    noms = sorted({n for n in noms if n}, key=len, reverse=True)
+    motifs = [re.escape(n).replace(r"\ ", r"[\s-]+").replace(r"\-", r"[\s-]+") + r"s?" for n in noms]
+    return re.compile(r"(?<![a-z])(?:" + "|".join(motifs) + r")(?![a-z])")
+
+
+def metier_de_conduite(titre: str) -> bool:
+    """L'intitulé nomme un métier de conduite (conducteur de bus, chauffeur...)."""
+    return bool(_metiers_conduite().search(_simple(titre)))
+
+
 # Poste confirmé, senior ou expérimenté (D179), dans l'intitulé ; pas « responsable » seul
 POSTE_SENIOR = re.compile(r"\b(?:confirm[ée]e?s?|senior|seniors|exp[ée]riment[ée]e?s?)\b", re.I)
 
@@ -227,6 +246,8 @@ def raisons(offre: dict, profil: dict, mode: str, crans_profil: int | None) -> l
     if poste_senior(offre, mode):
         out.append("poste confirmé ou senior")
     exiges = permis_exiges(description)
+    if metier_de_conduite(offre.get("titre") or ""):
+        exiges.append(PERMIS_SANS_CATEGORIE)          # permis implicite (D182)
     categories = [c for c in exiges if c != PERMIS_SANS_CATEGORIE]
     if p["permis"] is not None and not p["permis"] and exiges:
         # « Aucun permis » : tout permis exigé écarte l'offre, catégorie lue ou non (D175)

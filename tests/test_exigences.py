@@ -217,3 +217,21 @@ def test_m2_cite_sans_contexte_n_est_pas_exige():
     from shared.eligibilite import niveau_detecte
     assert niveau_detecte("Gérer les dossiers d'entrée en Master 1 et Master 2.")[1] == "souhaite"
     assert niveau_detecte("Les étudiants de M1 et M2 suivent le cours.") == ("bac+4", "souhaite")
+
+
+@pytest.mark.parametrize("titre, conduite", [
+    ("CONDUCTEUR DE BUS (H/F)", True), ("Conductrice de car scolaire", True), ("Chauffeur-livreur VL", True),
+    ("Chauffeur livreur", True), ("Chauffeur VTC", True), ("Ambulancier DEA", True), ("Ambulancière", True),
+    ("Conducteur de poids lourd", True), ("Chauffeurs SPL", True),
+    ("Chauffagiste (H/F)", False), ("Conducteur de travaux", False), ("Conducteur de ligne de production", False),
+])
+def test_metiers_de_conduite(titre, conduite):
+    """D182 : permis implicite d'après l'intitulé, fichier de référence."""
+    assert X.metier_de_conduite(titre) is conduite
+
+
+def test_permis_implicite_et_aucun_permis():
+    bus = {"titre": "CONDUCTEUR DE BUS (H/F)", "description": "Expérience : Débutant accepté"}
+    assert X.raisons(bus, _profil(permis=["aucun"]), "job", 0) == ["permis exigé, tu n'as pas de permis"]
+    assert X.raisons(bus, _profil(permis=["D"]), "job", 0) == []
+    assert X.raisons(bus, _profil(), "job", 0) == []

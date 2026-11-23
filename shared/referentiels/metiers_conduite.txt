@@ -1,0 +1,24 @@
+# Métiers de conduite (phase 15, décision D182) : un intitulé d'offre qui en
+# contient un vaut « permis exigé », même si le texte ne le dit pas. Un profil
+# « Aucun permis » est alors inéligible ; un profil qui a un permis ne l'est
+# pas (catégorie non lue, D175).
+# Un métier par ligne, comparé en minuscules et sans accents, sur des mots
+# entiers, au singulier comme au pluriel, au masculin comme au féminin.
+# Tests : tests/test_exigences.py.
+conducteur de bus
+conductrice de bus
+conducteur de car
+conductrice de car
+conducteur d'autocar
+conducteur de poids lourd
+conductrice de poids lourd
+conducteur pl
+conducteur spl
+conducteur routier
+chauffeur
+chauffeuse
+chauffeur-livreur
+chauffeur livreur
+chauffeur vtc
+ambulancier
+ambulanciere

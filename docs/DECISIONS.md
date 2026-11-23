@@ -954,3 +954,14 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 ### D180. M2 exigé seulement après « en », « de », « niveau », « étudiant(e) », « préparez » (phase 15, étape 3)
 - **Constat** (remesure après D177) : l'offre « Adjoint en scolarité », dont les missions citent les « dossiers d'entrée en Master 1 et Master 2 », devenait inéligible pour un profil Bac+1.
 - **Règle.** « M2 » ou « Master 2 » reste un indice de niveau Bac+5. Il ne vaut exigé que précédé, à quelques mots près, de « en », « de », « niveau », « étudiant(e) », « préparez » ou « préparant », un article pouvant s'intercaler (« préparez un M2 », « étudiant en M2 », « niveau Master 2 »). Sinon D103 s'applique. « Stage de fin d'études » et « dernière année d'école d'ingénieurs ou de master » restent exigés (D177).
+
+### D181. Annotation : « Assistant(e) administratif(ve) polyvalent(e) », 2 ans exigés, inéligible (phase 15, étape 3)
+- Dans le jeu de référence (`banc_reference.json`) et la moitié test, l'offre job qui exige 2 ans d'expérience passe en attendu inéligible. Elle est cohérente avec D174 : 21 mois d'écart pour un profil de 3 mois, au-delà des 12 tolérés. Les autres offres qui exigent 1 an gardent leur annotation éligible (plafond Moyen par D174). Comme pour le CACES (point 2 de la remesure précédente), c'est l'annotation qui change, pas une règle.
+
+### D182. Permis implicite pour les métiers de conduite (phase 15, étape 3)
+- **Constat** (remesure) : 3 offres « Conducteur de bus » restaient éligibles pour un profil « Aucun permis » ; leur description stockée ne dit pas « permis ».
+- **Règle.** `shared/referentiels/metiers_conduite.txt` liste les métiers de conduite : conducteur ou conductrice de bus, de car, d'autocar ou de poids lourd, conducteur PL, SPL ou routier, chauffeur et chauffeuse (y compris chauffeur-livreur et VTC), ambulancier et ambulancière. Un intitulé qui en contient un, sur des mots entiers et sans tenir compte des accents ni du pluriel, vaut « permis exigé, catégorie non lue ». Un profil « Aucun permis » est inéligible ; un profil qui a un permis ne l'est pas ; un permis non renseigné ne bloque pas. « Conducteur de travaux » et « chauffagiste » ne sont pas concernés.
+
+### D183. Expérience exigée sans durée, poste « débutant accepté » : aucun changement (phase 15, étape 3)
+- « Expérience : Expérience exigée » sans durée (Conseiller en gestion de patrimoine) ne rend pas inéligible : sans durée écrite, la règle job (D174) ne s'applique pas.
+- « Responsable commercial Clients Directs Ouest », dont le titre ne dit pas « confirmé » et dont le texte indique « Débutant accepté », reste éligible. Ces offres restent comptées faux éligibles dans le banc : décision de l'utilisatrice.
