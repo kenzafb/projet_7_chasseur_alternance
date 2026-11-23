@@ -203,6 +203,13 @@ def brancher_cache_recherche(S, chemin):
     return compte
 
 
+def adresses_en_base(base, ids) -> dict:
+    """{id: adresse (numéro et voie)} des entreprises, base en lecture seule (D173)."""
+    from database.models import Entreprise
+    with session_lecture(base) as db:
+        return {e.id: (e.extra or {}).get("adresse", "") for e in db.query(Entreprise).filter(Entreprise.id.in_(ids))}
+
+
 def mesurer(entreprises: list[dict], ddg=True, ia=False, base=None, reference=None, sites_export=None,
             cache_recherche=None) -> dict:
     """Phase 15 (D160, D161) : identification du site (sources, vérification
@@ -216,6 +223,7 @@ def mesurer(entreprises: list[dict], ddg=True, ia=False, base=None, reference=No
     S.time.sleep = journal.pause            # time est partagé : pauses DDG et entre pages comprises
     sites, candidats = [], []
     offres = {}
+    rues = adresses_en_base(base, [e["id"] for e in entreprises])
     try:
         for i, e in enumerate(entreprises, 1):
             journal.requetes, journal.html, journal.pauses = [], {}, 0.0
@@ -227,7 +235,7 @@ def mesurer(entreprises: list[dict], ddg=True, ia=False, base=None, reference=No
             # Le site en base vient de l'ancienne recherche : il n'est pas repris (seulement LBA, offres, recherche)
             ent = {"nom_commercial": e["nom"], "nom": e.get("raison_sociale"), "ville": e.get("ville"),
                    "code_postal": e.get("code_postal"), "siren": e.get("siren"),
-                   "_extra": {"lba": {"site_web": e.get("site_lba") or ""}}}
+                   "_extra": {"lba": {"site_web": e.get("site_lba") or ""}, "adresse": rues.get(e["id"], "")}}
             from spontanees.noms_entreprise import completer
             completer(ent)                      # sigle, dénominations usuelles, enseignes (D167)
             ligne["autres_noms"] = ent.get("autres_noms")

@@ -255,7 +255,8 @@ _CHAMPS_EXTRA_SCRAPER = ("telephone", "url_scrapee", "source_recherche", "tentat
                          "validation_emails", "emails_ecartes_ia",
                          # Phase 15 : site vérifié (D160) et essais, formulaires de contact (D161)
                          "site_verifie", "essais_site", "formulaires_contact",
-                         "autres_noms")   # D167 : sigle, dénominations usuelles, enseignes
+                         "autres_noms",   # D167 : sigle, dénominations usuelles, enseignes
+                         "adresse_siege")  # D173 : preuve du site par l'adresse
 
 
 def _codes_naf(d: dict) -> dict:

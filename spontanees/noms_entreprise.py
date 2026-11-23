@@ -28,9 +28,16 @@ def depuis_sirene(ul: dict, periode: dict | None) -> list[str]:
 
 def depuis_annuaire(siren: str, http=None) -> list[str] | None:
     """Autres noms d'après l'API Recherche d'entreprises, None si elle ne répond pas."""
+    fiche = fiche_annuaire(siren, http)
+    return None if fiche is None else fiche["noms"]
+
+
+def fiche_annuaire(siren: str, http=None) -> dict | None:
+    """{noms, siege: {code_postal, voie}} d'après l'API Recherche d'entreprises
+    (un appel), None si elle ne répond pas."""
     siren = re.sub(r"\D", "", siren or "")
     if len(siren) != 9:
-        return []
+        return {"noms": [], "siege": {}}
     http = http or requests
     try:
         r = http.get(URL, params={"q": siren, "page": 1, "per_page": 1}, timeout=DELAI_S)
@@ -41,12 +48,14 @@ def depuis_annuaire(siren: str, http=None) -> list[str] | None:
         return None
     e = next((x for x in resultats if x.get("siren") == siren), None)
     if not e:
-        return []
+        return {"noms": [], "siege": {}}
     siege = e.get("siege") or {}
     noms = [e.get("sigle"), siege.get("nom_commercial"), *(siege.get("liste_enseignes") or [])]
     # nom_complet : « RAISON SOCIALE (DÉNOMINATION USUELLE) »
     noms += re.findall(r"\(([^)]+)\)", e.get("nom_complet") or "")
-    return list(dict.fromkeys(str(n).strip() for n in noms if n and str(n).strip()))
+    voie = " ".join(str(siege.get(k) or "") for k in ("type_voie", "libelle_voie")).strip()
+    return {"noms": list(dict.fromkeys(str(n).strip() for n in noms if n and str(n).strip())),
+            "siege": {"code_postal": str(siege.get("code_postal") or ""), "voie": voie}}
 
 
 def completer(entreprise: dict) -> list[str]:
@@ -59,7 +68,9 @@ def completer(entreprise: dict) -> list[str]:
         entreprise["autres_noms"] = list(deja)
         return entreprise["autres_noms"]
     siren = entreprise.get("siren") or str((entreprise.get("_extra") or {}).get("siret") or "")[:9]
-    noms = depuis_annuaire(siren)
-    if noms is not None:
-        entreprise["autres_noms"] = noms
-    return noms or []
+    fiche = fiche_annuaire(siren)
+    if fiche is not None:
+        entreprise["autres_noms"] = fiche["noms"]
+        if fiche["siege"].get("code_postal"):
+            entreprise["adresse_siege"] = fiche["siege"]      # preuve par l'adresse (D173)
+    return (fiche or {}).get("noms") or []

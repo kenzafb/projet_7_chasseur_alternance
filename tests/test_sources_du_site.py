@@ -79,3 +79,42 @@ def test_redirection_vers_un_autre_domaine_suivie(monkeypatch):
     brancher(monkeypatch, FauxWeb(pages))
     v = S.verifier("https://cartadis.fr", {"nom": "CARTADIS", "siren": "123456789"}, S.DEVINE)
     assert v.verifie and v.preuve == "siren" and v.url == "https://www.cartadis.com" and v.domaine == "cartadis.com"
+
+
+# ─── D173 : nom d'un seul mot, domaine au nom et adresse sur le site ─────────
+def _site_sans_siren(racine, nom, adresse_page):
+    pages = site(racine=racine, nom=nom, siren_dans_mentions=False)
+    pages[f"{racine}/nous-joindre"] = f"<html><body><h1>Contact</h1><p>{adresse_page}</p></body></html>"
+    return pages
+
+
+def test_domaine_au_nom_et_code_postal(monkeypatch):
+    brancher(monkeypatch, FauxWeb(_site_sans_siren("https://www.cartadis.com", "Cartadis",
+                                                   "12 avenue du Maréchal Joffre, 94120 Fontenay-sous-Bois")))
+    e = {"nom": "CARTADIS", "siren": "123456789", "code_postal": "94120", "_extra": {"adresse": "12 AV DU MARECHAL JOFFRE"}}
+    v = S.verifier("https://www.cartadis.com", e, S.DEVINE)
+    assert v.verifie and v.preuve == "domaine_adresse" and "94120" in v.detail and "page contact" in v.detail
+
+
+def test_domaine_au_nom_et_voie_du_siege(monkeypatch):
+    brancher(monkeypatch, FauxWeb(_site_sans_siren("https://murex.com", "Murex", "8 rue Bellini, Paris")))
+    e = {"nom": "MUREX", "siren": "123456789", "code_postal": "75999",
+         "adresse_siege": {"code_postal": "75116", "voie": "RUE BELLINI"}}
+    assert S.verifier("https://murex.com", e, S.DEVINE).preuve == "domaine_adresse"
+
+
+def test_adresse_sans_domaine_au_nom_ne_suffit_pas(monkeypatch):
+    """fermat.app : domaine au nom, mais l'adresse de Fermat (92800) n'y est pas."""
+    brancher(monkeypatch, FauxWeb(_site_sans_siren("https://www.fermat.app", "Fermat", "Contact : hello@fermat.app")))
+    e = {"nom": "FERMAT", "siren": "123456789", "code_postal": "92800", "_extra": {"adresse": "1 RUE DE PUTEAUX"}}
+    assert not S.verifier("https://www.fermat.app", e, S.DEVINE).verifie
+    # Adresse présente mais domaine différent du nom : refusé
+    brancher(monkeypatch, FauxWeb(_site_sans_siren("https://fondation-x.org", "Fermat", "92800 Puteaux")))
+    assert not S.verifier("https://fondation-x.org", e, S.RECHERCHE).verifie
+
+
+def test_domaine_au_nom():
+    assert S.domaine_au_nom("https://www.lexmark.com", {"nom": "LEXMARK INTERNATIONAL SAS"})
+    assert S.domaine_au_nom("https://wetradelocal.io", {"nom": "WETRADELOCAL"})
+    assert not S.domaine_au_nom("https://olympic.fermat.edu.vn", {"nom": "FERMAT"})     # domaine principal : edu
+    assert not S.domaine_au_nom("https://fondationpierrebellon.org", {"nom": "BELLON SA"})

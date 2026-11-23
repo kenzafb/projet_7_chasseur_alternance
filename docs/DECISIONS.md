@@ -911,3 +911,10 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
   | Temps par offre | 23,3 s | 23,8 s | 50,2 s |
   | Réponses invalides | 0 | 0 | 0 |
 - **Décision** : v2 devient le prompt de l'application (`IA_VERSION_ANALYSE`, défaut `v2`, `v1` pour revenir), avec ministral-3:3b. Le 8b gagne un peu en catégorie mais double le temps. Les tests d'avant restent épinglés sur v1, v2 a les siens.
+
+### D173. Nom d'un seul mot : site accepté sans SIREN si le domaine est le nom et si l'adresse Sirene y figure (phase 15, étape 3)
+- **Constat** (D172) : la règle « SIREN obligatoire pour un nom d'un seul mot distinctif » écartait Fermat et Bellon, mais aussi 7 sites justes (WeTradeLocal, AMUE, Theatre de la Ville, Degetel, Cartadis, Lexmark, Murex), dont les mentions légales n'affichent ni SIREN, ni RCS, ni TVA.
+- **Règle.** Un tel site est accepté sans SIREN aux deux conditions suivantes ; sinon, SIREN toujours obligatoire :
+  1. le domaine principal (sans sous-domaine ni extension) est exactement le nom distinctif simplifié (cartadis.com pour CARTADIS, lexmark.com pour LEXMARK INTERNATIONAL) ;
+  2. l'accueil, la page contact (lien réel de l'accueil, une page de plus) ou les mentions légales portent le code postal ou la voie (au moins 8 caractères) d'une adresse Sirene de l'entreprise : l'établissement francilien en base, ou le siège donné par l'API Recherche d'entreprises (gardé dans `extra.adresse_siege`, même appel que D167).
+- Preuve enregistrée : `domaine_adresse`, avec ce qui a été trouvé et où (« domaine au nom de l'entreprise et code postal 94120 dans la page contact »).

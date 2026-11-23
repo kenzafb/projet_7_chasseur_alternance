@@ -41,7 +41,8 @@ SOURCES = {LBA: "La Bonne Alternance", FRANCE_TRAVAIL: "offre France Travail", R
 EXTENSIONS_DEVINEES = (".fr", ".com", ".eu", ".io")
 MAX_DOMAINES_DEVINES = 8
 PREUVES = {"siren": "SIREN", "siret": "SIRET", "tva": "numéro de TVA", "nom_titre": "nom dans le titre du site",
-           "nom_mentions": "nom dans les mentions légales"}
+           "nom_mentions": "nom dans les mentions légales",
+           "domaine_adresse": "domaine au nom de l'entreprise et adresse sur le site"}
 MAX_CANDIDATS_RECHERCHE = 8      # domaines de la recherche web essayés au plus (4 avant D171)
 MOTS_DISTINCTIFS_MIN = 2         # preuve par le nom : au moins 2 mots distinctifs, sinon SIREN (D172)
 
@@ -225,11 +226,80 @@ def verifier(url: str, entreprise: dict, source: str, lecteur_cls=L.LecteurSite)
     elif "mentions" in textes and (n := nom_present(textes["mentions"], variantes)):
         v.verifie, v.preuve, v.detail = True, "nom_mentions", f"« {n} » dans les mentions légales"
     elif not variantes and variantes_du_nom(entreprise):
-        v.detail = "nom d'un seul mot distinctif : SIREN exigé, absent de l'accueil et des mentions légales"
+        # Assouplissement (D173) : domaine principal = le nom, et adresse Sirene sur le site
+        preuve = preuve_domaine_adresse(v, entreprise, textes, liens, lecteur)
+        if preuve:
+            v.verifie, v.preuve, v.detail = True, "domaine_adresse", preuve
+        else:
+            v.detail = ("nom d'un seul mot distinctif : SIREN exigé (ou domaine au nom et adresse sur le site), "
+                        "absent de l'accueil et des mentions légales")
     else:
         v.detail = ("ni SIREN ni nom dans l'accueil et les mentions légales" if "mentions" in textes
                     else "ni SIREN dans l'accueil ni nom dans le titre, pas de lien vers des mentions légales")
     return v
+
+
+def domaine_principal(url: str) -> str:
+    """Partie principale du domaine, sans sous-domaine ni extension : www.cartadis.com -> cartadis."""
+    parties = L.domaine(url).split(".")
+    return parties[-2] if len(parties) >= 2 else parties[0]
+
+
+def domaine_au_nom(url: str, entreprise: dict) -> bool:
+    """Le domaine principal est exactement le nom distinctif (simplifié, sans espace ni tiret)."""
+    d = re.sub(r"[^a-z0-9]", "", domaine_principal(url))
+    for nom in variantes_du_nom(entreprise):
+        mots = mots_distinctifs(nom)
+        if mots and d in {"".join(mots), "".join(nom.split())}:
+            return True
+    return False
+
+
+def adresses_connues(entreprise: dict) -> list[dict]:
+    """Adresses Sirene de l'entreprise : établissement francilien (code postal,
+    voie) et siège (annuaire, D167)."""
+    extra = entreprise.get("_extra") or {}
+    voie = re.sub(r"^\s*\d+\s*(?:bis|ter|b|t)?\s*", "", str(extra.get("adresse") or entreprise.get("adresse") or ""),
+                  flags=re.I)
+    out = [{"code_postal": str(entreprise.get("code_postal") or ""), "voie": voie}]
+    siege = entreprise.get("adresse_siege") or extra.get("adresse_siege")
+    if siege:
+        out.append({"code_postal": str(siege.get("code_postal") or ""), "voie": str(siege.get("voie") or "")})
+    return [a for a in out if a["code_postal"] or a["voie"]]
+
+
+def adresse_presente(texte: str, adresses: list[dict]) -> str | None:
+    """« code postal 94120 » ou « rue … » si le texte porte l'une des adresses."""
+    simple = f" {simplifier(texte)} "
+    for a in adresses:
+        if re.fullmatch(r"\d{5}", a["code_postal"]) and re.search(rf"(?<!\d){a['code_postal']}(?!\d)", texte or ""):
+            return f"code postal {a['code_postal']}"
+        voie = simplifier(a["voie"])
+        if len(voie) >= 8 and f" {voie} " in simple:
+            return f"« {a['voie'].lower()} »"
+    return None
+
+
+def preuve_domaine_adresse(v, entreprise: dict, textes: dict, liens: dict, lecteur) -> str | None:
+    """D173 : nom d'un seul mot distinctif, sans SIREN sur le site. Accepté si le
+    domaine principal est exactement ce nom ET si l'accueil, le contact ou les
+    mentions légales portent le code postal ou la voie de l'adresse Sirene."""
+    if not domaine_au_nom(v.url, entreprise):
+        return None
+    adresses = adresses_connues(entreprise)
+    if not adresses:
+        return None
+    pages = dict(textes)
+    for lien in liens.get("contact", [])[:1]:
+        h, f = lecteur.lire(lien)
+        if h:
+            v.pages[f or lien] = h
+            pages["contact"] = L.texte_de(h)
+    for ou, texte in pages.items():
+        if trouve := adresse_presente(texte, adresses):
+            lieu = {"accueil": "l'accueil", "mentions": "les mentions légales", "contact": "la page contact"}[ou]
+            return f"domaine au nom de l'entreprise et {trouve} dans {lieu}"
+    return None
 
 
 def mots_distinctifs(nom: str) -> list[str]:
