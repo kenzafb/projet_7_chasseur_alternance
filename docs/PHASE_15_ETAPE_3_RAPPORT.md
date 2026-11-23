@@ -138,3 +138,23 @@ Méthode :
 
 - `venv/bin/python scripts/audit_champs_france_travail.py --user 1 --max 600` : noms et valeurs réels des champs France Travail ; renvoie `audit_exports/audit_champs_france_travail.json`.
 - Dans Mon profil, partie « Ton parcours » : permis, expérience en mois et certifications, pour que les règles de B s'appliquent pleinement.
+
+## Remesure de l'éligibilité avec le profil job rempli (23 novembre 2026)
+
+v2, ministral-3:3b, moitié test (68 offres), profils relus en base (`audit_exports/banc_test_profils_a_jour.json` : job et stage avec aucun permis, 3 mois d'expérience, aucune certification).
+
+- **Résultats** :
+  - éligibilité juste : 72,1 %, comme avant, mais 13 faux éligibles (18 avant) et 6 faux inéligibles (1 avant) ;
+  - catégorie exacte : 51,5 %, écart moyen 0,63 rang ;
+  - 23,9 s par offre.
+- **Faux inéligibles nouveaux** (6) : la règle demandée s'applique, l'annotation ne la suit pas.
+  - 5 offres job exigent 1 ou 2 ans d'expérience (`experienceExige` E), pour un profil de 3 mois. Elles avaient été annotées éligibles (« vente en magasin, accepté par le profil »…).
+  - 1 offre exige un CACES, absent du profil.
+  - À trancher : mettre à jour ces annotations, ou assouplir la règle (par exemple, en job, n'écarter qu'à partir de 2 ans exigés, ou si l'écart dépasse 12 mois).
+- **Faux éligibles restants, par cause** (13) :
+  - **Permis (3, « Conducteur de bus »)** : v2 extrait « permis C » ; le texte écrit probablement une autre catégorie (D, transport en commun), donc le contrôle contre le texte le rejette. Piste : profil « Aucun permis » et texte qui exige un permis, quelle que soit la catégorie, donne inéligible.
+  - **Expérience (2, « Conseiller en gestion de patrimoine »)** : v2 extrait 3 ans ; le texte l'écrit sous une forme que le contrôle ne lit pas (« trois ans », « 3 à 5 ans »). Piste : lire les nombres en lettres et les fourchettes.
+  - **Niveau Bac+5 non retenu comme exigé (3)** : stage de fin d'études en école d'ingénieurs, alternance Bac+5 (CRM, architecte logiciel). v2 dit « exigé », mais le contrôle Python (D103) ne voit pas de mot d'exigence à côté et le rend « souhaité » ; le plafond Moyen s'applique, pas l'inéligibilité. Pistes : « stage de fin d'études », « dernière année » valent Bac+5 exigé ; en alternance, comparer le diplôme préparé au niveau visé.
+  - **Diplôme préparé trop haut en alternance (1)** : Product Owner ISCOD Bac+4/5 pour un DEUST Bac+2 ; seulement 1 an d'expérience extrait, sous le seuil de 2 ans.
+  - **Métier qualifié sans exigence écrite (3)** : frigoriste, technicien CVC, gestion locative. Rien d'explicite à lire ; c'est un jugement de l'annotation. Le champ `qualificationLibelle` (« Ouvrier qualifié », « Technicien ») pourrait servir, si on le décide.
+  - **Poste confirmé (1)** : « Responsable commercial » confirmé, rien d'extrait. Piste : étendre au job la règle « poste senior » de l'alternance.
