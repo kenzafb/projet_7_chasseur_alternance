@@ -886,4 +886,15 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
   Niveau, durée, dates, permis et certifications ne comptent pas : ils sont vérifiés à part.
 - **Python** convertit le mot en note (Très bien 9, Bien 7, Moyen 5, Faible 3, Hors sujet 1), décide l'éligibilité (plafond 3 si inéligible) et plafonne : un niveau souhaité deux crans ou plus au-dessus du profil donne Moyen au plus, à la place du malus de 1 à 2 points de v1.
 - **Mesure** (D, `scripts/banc_ia/decouper.py`) : le jeu annoté est coupé en deux moitiés fixes (graine 15, réparties par mode), 69 offres de réglage et 68 de test. Le prompt ne s'ajuste que sur la moitié réglage. La moitié test sert à la mesure finale seulement : v1 contre v2 avec ministral-3:3b, puis v2 avec ministral-3:8b. Les bancs lisent les seules variables `IA_*` du `.env`. `banc_analyse.py --version v1|v2`.
-- L'application garde v1 tant que la mesure finale n'a pas tranché.
+- **Réglage** (moitié réglage seulement, ministral-3:3b, 1 essai, 69 offres) :
+
+  | Passage | Éligibilité | Catégorie exacte | Écart moyen |
+  |---|---|---|---|
+  | 1 | 87 % | 26 % | 1,14 rang |
+  | 2 | 87 % | 36 % | 0,88 rang |
+  | 3 | 87 % | 49 % | 0,61 rang |
+
+  1. Arbre tel que conçu : le modèle met « Hors sujet » partout où le poste n'est pas dans les types de jobs qui conviennent.
+  2. Étape 1 resserrée : Hors sujet seulement pour ce que le profil écarte explicitement ; en cas de doute, étape 2.
+  3. Le modèle doit recopier la phrase du profil qui impose Hors sujet (`hors_sujet_car`) ; Python ne garde Hors sujet que si elle vient d'un champ d'exclusion (types de jobs à éviter, ce qu'il préfère éviter, domaines recherchés hors job), sinon Faible.
+- L'application garde v1 tant que la mesure finale sur la moitié test n'a pas tranché.

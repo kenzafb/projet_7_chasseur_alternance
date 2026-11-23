@@ -18,9 +18,9 @@ def _extraction(**k):
     return json.dumps({**base, **k})
 
 
-def _jugement(categorie="Bien"):
-    return json.dumps({"categorie": categorie, "points_forts": ["Python"], "points_faibles": [], "domaine": "Web",
-                       "resume": "Stage web"})
+def _jugement(categorie="Bien", car="aucune"):
+    return json.dumps({"categorie": categorie, "hors_sujet_car": car, "points_forts": ["Python"], "points_faibles": [],
+                       "domaine": "Web", "resume": "Stage web"})
 
 
 def test_deux_appels_l_extraction_ne_voit_pas_le_profil(ia):
@@ -91,3 +91,13 @@ def test_seules_les_variables_ia_du_env_sont_lues(tmp_path, monkeypatch):
     assert charger_ia_env(env) == {"IA_NUM_CTX": "4096", "IA_MODELE_ANALYSE": "ministral-3:3b"}
     import os
     assert os.environ["IA_NUM_CTX"] == "4096" and "SECRET_KEY" not in charger_ia_env(env)
+
+
+def test_hors_sujet_exige_une_phrase_du_profil(ia):
+    profil = {**PROFIL, "types_jobs_eviter": "Postes très physiques ou pénibles (déménagement, BTP)"}
+    ia.file = [_extraction(), _jugement("Hors sujet", "aucune")]
+    assert analyser_offre_v2({"titre": "Caissier", "description": "x"}, profil, "job")["categorie"] == "Faible"
+    ia.file = [_extraction(), _jugement("Hors sujet", "Postes très physiques ou pénibles")]
+    assert analyser_offre_v2({"titre": "Déménageur", "description": "x"}, profil, "job")["categorie"] == "Hors sujet"
+    ia.file = [_extraction(), _jugement("Hors sujet", "Idéalement des postes calmes")]   # pas un champ d'exclusion
+    assert analyser_offre_v2({"titre": "Caissier", "description": "x"}, profil, "job")["categorie"] == "Faible"

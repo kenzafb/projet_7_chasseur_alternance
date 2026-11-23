@@ -90,6 +90,8 @@ class JugementOffre(_Reponse):
     """Prompt v2, second appel (D170) : adéquation en un mot, convertie en
     note par Python."""
     categorie: Literal[CATEGORIES_JUGEMENT] = Field(description="Très bien, Bien, Moyen, Faible ou Hors sujet")
+    # Hors sujet : phrase du profil qui l'impose, recopiée ; vérifiée en Python (D170)
+    hors_sujet_car: str = Field(description="Phrase du profil qui rend l'offre hors sujet, ou « aucune »")
     points_forts: list[str] = Field(description="3 au plus")
     points_faibles: list[str] = Field(description="2 au plus")
     domaine: str = Field(description="Catégorie métier en 2 à 4 mots")

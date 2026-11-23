@@ -74,18 +74,25 @@ DEFINITIONS = (
 )
 
 ETAPE_1 = {
-    "alternance": ("le poste réel est hors des domaines recherchés ; ou il correspond à ce que le candidat préfère "
-                   "éviter ; ou c'est un poste senior (confirmé, architecte, chef de service) ; ou l'offre exige "
-                   "plusieurs années d'expérience"),
-    "stage": ("le poste réel est hors des domaines recherchés ; ou ce n'est pas un stage pour un étudiant (emploi "
-              "salarié, formation payante)"),
-    "job": ("le poste correspond aux types de jobs à éviter ; ou il contredit nettement une contrainte écrite du "
-            "profil (horaires, durée, mobilité) ; ou il est hors des domaines préférés quand le profil en donne"),
+    "alternance": ("le poste réel est dans un tout autre domaine que ceux recherchés (un domaine voisin n'est pas "
+                   "hors sujet) ; ou il correspond exactement à ce que le candidat écrit préférer éviter ; ou c'est un "
+                   "poste senior (confirmé, architecte, chef de service)"),
+    "stage": ("le poste réel est dans un tout autre domaine que ceux recherchés (un domaine voisin n'est pas hors "
+              "sujet) ; ou ce n'est pas un stage pour un étudiant (emploi salarié, formation payante)"),
+    "job": ("le poste fait partie des types de jobs que le candidat écrit vouloir éviter ; ou il contredit une "
+            "contrainte écrite du profil de façon certaine. Un poste qui n'est pas dans les types qui conviennent "
+            "n'est PAS hors sujet pour autant"),
 }
 ETAPE_2 = {
-    "alternance": "compare les missions réelles (pas le seul titre) au niveau visé, à la formation et aux compétences",
-    "stage": "compare les missions réelles (pas le seul titre) aux missions visées et aux compétences",
-    "job": "compare le poste aux types de jobs qui conviennent, aux préférences et à l'expérience du profil",
+    "alternance": ("compare les missions réelles (pas le seul titre) au niveau visé, à la formation et aux "
+                   "compétences : Très bien ou Bien si elles y correspondent, Moyen si c'est le bon domaine avec des "
+                   "missions différentes, Faible si le lien est mince"),
+    "stage": ("compare les missions réelles (pas le seul titre) aux missions visées et aux compétences : Très bien "
+              "ou Bien si elles y correspondent, Moyen si c'est le bon domaine avec des missions différentes, Faible "
+              "si le lien est mince"),
+    "job": ("compare le poste aux types de jobs qui conviennent : Très bien ou Bien s'il en fait partie, Moyen s'il "
+            "est acceptable sans être souhaité (le profil le tolère), Faible s'il est peu adapté (physique, loin, "
+            "horaires peu compatibles) sans être à éviter"),
 }
 
 
@@ -93,8 +100,9 @@ def messages_jugement(offre: dict, profil: dict, mode: str, longueur: int) -> li
     intro, contexte, _ = REGLES.get(mode, REGLES["alternance"])
     regles = (
         "Décide en suivant ces étapes dans l'ordre ; arrête-toi à la première qui décide.\n"
-        f"Étape 1 : Hors sujet si {ETAPE_1[mode]}.\n"
-        f"Étape 2 : sinon, {ETAPE_2[mode]}, et choisis Très bien, Bien, Moyen ou Faible.\n"
+        f"Étape 1 : Hors sujet seulement si {ETAPE_1[mode]}. En cas de doute, ce n'est pas Hors sujet : passe à "
+        "l'étape 2.\n"
+        f"Étape 2 : sinon, {ETAPE_2[mode]}.\n"
         "Étape 3 : réserves. Si l'offre demande une compétence importante absente du profil, descends d'un cran "
         "(Très bien devient Bien, Bien devient Moyen, Moyen devient Faible), une seule fois.\n"
         "Le niveau d'études, la durée, les dates, le permis et les certifications sont vérifiés à part : n'en "
@@ -105,8 +113,11 @@ def messages_jugement(offre: dict, profil: dict, mode: str, longueur: int) -> li
         f"=== OFFRE ===\nTitre : {offre.get('titre', '')}\nEntreprise : {offre.get('entreprise', '') or 'non précisée'}\n"
         f"Lieu : {offre.get('lieu', '') or 'non précisé'}\nDescription : {_court(offre.get('description'), longueur)}\n"
         f"=== FIN ===\n\n{regles}\n\n{POINTS_FORTS}\n"
-        "domaine : catégorie métier courte, ou exactement « Hors domaine » si l'étape 1 décide.\n\n"
+        "domaine : catégorie métier courte, ou exactement « Hors domaine » si l'étape 1 décide.\n"
+        "hors_sujet_car : si tu choisis Hors sujet, recopie mot pour mot la phrase du profil qui l'impose "
+        "(domaines recherchés, ce qu'il préfère éviter, types de jobs à éviter) ; sinon « aucune ».\n\n"
         'Réponds uniquement avec cet objet JSON : {"categorie": "<Très bien, Bien, Moyen, Faible ou Hors sujet>", '
+        '"hors_sujet_car": "<phrase du profil ou aucune>", '
         '"points_forts": [<3 phrases courtes au plus>], "points_faibles": [<2 phrases courtes au plus>], '
         '"domaine": "<2 à 4 mots>", "resume": "<12 mots au plus>"}'
     )
@@ -136,6 +147,27 @@ def lignes_extraites(extraction: dict, offre: dict) -> list[str]:
     return list(dict.fromkeys(out))
 
 
+# Champs du profil qui peuvent rendre une offre hors sujet, par mode
+CHAMPS_EXCLUSION = {"job": ("types_jobs_eviter",), "stage": ("criteres_eviter",),
+                    "alternance": ("criteres_eviter",)}
+
+
+def hors_sujet_justifie(raison: str, profil: dict, mode: str) -> bool:
+    """La phrase citée par le modèle vient-elle d'un champ d'exclusion du
+    profil (ou, hors job, des domaines recherchés) ? Au moins deux mots de 4
+    lettres ou plus de la citation doivent s'y trouver."""
+    from offres.analyse import _domaines
+    from spontanees.site_officiel import simplifier
+    mots = [m for m in simplifier(raison).split() if len(m) >= 4]
+    if not mots or simplifier(raison) in ("aucune", "aucun"):
+        return False
+    sources = [str(profil.get(c) or "") for c in CHAMPS_EXCLUSION.get(mode, ())]
+    if mode != "job":
+        sources.append(_domaines(profil))
+    texte = f" {simplifier(' '.join(sources))} "
+    return sum(1 for m in mots if f" {m} " in texte) >= min(2, len(mots))
+
+
 def appliquer_plafonds(result: dict, profil: dict) -> dict:
     """Niveau seulement souhaité, deux crans ou plus au-dessus du profil :
     Moyen au plus (remplace le malus de v1)."""
@@ -161,6 +193,11 @@ def analyser_offre_v2(offre, profil, mode="alternance", modele=None, essais=2, t
     jugement = appeler_structure(messages_jugement(offre, profil, mode, longueur_jugement or ia_longueur_description()),
                                  JugementOffre, usage="analyse", modele=modele, essais=essais,
                                  temperature=temperature).model_dump()
+    # Hors sujet sans phrase du profil qui l'impose : Faible (le petit modèle en abusait, D170)
+    if jugement["categorie"] == "Hors sujet" and not hors_sujet_justifie(jugement["hors_sujet_car"], profil, mode):
+        jugement["categorie"] = "Faible"
+        if jugement["domaine"] == "Hors domaine":
+            jugement["domaine"] = "Non classé"
     result = {
         "score": NOTES[jugement["categorie"]], "categorie": jugement["categorie"], "eligible": True,
         "points_forts": jugement["points_forts"][:3], "points_faibles": jugement["points_faibles"][:2],
