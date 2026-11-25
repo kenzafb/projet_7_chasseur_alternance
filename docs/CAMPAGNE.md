@@ -152,7 +152,7 @@ busctl get-property org.freedesktop.login1 /org/freedesktop/login1 org.freedeskt
 ## Déroulé
 
 - **Préparation** de tous les modes, l'un après l'autre. File vide : nouvelle recherche d'entreprises selon le profil du mode. Arrêt du mode : cible atteinte, durée ou nombre d'entreprises maximal, recherche web en panne, plus rien à trouver.
-- **Résumé** par mode, avec « Envoyer » et « Voir d'abord » (objet, pièces jointes, texte du mail). Seules les entreprises et les adresses du résumé peuvent partir. Sans réponse à l'heure limite, rien n'est envoyé et la sélection reste prête dans l'interface.
+- **Résumé** par mode, avec « Envoyer » et « Voir d'abord » (objet, pièces jointes, texte du mail). Il dit « ENVOI RÉEL aux entreprises » ou « MODE ESSAI : les mails arriveront chez toi », d'après le réglage du compte d'envoi. Seules les entreprises et les adresses du résumé peuvent partir. Sans réponse à l'heure limite, rien n'est envoyé et la sélection reste prête dans l'interface.
 - **Envoi** : celui de l'interface, 2 à 5 minutes entre deux mails. 30 mails prennent environ 1 h 45.
 - **Plafond du jour** (`PLAFOND_ENVOIS_JOUR`, 50) : 30 en stage, 20 en job. Un envoi fait à la main le même jour compte aussi. Les entreprises job préparées en trop servent le lendemain.
 - **Suivi** : envois et statuts dans l'interface comme d'habitude ; bilan et journal dans « Entreprises à contacter », « Dernière campagne automatique ».
@@ -178,4 +178,5 @@ Oui. La base est en WAL, une écriture attend l'autre 30 s au plus, et chaque tr
 
 - Un clic n'est accepté que si son auteur et la conversation sont `TELEGRAM_CHAT_ID` ; chaque bouton porte un jeton de la campagne, donc un vieux bouton ne fait rien.
 - Le jeton du bot est un secret : toute personne qui l'a peut lire les messages du bot. Les résumés contiennent les noms et les adresses des entreprises, et « Voir d'abord » le texte de ton mail : ils passent par les serveurs de Telegram.
+- Ne pas suspendre la campagne dans un terminal (Ctrl+Z) : elle ne répond plus et garde son verrou, donc aucune autre ne démarre. Pour l'arrêter : Ctrl+C.
 - Rien d'autre ne doit interroger ce bot (`getUpdates`) pendant une campagne.

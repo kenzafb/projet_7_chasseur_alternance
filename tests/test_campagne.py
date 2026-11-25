@@ -91,13 +91,13 @@ def plusieurs(*reponses):
 @pytest.fixture
 def monde(utilisateur, smtp_simule, monkeypatch):
     """Utilisateur prêt à envoyer, faux scraper, fausses sources, faux système."""
-    _, uid = utilisateur("a@test.fr", prenom="Ada")
+    client, uid = utilisateur("a@test.fr", prenom="Ada")
     compte_verifie(smtp_simule, uid, "ada@gmail.com")
     profil = {"prenom": "Ada", "date_debut": "2027-02-08", "date_fin": "2027-04-18"}
     from database.profil_db import sauvegarder_profil
     for mode in ("stage", "job"):
         sauvegarder_profil(uid, profil, mode=mode)
-    m = types.SimpleNamespace(uid=uid, smtp=smtp_simule, scrapees=[], recherches=[], commandes=[], avec_email=lambda nom: True,
+    m = types.SimpleNamespace(uid=uid, client=client, smtp=smtp_simule, scrapees=[], recherches=[], commandes=[], avec_email=lambda nom: True,
                               source=lambda n: [], logind='s "yes"', horloge=FausseHorloge())
 
     def faux_scraper(user_id, stop_event=None, log_fn=None, max_scrapees=None, mode=MODE, **_):
@@ -726,6 +726,178 @@ def test_identifiant_de_groupe_refuse(monkeypatch, chat):
     monkeypatch.setenv("TELEGRAM_CHAT_ID", chat)
     with pytest.raises(telegram.ErreurTelegram):
         telegram.depuis_env()
+
+
+# ─── Réponse aux clics avant toute action (D214) ──────────────────────────────
+class _Serveur:
+    """Faux serveur Telegram, sous le vrai client : note chaque appel dans
+    l'ordre ; a_l_envoi(serveur, boutons) ajoute des clics après un message."""
+
+    def __init__(self, monkeypatch, a_l_envoi):
+        import threading
+        self.faits, self.attente, self.a_l_envoi, self.n = [], [], a_l_envoi, 0
+        self.change = threading.Condition()
+        monkeypatch.setattr(telegram, "_poster", self._poster)
+
+    def noter(self, *fait):
+        with self.change:
+            self.faits.append(fait)
+            self.change.notify_all()
+
+    def cliquer(self, donnee):
+        self.n += 1
+        self.attente.append(_clic(self.n, 42, 42, donnee))
+
+    def reponses(self):
+        return [f[1] for f in self.faits if f[0] == "reponse"]
+
+    def attendre_reponses(self, nombre):
+        with self.change:
+            return self.change.wait_for(lambda: len(self.reponses()) >= nombre, timeout=5)
+
+    def _poster(self, url, charge, delai):
+        methode, resultat = url.rsplit("/", 1)[1], True
+        if methode == "getUpdates":
+            with self.change:
+                if not self.attente:
+                    self.change.wait(0.01)
+            resultat, self.attente = self.attente, []
+        elif methode == "answerCallbackQuery":
+            self.noter("reponse", charge["text"])
+        elif methode == "sendMessage":
+            self.noter("message", charge["text"])
+            resultat = {"message_id": len(self.faits)}
+            boutons = {b["text"]: b["callback_data"] for b in charge.get("reply_markup", {}).get("inline_keyboard", [[]])[0]}
+            self.a_l_envoi(self, boutons)
+        return _Reponse({"ok": True, "result": resultat})
+
+
+class _HorlogeFixe:
+    """Toujours 9 h : seuls les clics font avancer la campagne."""
+
+    def maintenant(self):
+        return datetime(2026, 11, 26, 9, 0, tzinfo=PARIS)
+
+    def dormir(self, secondes):
+        import time
+        time.sleep(0.005)
+
+
+def avec_serveur(monde, monkeypatch, a_l_envoi, modes=("stage",), ecoute=True, horloge=None):
+    serveur = _Serveur(monkeypatch, a_l_envoi)
+    vrai = envoi.envoyer_mail
+
+    def envoyer_mail(*a, **k):
+        serveur.noter("mail")
+        return vrai(*a, **k)
+    monkeypatch.setattr(envoi, "envoyer_mail", envoyer_mail)
+    monkeypatch.setattr(C, "PAUSE_ENVOIS", (0, 0))
+    c = C.Campagne(monde.uid, modes, C.Reglages(cible=2, fin="rien").verifier(), telegram.Telegram("J", "42"),
+                   horloge or _HorlogeFixe(), ecoute=ecoute)
+    return serveur, c
+
+
+@pytest.mark.parametrize("ecoute", [True, False])
+def test_reponse_au_clic_avant_l_envoi(monde, monkeypatch, ecoute):
+    ajouter_entreprises(monde.uid, entreprises(2), MODE)
+    serveur, c = avec_serveur(monde, monkeypatch, lambda s, b: "Voir d'abord" in b and s.cliquer(b["Envoyer"]),
+                              ecoute=ecoute)
+    c.executer()
+    noms = [f[0] for f in serveur.faits]
+    assert noms.count("mail") == 2 and serveur.reponses() == ["Envoi noté."]
+    assert noms.index("reponse") < noms.index("mail")
+
+
+@pytest.mark.parametrize("ecoute", [True, False])
+def test_tous_les_clics_ont_leur_reponse_avant_la_premiere_action(monde, monkeypatch, ecoute):
+    """« Voir d'abord » envoie un long message : il ne retarde pas la réponse au clic suivant."""
+    ajouter_entreprises(monde.uid, entreprises(2), MODE)
+
+    def deux_clics(s, b):
+        if "Voir d'abord" in b:
+            with s.change:
+                s.cliquer(b["Voir d'abord"])
+                s.cliquer(b["Envoyer"])
+    serveur, c = avec_serveur(monde, monkeypatch, deux_clics, ecoute=ecoute)
+    c.executer()
+    reponses = [i for i, f in enumerate(serveur.faits) if f[0] == "reponse"]
+    vu = next(i for i, f in enumerate(serveur.faits) if f[0] == "message" and "👀" in f[1])
+    assert serveur.reponses() == ["Rien n'est parti.", "Envoi noté."] and max(reponses) < vu
+
+
+def test_reponse_pendant_la_recherche_du_mode_suivant(monde, monkeypatch):
+    """« Envoyer » du stage pendant que job cherche ses emails : réponse immédiate,
+    l'envoi suit la recherche."""
+    ajouter_entreprises(monde.uid, entreprises(2), MODE)
+    ajouter_entreprises(monde.uid, entreprises(2, "Job"), "job")
+    serveur, c = avec_serveur(monde, monkeypatch, lambda s, b: "Voir d'abord" in b and s.cliquer(b["Envoyer"]),
+                              modes=("stage", "job"))
+    vrai, vu = C.recherche_emails.main, []
+
+    def lente(*a, mode=MODE, **k):
+        if mode == "job":
+            vu.append(serveur.attendre_reponses(1) and serveur.reponses() == ["Envoi noté."])
+        return vrai(*a, mode=mode, **k)
+    monkeypatch.setattr(C.recherche_emails, "main", lente)
+    b = c.executer()
+    assert vu == [True] and b["stage"]["envoyes"] == b["job"]["envoyes"] == 2
+
+
+def test_reponse_pendant_l_envoi_d_un_mail(monde, monkeypatch):
+    ajouter_entreprises(monde.uid, entreprises(2), MODE)
+    boutons = {}
+
+    def premier_clic(s, b):
+        if "Voir d'abord" in b:
+            boutons.update(b)
+            s.cliquer(b["Envoyer"])
+    serveur, c = avec_serveur(monde, monkeypatch, premier_clic)
+    vrai, vu = envoi.envoyer_mail, []
+
+    def mail_lent(*a, **k):
+        if not vu:
+            serveur.cliquer(boutons["Envoyer"])          # second clic, pendant le mail
+            vu.append(serveur.attendre_reponses(2))
+        return vrai(*a, **k)
+    monkeypatch.setattr(envoi, "envoyer_mail", mail_lent)
+    b = c.executer()
+    assert vu == [True] and serveur.reponses() == ["Envoi noté.", "Ce bouton n'est plus valable."]
+    assert b["stage"]["envoyes"] == 2
+
+
+def test_ecoute_survit_a_une_panne(monde, monkeypatch):
+    monkeypatch.setattr(C, "REPRISE_ECOUTE_S", 0)
+    ajouter_entreprises(monde.uid, entreprises(2), MODE)
+    serveur, c = avec_serveur(monde, monkeypatch, lambda s, b: "Voir d'abord" in b and s.cliquer(b["Envoyer"]))
+    lire, n = c.recevoir, []
+
+    def capricieux(attente=0):
+        n.append(1)
+        if len(n) in (1, 2):
+            raise telegram.ErreurTelegram("Telegram injoignable (essai)")
+        return lire(attente)
+    monkeypatch.setattr(c, "recevoir", capricieux)
+    assert c.executer()["stage"]["envoyes"] == 2
+    assert campagnes_db.derniere(monde.uid)["journal"].count("injoignable (essai)") == 1
+    assert c._ecoute is None                                  # arrêtée avec la campagne
+
+
+# ─── Réel ou essai, à côté du bouton (D214) ───────────────────────────────────
+@pytest.mark.parametrize("essai, dit, tu", [
+    (False, "ENVOI RÉEL aux entreprises", "MODE ESSAI"),
+    (True, "MODE ESSAI : les mails arriveront chez toi", "ENVOI RÉEL")])
+def test_resume_dit_reel_ou_essai(monde, essai, dit, tu):
+    """Le réglage est celui que l'interface écrit et affiche (comptes_envoi.mode_test)."""
+    client = monde.client
+    r = client.post("/api/compte_envoi/mode_test", json={"actif": essai})
+    assert r.json()["compte"]["mode_test"] is essai
+    ajouter_entreprises(monde.uid, entreprises(3), MODE)
+    lancer(monde, plusieurs(une_fois("Voir d'abord"), une_fois("Envoyer", 1)))
+    avec_bouton = [m for m in monde.telegram.messages if "📬" in m or "👀" in m]
+    assert len(avec_bouton) == 2 and all(dit in m and tu not in m for m in avec_bouton)
+    assert avec_bouton[0].endswith(dit)                       # juste au-dessus des boutons, même en liste longue
+    assert (destinataires(monde) == [["ada@gmail.com"]] * 3) is essai
+    assert client.get("/api/compte_envoi").json()["compte"]["mode_test"] is essai
 
 
 # ─── Script et réglages ───────────────────────────────────────────────────────
