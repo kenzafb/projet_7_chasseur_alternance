@@ -6,8 +6,8 @@ modes (D200), sans toucher aux autres utilisateurs.
 
 Effacé : offres et analyses, lettres (candidatures), offres déjà vues
 (offres_vues), entreprises et résultats du scraper (entreprises), leur
-sélection, leurs envois et leur suivi (entreprises_modes), lettres PDF de
-LETTRES_PDF_DIR/user_<id>/.
+sélection, leurs envois et leur suivi (entreprises_modes), campagnes
+automatiques (campagnes), lettres PDF de LETTRES_PDF_DIR/user_<id>/.
 
 Gardé : compte, profils et réglages des trois modes, pièces jointes, compte
 d'envoi (mode essai compris), compteurs d'envoi, adresses déjà contactées,
@@ -40,13 +40,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from sqlalchemy import delete, or_, select, text
 
 from database.dedup_db import normaliser_email
-from database.models import (Base, Candidature, CompteEnvoi, CompteurEnvoi, EmailContacte, Entreprise,
+from database.models import (Base, Campagne, Candidature, CompteEnvoi, CompteurEnvoi, EmailContacte, Entreprise,
                              EntrepriseMode, OffreVue, Profil, User)
 from shared import config
 from shared.modes import MODES
 
 # Dans l'ordre d'effacement : l'état par mode avant les entreprises
-EFFACEES = (EntrepriseMode, Entreprise, Candidature, OffreVue)
+EFFACEES = (EntrepriseMode, Entreprise, Candidature, OffreVue, Campagne)
 
 
 class Refus(Exception):

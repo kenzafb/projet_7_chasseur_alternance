@@ -1,0 +1,11 @@
+// Chasseur (D213) : l'utilisateur UTILISATEUR, et lui seul, peut éteindre le PC
+// et le mettre en veille sans mot de passe. Rien d'autre : ni redémarrage, ni
+// passage outre une autre session ouverte ou un programme qui s'y oppose.
+// Installation : docs/CAMPAGNE.md.
+polkit.addRule(function (action, subject) {
+    if (subject.user === "UTILISATEUR" &&
+        (action.id === "org.freedesktop.login1.power-off" ||
+         action.id === "org.freedesktop.login1.suspend")) {
+        return polkit.Result.YES;
+    }
+});

@@ -657,6 +657,9 @@
 .ent-table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 8px; }
 .ent-table th, .ent-table td { padding: 8px; text-align: left; border-bottom: 1px solid var(--fond-neutre); }
 .ent-table thead th { font-size: 13px; color: var(--texte-2); }
+.campagne__bilan { margin: 12px 0; font-size: 14px; }
+.campagne__journal { max-height: 320px; overflow: auto; padding: 12px; border-radius: var(--r-champ); background: var(--fond);
+  font-family: var(--police); font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--texte-3); }
 .reglages__sous-titre { margin: 18px 0 10px; font-size: 15px; font-weight: 700; }
 @media (max-width: 900px) { .etapes { grid-template-columns: 1fr; } }
 @media (max-width: 640px) {

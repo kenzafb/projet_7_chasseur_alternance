@@ -38,6 +38,7 @@ def _dossier(variable: str, defaut: Path) -> Path:
 DATA_DIR        = _dossier("DATA_DIR", BASE_DIR / "data")
 UPLOADS_DIR     = _dossier("UPLOADS_DIR", DATA_DIR / "uploads")
 LETTRES_PDF_DIR = _dossier("LETTRES_PDF_DIR", DATA_DIR / "lettres_pdf")   # D197 : avec les autres données
+VERROUS_DIR     = DATA_DIR / "verrous"   # verrous entre l'application et la campagne (D213)
 LETTRES_PDF_ANCIEN = BASE_DIR / "lettres_pdf"                              # défaut avant D197
 TEMPLATES_DIR   = BASE_DIR / "templates"
 STATIC_DIR      = BASE_DIR / "static"

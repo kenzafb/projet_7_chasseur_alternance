@@ -13,14 +13,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
 from auth.securite import utilisateur_requis
-from database import compte_envoi_db
 from database.entreprises_db import calculer_stats
 from database.models import User
 from database.profil_db import (lire_profil)
 from offres.la_bonne_alternance import ignoree_pour_profil as lba_ignoree_pour_profil
 from routes import commun
 from routes.commun import limite_appliquee, mode_requis, routeur_prive
-from shared import compte_envoi, config
+from shared import config
 from shared.erreurs import ErreurUtilisateur
 from shared.modes import get_mode
 from shared.pipelines import SPONTANEES
@@ -115,7 +114,11 @@ def _lancer_spontanees(user_id: int, etape: str, message: str, debut_log: str,
     travail(stop_event, log_fn, on_progress) fait le vrai travail.
     Retourne une réponse 400 si un pipeline spontané de l'utilisateur tourne déjà."""
     if not commun.pipelines.demarrer(SPONTANEES, user_id, etape=etape, message=message, **etat):
-        en_cours = commun.pipelines.etat(SPONTANEES, user_id).get("mode")
+        en_cours = commun.pipelines.etat(SPONTANEES, user_id)
+        if not en_cours["en_cours"]:
+            return JSONResponse({"erreur": "Campagne automatique en cours : réessaie quand elle aura fini cette étape."},
+                                status_code=400)
+        en_cours = en_cours.get("mode")
         return JSONResponse({"erreur": f"Pipeline déjà en cours (mode {en_cours})"}, status_code=400)
     arret = commun.pipelines.evenement_arret(user_id)
 
@@ -200,6 +203,13 @@ def api_spontanees_scraper(request: Request, body: Scraper | None = None,
         f"▶ Scraper emails démarré (au plus {maximum} entreprises){note}", travail,
         "Scraping terminé !", "✅ Scraping terminé", "scraper", mode=mode), max_scrapees=maximum)
 
+@router.get("/api/spontanees/campagne")
+def api_spontanees_campagne(user: User = Depends(utilisateur_requis)):
+    """Dernière campagne automatique de l'utilisateur (D213), ou null."""
+    from database.campagnes_db import derniere
+    return derniere(user.id)
+
+
 # ─── Emails non validés par l'IA : jamais envoyés tels quels (D15) ────────────
 @router.get("/api/spontanees/a_valider")
 def api_spontanees_a_valider(request: Request, user: User = Depends(utilisateur_requis),
@@ -254,13 +264,9 @@ def api_spontanees_envoyer(body: Envoyer, request: Request, user: User = Depends
     # Plafond de sécurité par lancement (réputation du compte d'envoi)
     # Refus clair AVANT tout lancement : pas de clé (503), pas de compte ou
     # compte jamais vérifié (400), plafond du jour déjà atteint (400), rien à envoyer (400)
-    compte = compte_envoi.exiger_compte_verifie(user_id)
-    if compte_envoi_db.envois_du_jour(user_id) >= config.PLAFOND_ENVOIS_JOUR:
-        raise ErreurUtilisateur(f"Plafond de {config.PLAFOND_ENVOIS_JOUR} mails par jour atteint : "
-                                "les envois reprendront demain.")
-    from spontanees.envoi import compter_a_envoyer, objet_et_corps
-    # Balise inconnue, ou vide dans le profil (dates du stage...) : 400 avant tout lancement
-    objet_et_corps(lire_profil(user_id, mode=mode), mode)
+    # (balise inconnue, ou vide dans le profil : dates du stage... : 400 aussi)
+    from spontanees.envoi import compter_a_envoyer, verifier_avant_envoi
+    compte = verifier_avant_envoi(user_id, mode)
     disponibles = compter_a_envoyer(user_id, mode)
     if not disponibles:
         raise ErreurUtilisateur("Rien à envoyer : aucune entreprise avec un email non contacté dans ce mode.")

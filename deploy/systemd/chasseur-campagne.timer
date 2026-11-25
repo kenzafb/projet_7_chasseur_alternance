@@ -1,0 +1,14 @@
+[Unit]
+Description=Chasseur : campagne automatique, du lundi au vendredi
+
+[Timer]
+# Heure réglable : systemctl --user edit chasseur-campagne.timer (docs/CAMPAGNE.md)
+OnCalendar=Mon..Fri *-*-* 07:00:00
+AccuracySec=1min
+# PC éteint à l'heure dite : lancée à l'ouverture suivante
+Persistent=true
+# PC en veille à l'heure dite : réveillé (CAP_WAKE_ALARM de systemd --user)
+WakeSystem=true
+
+[Install]
+WantedBy=timers.target

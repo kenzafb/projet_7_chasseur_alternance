@@ -548,6 +548,17 @@ def sauvegarder_entreprises(user_id: int, liste: list[dict], mode: str = MODE_DE
     finally:
         db.close()
 
+def deja_envoyee(user_id: int, entreprise_id: int, mode: str) -> bool:
+    """État d'envoi relu en base : l'entreprise est-elle déjà contactée dans
+    ce mode, peut-être depuis un autre processus (D213) ?"""
+    db = SessionLocal()
+    try:
+        return bool(db.query(EntrepriseMode.mail_envoye).filter_by(
+            entreprise_id=entreprise_id, user_id=user_id, mode=mode).scalar())
+    finally:
+        db.close()
+
+
 def sauvegarder_enrichissement(user_id: int, liste: list[dict]):
     """
     Réécrit en base les enrichissements faits par le scraper d'emails :

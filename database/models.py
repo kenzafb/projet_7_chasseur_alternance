@@ -75,6 +75,7 @@ class User(Base):
     compte_envoi     = relationship("CompteEnvoi", back_populates="user", uselist=False,
                                     cascade="all, delete-orphan", passive_deletes=True)
     compteurs_envoi  = _relation_depuis_user("CompteurEnvoi")
+    campagnes        = _relation_depuis_user("Campagne")
 
 
 # ─── Profil (un par utilisateur et par mode) ──────────────────────────────────
@@ -332,3 +333,19 @@ class CompteurEnvoi(Base):
     nombre  = Column(Integer, nullable=False, default=0)
 
     user = _relation_vers_user("compteurs_envoi")
+
+
+# ─── Campagnes automatiques d'entreprises à contacter (D213) ──────────────────
+class Campagne(Base):
+    __tablename__ = "campagnes"
+    __table_args__ = (Index("ix_campagnes_user_id", "user_id"),)
+
+    id      = Column(Integer, primary_key=True)
+    user_id = _user_id()
+    debut   = Column(DateTime(timezone=True), nullable=False)
+    fin     = Column(DateTime(timezone=True))
+    etat    = Column(String(20), nullable=False, default="en_cours", server_default="en_cours")   # en_cours, terminee, arretee, erreur, interrompue
+    bilan   = Column(JSON, nullable=False, default=dict, server_default=text("'{}'"))   # par mode
+    journal = Column(Text, nullable=False, default="", server_default="")
+
+    user = _relation_vers_user("campagnes")

@@ -48,12 +48,15 @@ assert str(config.BASE_DIR / "data") not in str(config.DATABASE_URL), "les tests
 
 import main  # noqa: E402
 import shared.ia  # noqa: E402
+import database.connexion  # noqa: E402
 from database.connexion import SessionLocal, engine  # noqa: E402
 from database.models import User  # noqa: E402
 from database.schema import migrer  # noqa: E402
 
 CODE = "code-invitation-de-test"
 MOT_DE_PASSE = "motdepasse-solide"
+# La base est recopiée avant chaque test : pas de fichiers -wal à côté (D213)
+database.connexion.MODE_JOURNAL = "DELETE"
 
 
 # ─── Barrières réseau ─────────────────────────────────────────────────────────
@@ -229,6 +232,13 @@ def dossiers_temporaires(monkeypatch, tmp_path):
     """PDF et pièces jointes dans tmp_path, jamais dans le projet."""
     monkeypatch.setattr(config, "LETTRES_PDF_DIR", tmp_path / "pdf")
     monkeypatch.setattr(config, "UPLOADS_DIR", tmp_path / "uploads")
+    monkeypatch.setattr(config, "VERROUS_DIR", tmp_path / "verrous")
+    # Jamais de vrai message Telegram ni de vraie extinction (D213)
+    from shared import extinction, telegram
+    def interdit(*a, **k):
+        raise AssertionError("Telegram ou commande système appelé pendant les tests")
+    monkeypatch.setattr(telegram, "_poster", interdit)
+    monkeypatch.setattr(extinction, "_executer", interdit)
     # Export LBA compact (D163) : jamais le fichier de DATA_DIR
     from offres import export_lba
     monkeypatch.setattr(export_lba, "FICHIER", tmp_path / "lba_recruteurs_idf.jsonl.gz")

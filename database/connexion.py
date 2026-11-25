@@ -11,11 +11,17 @@ Le jour du déploiement : il suffira de changer DATABASE_URL
 C'est tout l'intérêt de SQLAlchemy.
 """
 
+import sqlite3
+
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 # shared.config charge le .env : DATABASE_URL y est surchargeable
 # (ce qui permettra de basculer sur PostgreSQL sans toucher au code).
 from shared.config import DATABASE_URL
+
+ATTENTE_VERROU_MS = 30_000
+MODE_JOURNAL = "WAL"      # la suite de tests, qui recopie sa base, emploie DELETE
+
 
 def creer_moteur(url: str):
     """Moteur SQLAlchemy pour `url`. Sert à l'app, à Alembic et au script d'import."""
@@ -30,6 +36,13 @@ def creer_moteur(url: str):
         """SQLite n'applique les clés étrangères (et ON DELETE CASCADE)
         que si on le lui demande, à chaque connexion."""
         connexion_dbapi.execute("PRAGMA foreign_keys=ON")
+        # Application et campagne automatique en même temps (D213) : lecteurs
+        # jamais bloqués (WAL), un écrivain attend l'autre au lieu d'échouer
+        connexion_dbapi.execute(f"PRAGMA busy_timeout={ATTENTE_VERROU_MS}")
+        try:
+            connexion_dbapi.execute(f"PRAGMA journal_mode={MODE_JOURNAL}").fetchone()
+        except sqlite3.OperationalError:
+            pass   # base ouverte en lecture seule, ou occupée : la prochaine connexion
 
     return moteur
 

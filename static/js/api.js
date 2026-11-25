@@ -204,6 +204,7 @@ export const api = {
   spFetch:    (max)    => post("/api/spontanees/fetch", { max_entreprises: max }),
   spScraper:  (max)    => post("/api/spontanees/scraper", { max_scrapees: max }),
   spEnvoyer:  (limite, test = false) => post("/api/spontanees/envoyer", { limite, test }),
+  spCampagne: ()       => get("/api/spontanees/campagne"),
   spStop:     ()       => post("/api/spontanees/stop"),
   spAValider:  ()      => get("/api/spontanees/a_valider"),
   spValider:   (id)    => post("/api/spontanees/valider", { id }),
