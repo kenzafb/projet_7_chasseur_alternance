@@ -35,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from audit_commun import ecrire_json, maintenant, session_lecture  # noqa: E402
 
-from shared.validation_emails import DOUTEUX, ECARTE, VALIDE, classer, titre_seul_hors_fr  # noqa: E402
+from shared.validation_emails import DOUTEUX, ECARTE, VALIDE, classer, titre_seul  # noqa: E402
 
 
 @contextmanager
@@ -66,7 +66,7 @@ def revalider_une(e, verification) -> dict:
             garde.append(a)
             continue
         decision, raison = classer(a, domaine, verifie=bool(domaine))
-        if decision == VALIDE and not titre_seul_hors_fr(verification):
+        if decision == VALIDE and not titre_seul(verification):
             garde.append(a)
         elif decision in (VALIDE, DOUTEUX):
             garde.append(a)

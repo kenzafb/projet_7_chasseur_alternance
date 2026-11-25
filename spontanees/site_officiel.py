@@ -43,6 +43,7 @@ EXTENSIONS_DEVINEES = (".fr", ".com", ".eu", ".io")
 MAX_DOMAINES_DEVINES = 8
 PREUVES = {"siren": "SIREN", "siret": "SIRET", "tva": "numéro de TVA", "nom_titre": "nom dans le titre du site",
            "nom_mentions": "nom dans les mentions légales",
+           "titre_adresse": "nom dans le titre et adresse Sirene sur le site",
            "domaine_adresse": "domaine au nom de l'entreprise et adresse sur le site",
            "wikidata": "site officiel déclaré dans Wikidata pour le SIREN"}
 PREUVES_NUMERO = ("siren", "siret", "tva")
@@ -226,6 +227,9 @@ def verifier(url: str, entreprise: dict, source: str, lecteur_cls=L.LecteurSite)
     variantes = [x for x in variantes_du_nom(entreprise) if len(mots_distinctifs(x)) >= MOTS_DISTINCTIFS_MIN]
     if n := nom_present(L.titre_de(html), variantes):
         v.verifie, v.preuve, v.detail = True, "nom_titre", f"« {n} » dans le titre du site"
+        # Le titre seul ne suffit pas pour envoyer, avec l'adresse Sirene oui (D216)
+        if trouve := adresse_sur_le_site(v, entreprise, textes, liens, lecteur):
+            v.preuve, v.detail = "titre_adresse", f"{v.detail} et {trouve}"
     elif "mentions" in textes and (n := nom_present(textes["mentions"], variantes)):
         v.verifie, v.preuve, v.detail = True, "nom_mentions", f"« {n} » dans les mentions légales"
     elif not variantes and variantes_du_nom(entreprise):
@@ -289,6 +293,13 @@ def preuve_domaine_adresse(v, entreprise: dict, textes: dict, liens: dict, lecte
     mentions légales portent le code postal ou la voie de l'adresse Sirene."""
     if not domaine_au_nom(v.url, entreprise):
         return None
+    trouve = adresse_sur_le_site(v, entreprise, textes, liens, lecteur)
+    return f"domaine au nom de l'entreprise et {trouve}" if trouve else None
+
+
+def adresse_sur_le_site(v, entreprise: dict, textes: dict, liens: dict, lecteur) -> str | None:
+    """« code postal 94120 dans l'accueil » : adresse Sirene dans l'accueil, les
+    mentions légales ou la page contact ; None sinon."""
     adresses = adresses_connues(entreprise)
     if not adresses:
         return None
@@ -301,7 +312,7 @@ def preuve_domaine_adresse(v, entreprise: dict, textes: dict, liens: dict, lecte
     for ou, texte in pages.items():
         if trouve := adresse_presente(texte, adresses):
             lieu = {"accueil": "l'accueil", "mentions": "les mentions légales", "contact": "la page contact"}[ou]
-            return f"domaine au nom de l'entreprise et {trouve} dans {lieu}"
+            return f"{trouve} dans {lieu}"
     return None
 
 

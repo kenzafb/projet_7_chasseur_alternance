@@ -31,8 +31,8 @@ export function etiquettesAutresModes(e) {
 const VALIDATION = {
   regle: ["validée par règle", "chip--vert"], ia: ["validée par l'IA", "chip--vert"],
   manuelle: ["validée à la main", "chip--vert"], lba: ["fournie par LBA", "chip--lba"],
-  inconnue: ["adresse validée", "chip--gris"], douteuse: ["à vérifier", "chip--gris"],
-  ecartee_ia: ["écartée par l'IA", "chip--rouge"],
+  inconnue: ["adresse validée", "chip--gris"], douteuse: ["à valider", "chip--gris"],
+  ecartee_ia: ["écartée par l'IA", "chip--rouge"], rejetee: ["rejetée à la main", "chip--rouge"],
 };
 function etiquetteAdresse(a) {
   const [texte, classe] = VALIDATION[a.validation] || [a.validation, "chip--gris"];
@@ -54,11 +54,14 @@ function boutonLba(e) {
     : `<a class="ent__lien" href="${esc(e.lba.url)}" target="_blank" rel="noopener">Voir sur La Bonne Alternance<span class="visuellement-cache"> (nouvel onglet)</span></a>`;
 }
 
-/* Onglet d'une entreprise à contacter : email trouvé, formulaire LBA, ou rien */
-const ongletDe = e => e.email ? "pretes" : e.lba?.formulaire ? "lba" : lienSur(e.carrieres) ? "carrieres" : "aucun";
+/* Onglet d'une entreprise à contacter : email validé, formulaire LBA, site carrières,
+   adresse à valider (liste de son onglet : aValider), ou rien */
+const ongletDe = e => e.email ? "pretes" : e.lba?.formulaire ? "lba" : lienSur(e.carrieres) ? "carrieres"
+  : (e.adresses || []).length ? "a_valider" : "aucun";
 const AIDES = {
   pretes: "Leur email est trouvé : le Chasseur peut leur envoyer ta candidature (étape 3).",
   lba: "Pas d'email, mais un formulaire sur La Bonne Alternance. Postule là-bas, puis indique-le ici.",
+  a_valider: "Ces adresses ne partent jamais seules, ni par l'envoi groupé ni par la campagne. Valide ou rejette chacune.",
   carrieres: "Grandes entreprises (500 salariés et plus) : elles recrutent par leur site carrières. Postule là-bas, ce n'est pas un échec.",
   aucun: "Pas d'email gardé : site non vérifié, ou formulaire de contact seulement (lien sur l'entreprise).",
   faites: "Elles sont aussi dans tes Candidatures, où tu suis leurs réponses.",
@@ -79,7 +82,6 @@ function ligne(e) {
     ? `Email trouvé : ${esc(e.email)}${e.email_lba ? " (fourni par La Bonne Alternance)" : ""}`
     : onglet === "lba" ? "Formulaire de candidature sur La Bonne Alternance"
     : onglet === "carrieres" ? "Grande entreprise : candidature sur son site carrières"
-    : (e.adresses || []).length ? "Adresses à vérifier, voir plus haut"
     : e.formulaire ? "Pas d'email, mais un formulaire de contact sur son site"
     : e.site_non_verifie ? "Site non vérifié : ni son SIREN ni son nom trouvés sur un site, aucun email gardé"
     : "Ni email ni formulaire trouvés";
@@ -121,8 +123,10 @@ function rendreTable() {
   // Les prochaines entreprises (ordre de la recherche d'emails et de l'envoi) ;
   // une fois contactées, elles sont dans Candidatures (D110)
   const prochaines = stats.prochaines || [];
-  const compte = { pretes: 0, lba: 0, carrieres: 0, aucun: 0, faites: contactees.length };
+  const compte = { pretes: 0, lba: 0, carrieres: 0, aucun: 0 };
   prochaines.forEach(e => { compte[ongletDe(e)]++; });
+  compte.faites = contactees.length;
+  compte.a_valider = enAttente().length;   // toutes, pas seulement les prochaines
   for (const [k, n] of Object.entries(compte)) {
     const nb = document.querySelector(`[data-sp-nombre="${k}"]`);
     if (nb) nb.textContent = fmt(n);
@@ -131,7 +135,12 @@ function rendreTable() {
     b.setAttribute("aria-pressed", String(b.dataset.filter === filtre)));
   const aide = document.querySelector("[data-sp-aide]");
   if (aide) aide.textContent = AIDES[filtre] || "";
-  const items = filtre === "faites" ? contactees.filter(deLOrigine).map(ligneContactee)
+  const bloc = document.querySelector("[data-a-valider]");
+  if (bloc) bloc.hidden = filtre !== "a_valider" || !enAttente().length;
+  const origine = document.querySelector("[data-sp-origine]");
+  if (origine) origine.hidden = filtre === "a_valider";   // toutes origines : aucune adresse oubliée
+  const items = filtre === "a_valider" ? lignesAValider()
+    : filtre === "faites" ? contactees.filter(deLOrigine).map(ligneContactee)
     : prochaines.filter(e => ongletDe(e) === filtre && deLOrigine(e)).map(ligne);
   el.innerHTML = items.length ? items.join("") : '<li class="ent-liste__vide">Rien ici pour l\'instant.</li>';
 }
@@ -245,25 +254,48 @@ function rendreMaximums() {
   }
 }
 
-/* Emails non validés : mention, validation manuelle une entreprise à la fois */
-function rendreAValider() {
-  const carte = document.querySelector("[data-a-valider]");
-  const liste = document.querySelector('[data-list="a-valider"]');
-  if (!carte || !liste) return;
-  carte.hidden = aValider.length === 0;
-  const nb = document.querySelector("[data-a-valider-nombre]");
-  if (nb) nb.textContent = fmt(aValider.length);
-  // Chaque adresse avec sa mention ; douteuses et écartées par l'IA validables une à une
-  const adresse = (e, a) => `<div>${esc(a.adresse)} ${etiquetteAdresse(a)}${
-    ["douteuse", "ecartee_ia"].includes(a.validation)
-      ? ` <button type="button" class="btn btn--sm" data-valider-adresse="${esc(a.adresse)}" data-entreprise="${e.id}">${
-          a.validation === "ecartee_ia" ? "Valider quand même" : "Valider"}</button>` : ""}</div>`;
-  liste.innerHTML = aValider.map(e => `
-    <div class="a-valider__ligne">
-      <div><p class="ent__nom">${esc(e.nom)}</p><p class="ent__detail">${esc(e.ville)}</p></div>
-      <div class="a-valider__adresses">${(e.adresses || []).map(a => adresse(e, a)).join("")}</div>
-      ${e.emails.length ? `<button type="button" class="btn btn--sm" data-valider="${e.id}">Tout valider</button>` : ""}
-    </div>`).join("");
+/* Onglet « Adresses à valider » (D216) : chaque adresse se valide ou se rejette ;
+   une adresse rejetée reste visible en bas, validable quand même */
+const enAttente = () => aValider.filter(e => e.emails.length || e.ecartees_ia.length);
+
+function adresseAValider(e, a) {
+  const bouton = (action, texte, classe = "") => `<button type="button" class="btn btn--sm${classe}" data-adresse-action="${action}"
+      data-adresse="${esc(a.adresse)}" data-entreprise="${e.id}">${texte}<span class="visuellement-cache"> ${esc(a.adresse)}</span></button>`;
+  const boutons = a.validation === "douteuse" ? bouton("valider", "Valider") + bouton("rejeter", "Rejeter", " btn--ghost")
+    : a.validation === "ecartee_ia" ? bouton("valider", "Valider quand même") + bouton("rejeter", "Rejeter", " btn--ghost")
+    : a.validation === "rejetee" ? bouton("valider", "Valider quand même") : "";
+  return `<div class="ent__actions a-valider__adresse"><span class="a-valider__email">${esc(a.adresse)}</span> ${etiquetteAdresse(a)} ${boutons}</div>`;
+}
+
+function ligneAValider(e, adresses) {
+  const recherche = `${e.nom || ""} ${e.ville || ""} ${adresses.map(a => a.adresse).join(" ")}`.toLowerCase();
+  const site = lienSur(e.site);
+  return `<li class="ent" data-search-text="${esc(recherche)}">
+      <span class="ent__initiale" aria-hidden="true">${esc((e.nom || "?").trim()[0] || "?")}</span>
+      <div class="ent__corps">
+        <p class="ent__nom">${esc(e.nom || "Entreprise sans nom")}${e.a_la_main ? ' <span class="chip chip--ambre">site reconnu à son titre seul</span>' : ""}</p>
+        <p class="ent__detail">${esc([e.ville, e.preuve_site].filter(Boolean).join(" · "))}</p>
+        ${site ? `<a class="ent__lien" href="${esc(site)}" target="_blank" rel="noopener">${esc(e.site)}<span class="visuellement-cache"> (nouvel onglet)</span></a>` : ""}
+        ${adresses.map(a => adresseAValider(e, a)).join("")}
+        ${adresses.filter(a => a.validation === "douteuse").length > 1 ? `<div class="ent__actions"><button type="button" class="btn btn--sm" data-adresse-action="tout"
+          data-entreprise="${e.id}">Tout valider</button></div>` : ""}
+      </div>
+    </li>`;
+}
+
+function lignesAValider() {
+  const rejetees = aValider.filter(e => e.rejetees.length)
+    .map(e => ligneAValider(e, e.rejetees.map(adresse => ({ adresse, validation: "rejetee" }))));
+  return [...enAttente().map(e => ligneAValider(e, e.adresses)),
+    ...(rejetees.length ? ['<li class="a-valider__titre">Adresses rejetées</li>', ...rejetees] : [])];
+}
+
+async function agirSurAdresse(bouton) {
+  bouton.disabled = true;
+  try {
+    const agir = { valider: api.spValiderAdresse, rejeter: api.spRejeterAdresse, tout: api.spValider }[bouton.dataset.adresseAction];
+    await agir(parseInt(bouton.dataset.entreprise, 10), bouton.dataset.adresse);
+  } catch (err) { alert(err.message); }
 }
 
 /* Répartition par source : entreprises, emails, envoyés, réponses, entretiens */
@@ -309,17 +341,11 @@ export const Spontanees = {
       this._brancheEssai = true;
     }
     rendreCampagne();
-    rendreAValider();
     if (!this._brancheValider) {
-      const liste = document.querySelector('[data-list="a-valider"]');
-      if (liste) liste.addEventListener("click", async e => {
-        const une = e.target.closest("[data-valider-adresse]");
-        const id = une ? une.dataset.entreprise : e.target.closest("[data-valider]")?.dataset.valider;
-        if (!id) return;
-        try {
-          if (une) await api.spValiderAdresse(parseInt(id, 10), une.dataset.validerAdresse);
-          else await api.spValider(parseInt(id, 10));
-        } catch (err) { alert(err.message); }
+      document.querySelector('[data-list="spontanees"]')?.addEventListener("click", async e => {
+        const bouton = e.target.closest("[data-adresse-action]");
+        if (!bouton) return;
+        await agirSurAdresse(bouton);
         this.charger();
       });
       this._brancheValider = true;

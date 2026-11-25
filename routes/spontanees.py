@@ -227,10 +227,18 @@ def api_spontanees_valider(body: ValiderEmails, user: User = Depends(utilisateur
 
 @router.post("/api/spontanees/valider_adresse")
 def api_spontanees_valider_adresse(body: ValiderAdresse, user: User = Depends(utilisateur_requis)):
-    """Validation manuelle d'une adresse, douteuse ou écartée par l'IA."""
+    """Validation manuelle d'une adresse, douteuse, écartée par l'IA ou rejetée."""
     from database.entreprises_db import valider_adresse
     if not valider_adresse(user.id, body.id, body.adresse):
         return JSONResponse({"erreur": "Adresse introuvable ou déjà validée"}, status_code=404)
+    return {"ok": True}
+
+@router.post("/api/spontanees/rejeter_adresse")
+def api_spontanees_rejeter_adresse(body: ValiderAdresse, user: User = Depends(utilisateur_requis)):
+    """Rejet manuel d'une adresse, douteuse ou écartée par l'IA (D216)."""
+    from database.entreprises_db import rejeter_adresse
+    if not rejeter_adresse(user.id, body.id, body.adresse):
+        return JSONResponse({"erreur": "Adresse introuvable ou déjà traitée"}, status_code=404)
     return {"ok": True}
 
 @router.post("/api/spontanees/revalider")

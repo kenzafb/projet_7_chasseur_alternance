@@ -63,22 +63,11 @@
     </li>
   </ol>
 
-  <!-- Emails douteux que ni les règles ni l'IA n'ont validés : jamais envoyés tels quels -->
-  <section class="carte-verif" data-a-valider aria-labelledby="verif-titre" hidden>
-    <h2 class="carte-verif__titre" id="verif-titre"><span data-a-valider-nombre>0</span> entreprises ont des adresses à vérifier</h2>
-    <p class="carte-verif__aide">Adresses douteuses (autre domaine que le site, messagerie grand public, adresse nominative) que ni les règles ni l'IA n'ont pu valider, ou site hors .fr reconnu à son titre seul (maison mère, homonyme : à valider à la main, l'IA n'y touche pas) : elles ne partent jamais seules. Valide-les une à une, ou fais revoir les autres par l'IA. Les adresses déjà validées de l'entreprise partent normalement.</p>
-    {% if analyse_ia|default(true) %}
-    <button type="button" class="btn btn--sm" data-action="revalider">Faire revoir par l'IA</button>
-    {% else %}
-    <p class="carte-verif__aide">IA désactivée : valide les adresses à la main.</p>
-    {% endif %}
-    <div class="carte-verif__liste" data-list="a-valider"></div>
-  </section>
-
   <!-- Les entreprises, rangées par moyen de contact -->
   <section class="ent-liste" aria-label="Entreprises">
     <div class="onglets" role="group" aria-label="Classer les entreprises" data-filters="spontanees">
       <button type="button" class="onglet" data-filter="pretes" aria-pressed="true">Prêtes à envoyer · <span data-sp-nombre="pretes">0</span></button>
+      <button type="button" class="onglet" data-filter="a_valider" aria-pressed="false">Adresses à valider · <span data-sp-nombre="a_valider">0</span></button>
       <button type="button" class="onglet" data-filter="lba" aria-pressed="false">Via La Bonne Alternance · <span data-sp-nombre="lba">0</span></button>
       <button type="button" class="onglet" data-filter="carrieres" aria-pressed="false">Sur leur site carrières · <span data-sp-nombre="carrieres">0</span></button>
       <button type="button" class="onglet" data-filter="aucun" aria-pressed="false">Sans contact · <span data-sp-nombre="aucun">0</span></button>
@@ -86,7 +75,7 @@
     </div>
     <div class="ent-liste__barre">
       <p class="ent-liste__aide" data-sp-aide></p>
-      <label class="filtre filtre--ligne"><span>Origine</span>
+      <label class="filtre filtre--ligne" data-sp-origine><span>Origine</span>
         <select class="filtre-menu" data-sp-source>
           <option value="all">Toutes</option>
           <option value="coeur">Ton secteur (Sirene)</option>
@@ -94,6 +83,15 @@
           <option value="lba">La Bonne Alternance</option>
           <option value="autre">Autres (secteurs choisis, tous secteurs)</option>
         </select></label>
+    </div>
+    <!-- Onglet « Adresses à valider » (D216) -->
+    <div class="carte-verif" data-a-valider hidden>
+      <p class="carte-verif__aide">Adresse nominative ou de messagerie grand public que ni les règles ni l'IA n'ont pu valider, ou site reconnu à son titre seul (homonyme, maison mère : ouvre le site pour vérifier, l'IA n'y touche pas). Les adresses déjà validées de l'entreprise partent normalement.</p>
+      {% if analyse_ia|default(true) %}
+      <button type="button" class="btn btn--sm" data-action="revalider">Faire revoir par l'IA</button>
+      {% else %}
+      <p class="carte-verif__aide">IA désactivée : valide les adresses à la main.</p>
+      {% endif %}
     </div>
     <ul class="ent-liste__items" data-list="spontanees">
       <!-- entreprises injectées par spontanees.js -->

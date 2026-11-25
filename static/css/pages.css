@@ -208,12 +208,6 @@
 }
 .filtre-menu:hover { border-color: var(--accent); }
 
-/* Emails non validés par l'IA */
-.a-valider { padding: 14px 16px; margin-bottom: 14px; border: 1px solid var(--attention); }
-.a-valider[hidden] { display: none; }
-
-.a-valider__ligne { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--bordure); font-size: 13px; flex-wrap: wrap; }
-
 /* Confirmation d'un lancement (limite appliquée par le serveur) */
 .confirmation {
   border: 1px solid var(--succes); background: var(--succes-fond); border-radius: var(--r-liste);
@@ -625,12 +619,9 @@
   display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 18px 20px;
   background: var(--surface); border: 1px solid var(--bordure); border-left: 4px solid var(--attention); border-radius: var(--r-carte);
 }
-.carte-verif__titre { font-size: 16px; font-weight: 700; }
 .carte-verif__aide { font-size: 13px; color: var(--texte-2); }
-.carte-verif__liste { width: 100%; display: flex; flex-direction: column; }
-.a-valider__ligne { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 16px; padding: 12px 0; border-top: 1px solid var(--fond-neutre); }
-.a-valider__ligne > div:first-child { flex: 1 1 180px; }
-.a-valider__adresses { flex: 2 1 280px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; overflow-wrap: anywhere; }
+.a-valider__email { font-size: 14px; overflow-wrap: anywhere; }
+.a-valider__titre { padding: 14px 4px; border-top: 1px solid var(--fond-neutre); font-weight: 700; color: var(--texte-2); }
 .ent-liste {
   display: flex; flex-direction: column; gap: 12px; padding: 16px;
   background: var(--surface); border: 1px solid var(--bordure); border-radius: var(--r-panneau);

@@ -81,7 +81,7 @@ def test_visibles_avec_leur_mention(alice):
     page = (config.TEMPLATES_DIR / "partials" / "spontanees.html").read_text(encoding="utf-8")
     js = (config.STATIC_DIR / "js" / "spontanees.js").read_text(encoding="utf-8")
     assert "data-a-valider" in page and 'data-action="revalider"' in page
-    assert "non validé" in js and "data-valider" in js and "api.spValider" in js
+    assert "data-adresse-action" in js and all(f"api.{a}" in js for a in ("spValider", "spValiderAdresse", "spRejeterAdresse"))
 
 
 def test_validation_manuelle_une_par_une(alice, smtp_simule):
@@ -258,21 +258,21 @@ def test_validation_d_une_seule_douteuse(alice):
     assert envoyeur.emails_valides(e) == ["a@gmail.com"]
 
 
-# ─── D215 : site hors .fr vérifié par son titre seul ──────────────────────────
+# ─── D216 : site vérifié par son titre seul, quelle que soit l'extension ──────
 TITRE_EU = {"url": "https://www.ent.eu", "domaine": "ent.eu", "source": "recherche", "verifie": True, "preuve": "nom_titre"}
 
 
 @pytest.mark.parametrize("site, attendu", [
     (TITRE_EU, True),
-    ({**TITRE_EU, "domaine": "ent.fr"}, False),
-    ({**TITRE_EU, "domaine": "www.ENT.FR"}, False),
+    ({**TITRE_EU, "domaine": "ent.fr"}, True),
+    ({**TITRE_EU, "preuve": "titre_adresse"}, False),
+    ({**TITRE_EU, "preuve": "domaine_adresse"}, False),
     ({**TITRE_EU, "preuve": "siren"}, False),
     ({**TITRE_EU, "preuve": "wikidata"}, False),
     ({**TITRE_EU, "verifie": False}, False),
-    ({**TITRE_EU, "domaine": "ent.fr:443"}, False),
     (None, False)])
-def test_titre_seul_hors_fr(site, attendu):
-    assert validation_emails.titre_seul_hors_fr(site) is attendu
+def test_titre_seul(site, attendu):
+    assert validation_emails.titre_seul(site) is attendu
 
 
 def _eu(user_id, provenance, **champs):
@@ -334,10 +334,124 @@ def test_lecture_du_site_rien_de_valide_sans_appel_a_l_ia(monkeypatch):
 def test_le_scraper_les_met_a_valider(monkeypatch):
     import spontanees.site_officiel as S
     from tests.faux_web import FauxWeb, brancher, site
-    for racine, attendu in (("https://acme-labo.eu", True), ("https://acme-labo.fr", False)):
+    for racine in ("https://acme-labo.eu", "https://acme-labo.fr"):
         mail = f"contact@{racine.split('//')[1]}"
         brancher(monkeypatch, FauxWeb(site(racine=racine, nom="ACME LABO", siren_dans_mentions=False, emails=(mail,))))
         v = S.verifier(racine, {"nom": "ACME LABO", "siren": "123456789"}, S.RECHERCHE)
         assert v.preuve == "nom_titre"
         r = se.scraper_et_extraire(v, "ACME LABO", ia=True)
-        assert r["emails"] == [mail] and (r["douteux"] == [mail]) is attendu
+        assert r["emails"] == [mail] and r["douteux"] == [mail]
+
+
+def test_titre_et_adresse_sirene_part_normalement(monkeypatch):
+    """Cas samsic.fr : le site porte l'adresse Sirene de l'établissement."""
+    import spontanees.site_officiel as S
+    from tests.faux_web import FauxWeb, brancher, site
+    pages = site(racine="https://acme-labo.fr", nom="ACME LABO", siren_dans_mentions=False, emails=("contact@acme-labo.fr",))
+    pages = {u: p.replace("</body>", "<p>85 Bd du Montparnasse 75006 Paris</p></body>") if isinstance(p, str) else p
+             for u, p in pages.items()}
+    brancher(monkeypatch, FauxWeb(pages))
+    e = {"nom": "ACME LABO", "siren": "123456789", "code_postal": "75006"}
+    v = S.verifier("https://acme-labo.fr", e, S.RECHERCHE)
+    assert v.verifie and v.preuve == "titre_adresse" and "75006" in v.detail
+    assert se.scraper_et_extraire(v, "ACME LABO", ia=True)["douteux"] == []
+    assert S.verifier("https://acme-labo.fr", {**e, "code_postal": "75015"}, S.RECHERCHE).preuve == "nom_titre"
+
+
+def _rejeter(client, ident, adresse):
+    return client.post("/api/spontanees/rejeter_adresse", json={"id": ident, "adresse": adresse})
+
+
+def test_rejeter_puis_valider_quand_meme(alice):
+    client, user_id, ids = alice
+    ident = _eu(user_id, {"contact@ent.eu": "regle"})
+    assert _rejeter(client, ident, "contact@ent.eu").json() == {"ok": True}
+    e = lire_entreprises(user_id)[0]
+    assert e["emails_trouves"] == [] and e["emails_douteux"] == [] and e["validation_emails"] == {}
+    assert not e["emails_non_valides"] and envoyeur.pretes(user_id, "alternance") == []
+    ligne = next(x for x in client.get("/api/spontanees/a_valider").json() if x["id"] == ident)
+    assert ligne["emails"] == [] and ligne["rejetees"] == ["contact@ent.eu"] and ligne["adresses"] == []
+    assert _rejeter(client, ident, "contact@ent.eu").status_code == 404          # déjà traitée
+    assert valider_adresse(user_id, ident, "contact@ent.eu")
+    ligne = [x for x in client.get("/api/spontanees/a_valider").json() if x["id"] == ident]
+    assert ligne == [] and [p["adresses"] for p in envoyeur.pretes(user_id, "alternance")] == [["contact@ent.eu"]]
+
+
+def test_rejeter_une_adresse_laisse_les_autres(alice):
+    client, user_id, ids = alice
+    liste = lire_entreprises(user_id)
+    liste[1].update(emails_trouves=["a@gmail.com", "b@gmail.com"], emails_douteux=["a@gmail.com", "b@gmail.com"],
+                    contextes_emails={"a@gmail.com": "x", "b@gmail.com": "y"}, meilleur_contact="a@gmail.com")
+    sauvegarder_enrichissement(user_id, liste[1:2])
+    assert _rejeter(client, ids[1], "a@gmail.com").json() == {"ok": True}
+    e = lire_entreprises(user_id)[1]
+    assert e["emails_trouves"] == e["emails_douteux"] == ["b@gmail.com"] and e["emails_non_valides"] is True
+    assert e["contextes_emails"] == {"b@gmail.com": "y"} and e["meilleur_contact"] is None
+
+
+def test_rejeter_entreprise_d_avant_la_phase_7(alice):
+    client, user_id, ids = alice
+    liste = lire_entreprises(user_id)
+    liste[1].update(emails_trouves=["a@gmail.com", "b@gmail.com"])
+    sauvegarder_enrichissement(user_id, liste[1:2])
+    assert lire_entreprises(user_id)[1]["emails_douteux"] is None
+    assert _rejeter(client, ids[1], "a@gmail.com").json() == {"ok": True}
+    assert envoyeur.emails_valides(lire_entreprises(user_id)[1]) == []            # b@ attend toujours
+
+
+def test_rejeter_une_adresse_ecartee_par_l_ia(alice):
+    client, user_id, ids = alice
+    liste = lire_entreprises(user_id)
+    liste[0].update(emails_ecartes_ia=["c@gmail.com"])
+    sauvegarder_enrichissement(user_id, liste[:1])
+    assert _rejeter(client, ids[0], "c@gmail.com").json() == {"ok": True}
+    e = lire_entreprises(user_id)[0]
+    assert e["emails_ecartes_ia"] == [] and e["emails_trouves"] == ["rh0@ent0.fr"]
+    assert _rejeter(client, ids[0], "rh0@ent0.fr").status_code == 404             # adresse validée : pas concernée
+
+
+def test_adresse_rejetee_jamais_reprise(alice):
+    """Nouvelle recherche d'emails, liste lue avant le rejet, ou La Bonne Alternance."""
+    from database.entreprises_db import ajouter_entreprises_lba
+    client, user_id, _ = alice
+    ident = _eu(user_id, {"contact@ent.eu": "regle"})
+    ancienne = lire_entreprises(user_id)[:1]
+    assert _rejeter(client, ident, "contact@ent.eu").json() == {"ok": True}
+    ancienne[0].update(emails_trouves=["contact@ent.eu", "rh@ent.eu"], emails_douteux=["contact@ent.eu", "rh@ent.eu"],
+                       emails_ecartes_ia=["contact@ent.eu"], validation_emails={"contact@ent.eu": "regle"})
+    sauvegarder_enrichissement(user_id, ancienne)
+    e = lire_entreprises(user_id)[0]
+    assert e["emails_trouves"] == e["emails_douteux"] == ["rh@ent.eu"]
+    assert e["emails_ecartes_ia"] == [] and e["validation_emails"] == {}
+    from database.connexion import SessionLocal
+    from database.models import Entreprise
+    db = SessionLocal()
+    db.get(Entreprise, ident).siren = "111222333"
+    db.commit()
+    db.close()
+    ajouter_entreprises_lba(user_id, [{"siret": "11122233300011", "siren": "111222333", "nom": "ENT", "email": "contact@ent.eu"}])
+    assert lire_entreprises(user_id)[0]["emails_trouves"] == ["rh@ent.eu"]
+
+
+def test_rejeter_entreprise_d_un_autre(alice, utilisateur):
+    _, user_id, _ = alice
+    ident = _eu(user_id, {"contact@ent.eu": "regle"})
+    client_b, _ = utilisateur("b@test.fr", prenom="Bob")
+    assert _rejeter(client_b, ident, "contact@ent.eu").status_code == 404
+    assert lire_entreprises(user_id)[0]["emails_trouves"] == ["contact@ent.eu"]
+
+
+def test_adresse_a_valider_pas_affichee_prete(alice):
+    """Interface : l'entreprise n'est « prête à envoyer » que par une adresse validée."""
+    client, user_id, _ = alice
+    ident = _eu(user_id, {"contact@ent.eu": "regle"})
+    ligne = next(e for e in client.get("/api/spontanees/stats").json()["prochaines"] if e["id"] == ident)
+    assert ligne["email"] == "" and ligne["adresses"][0]["validation"] == "douteuse"
+    assert valider_adresse(user_id, ident, "contact@ent.eu")
+    ligne = next(e for e in client.get("/api/spontanees/stats").json()["prochaines"] if e["id"] == ident)
+    assert ligne["email"] == "contact@ent.eu"
+
+
+def test_onglet_adresses_a_valider():
+    page = (config.TEMPLATES_DIR / "partials" / "spontanees.html").read_text(encoding="utf-8")
+    assert 'data-filter="a_valider"' in page and 'data-sp-nombre="a_valider"' in page
