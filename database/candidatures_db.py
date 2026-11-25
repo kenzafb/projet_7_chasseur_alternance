@@ -27,7 +27,7 @@ _CHAMPS = [
     "description", "score", "verdict", "eligible", "points_forts",
     "points_faibles", "resume_analyse", "lettre", "email_candidature",
     "objet_email", "statut", "raison_archivage", "date_trouvee", "date_candidature", "notes", "vue",
-    "marques",
+    "marques", "code_rome", "hors_sujet_car",
 ]
 # Colonnes DateTime, échangées avec l'app sous forme "AAAA-MM-JJ"
 _DATES = {"date_trouvee", "date_candidature"}

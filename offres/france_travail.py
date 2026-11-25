@@ -317,6 +317,13 @@ def _normaliser(bruts: list, log=journaliser) -> list:
     return offres
 
 
+def code_rome(offre: dict) -> str:
+    """Code métier ROME de l'offre (romeCode, donné par l'API pour chaque
+    offre), "" s'il manque ou n'a pas la forme attendue (D203)."""
+    code = str(offre.get("romeCode") or "").strip().upper()
+    return code if re.fullmatch(r"[A-Z]\d{4}", code) else ""
+
+
 def _normaliser_une(offre: dict) -> dict | None:
     """Offre au format des candidatures, None hors IDF."""
     # Lien de l'offre d'origine, seulement s'il est http(s) (D132)
@@ -383,7 +390,9 @@ def _normaliser_une(offre: dict) -> dict | None:
         if lib:
             lignes.append(f"Langue : {lib} ({exige})")
     structure = "\n" + "\n".join(lignes) if lignes else ""
-    desc = desc[:max(0, LONGUEUR_DESCRIPTION - len(structure))] + structure
+    place = max(0, LONGUEUR_DESCRIPTION - len(structure))
+    coupee = (len(desc), place) if len(desc) > place else None
+    desc = desc[:place] + structure
 
     return {
         "id":           generer_id(offre.get("id", lien)),
@@ -395,11 +404,13 @@ def _normaliser_une(offre: dict) -> dict | None:
         "lien":         lien,
         "source":       "France Travail",
         "description":  desc,
+        "code_rome":    code_rome(offre),
         "date_trouvee": instant_depuis_api(offre.get("dateCreation")),
         "score":        0,
         "lettre":       "",
         "statut":       "nouveau",
         "_alternance":  bool(offre.get("alternance", False)),
+        "_coupee":      coupee,
         "_taille":      taille_depuis_tranche(parametres_api.tranche_effectif(offre)),
     }
 
@@ -471,6 +482,10 @@ def chercher_offres(user_id, criteres=None, mode="alternance", limite_lot=None, 
     elif marquer:
         marquer_offres_vues(user_id, mode, {o["id"] for o in candidates})
 
+    for o in toutes_offres:
+        if o["_coupee"]:   # D209
+            log(f"  ⚠️  Description France Travail coupée ({o['titre'][:50]}) : {o['_coupee'][0]} caractères, "
+                f"gardés : {o['_coupee'][1]}")
     log(f"  {len(toutes_offres)} nouvelles offres France Travail (hors déjà vues)")
     return toutes_offres
 

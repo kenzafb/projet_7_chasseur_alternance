@@ -16,7 +16,7 @@ PAR_MODE = {
                        "types_jobs_ok", "types_jobs_eviter", "localisation_pref"],
             "rech": ["disponibilite"]},
     "stage": {"profil": ["date_debut", "date_fin", "etablissement", "formation", "niveau_etudes", "missions",
-                         "experience"],
+                         "experience", "criteres_eviter"],
               "rech": []},
 }
 

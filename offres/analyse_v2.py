@@ -100,11 +100,20 @@ ETAPE_2 = {
 }
 
 
+# Stage : « à éviter » facultatif (D201). Sans lui, le prompt reste celui mesuré par le banc
+EVITER_STAGE = " ; ou il correspond exactement à ce que le candidat écrit préférer éviter"
+
+
+def etape_1(profil: dict, mode: str) -> str:
+    eviter = mode == "stage" and (profil.get("criteres_eviter") or "").strip()
+    return ETAPE_1[mode] + (EVITER_STAGE if eviter else "")
+
+
 def messages_jugement(offre: dict, profil: dict, mode: str, longueur: int) -> list[dict]:
     intro, contexte, _ = REGLES.get(mode, REGLES["alternance"])
     regles = (
         "Décide en suivant ces étapes dans l'ordre ; arrête-toi à la première qui décide.\n"
-        f"Étape 1 : Hors sujet seulement si {ETAPE_1[mode]}. En cas de doute, ce n'est pas Hors sujet : passe à "
+        f"Étape 1 : Hors sujet seulement si {etape_1(profil, mode)}. En cas de doute, ce n'est pas Hors sujet : passe à "
         "l'étape 2.\n"
         f"Étape 2 : sinon, {ETAPE_2[mode]}.\n"
         "Étape 3 : réserves. Si l'offre demande une compétence importante absente du profil, descends d'un cran "
@@ -242,6 +251,9 @@ def analyser_offre_v2(offre, profil, mode="alternance", modele=None, essais=2, t
         **{k: extraction[k] for k in ("niveau_requis", "niveau_exigence", "duree_mois", "date_debut_offre",
                                       "alternance_seulement")},
         "extraction": extraction,
+        # Gardée même rétrogradée en Faible (D205) ; « aucune » : rien
+        "hors_sujet_car": "" if jugement["hors_sujet_car"].strip(" .«»").lower() in ("aucune", "aucun")
+        else jugement["hors_sujet_car"].strip(),
     }
     result["verdict"] = score_to_verdict(result["score"])
     # Exigences extraites du texte libre : contrôlées, puis jugées par les mêmes règles Python

@@ -24,7 +24,12 @@ Règles (une information non précisée ne rend jamais inéligible) :
     jamais inéligible ;
   - mode stage : durée de l'offre supérieure à celle du profil de plus de
     4 semaines, ou début de l'offre incompatible avec les dates du profil ;
+  - mode stage : niveau minimal lu par Python au-dessus de Bac+3, exigé ou
+    souhaité (D202) ;
   - modes stage et job : offre en alternance seulement.
+
+raisons_sans_ia applique les mêmes règles à ce que Python lit seul, avant
+tout appel à l'IA (D204).
 
 Niveau du profil : champ niveau_etudes ; vide, niveau visé (alternance) ;
 vide, déduit de la formation quand c'est sans ambiguïté (BUT1 = bac,
@@ -287,6 +292,102 @@ def niveau_prepare(texte: str) -> str | None:
     return max(niveaux, key=CRANS.get) if niveaux else None
 
 
+# Stage (D202) : 1re ou 2e année visée, 3e au plus. Un profil déjà au-dessus garde son niveau
+NIVEAU_MAX_STAGE = 3
+
+
+def niveau_trop_haut_stage(offre: dict, profil: dict) -> str:
+    """Raison d'inéligibilité d'un stage dont le niveau minimal demandé
+    (niveau_detecte : lu par Python, borne basse d'une fourchette, exigé ou
+    souhaité) dépasse Bac+3 ; "" sinon, ou sans niveau écrit."""
+    detecte = niveau_detecte(_texte(offre))
+    if not detecte:
+        return ""
+    maximum = max(NIVEAU_MAX_STAGE, niveau_du_profil(profil)["crans"] or 0)
+    crans = CRANS[detecte[0]]
+    if crans <= maximum:
+        return ""
+    return f"{LIBELLES[crans]} {'exigé' if detecte[1] == 'exige' else 'souhaité'}, {LIBELLES[maximum]} au plus en stage"
+
+
+# ─── Ce que Python lit seul, sans l'IA (D204) ─────────────────────────────────
+# Durée et début ne sont sûrs que dans une tournure qui ne peut désigner que le
+# stage, sans mention contraire ailleurs dans le texte ; sinon l'IA les lit.
+_DUREE = r"(\d+(?:[.,]\d+)?)\s*(?:(?:à|-|–|/|ou|et)\s*\d+(?:[.,]\d+)?\s*)?(mois|semaines?)\b"
+_TOUTE_DUREE = re.compile(_DUREE)
+_DUREE_SURE = re.compile(r"(?:\bstage(?: conventionné)?(?: d.une durée)? (?:de|:|-)\s*(?:entre )?"
+                         r"|\bdurée(?: du stage| de stage)?\s*(?::|,|de)\s*(?:de |entre )?)" + _DUREE)
+_PASSE = re.compile(r"exp[ée]rience|d[ée]j[àa]|effectu|premi[èe]re?|pr[ée]c[ée]dent|ancien|\bcdi\b|\bcdd\b")
+_NOMS_MOIS = r"janvier|f[ée]vrier|mars|avril|mai|juin|juillet|ao[ûu]t|septembre|octobre|novembre|d[ée]cembre"
+_DEBUT_SUR = re.compile(r"(?:à partir d[eu']|à compter d[eu']|\bdès|\b(?:date de )?début(?: du stage)?\s*:|\bdémarrage\s*:"
+                        r"|à pourvoir (?:en|début))\s*(?:le |en |début |du )?"
+                        rf"((?:1er |\d{{1,2}} )?(?:{_NOMS_MOIS}) 20\d\d|\d{{1,2}}/\d{{1,2}}/20\d\d)")
+_SOUPLE = re.compile(r"flexible|n[ée]gociable|modulable|adaptable|id[ée]alement|selon (?:vos|tes|les) disponibilit"
+                     r"|\bou (?:" + _NOMS_MOIS + r")\b")
+
+
+def _texte_plat(offre: dict) -> str:
+    """Titre et description, sans les lignes « Expérience », en minuscules."""
+    lignes = [l for l in _texte(offre).splitlines() if not l.strip().lower().startswith("expérience")]
+    return " ".join(" ".join([(offre.get("titre") or "") + " .", *lignes]).lower().replace("’", "'").split())
+
+
+def _en_mois(nombre: str, unite: str) -> float:
+    n = float(nombre.replace(",", "."))
+    return n if unite == "mois" else n / SEMAINES_PAR_MOIS
+
+
+def duree_sure(offre: dict) -> float | None:
+    """Durée du stage lue sans l'IA, en mois (borne basse d'une fourchette) :
+    la plus courte de toutes les durées écrites, si l'une d'elles est dans
+    une tournure sûre (« stage de 6 mois », « durée : 4 à 6 mois »). Une
+    durée plus courte ailleurs (délai, expérience) l'emporte : jamais plus
+    sévère que le texte."""
+    texte = _texte_plat(offre)
+    sure = any(not _PASSE.search(texte[max(0, m.start() - 60):m.start()]) for m in _DUREE_SURE.finditer(texte))
+    if not sure:
+        return None
+    return min(_en_mois(*m.groups()) for m in _TOUTE_DUREE.finditer(texte))
+
+
+def debut_sur(offre: dict) -> str | None:
+    """Début du stage lu sans l'IA (« à partir de janvier 2027 ») : une seule
+    date sûre, dans un texte qui n'offre pas de souplesse ; None sinon."""
+    texte = _texte_plat(offre)
+    if _SOUPLE.search(texte):
+        return None
+    dates = {m.group(1) for m in _DEBUT_SUR.finditer(texte)
+             if not re.search(r"candidature|limite|alternance", texte[max(0, m.start() - 60):m.start()])}
+    return dates.pop() if len(dates) == 1 else None
+
+
+def _mois_du_profil_cites(offre: dict, debut: date, fin: date) -> bool:
+    """Le texte nomme un mois de la période du profil (« entre janvier et avril ») : à lire par l'IA."""
+    mois, jour = set(), debut
+    while (jour.year, jour.month) <= (fin.year, fin.month):
+        mois.add(MOIS[jour.month - 1])
+        jour = date(jour.year + jour.month // 12, jour.month % 12 + 1, 1)
+    texte = _texte_plat(offre)
+    return any(re.search(rf"\b{m.replace('é', '[ée]').replace('û', '[ûu]')}\b", texte) for m in mois)
+
+
+def extraits_python(offre: dict, profil: dict, mode: str) -> dict:
+    """Champs que Python lit seul dans l'offre, au format de l'extraction de l'IA."""
+    niveau, exigence = niveau_detecte(_texte(offre)) or ("non_precise", "non_precise")
+    extraits = {"niveau_requis": niveau, "niveau_exigence": exigence, "duree_mois": None, "date_debut_offre": None,
+                "alternance_seulement": False}
+    if mode == "stage":
+        extraits["duree_mois"] = duree_sure(offre)
+        debut, fin = lire_date(profil.get("date_debut") or None), lire_date(profil.get("date_fin") or None)
+        if debut and fin and not _mois_du_profil_cites(offre, debut, fin):
+            extraits["date_debut_offre"] = debut_sur(offre)
+    return extraits
+
+
+def raisons_sans_ia(offre: dict, profil: dict, mode: str) -> list[str]:
+    """Raisons d'inéligibilité que Python établit seul, avant tout appel à l'IA."""
+    return raisons_ineligibilite(extraits_python(offre, profil, mode), profil, mode, offre)
+
 
 def raisons_ineligibilite(extraits: dict, profil: dict, mode: str, offre: dict | None = None) -> list[str]:
     """Raisons d'inéligibilité établies en Python ; vide si rien ne bloque.
@@ -313,6 +414,8 @@ def raisons_ineligibilite(extraits: dict, profil: dict, mode: str, offre: dict |
     if mode in ("stage", "job") and extraits.get("alternance_seulement"):
         raisons.append("offre en alternance seulement")
     if mode == "stage":
+        if offre is not None and not niveau_bloque and (trop_haut := niveau_trop_haut_stage(offre, profil)):
+            raisons.append(trop_haut)
         debut, fin = lire_date(profil.get("date_debut") or None), lire_date(profil.get("date_fin") or None)
         semaines = profil.get("duree_semaines")
         duree = extraits.get("duree_mois")

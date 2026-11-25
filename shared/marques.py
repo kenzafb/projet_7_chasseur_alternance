@@ -28,7 +28,10 @@ NIVEAU_DIFFERENT = "niveau_different"
 ORGANISME_FORMATION = "organisme_formation"
 # Posée par l'analyse (D189) : « description_coupee:<caractères lus> »
 DESCRIPTION_COUPEE = "description_coupee"
+# Stage hors informatique d'après son code métier ROME (D203)
+HORS_INFORMATIQUE = "hors_informatique"
 MARQUES = {
+    HORS_INFORMATIQUE: "Hors informatique (code métier)",
     NIVEAU_DIFFERENT: "Niveau différent du tien",
     ORGANISME_FORMATION: "Offre déposée par un organisme de formation",
 }

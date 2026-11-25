@@ -33,7 +33,7 @@ def lancer_recherche(user_id, profil, max_offres=999, on_offre=None, mode="alter
         return []
 
     for offre in nouvelles_offres:
-        marquer_non_analysee(offre, mode=mode)
+        marquer_non_analysee(offre, mode=mode, profil=profil)
         on_offre(offre)
         marquer_offres_vues(user_id, mode, {offre["id"]})
     return nouvelles_offres

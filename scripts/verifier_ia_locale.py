@@ -319,7 +319,8 @@ def main(argv=None, sortie=print) -> int:
         for i, o in enumerate(offres, 1):
             debut = time.monotonic()
             try:
-                a = analyser_offre(o["offre"], o["profil"], mode=o["mode"], modele=modele, essais=1)
+                a = analyser_offre(o["offre"], o["profil"], mode=o["mode"], modele=modele, essais=1,
+                                   regles_d_abord=False)
                 duree = a.get("duree_mois")
                 ligne = [modele, f"O{i}", _secondes(debut), "oui", f"{a['score']}/10", a["verdict"],
                          a.get("niveau_requis") or "-", a.get("niveau_exigence") or "-",

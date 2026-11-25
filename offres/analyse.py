@@ -143,6 +143,7 @@ def contexte_stage(profil) -> str:
         ("Expérience", _court(profil.get("experience"))),
         ("Projets", _projets(profil)),
         ("Période du stage", periode or "non précisée"),
+        ("Préfère éviter", _court(profil.get("criteres_eviter"))),
         ("Domaines recherchés", _domaines(profil) or "ceux qui correspondent aux missions visées"),
     ])
 
@@ -232,12 +233,18 @@ def construire_messages(offre, profil, mode="alternance") -> list[dict]:
     return [{"role": "system", "content": SYSTEME}, {"role": "user", "content": prompt}]
 
 
-def analyser_offre(offre, profil, mode="alternance", modele=None, essais=2):
+def analyser_offre(offre, profil, mode="alternance", modele=None, essais=2, regles_d_abord=True):
     """Analyse d'une offre par l'IA (modèle de l'usage « analyse », ou
     `modele`). ErreurIABloquante et ErreurIAPassagere (dont ReponseInvalide)
     remontent : jamais de note inventée. En alternance, une offre d'école ou
-    de CFA est marquée à archiver (statut_auto)."""
+    de CFA est marquée à archiver (statut_auto). regles_d_abord : une offre que
+    les règles Python rendent inéligible n'est pas lue par l'IA (D204) ; False
+    pour les scripts qui mesurent le modèle."""
     exiger_profil(profil)   # plus de repli sur un utilisateur par défaut
+    # Règles Python d'abord (D204) : l'IA ne lit que les offres restées éligibles
+    from shared.eligibilite import raisons_sans_ia
+    if regles_d_abord and (raisons := raisons_sans_ia(offre, profil, mode)):
+        return decision_sans_ia(offre, raisons, profil, mode)
     from shared.config import ia_version_analyse
     if ia_version_analyse() == "v2":
         # Prompt v2 (D170) : extraction sans le profil, puis jugement en un mot
@@ -251,6 +258,19 @@ def analyser_offre(offre, profil, mode="alternance", modele=None, essais=2):
         result["description_coupee"] = coupure_description(offre, note=ia_longueur_description())
         journaliser_coupure(offre, result["description_coupee"])
     # Mode stage : une école peut accueillir un stagiaire (D74), rien à archiver
+    if mode == "alternance" and est_ecole_cfa(offre):
+        result["statut_auto"] = "archive"
+    return result
+
+
+def decision_sans_ia(offre, raisons, profil, mode) -> dict:
+    """Analyse d'une offre que les règles Python rendent inéligible sans l'IA
+    (D204) : mêmes champs qu'une analyse, sans note ni jugement inventés."""
+    from shared.eligibilite import extraits_python
+    result = {**extraits_python(offre, profil, mode), "extraits_ecartes": [], "score": None, "verdict": "ineligible", "eligible": False, "points_forts": [],
+              "points_faibles": [f"Inéligible : {r}" for r in raisons], "domaine": "Non classé", "resume": "",
+              "raison_ineligibilite": " ; ".join(raisons), "hors_sujet_car": "", "description_coupee": None,
+              "sans_ia": True}
     if mode == "alternance" and est_ecole_cfa(offre):
         result["statut_auto"] = "archive"
     return result
@@ -382,7 +402,7 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
         if not offre.get("eligible", True):
             offre["statut"] = "archive"
             offre["raison_archivage"] = "ineligible"
-            _log(f"     -> Archivée automatiquement (inéligible, score {offre['score']})")
+            _log("     -> Archivée automatiquement (inéligible)")
     else:
         # Mode alternance : règles complètes
         if reserve_public_specifique(desc_lower) or reserve_public_specifique(titre_lower):
@@ -399,7 +419,7 @@ def appliquer_archivage_auto(offre, analyse, mode="alternance", verbeux=True):
         elif not offre.get("eligible", True):
             offre["statut"] = "archive"
             offre["raison_archivage"] = "ineligible"
-            _log(f"     -> Archivée automatiquement (inéligible, score {offre['score']})")
+            _log("     -> Archivée automatiquement (inéligible)")
 
 
 def appliquer_analyse(offre, analyse, mode="alternance", verbeux=True):
@@ -413,6 +433,7 @@ def appliquer_analyse(offre, analyse, mode="alternance", verbeux=True):
         "points_faibles": analyse["points_faibles"],
         "domaine":        analyse["domaine"],
         "resume_analyse": analyse["resume"],
+        "hors_sujet_car": analyse.get("hors_sujet_car") or "",   # D205
     })
     # Description coupée (D189) : la note repose sur les caractères lus par le dernier appel
     from shared.marques import marquer_description_coupee
@@ -427,10 +448,10 @@ def appliquer_analyse(offre, analyse, mode="alternance", verbeux=True):
 VERDICT_NON_ANALYSEE = "non_analysee"
 
 
-def archivage_mots_cles(offre, mode="alternance") -> str | None:
+def archivage_mots_cles(offre, mode="alternance", profil=None) -> str | None:
     """Raison d'archivage établie sans IA, ou None. Mode alternance :
     réservée à un public spécifique, école ou CFA, stage ; mode stage :
-    réservée seulement (une école peut accueillir un stagiaire, le mot
+    réservée, ou code métier hors informatique (D203 ; une école peut accueillir un stagiaire, le mot
     « stage » est attendu) ; mode job : aucune."""
     if mode == "job":
         return None
@@ -439,7 +460,9 @@ def archivage_mots_cles(offre, mode="alternance") -> str | None:
     if reserve_public_specifique(desc_lower) or reserve_public_specifique(titre_lower):
         return "public_specifique"
     if mode == "stage":
-        return None
+        # Code métier ROME hors informatique (D203), sans IA
+        from shared.metiers_informatique import hors_informatique
+        return "hors_informatique" if hors_informatique(offre, profil) else None
     if est_ecole_cfa(offre):
         return "ecole_cfa"
     if "stage" in titre_lower:
@@ -448,10 +471,18 @@ def archivage_mots_cles(offre, mode="alternance") -> str | None:
 
 
 MESSAGES_ARCHIVAGE = {"public_specifique": "réservé public spécifique / BOETH", "ecole_cfa": "école/CFA détectée",
-                      "stage": "stage détecté"}
+                      "stage": "stage détecté", "hors_informatique": "hors informatique (code métier)"}
 
 
-def marquer_non_analysee(offre, mode="alternance", verbeux=True):
+def marquer_archivage(offre, raison) -> dict:
+    """Marque affichée qui accompagne une raison d'archivage (D203) ; modifie offre en place."""
+    from shared.marques import HORS_INFORMATIQUE, ajouter_marque
+    if raison == HORS_INFORMATIQUE:
+        ajouter_marque(offre, HORS_INFORMATIQUE)
+    return offre
+
+
+def marquer_non_analysee(offre, mode="alternance", verbeux=True, profil=None):
     """Prépare une offre pour l'insertion sans analyse et applique les seules
     règles d'archivage qui ne dépendent pas d'une analyse
     (archivage_mots_cles). Jamais d'archivage pour note basse ni hors
@@ -469,9 +500,10 @@ def marquer_non_analysee(offre, mode="alternance", verbeux=True):
     # Intermédiaire d'école (CAPIVISION) : marqué, jamais archivé (D156)
     from shared.marques import marquer_intermediaire
     marquer_intermediaire(offre)
-    raison = archivage_mots_cles(offre, mode)
+    raison = archivage_mots_cles(offre, mode, profil)
     if raison:
         offre["statut"], offre["raison_archivage"] = "archive", raison
+        marquer_archivage(offre, raison)
         if verbeux:
             journaliser(f"     -> Archivée automatiquement ({MESSAGES_ARCHIVAGE[raison]})")
     return offre

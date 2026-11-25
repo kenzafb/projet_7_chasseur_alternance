@@ -22,13 +22,14 @@ import threading
 import time
 
 from database.candidatures_db import lire_candidature, lire_en_attente, modifier_candidature
-from offres.analyse import analyser_offre, appliquer_analyse, archivage_mots_cles
+from offres.analyse import (MESSAGES_ARCHIVAGE, analyser_offre, appliquer_analyse, archivage_mots_cles,
+                            marquer_archivage)
 from shared.ia import ErreurIAPassagere, verifier_demarrage
 from shared.journal import journaliser
 
 # Champs de l'offre écrits après une analyse réussie
 CHAMPS_ANALYSE = ("score", "verdict", "eligible", "points_forts", "points_faibles", "domaine",
-                  "resume_analyse", "marques")   # marques : description coupée (D189)
+                  "resume_analyse", "marques", "hors_sujet_car")   # marques : description coupée (D189)
 
 
 def enregistrer_analyse(user_id: int, mode: str, offre: dict, analyse: dict) -> dict:
@@ -96,7 +97,7 @@ def analyser_en_attente(user_id: int, mode: str, profil: dict, maximum: int, sto
     verifier_demarrage(usage="analyse")
     offres = lire_en_attente(user_id, mode, limite=maximum)
     total = len(offres)
-    bilan = {"analysees": 0, "sautees": 0, "archivees": 0, "mots_cles": 0, "arret": False}
+    bilan = {"analysees": 0, "sautees": 0, "archivees": 0, "mots_cles": 0, "sans_ia": 0, "arret": False}
     debut = horloge()
     if on_progress:
         on_progress(0, total, None)
@@ -107,12 +108,14 @@ def analyser_en_attente(user_id: int, mode: str, profil: dict, maximum: int, sto
             break
         titre = (offre.get("titre") or "?")[:60]
         # Mots-clés d'abord : une offre qui serait archivée de toute façon n'est pas analysée
-        raison = archivage_mots_cles(offre, mode)
+        raison = archivage_mots_cles(offre, mode, profil)
         if raison:
+            marquer_archivage(offre, raison)
             if (lire_candidature(user_id, offre["id"], mode=mode) or offre).get("statut", "nouveau") == "nouveau":
-                modifier_candidature(user_id, offre["id"], {"statut": "archive", "raison_archivage": raison}, mode=mode)
+                modifier_candidature(user_id, offre["id"], {"statut": "archive", "raison_archivage": raison,
+                                                           "marques": offre.get("marques") or []}, mode=mode)
             bilan["mots_cles"] += 1
-            log(f"  [{i}/{total}] « {titre} » archivée par mots-clés ({raison}), sans IA")
+            log(f"  [{i}/{total}] « {titre} » archivée par les règles ({MESSAGES_ARCHIVAGE.get(raison, raison)}), sans IA")
             if on_progress:
                 on_progress(i, total, (horloge() - debut) / i * (total - i))
             continue
@@ -123,14 +126,20 @@ def analyser_en_attente(user_id: int, mode: str, profil: dict, maximum: int, sto
             bilan["sautees"] += 1
             log(f"  ⚠️  [{i}/{total}] « {titre} » sautée : {e}. Elle reste à analyser.")
         else:
-            noter_duree(horloge() - debut_offre)
+            if analyse.get("sans_ia"):
+                bilan["sans_ia"] += 1     # décidée en Python : ne compte pas dans la durée d'une analyse
+            else:
+                noter_duree(horloge() - debut_offre)
             modifs = enregistrer_analyse(user_id, mode, offre, analyse)
             bilan["analysees"] += 1
             archive = ""
             if modifs.get("statut") == "archive":
                 bilan["archivees"] += 1
                 archive = f", archivée ({modifs['raison_archivage']})"
-            log(f"  [{i}/{total}] « {titre} » : {modifs['score']}/10, {modifs['verdict']}{archive}")
+            if analyse.get("sans_ia"):
+                log(f"  [{i}/{total}] « {titre} » : inéligible sans IA ({analyse['raison_ineligibilite']}){archive}")
+            else:
+                log(f"  [{i}/{total}] « {titre} » : {modifs['score']}/10, {modifs['verdict']}{archive}")
         if on_progress:
             ecoule = horloge() - debut
             on_progress(i, total, ecoule / i * (total - i))

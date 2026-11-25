@@ -174,12 +174,17 @@ class Candidature(Base):
     email_candidature = Column(String(255), default="")
     objet_email       = Column(String(300), default="")
     statut            = Column(String(50), default="nouveau")   # nouveau, en_cours, gardee, archive, envoye...
-    raison_archivage  = Column(String(40), default="")   # ineligible, note_basse, ecole_cfa, hors_domaine, stage, public_specifique, manuel
+    raison_archivage  = Column(String(40), default="")   # ineligible, note_basse, ecole_cfa, hors_domaine, hors_informatique, stage, public_specifique, manuel
     # Offre ouverte au moins une fois dans le volet de la page Offres (D145).
     # Rien à voir avec la table offres_vues, qui dédoublonne les recherches
     vue               = Column(Boolean, nullable=False, default=False, server_default=false())
     # Marques posées par la recherche (shared.marques, D154) : niveau_different, organisme_formation
     marques           = Column(JSON, nullable=False, default=list, server_default=text("'[]'"))
+
+    # Code métier ROME donné par France Travail (romeCode, D203) ; vide : inconnu
+    code_rome         = Column(String(5), nullable=False, default="", server_default="")
+    # Phrase du profil citée par l'IA pour un « Hors sujet », même rétrogradé (D205)
+    hors_sujet_car    = Column(Text, nullable=False, default="", server_default="")
 
     # Dernière lettre PDF générée : chemin relatif à LETTRES_PDF_DIR
     # ("user_<id>/lettre_<hex>.pdf"), servie par /api/lettre_pdf/<ref_offre>

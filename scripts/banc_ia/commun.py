@@ -31,9 +31,11 @@ def categorie_du_resultat(res: dict) -> str:
     Python) : inéligible ou 0-2 : Hors sujet ; 3-4 Faible ; 5-6 Moyen ;
     7-8 Bien ; 9-10 Très bien. Même seuils que offres.analyse.score_to_verdict."""
     score = res.get("score")
+    if not res.get("eligible", True):      # décidée sans l'IA (D204) : pas de note
+        return "Hors sujet"
     if score is None:
         return "?"
-    if not res.get("eligible", True) or score <= 2:
+    if score <= 2:
         return "Hors sujet"
     if score >= 9:
         return "Très bien"

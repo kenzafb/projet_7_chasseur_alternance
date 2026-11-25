@@ -91,7 +91,7 @@ def tracer(id_base, offre, profil, mode, stocke, avec_ia=False) -> dict:
     if avec_ia:
         from offres.analyse import analyser_offre
         activer_ia()
-        r = analyser_offre(copy.deepcopy(offre), profil, mode)
+        r = analyser_offre(copy.deepcopy(offre), profil, mode, regles_d_abord=False)
         t["ia"] = {k: r.get(k) for k in ("score", "verdict", "eligible", "niveau_requis", "niveau_exigence",
                                          "raison_ineligibilite", "extraits_ecartes", "points_faibles")}
     return t
