@@ -28,9 +28,9 @@ router = routeur_prive()
 # ─── Profil utilisateur ───────────────────────────────────────────────────────
 @router.get("/api/mode")
 def api_get_mode(mode: str = Depends(mode_requis)):
-    """Label et couleur du mode demandé (alternance, job, stage)."""
+    """Label du mode demandé (alternance, job, stage)."""
     m = get_mode(mode)
-    return {"mode": mode, "label": m["label"], "couleur": m["couleur"]}
+    return {"mode": mode, "label": m["label"]}
 
 
 @router.get("/api/domaines")

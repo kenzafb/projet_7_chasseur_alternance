@@ -88,7 +88,7 @@
   background: var(--surface); border-top: 1px solid var(--fond-neutre);
 }
 .profil-save__status { margin-right: auto; font-size: 14px; color: var(--texte-2); }
-.profil-save__status.is-ok { color: var(--accent-survol); }
+.profil-save__status.is-ok { color: var(--succes-texte); }
 
 @media (max-width: 720px) {
   .profil-grid { grid-template-columns: 1fr; }
@@ -105,7 +105,7 @@
   width: 28px; height: 28px; border-radius: 50%; color: var(--accent-survol);
   font-weight: 700; font-size: 16px; line-height: 1;
 }
-.tag__x:hover { background: #CFE7E3; }
+.tag__x:hover { background: var(--accent-moyen); }
 .tags__input { max-width: 100%; }
 .tags:empty { display: none; }   /* pas de zone vide tant qu'aucune étiquette (D185) */
 
@@ -134,13 +134,13 @@
 
 /* Compte d'envoi */
 .ce-etat { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--texte-2); }
-.ce-etat.is-ok { color: var(--accent-survol); }
+.ce-etat.is-ok { color: var(--succes-texte); }
 .ce-etat.is-ko { color: var(--refus); }
 .ce-presets { display: flex; gap: 18px; margin-bottom: 12px; font-size: 13px; }
 .ce-preset { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
 .ce-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
 .ce-message { font-size: 13px; margin-top: 10px; min-height: 1em; }
-.ce-message.is-ok { color: var(--accent-survol); }
+.ce-message.is-ok { color: var(--succes-texte); }
 .ce-message.is-ko { color: var(--refus); }
 /* Mode test d'envoi : bien visible, dans le profil et sur la page spontanées */
 .ce-mode-test {
@@ -209,7 +209,7 @@
 
 /* Confirmation d'un lancement (limite appliquée par le serveur) */
 .confirmation {
-  border: 1px solid var(--accent); background: var(--accent-doux); border-radius: var(--r-liste);
+  border: 1px solid var(--succes); background: var(--succes-fond); border-radius: var(--r-liste);
   padding: 10px 14px; margin-bottom: 14px; font-size: 13px; font-weight: 600; color: var(--texte);
 }
 .confirmation[hidden] { display: none; }
@@ -428,7 +428,7 @@
   flex: none; width: 42px; height: 42px; border-radius: 12px;
   display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px;
 }
-.note--bien, .verdict--bien { background: var(--accent-doux); color: var(--accent-survol); }
+.note--bien, .verdict--bien { background: var(--succes-fond); color: var(--succes-texte); }
 .note--moyen, .verdict--moyen { background: var(--attention-fond); color: var(--attention); }
 .note--faible, .verdict--faible, .note--attente, .verdict--attente { background: var(--neutre-fond); color: var(--neutre); }
 
@@ -459,14 +459,14 @@
 .volet__points { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
 .volet__points li { position: relative; padding-left: 24px; }
 .volet__points li::before { position: absolute; left: 2px; top: 0; font-weight: 700; }
-.volet__points--colle li::before { content: "✓"; color: var(--accent); }
+.volet__points--colle li::before { content: "✓"; color: var(--succes); }
 .volet__points--coince li::before { content: "–"; color: var(--attention); }
 .volet__ecarter { margin-left: auto; }
 .volet__rien, .volet__resume { font-size: 14px; color: var(--texte-3); }
 .volet__resume { white-space: pre-line; }
 .volet__liens { display: flex; flex-wrap: wrap; gap: 8px 20px; font-weight: 700; font-size: 14px; }
 .volet__liens:empty { display: none; }
-.volet__message { font-size: 14px; color: var(--accent-survol); font-weight: 600; }
+.volet__message { font-size: 14px; color: var(--succes-texte); font-weight: 600; }
 .volet__message:empty { display: none; }
 .volet__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 4px; border-top: 1px solid var(--fond-neutre); padding-top: 18px; }
 .volet__postuler { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -508,7 +508,7 @@
 .cand-barre { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 20px; margin-bottom: 16px; }
 .cand-barre__aide { font-size: 14px; color: var(--texte-2); }
 .filtre--ligne { flex-direction: row; align-items: center; gap: 10px; font-size: 14px; }
-.cand-message { min-height: 0; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: var(--accent-survol); }
+.cand-message { min-height: 0; margin-bottom: 8px; font-size: 14px; font-weight: 600; color: var(--succes-texte); }
 .cand-message:empty { display: none; }
 .tableau { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start; }
 .colonne {
@@ -559,7 +559,7 @@
 .partie-lien__titre { font-weight: 700; }
 .partie-lien__etat { font-size: 12px; font-weight: 700; padding: 1px 9px; border-radius: var(--r-pill); }
 .partie-lien__etat:empty { display: none; }
-.partie-lien__etat--complet { background: var(--accent-doux); color: var(--accent-survol); }
+.partie-lien__etat--complet { background: var(--succes-fond); color: var(--succes-texte); }
 .partie-lien__etat--manque { background: var(--attention-fond); color: var(--attention); }
 .profil__panneau {
   flex: 999 1 520px; min-width: 0; padding: 28px;
@@ -669,7 +669,7 @@
 .lettre__pour strong { color: var(--texte); }
 .lettre__etat { font-size: 14px; font-weight: 600; }
 .lettre__etat:empty { display: none; }
-.lettre__etat.is-ok { color: var(--accent-survol); }
+.lettre__etat.is-ok { color: var(--succes-texte); }
 .lettre__etat.is-ko { color: var(--refus); }
 .lettre__corps { display: flex; flex-wrap: wrap; gap: 32px; align-items: flex-start; }
 .lettre__gauche { flex: 1 1 360px; max-width: 460px; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
