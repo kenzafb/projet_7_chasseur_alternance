@@ -21,7 +21,8 @@ Moyen au plus).
 import re
 import time
 
-from offres.analyse import (POINTS_FORTS, REGLES, SYSTEME, _court, appliquer_eligibilite, score_to_verdict)
+from offres.analyse import (POINTS_FORTS, REGLES, SYSTEME, _court, appliquer_eligibilite, coupure_description,
+                            journaliser_coupure, score_to_verdict)
 from shared.erreurs import exiger_profil
 from shared.exigences import PERMIS_SANS_CATEGORIE, annees_dans_texte
 from shared.ia import appeler_structure
@@ -55,8 +56,8 @@ EXTRACTION = (
 )
 
 
-def messages_extraction(offre: dict) -> list[dict]:
-    description = _court(offre.get("description"), LONGUEUR_EXTRACTION)
+def messages_extraction(offre: dict, longueur: int = LONGUEUR_EXTRACTION) -> list[dict]:
+    description = _court(offre.get("description"), longueur)
     texte = (f"=== TEXTE DE L'OFFRE ===\nTitre : {offre.get('titre', '')}\n"
              f"Description : {description}\n=== FIN ===\n\n{EXTRACTION}")
     return [{"role": "system", "content": "Tu recopies des informations d'une offre d'emploi. Tu réponds uniquement "
@@ -188,15 +189,17 @@ def appliquer_plafonds(result: dict, profil: dict) -> dict:
 
 
 def analyser_offre_v2(offre, profil, mode="alternance", modele=None, essais=2, temperature=0.1,
-                      longueur_jugement=None) -> dict:
+                      longueur_jugement=None, longueur_extraction=LONGUEUR_EXTRACTION) -> dict:
     """Analyse v2 : même format de résultat que offres.analyse.analyser_offre,
     plus « categorie », « extraction », « secondes » (des deux appels)."""
     from shared.config import ia_longueur_description
     exiger_profil(profil)
     debut = time.monotonic()
-    extraction = appeler_structure(messages_extraction(offre), ExtractionOffre, usage="analyse", modele=modele,
+    longueur_jugement = longueur_jugement or ia_longueur_description()
+    extraction = appeler_structure(messages_extraction(offre, longueur_extraction), ExtractionOffre, usage="analyse",
+                                   modele=modele,
                                    essais=essais, temperature=temperature).model_dump()
-    jugement = appeler_structure(messages_jugement(offre, profil, mode, longueur_jugement or ia_longueur_description()),
+    jugement = appeler_structure(messages_jugement(offre, profil, mode, longueur_jugement),
                                  JugementOffre, usage="analyse", modele=modele, essais=essais,
                                  temperature=temperature).model_dump()
     # Hors sujet sans phrase du profil qui l'impose : Faible (le petit modèle en abusait, D170)
@@ -221,5 +224,9 @@ def analyser_offre_v2(offre, profil, mode="alternance", modele=None, essais=2, t
         appliquer_plafonds(result, profil)
         result["verdict"] = score_to_verdict(result["score"])
     result["exigences_extraites"] = lignes
+    # Description plus longue que ce que lit un des deux appels (D189)
+    result["description_coupee"] = coupure_description(offre, extraction=longueur_extraction,
+                                                       jugement=longueur_jugement)
+    journaliser_coupure(offre, result["description_coupee"])
     result["secondes"] = round(time.monotonic() - debut, 2)
     return result

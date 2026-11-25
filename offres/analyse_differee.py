@@ -28,7 +28,7 @@ from shared.journal import journaliser
 
 # Champs de l'offre écrits après une analyse réussie
 CHAMPS_ANALYSE = ("score", "verdict", "eligible", "points_forts", "points_faibles", "domaine",
-                  "resume_analyse")
+                  "resume_analyse", "marques")   # marques : description coupée (D189)
 
 
 def enregistrer_analyse(user_id: int, mode: str, offre: dict, analyse: dict) -> dict:

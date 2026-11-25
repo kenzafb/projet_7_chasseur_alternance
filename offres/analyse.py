@@ -54,6 +54,23 @@ SYSTEME = ("Tu es un recruteur qui évalue des offres pour un candidat. Tu répo
            "objet JSON valide, en français, sans texte autour.")
 
 
+def coupure_description(offre: dict, **limites) -> dict | None:
+    """Description plus longue qu'une des limites de caractères (par appel) :
+    {"longueur", "lus": {appel: caractères lus}} ; None si tout est lu (D189).
+    Même mesure que _court : espaces regroupés."""
+    n = len(" ".join(str(offre.get("description") or "").split()))
+    if not limites or n <= min(limites.values()):
+        return None
+    return {"longueur": n, "lus": {appel: min(n, lim) for appel, lim in limites.items()}}
+
+
+def journaliser_coupure(offre: dict, coupure: dict | None):
+    if coupure:
+        detail = ", ".join(f"{appel} {lus}" for appel, lus in coupure["lus"].items())
+        journaliser(f"  ✂️  Description coupée pour l'IA ({offre.get('titre', '')[:50]}) : {coupure['longueur']} "
+                    f"caractères, lus : {detail}")
+
+
 def _court(texte, longueur=LONGUEUR_CHAMP) -> str:
     texte = " ".join(str(texte or "").split())
     return texte if len(texte) <= longueur else texte[:longueur].rsplit(" ", 1)[0] + "…"
@@ -231,6 +248,8 @@ def analyser_offre(offre, profil, mode="alternance", modele=None, essais=2):
                                     usage="analyse", modele=modele, essais=essais, temperature=0.1)
         result = _valider_analyse(analyse)
         appliquer_eligibilite(result, offre, profil, mode)
+        result["description_coupee"] = coupure_description(offre, note=ia_longueur_description())
+        journaliser_coupure(offre, result["description_coupee"])
     # Mode stage : une école peut accueillir un stagiaire (D74), rien à archiver
     if mode == "alternance" and est_ecole_cfa(offre):
         result["statut_auto"] = "archive"
@@ -395,6 +414,10 @@ def appliquer_analyse(offre, analyse, mode="alternance", verbeux=True):
         "domaine":        analyse["domaine"],
         "resume_analyse": analyse["resume"],
     })
+    # Description coupée (D189) : la note repose sur les caractères lus par le dernier appel
+    from shared.marques import marquer_description_coupee
+    coupure = analyse.get("description_coupee")
+    marquer_description_coupee(offre, min(coupure["lus"].values()) if coupure else None)
     appliquer_archivage_auto(offre, analyse, mode=mode, verbeux=verbeux)
 
 

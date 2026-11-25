@@ -76,3 +76,11 @@ Les autres champs viennent de l'export et ne servent qu'à la lecture. On peut r
 - **Analyse** : exactitude de l'éligibilité, faux éligibles et faux inéligibles ; exactitude du niveau extrait (après contrôle Python) ; faux positifs de niveau (attendu Bac+4 ou plus, profil Bac+2 ou moins, éligible et note 7 ou plus) ; écart de rang moyen avec la catégorie attendue, part exacte, matrice de confusion ; écart type de la note sur les essais et offres dont la catégorie change ; temps par offre ; réponses invalides.
 - **Lettre** : nombre de mots (consigne 60, maximum 80) ; part des phrases à la première personne ; tournures impersonnelles et inversion des rôles ; termes absents du profil, de l'offre et de la lettre type (indice de fait inventé, à relire) ; suites de 5 mots reprises de la lettre type ; markdown, tiret cadratin, esperluette, « expertise ».
 - **Emails** : précision et rappel des règles seules, puis des règles avec l'IA, par essai ; faux positifs et faux négatifs nommés ; adresses dont la décision change d'un essai à l'autre.
+
+## Ce que voit l'IA (phase 16, D189)
+
+`voir_texte_ia.py` montre, pour chaque offre, le texte exact envoyé aux deux appels du prompt v2, la coupure de la description et le texte perdu. Base en lecture seule, `.env` jamais chargé en entier (seulement les `IA_*` avec `--analyser`). Exemple, les 5 offres de stage les plus longues, avec les deux appels :
+
+    venv/bin/python scripts/banc_ia/voir_texte_ia.py --mode stage --offres 5 --analyser
+
+Options : `--id` (une offre), `--user`, `--max-extraction`, `--max-jugement` (caractères lus par chaque appel), `--num-ctx` (remplace `IA_NUM_CTX` pour l'essai).

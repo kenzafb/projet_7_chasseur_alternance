@@ -47,7 +47,7 @@ La base, `UPLOADS_DIR` et `LETTRES_PDF_DIR` sont à sauvegarder ensemble.
 | `IA_DELAI_S` | Attente maximale d'une réponse, en secondes, chargement du modèle compris. | `600` |
 | `IA_LONGUEUR_DESCRIPTION` | Caractères de la description d'une offre envoyés à l'IA. | `2000` |
 | `IA_VERSION_ANALYSE` | Prompt d'analyse des offres : `v2`, un appel d'extraction sans le profil puis un appel de jugement en un mot (D170), ou `v1`, un seul appel. | `v2` |
-| `IA_NUM_CTX` | Contexte demandé à Ollama, en tokens. | `8192` |
+| `IA_NUM_CTX` | Contexte demandé à Ollama, en tokens, au moins. Un prompt estimé plus long (3 caractères par token, réponse comprise) relève le contexte de cet appel au millier supérieur, jusqu'à 16 384 : Ollama ne coupe jamais en silence (D189). | `8192` |
 | `IA_KEEP_ALIVE` | Durée pendant laquelle Ollama garde le modèle chargé après un appel. | `10m` |
 | `IA_REFLEXION` | Mode de réflexion des modèles qui en ont un. | `false` |
 
