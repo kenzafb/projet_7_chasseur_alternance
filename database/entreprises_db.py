@@ -192,6 +192,7 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
         # Pourquoi chaque entreprise est là (D190), d'après le profil actuel
         from database.profil_db import lire_profil
         from shared.naf import codes_par_origine, origines
+        from shared.tailles import grande_entreprise
         codes = codes_par_origine(lire_profil(user_id, mode=mode))
 
         # 5 dernières entreprises contactées : les plus récentes par date d'envoi
@@ -229,6 +230,9 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
                 "site":      ((e.extra or {}).get("site_verifie") or {}).get("url") or "",
                 "site_non_verifie": bool(e.traite) and ((e.extra or {}).get("site_verifie") or {}).get("verifie") is False,
                 "formulaire": (((e.extra or {}).get("formulaires_contact") or [{}])[0]).get("page", ""),
+                # Grande entreprise (500 salariés et plus) : son site carrières (D191)
+                "carrieres": (e.extra or {}).get("page_carrieres") or "" if grande_entreprise(
+                    (e.extra or {}).get("taille"), (e.extra or {}).get("categorie")) else "",
             }
             for e, m in prochaines_paires
         ]
@@ -262,7 +266,8 @@ _CHAMPS_EXTRA_SCRAPER = ("telephone", "url_scrapee", "source_recherche", "tentat
                          # Phase 15 : site vérifié (D160) et essais, formulaires de contact (D161)
                          "site_verifie", "essais_site", "formulaires_contact",
                          "autres_noms",   # D167 : sigle, dénominations usuelles, enseignes
-                         "adresse_siege")  # D173 : preuve du site par l'adresse
+                         "adresse_siege",  # D173 : preuve du site par l'adresse
+                         "page_carrieres")  # D191 : site carrières des grandes entreprises
 
 
 def _codes_naf(d: dict) -> dict:
@@ -356,6 +361,7 @@ def _entreprise_vers_dict(e, m, ailleurs=()) -> dict:
     d["emails_ecartes_ia"] = list(extra.get("emails_ecartes_ia") or [])
     d["site_verifie"] = extra.get("site_verifie")          # None : pas (encore) vérifié (D160)
     d["formulaires_contact"] = list(extra.get("formulaires_contact") or [])   # D161
+    d["page_carrieres"] = extra.get("page_carrieres") or ""                     # D191
     # On garde extra complet aussi, au cas où
     d["_extra"] = extra
     d["_id"] = e.id   # id technique en base, pour réécrire précisément

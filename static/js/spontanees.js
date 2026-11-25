@@ -55,10 +55,11 @@ function boutonLba(e) {
 }
 
 /* Onglet d'une entreprise à contacter : email trouvé, formulaire LBA, ou rien */
-const ongletDe = e => e.email ? "pretes" : e.lba?.formulaire ? "lba" : "aucun";
+const ongletDe = e => e.email ? "pretes" : e.lba?.formulaire ? "lba" : lienSur(e.carrieres) ? "carrieres" : "aucun";
 const AIDES = {
   pretes: "Leur email est trouvé : le Chasseur peut leur envoyer ta candidature (étape 3).",
   lba: "Pas d'email, mais un formulaire sur La Bonne Alternance. Postule là-bas, puis indique-le ici.",
+  carrieres: "Grandes entreprises (500 salariés et plus) : elles recrutent par leur site carrières. Postule là-bas, ce n'est pas un échec.",
   aucun: "Pas d'email gardé : site non vérifié, ou formulaire de contact seulement (lien sur l'entreprise).",
   faites: "Elles sont aussi dans tes Candidatures, où tu suis leurs réponses.",
 };
@@ -77,6 +78,7 @@ function ligne(e) {
   const detail = onglet === "pretes"
     ? `Email trouvé : ${esc(e.email)}${e.email_lba ? " (fourni par La Bonne Alternance)" : ""}`
     : onglet === "lba" ? "Formulaire de candidature sur La Bonne Alternance"
+    : onglet === "carrieres" ? "Grande entreprise : candidature sur son site carrières"
     : (e.adresses || []).length ? "Adresses à vérifier, voir plus haut"
     : e.formulaire ? "Pas d'email, mais un formulaire de contact sur son site"
     : e.site_non_verifie ? "Site non vérifié : ni son SIREN ni son nom trouvés sur un site, aucun email gardé"
@@ -94,6 +96,7 @@ function ligne(e) {
         ${onglet === "pretes" && (e.adresses || []).length > 1 ? `<details class="ent__adresses"><summary>Ses ${e.adresses.length} adresses</summary>${listeAdresses(e.adresses)}</details>`
           : onglet === "pretes" && (e.adresses || []).length ? `<p class="ent__detail">${etiquetteAdresse(e.adresses[0])}</p>` : ""}
         ${boutonLba(e)}
+        ${onglet === "carrieres" ? `<div class="ent__actions"><a class="btn btn--sm" href="${esc(lienSur(e.carrieres))}" target="_blank" rel="noopener">Postuler sur leur site carrières<span class="visuellement-cache"> (nouvel onglet)</span></a></div>` : ""}
         ${formulaire}
       </div>
     </li>`;
@@ -118,7 +121,7 @@ function rendreTable() {
   // Les prochaines entreprises (ordre de la recherche d'emails et de l'envoi) ;
   // une fois contactées, elles sont dans Candidatures (D110)
   const prochaines = stats.prochaines || [];
-  const compte = { pretes: 0, lba: 0, aucun: 0, faites: contactees.length };
+  const compte = { pretes: 0, lba: 0, carrieres: 0, aucun: 0, faites: contactees.length };
   prochaines.forEach(e => { compte[ongletDe(e)]++; });
   for (const [k, n] of Object.entries(compte)) {
     const nb = document.querySelector(`[data-sp-nombre="${k}"]`);

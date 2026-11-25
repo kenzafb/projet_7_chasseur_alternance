@@ -483,12 +483,32 @@ def meilleurs_emails(emails, domaine=None):
 ORDRE_PAGES = ("contact", "recrutement", "mentions", "a_propos")
 
 
+# Page carrières (D191) : mots préférés, dans l'adresse ou le texte du lien
+MOTS_CARRIERES = ("carriere", "careers", "career", "recrutement", "recrute", "jobs", "rejoindre", "rejoignez",
+                  "join-us", "join us")
+
+
+def page_carrieres(liens_recrutement: list[str]) -> str:
+    """Page carrières ou recrutement parmi les liens de la catégorie
+    « recrutement » : un lien aux mots préférés d'abord (pas « stage »,
+    « alternance » ou « talent » seuls), sinon le premier ; "" sans lien."""
+    from spontanees.lecture_site import _simple
+    return next((u for u in liens_recrutement if any(m in _simple(u) for m in MOTS_CARRIERES)), "") \
+        or (liens_recrutement[0] if liens_recrutement else "")
+
+
+def liens_du_site(verification) -> tuple[dict, dict]:
+    """(liens de l'accueil, liens du sitemap), par catégorie, lus une fois."""
+    if getattr(verification, "_liens", None) is None:
+        accueil, html = next(iter(verification.pages.items()))
+        verification._liens = (liens_utiles(html, accueil), liens_du_sitemap(verification.lecteur))
+    return verification._liens
+
+
 def pages_a_lire(verification) -> list[str]:
     """Pages utiles du site, liens réels de l'accueil puis du sitemap, par
     catégorie (contact, recrutement et carrières, mentions légales, à propos)."""
-    accueil, html = next(iter(verification.pages.items()))
-    liens = liens_utiles(html, accueil)
-    plan = liens_du_sitemap(verification.lecteur)
+    liens, plan = liens_du_site(verification)
     ordre = []
     for cat in ORDRE_PAGES:
         for url in liens[cat][:2] + plan[cat][:2]:
@@ -536,6 +556,8 @@ def scraper_et_extraire(verification, nom_entreprise, dirigeant=None, ia=True):
         "contact_rh": None,
         "url_finale": next(iter(pages)),
         "formulaires": list(formes.values()),
+        "page_carrieres": page_carrieres(liens_du_site(verification)[0]["recrutement"]
+                                         + liens_du_site(verification)[1]["recrutement"]),
         "pages_lues": [u for u, _ in lecteur.lues],
         "interdites_robots": list(lecteur.interdites),
         "robots": lecteur.robots,
@@ -562,10 +584,18 @@ def _sans_resultat(e: dict):
     e["emails_douteux"] = []
     e["emails_non_valides"] = False
     e["formulaires_contact"] = []
+    e["page_carrieres"] = ""
     e["telephones"] = []
     e["telephone"] = None
     e["contact_rh"] = None
     e["traite"] = True
+
+
+def est_grande(e: dict) -> bool:
+    """500 salariés et plus (D191) : l'absence d'email n'est pas un échec."""
+    from shared.tailles import grande_entreprise
+    extra = e.get("_extra") or {}
+    return grande_entreprise(e.get("taille") or extra.get("taille"), e.get("categorie") or extra.get("categorie"))
 
 
 def charger_entreprises(user_id, mode=MODE_DEFAUT):
@@ -687,7 +717,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
                 _log(f"  ❔ {', '.join(douteux)} (non validés : à valider)")
             if resultat.get("ecartes"):
                 _log("  🚫 Écartés : " + ", ".join(f"{a} ({r})" for a, r in resultat["ecartes"]))
-            if not emails:
+            if not emails and not (est_grande(e) and resultat.get("page_carrieres")):
                 _log("  ⚠️  Aucun email")
 
             e["emails_trouves"]   = emails
@@ -703,8 +733,11 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
             e["url_scrapee"]      = resultat.get("url_finale") or verification.url
             e["source_recherche"] = source_site
             e["formulaires_contact"] = resultat.get("formulaires", [])
+            e["page_carrieres"] = resultat.get("page_carrieres") or ""
             if e["formulaires_contact"] and not emails:
                 _log(f"  📝 Formulaire de contact : {e['formulaires_contact'][0]['page']}")
+            if e["page_carrieres"] and not emails and est_grande(e):
+                _log(f"  💼 Grande entreprise, candidature sur son site carrières : {e['page_carrieres']}")
             e["traite"]           = True
             traites_ce_run += 1
 
@@ -720,7 +753,9 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
 
     sauvegarder(user_id, entreprises)
     avec_email = sum(1 for e in entreprises if e.get("emails_trouves"))
-    _log(f"✅ Scraping terminé — {avec_email}/{total} avec email")
+    carrieres = sum(1 for e in entreprises if not e.get("emails_trouves") and e.get("page_carrieres") and est_grande(e))
+    _log(f"✅ Scraping terminé — {avec_email}/{total} avec email"
+         + (f", {carrieres} grandes entreprises à contacter sur leur site carrières" if carrieres else ""))
     _log(f"   Recherche web : {_compteur_ddg} requêtes" + (f", {erreurs_ddg} en échec" if erreurs_ddg else "")
          + (" (arrêtée en cours de lancement après des échecs d'affilée)" if recherche_arretee else ""))
 
