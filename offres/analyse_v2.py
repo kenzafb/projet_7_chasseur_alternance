@@ -162,6 +162,17 @@ def domaine_dans_texte(domaine, texte: str) -> str:
     return domaine if _fenetres(domaine, texte) else ""
 
 
+def texte_sans_souhait(texte: str) -> str:
+    """Le texte sans ses phrases qui parlent d'expérience au souhait seulement
+    (« 2 ans d'expérience souhaités », « idéalement 3 ans ») : une durée qui
+    n'est écrite que là n'est pas exigée (D212)."""
+    from shared.eligibilite import MARQUEURS_SOUHAIT
+    from shared.exigences import MARQUEURS_EXIGENCE
+    phrases = re.split(r"\n|(?<=[.!?;])\s", texte)
+    return "\n".join(p for p in phrases
+                     if not MARQUEURS_SOUHAIT.search(p.lower()) or MARQUEURS_EXIGENCE.search(p.lower()))
+
+
 def ligne_domaine(domaine: str, texte: str) -> str:
     """Ligne d'un domaine extrait sans nombre d'années : complète la ligne
     « exigée » de France Travail, ou seule si le passage porte un mot
@@ -188,7 +199,7 @@ def lignes_extraites(extraction: dict, offre: dict) -> list[str]:
     annees = extraction.get("experience_exigee_annees")
     domaine = domaine_dans_texte(extraction.get("experience_exigee_domaine"), texte)
     suite = f" - {domaine}" if domaine else ""
-    if annees and int(annees) in annees_dans_texte(texte):   # en chiffres, en lettres, en fourchette (D176)
+    if annees and int(annees) in annees_dans_texte(texte_sans_souhait(texte)):   # en chiffres, en lettres, en fourchette (D176)
         out.append(f"Expérience : {int(annees)} An(s){suite} (exigée)")
     elif domaine and (ligne := ligne_domaine(domaine, texte)):
         out.append(ligne)
