@@ -985,3 +985,9 @@ Une certification choisie dans la liste suggérée remplissait le champ sans tou
 - Mesure (`scripts/mesurer_moteurs_recherche.py`, 25 entreprises de référence qui ont un site, première requête du scraper, adresse bloquée) : Brave, Mojeek, DuckDuckGo et Google refusent les 25 requêtes (0,5 s chacune) ; Yahoo répond 15 fois (site officiel 3 fois), Yandex 22 fois (2 fois). Un moteur bloqué coûte moins d'une seconde : les moteurs habituels restent en tête, Yahoo et Yandex servent de repli. Mesure à refaire hors blocage pour départager les premiers.
 - Après 5 requêtes d'affilée sans réponse d'aucun moteur, la recherche web s'arrête pour le lancement (journalisé) ; plus aucune attente de 90 s ; les autres sources du site restent essayées. Le lancement suivant la réautorise.
 - Aucune API payante.
+
+### D188. Site officiel d'après Wikidata, avant toute recherche web (phase 16)
+- `spontanees/wikidata.py` interroge query.wikidata.org (SPARQL, public, gratuit, sans clé) : l'élément qui porte le SIREN (P1616) et son site officiel (P856). Seuls les SIREN sont envoyés, par lots de 100 au début d'un lancement, avec un User-Agent qui nomme le client sans contact personnel. Une panne ne bloque rien.
+- Ordre des sources du site : déjà vérifié, Wikidata, LBA, offres, domaines devinés, recherche web. Un site trouvé par Wikidata compte comme vérifié dès que son accueil se lit (preuve « site officiel déclaré dans Wikidata pour le SIREN »), sans SIREN ni nom à trouver sur le site ; illisible, la source suivante est essayée.
+- Mesure (`scripts/mesurer_wikidata.py`, 40 entreprises de `scraper_reference.json`) : 7 ont un site dans Wikidata, 6 justes (France Université Numérique, Onisep, Amue, Neurones, PAP, Murex), 1 non tranché (« PARIS HOTEL DE VILLE », bred.fr : la référence n'a pas de site), aucun faux. 33 absentes de Wikidata.
+- Les tests ne l'appellent jamais (conftest coupe `requests` du module).

@@ -238,6 +238,14 @@ def dossiers_temporaires(monkeypatch, tmp_path):
     from spontanees import noms_entreprise
     def hors_ligne(*a, **k):
         raise noms_entreprise.requests.ConnectionError("annuaire non appelé pendant les tests")
+    # Wikidata (D188) : jamais appelé par les tests, cache vidé
+    from spontanees import wikidata
+    def wikidata_hors_ligne(*a, **k):
+        raise wikidata.requests.ConnectionError("Wikidata non appelé pendant les tests")
+    monkeypatch.setattr(wikidata, "requests", types.SimpleNamespace(
+        get=wikidata_hors_ligne, RequestException=wikidata.requests.RequestException,
+        ConnectionError=wikidata.requests.ConnectionError))
+    monkeypatch.setattr(wikidata, "_cache", {})
     monkeypatch.setattr(noms_entreprise, "requests", types.SimpleNamespace(
         get=hors_ligne, RequestException=noms_entreprise.requests.RequestException,
         ConnectionError=noms_entreprise.requests.ConnectionError))

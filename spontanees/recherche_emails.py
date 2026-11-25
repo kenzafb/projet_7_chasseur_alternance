@@ -39,7 +39,7 @@ from database.dates import maintenant_utc
 from database.entreprises_db import a_scraper, lire_entreprises, sauvegarder_enrichissement
 from spontanees.lecture_site import MAX_PAGES, categorie, formulaires, liens_du_sitemap, liens_utiles
 from spontanees.noms_entreprise import completer as completer_noms
-from spontanees.site_officiel import SOURCES, autres_noms, domaine_interdit, identifier
+from spontanees.site_officiel import SOURCES, autres_noms, domaine_interdit, identifier, site_deja_verifie
 from shared.journal import journaliser
 from shared.modes import MODE_DEFAUT
 
@@ -433,7 +433,7 @@ def _resultats_ddg(requete):
     if _echecs_affilee >= ECHECS_AVANT_ARRET:
         recherche_arretee = True
         journaliser(f"  [⛔ Recherche web arrêtée pour ce lancement : {_echecs_affilee} requêtes d'affilée sans "
-                    f"réponse de {', '.join(moteurs)}. Les autres sources du site (LBA, offres, "
+                    f"réponse de {', '.join(moteurs)}. Les autres sources du site (Wikidata, LBA, offres, "
                     "domaines devinés) restent essayées.]")
     return []
 
@@ -617,6 +617,11 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
 
     traites_ce_run = 0
     sites_offres = sites_des_offres(user_id)   # sites donnés par les offres France Travail et LBA
+    # Sites déclarés dans Wikidata, demandés par lots avant toute recherche web (D188)
+    from spontanees import wikidata
+    sans_site = [e.get("siren") for e in a_traiter if not site_deja_verifie(e)]
+    if sans_site:
+        _log(f"Wikidata : {wikidata.precharger(sans_site)} site(s) officiel(s) trouvé(s) pour {len(sans_site)} SIREN")
     # Coupée pour tout le lancement sur une erreur bloquante de l'IA, ou d'emblée sans IA
     ia_active = ia_configuree
     if not ia_configuree:
