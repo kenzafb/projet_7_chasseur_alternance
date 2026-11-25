@@ -1046,3 +1046,9 @@ Une certification choisie dans la liste suggérée remplissait le champ sans tou
 - Défaut de `LETTRES_PDF_DIR` : `DATA_DIR/lettres_pdf` au lieu de `lettres_pdf/` à la racine ; une valeur dans le `.env` reste prioritaire.
 - La base stocke le chemin relatif à ce dossier (`candidatures.lettre_pdf`, « user_<id>/lettre_<hex>.pdf ») : aucune migration, seuls les fichiers bougent.
 - `scripts/deplacer_lettres_pdf.py` : lecture seule par défaut (4 fichiers de user_1 à déplacer chez toi), `--appliquer` déplace, sous-dossiers compris, sans jamais écraser un fichier déjà présent ; application arrêtée.
+
+### D198. Pièces jointes : fichiers sans nom répété ni suffixes empilés (ménage)
+- Constat : le nom reçu par l'entreprise est le nom affiché de la pièce plus « .pdf » (`charger_pieces_jointes`), déjà propre (forme « Programme_X.pdf »). Le nom répété est celui des fichiers sur disque importés de l'ancienne application le 14/10 (forme « Programme_X_Programme_X.pdf », ou « Lettre_…_Lettre_…(tronqué) » sans extension), recopiés tels quels par l'import de l'ancienne base.
+- Téléversement : la base du fichier perd un suffixe unique déjà présent (« _1a2b3c4d », fichier retéléversé) et une répétition (« A_A », ou « A_<début de A> » d'au moins 10 caractères) avant d'ajouter son suffixe unique.
+- `scripts/renommer_pieces_jointes.py` : lecture seule par défaut ; `--appliquer` renomme les fichiers hérités et met à jour les chemins de tous les profils qui les citent, en une transaction (fichiers remis en place si l'écriture échoue), sans jamais écraser un fichier. Chez toi : 2 fichiers renommés ; le CV de stage (suffixe `_cd87164d`) garde son nom, le nom sans suffixe étant pris par l'autre CV.
+- CV joints : en alternance, le CV du 14/10 (162 818 octets, nom sans suffixe) ; en stage, un autre fichier, celui du 12/11 (347 748 octets, suffixe `_cd87164d`) ; en job, aucun.
