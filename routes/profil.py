@@ -79,7 +79,21 @@ def _base_nom_fichier(nom: str) -> str:
     base = re.sub(r"\.[^.]*$", "", nom)   # extension retirée (splitext garde "....pdf")
     base = unicodedata.normalize("NFKD", base).encode("ascii", "ignore").decode()
     base = re.sub(r"[^A-Za-z0-9_-]+", "_", base).strip("_-")
-    return base[:LONGUEUR_MAX_NOM_PJ].rstrip("_-") or "document"
+    return nom_sans_repetition(base)[:LONGUEUR_MAX_NOM_PJ].rstrip("_-") or "document"
+
+
+def nom_sans_repetition(base: str) -> str:
+    """Base de fichier propre (D198) : sans suffixe unique déjà ajouté
+    (« _1a2b3c4d », fichier retéléversé) ni nom répété (« A_A » ou « A_<début de A> », héritage
+    de l'ancienne application : « Programme_BTS_SIO_Programme_BTS_SIO »)."""
+    while (m := re.fullmatch(r"(.+)_[0-9a-f]{8}", base)):
+        base = m.group(1)
+    # « A_A », ou « A_<début de A> » quand l'ancienne application a tronqué le nom
+    for i in (i for i, c in enumerate(base) if c == "_"):
+        gauche, droite = base[:i], base[i + 1:]
+        if droite and gauche.startswith(droite) and len(droite) >= min(len(gauche), 10):
+            return gauche
+    return base
 
 
 def _ecrire_piece_jointe(user_id: int, nom_origine: str, contenu: bytes) -> str:

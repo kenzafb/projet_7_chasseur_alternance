@@ -1036,3 +1036,25 @@ Une certification choisie dans la liste suggérée remplissait le champ sans tou
 - Constat : « Architecte logiciel » écrit « Dans le cadre de la préparation du titre Architecte des Systèmes d'Information - Bac+5, niveau 7, nous recherchons […] un(e) alternant(e) » et « Vous êtes titulaire d'un Bac+3 en informatique […] et souhaitez poursuivre vos études en Bac+5 ». Pas de mot d'exigence près de « Bac+5 » : c'est le diplôme préparé (règle D178), pas un niveau exigé. Le contrôle Python acceptait la lecture « bac+3 » de l'IA puisque le texte cite aussi un Bac+3.
 - Règle : `shared.eligibilite.niveau_prepare` lit le niveau d'un indice placé dans les 100 caractères qui suivent « préparation », « préparer », « préparez », « préparant », « prépare » ou « poursuivre vos études en », dans la même phrase. En alternance, D178 prend le plus haut niveau entre celui de l'IA et celui-ci.
 - Vérification sur les 137 offres annotées (`banc_reference.json`, Python seul) : la règle se déclenche 2 fois (Product Owner / QA et Architecte logiciel), toutes deux inéligibles attendues ; aucun faux inéligible. Hors alternance, elle ne s'applique pas.
+
+### D196. Références des bancs : seule scraper_reference.json est versionnée (ménage)
+- `audit_exports/` est ignoré par git : aucune référence n'était versionnée.
+- `scraper_reference.json` (entreprises, SIREN, sites officiels : données publiques) passe dans `scripts/references/`, versionné ; `audit_scraper.py`, `mesurer_wikidata.py` et `mesurer_moteurs_recherche.py` le lisent là par défaut (`audit_commun.REFERENCES`).
+- Non versionnées, laissées dans `audit_exports/` : `banc_reference.json`, `banc_reglage.json`, `banc_test.json`, `banc_test_profils_a_jour.json` (profils complets des utilisateurs 1, 3, 4 et 5, état des candidatures) et `banc_emails_reference.json` (adresse nominative d'un tiers). Les scripts qui les lisent les reçoivent en argument : rien à changer.
+
+### D197. Lettres PDF rangées dans DATA_DIR/lettres_pdf (ménage)
+- Défaut de `LETTRES_PDF_DIR` : `DATA_DIR/lettres_pdf` au lieu de `lettres_pdf/` à la racine ; une valeur dans le `.env` reste prioritaire.
+- La base stocke le chemin relatif à ce dossier (`candidatures.lettre_pdf`, « user_<id>/lettre_<hex>.pdf ») : aucune migration, seuls les fichiers bougent.
+- `scripts/deplacer_lettres_pdf.py` : lecture seule par défaut (4 fichiers de user_1 à déplacer chez toi), `--appliquer` déplace, sous-dossiers compris, sans jamais écraser un fichier déjà présent ; application arrêtée.
+
+### D198. Pièces jointes : fichiers sans nom répété ni suffixes empilés (ménage)
+- Constat : le nom reçu par l'entreprise est le nom affiché de la pièce plus « .pdf » (`charger_pieces_jointes`), déjà propre (forme « Programme_X.pdf »). Le nom répété est celui des fichiers sur disque importés de l'ancienne application le 14/10 (forme « Programme_X_Programme_X.pdf », ou « Lettre_…_Lettre_…(tronqué) » sans extension), recopiés tels quels par l'import de l'ancienne base.
+- Téléversement : la base du fichier perd un suffixe unique déjà présent (« _1a2b3c4d », fichier retéléversé) et une répétition (« A_A », ou « A_<début de A> » d'au moins 10 caractères) avant d'ajouter son suffixe unique.
+- `scripts/renommer_pieces_jointes.py` : lecture seule par défaut ; `--appliquer` renomme les fichiers hérités et met à jour les chemins de tous les profils qui les citent, en une transaction (fichiers remis en place si l'écriture échoue), sans jamais écraser un fichier. Chez toi : 2 fichiers renommés ; le CV de stage (suffixe `_cd87164d`) garde son nom, le nom sans suffixe étant pris par l'autre CV.
+- CV joints : en alternance, le CV du 14/10 (162 818 octets, nom sans suffixe) ; en stage, un autre fichier, celui du 12/11 (347 748 octets, suffixe `_cd87164d`) ; en job, aucun.
+
+### D199. docs/ rangé, sorties de vérification hors de docs/ (ménage)
+- Rapports `PHASE_*` et guides de fusion dans `docs/historique/` (liens de DECISIONS.md et RECETTE.md mis à jour) ; l'état des lieux du 7 octobre y devient `ARCHITECTURE_2026-10-07.md`, et `docs/ARCHITECTURE_ACTUELLE.md` est réécrit d'après le code (phases 15, 16 et ménage).
+- `verification_*.json` et `test_pagination.json` ne sont lus par aucun code de l'application : ce sont les sorties des scripts de vérification des API (`verification_stage.json` sert aussi de jeu d'essai à `tests/test_intitules_stage.py`). Ils passent dans `scripts/verifications/<source>/` (versionné), où ces scripts écrivent désormais ; `docs/referentiels/` ne garde que les référentiels lus par le code (France Travail, table NAF de l'INSEE).
+- `audit_exports/` (hors git) : 22 fichiers gardés (références, entrées des scripts, dernières mesures citées par D173 à D194), 34 déplacés dans `audit_exports/archives/` (dont l'export LBA brut, 787 Mo).
+- `data/chasseur.db` et `data/emails_deja_envoyes.json` ne sont plus lus par l'application ; seuls `scripts/importer_contacts_historiques.py` (défauts de --source et --fichier, import ponctuel déjà fait) et un test de garde-fou du schéma de l'ancienne base (sauté si le fichier est absent) les citent. Ils peuvent être archivés.

@@ -39,7 +39,7 @@ exclues en ET) pour confirmer que l'API l'accepte. Quatre requêtes, écrites
 dans verification_tous_secteurs.json ; les nombres sont à reporter dans
 VOLUME_TOUS_SECTEURS (shared/naf.py), affiché dans le profil.
 
-Résultat détaillé dans docs/referentiels/insee/verification_api.json
+Résultat détaillé dans scripts/verifications/insee/verification_api.json
 (--sortie pour un autre dossier), sans clé. À la fin, les valeurs à
 reporter dans spontanees/parametres_sirene.py, seul endroit du code qui
 dépend de ces réponses. Une soixantaine de requêtes espacées de 2 s (quota
@@ -64,7 +64,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from shared import config  # noqa: E402  (charge le .env)
 from spontanees import parametres_sirene as P  # noqa: E402
 
-DOSSIER_SORTIE = config.BASE_DIR / "docs" / "referentiels" / "insee"
+DOSSIER_SORTIE = config.BASE_DIR / "scripts" / "verifications" / "insee"   # D199 : hors de docs/
 CORRESPONDANCE = config.BASE_DIR / "docs" / "referentiels" / "insee" / "correspondance_naf_rev2_naf2025.csv"
 PAUSE_S = 2.1          # quota de l'API : 30 requêtes par minute
 DELAI_S = 30

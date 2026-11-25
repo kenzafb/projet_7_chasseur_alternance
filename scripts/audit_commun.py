@@ -26,6 +26,8 @@ if str(RACINE) not in sys.path:
     sys.path.insert(0, str(RACINE))
 
 SORTIE = RACINE / "audit_exports"
+# Références annotées sans donnée personnelle, versionnées (ménage, D196)
+REFERENCES = RACINE / "scripts" / "references"
 
 
 def maintenant() -> str:

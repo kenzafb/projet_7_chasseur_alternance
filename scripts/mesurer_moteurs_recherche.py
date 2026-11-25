@@ -3,7 +3,7 @@ scripts/mesurer_moteurs_recherche.py
 ====================================
 Phase 16 (point 4 b, D187) : quel moteur de ddgs, et dans quel ordre de
 repli, pour la recherche web du site officiel. Pour chaque entreprise de
-audit_exports/scraper_reference.json qui a un site officiel, la première
+scripts/references/scraper_reference.json qui a un site officiel, la première
 requête que construit le scraper part vers chaque moteur, à tour de rôle
 (un moteur n'est sollicité qu'une fois toutes les len(moteurs) requêtes).
 Mesuré par moteur : réponses, refus ou erreurs, site officiel parmi les
@@ -27,7 +27,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from audit_commun import SORTIE, ecrire_json, lire_json, maintenant  # noqa: E402
+from audit_commun import REFERENCES, SORTIE, ecrire_json, lire_json, maintenant  # noqa: E402
 from audit_scraper import _parent  # noqa: E402
 
 MOTEURS = "brave,mojeek,duckduckgo,google,yahoo,yandex"
@@ -73,7 +73,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--moteurs", default=MOTEURS)
     ap.add_argument("--max", type=int)
-    ap.add_argument("--reference", default=str(SORTIE / "scraper_reference.json"))
+    ap.add_argument("--reference", default=str(REFERENCES / "scraper_reference.json"))
     ap.add_argument("--echantillon", default=str(SORTIE / "scraper_echantillon.json"))
     args = ap.parse_args(argv)
     from spontanees.recherche_emails import analyser_nom, construire_requetes

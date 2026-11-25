@@ -13,7 +13,7 @@ dans le .env) :
 puis reporter ici les valeurs que le script affiche à la fin.
 
 Valeurs vérifiées sur la vraie API le 8 octobre 2026 (détail dans
-docs/referentiels/france_travail/verification_api.json).
+scripts/verifications/france_travail/verification_api.json).
 """
 
 # Paramètre de recherche d'un grand domaine (lettre A à N). None : l'API

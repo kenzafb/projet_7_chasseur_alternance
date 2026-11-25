@@ -43,7 +43,7 @@ publique (data.gouv.fr, fiche « API Offres d'emploi » : « Documentation
 machine (OpenAPI) manquante ») ; sa documentation est sur
 https://francetravail.io/data/api/offres-emploi (compte requis). Les
 comportements mesurés le 8 et le 9 octobre 2026 sont dans
-docs/referentiels/france_travail/verification_api.json et
+scripts/verifications/france_travail/verification_api.json et
 verification_stage.json ; ce script enregistre les réponses réelles
 (messages d'erreur de l'API compris) pour chaque point.
 """

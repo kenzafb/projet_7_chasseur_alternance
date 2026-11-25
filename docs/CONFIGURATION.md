@@ -18,7 +18,7 @@ Toutes les variables se règlent dans le fichier `.env`, copié depuis `.env.exa
 | `DATABASE_URL` | Base SQLite, créée par `venv/bin/alembic upgrade head`. Chemin absolu : quatre barres obliques après `sqlite:`. Le fichier `.env.example` contient un chemin d'exemple, à remplacer ou à vider. | `DATA_DIR/chasseur_v2.db` |
 | `DATA_DIR` | Dossier des données : base par défaut et pièces jointes. Chemin relatif : depuis la racine du projet. | `data/` |
 | `UPLOADS_DIR` | Pièces jointes envoyées par les utilisateurs (CV...). | `DATA_DIR/uploads` |
-| `LETTRES_PDF_DIR` | PDF des lettres de motivation générées. | `lettres_pdf/` |
+| `LETTRES_PDF_DIR` | PDF des lettres de motivation générées (avant le ménage : `lettres_pdf/` à la racine, `scripts/deplacer_lettres_pdf.py` pour déplacer les fichiers). | `DATA_DIR/lettres_pdf` |
 
 La base, `UPLOADS_DIR` et `LETTRES_PDF_DIR` sont à sauvegarder ensemble.
 

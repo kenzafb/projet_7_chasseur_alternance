@@ -2,7 +2,7 @@
 scripts/mesurer_wikidata.py
 ===========================
 Phase 16 (point 4 d, D188) : combien d'entreprises de
-audit_exports/scraper_reference.json ont un site officiel dans Wikidata
+scripts/references/scraper_reference.json ont un site officiel dans Wikidata
 (SIREN P1616 -> site P856), et combien sont justes face à la référence
 (même domaine principal). Une requête par lot de 100 SIREN, rien en base.
 
@@ -19,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from audit_commun import SORTIE, ecrire_json, lire_json, maintenant  # noqa: E402
+from audit_commun import REFERENCES, ecrire_json, lire_json, maintenant  # noqa: E402
 from audit_scraper import _parent  # noqa: E402
 
 
@@ -38,7 +38,7 @@ def verdict(sites: list[str], ref: dict) -> str:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    ap.add_argument("--reference", default=str(SORTIE / "scraper_reference.json"))
+    ap.add_argument("--reference", default=str(REFERENCES / "scraper_reference.json"))
     args = ap.parse_args(argv)
     from spontanees import wikidata
     refs = lire_json(args.reference)["entreprises"]

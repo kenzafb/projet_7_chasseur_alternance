@@ -34,7 +34,7 @@ Vérifie sur la vraie API de La Bonne Alternance les points encore ouverts
    partenaire. Aucune requête de plus : lues dans les réponses déjà reçues.
    À ouvrir dans un navigateur pour voir lesquelles ont un formulaire.
 
-Résultat détaillé dans docs/referentiels/lba/verification_api.json
+Résultat détaillé dans scripts/verifications/lba/verification_api.json
 (--sortie pour un autre dossier), sans clé ni email ni téléphone. À la fin,
 les valeurs à reporter dans offres/parametres_lba.py, seul endroit
 du code qui dépend de ces réponses. Une quarantaine de requêtes, moins
@@ -59,7 +59,7 @@ from shared import config  # noqa: E402  (charge le .env)
 from offres import parametres_lba as P  # noqa: E402
 from shared import referentiels  # noqa: E402
 
-DOSSIER_SORTIE = config.BASE_DIR / "docs" / "referentiels" / "lba"
+DOSSIER_SORTIE = config.BASE_DIR / "scripts" / "verifications" / "lba"   # D199 : hors de docs/
 PAUSE_S = 0.5
 DELAI_S = 30
 

@@ -16,7 +16,7 @@ l'humain avec ses identifiants (FT_CLIENT_ID, FT_CLIENT_SECRET du .env) :
    de contrat avec leurs effectifs) dans repartition_idf.json.
 3. Teste le plafond de pagination : demande les plages de
    PLAGES_PAGINATION sur cette même recherche et enregistre la réponse de
-   l'API (code, en-têtes de plage, message) dans test_pagination.json.
+   l'API (code, en-têtes de plage, message) dans scripts/verifications/france_travail/test_pagination.json.
 
 Les fichiers produits ne contiennent que des données de l'API : ni
 identifiant, ni secret, ni token (chaque texte écrit est en outre purgé de
@@ -88,6 +88,8 @@ PAUSE_S = 0.5          # entre deux requêtes
 DELAI_S = 30           # délai d'une requête
 ATTENTE_429_S = 5      # une seule nouvelle tentative sur 429
 DOSSIER_SORTIE = config.BASE_DIR / "docs" / "referentiels" / "france_travail"
+# Sorties de vérification (pas des référentiels lus par le code) : à part (D199)
+DOSSIER_VERIFICATIONS = config.BASE_DIR / "scripts" / "verifications" / "france_travail"
 
 
 # ─── Outils ───────────────────────────────────────────────────────────────────
@@ -130,6 +132,9 @@ class Explorateur:
     def __init__(self, session=None, sortie: Path = DOSSIER_SORTIE, pause: float = PAUSE_S, afficher=print):
         self.session = session or requests.Session()
         self.sortie = Path(sortie)
+        # Dossier par défaut : la vérification va dans scripts/verifications/ ; un
+        # autre dossier donné (tests, --sortie) reçoit tout
+        self.verifications = DOSSIER_VERIFICATIONS if self.sortie == DOSSIER_SORTIE else self.sortie
         self.pause = pause
         self.afficher = afficher
         self.token = None
@@ -168,9 +173,10 @@ class Explorateur:
                 continue
             return r
 
-    def ecrire(self, nom: str, donnees) -> Path:
-        self.sortie.mkdir(parents=True, exist_ok=True)
-        chemin = self.sortie / f"{nom}.json"
+    def ecrire(self, nom: str, donnees, dossier: Path | None = None) -> Path:
+        dossier = Path(dossier or self.sortie)
+        dossier.mkdir(parents=True, exist_ok=True)
+        chemin = dossier / f"{nom}.json"
         texte = purger(json.dumps(donnees, ensure_ascii=False, indent=2), self.secrets)
         chemin.write_text(texte + "\n", encoding="utf-8")
         return chemin
@@ -282,7 +288,7 @@ class Explorateur:
                     "teste_le": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                     "essais": essais, "plages_acceptees": acceptees,
                     "dernier_index_obtenu": fin_max}
-        self.ecrire("test_pagination", resultat)
+        self.ecrire("test_pagination", resultat, self.verifications)
         return resultat
 
 
