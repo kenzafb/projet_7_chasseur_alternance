@@ -142,7 +142,13 @@ def _noter_compteurs(reponse: httpx.Response, corps: dict, modele: str):
     sortie = donnees.get("eval_count", usage.get("completion_tokens"))
     num_ctx = (corps.get("options") or {}).get("num_ctx")
     pleine = bool(num_ctx and isinstance(prompt, int) and prompt + (sortie or 0) >= num_ctx - MARGE_FENETRE)
-    _dernier.infos = {"prompt_eval_count": prompt, "eval_count": sortie, "num_ctx": num_ctx, "fenetre_pleine": pleine}
+    # load_duration (ns) : temps de chargement du modèle pour cet appel ; plus
+    # d'une seconde, Ollama a (re)chargé le modèle (num_ctx changé, D193)
+    chargement = donnees.get("load_duration")
+    _dernier.infos = {"prompt_eval_count": prompt, "eval_count": sortie, "num_ctx": num_ctx, "fenetre_pleine": pleine,
+                      "load_duration_s": round(chargement / 1e9, 2) if isinstance(chargement, (int, float)) else None,
+                      "total_duration_s": round(donnees["total_duration"] / 1e9, 2)
+                      if isinstance(donnees.get("total_duration"), (int, float)) else None}
     if pleine:
         journaliser(f"  ⚠️  Fenêtre de contexte pleine pour « {modele} » : {prompt} tokens lus + {sortie} écrits, "
                     f"num_ctx {num_ctx}. Ollama a pu couper le prompt sans prévenir : augmente IA_NUM_CTX.")
@@ -245,9 +251,10 @@ def _requete(modele: str, messages, schema_json: dict | None, options: dict) -> 
     if "tools" in options and schema_json is not None:
         raise ValueError("« tools » et un format de sortie ne s'envoient jamais ensemble.")
     temperature, max_tokens = options.pop("temperature", None), options.pop("max_tokens", None)
+    num_ctx = options.pop("num_ctx", None)     # imposé par l'appelant (analyse, D193)
     base = ia_base_url()
     if ia_api() == "ollama":
-        reglages = {"num_ctx": num_ctx_pour(messages, max_tokens)}
+        reglages = {"num_ctx": max(num_ctx or 0, num_ctx_pour(messages, max_tokens))}
         if temperature is not None:
             reglages["temperature"] = temperature
         if max_tokens:

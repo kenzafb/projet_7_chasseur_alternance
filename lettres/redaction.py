@@ -92,6 +92,9 @@ Dans l'attente de votre retour, je vous prie d'agréer, Madame, Monsieur, mes sa
 }
 
 
+LONGUEUR_DESCRIPTION_LETTRE = 2000
+
+
 def lettre_par_defaut(mode: str) -> str:
     """Exemple de lettre type du mode (proposé dans le profil, jamais utilisé seul)."""
     return LETTRES_PAR_DEFAUT.get(mode, LETTRES_PAR_DEFAUT["alternance"])
@@ -252,8 +255,9 @@ MOTS_MAX = 80
 
 def construire_messages_paragraphe(offre, profil, mode="alternance", lettre_type="") -> list[dict]:
     """Messages envoyés à l'IA pour le seul paragraphe personnalisé (D109)."""
-    from shared.config import ia_longueur_description
-    description = " ".join((offre.get("description", "") or "").split())[:ia_longueur_description()]
+    # Limite propre à la lettre (2 000 caractères, comme avant D193) : le
+    # plafond IA_LONGUEUR_DESCRIPTION de l'analyse ne change pas la lettre
+    description = " ".join((offre.get("description", "") or "").split())[:LONGUEUR_DESCRIPTION_LETTRE]
     lettre = "\n".join(" ".join(l.split()) for l in re.sub(r"\{[^}]*\}", "", lettre_type or "").splitlines()).strip()
     lettre = re.sub(r"\n{3,}", "\n\n", lettre)[:1500]
     vise = ce_qui_est_vise(profil, mode) or "- Non précisé : reste sur ce que dit l'offre, sans inventer d'intérêt."

@@ -20,10 +20,12 @@ def test_compteurs_et_fenetre_pleine(ia, monkeypatch):
     journal = []
     monkeypatch.setattr(shared.ia, "journaliser", journal.append)
     monkeypatch.setenv("IA_NUM_CTX", "4096")
+    monkeypatch.setattr("offres.analyse_v2.num_ctx_analyse", lambda: 4096)
     ia.file = [_avec_compteurs(_extraction(), 1800, 120), _avec_compteurs(_jugement(), 4050, 60)]
     analyser_offre_v2({"titre": "Stage", "description": "Stage web."}, PROFIL, "stage")
     infos = shared.ia.dernier_appel()
-    assert infos == {"prompt_eval_count": 4050, "eval_count": 60, "num_ctx": 4096, "fenetre_pleine": True}
+    assert {k: infos[k] for k in ("prompt_eval_count", "eval_count", "num_ctx", "fenetre_pleine")} == {
+        "prompt_eval_count": 4050, "eval_count": 60, "num_ctx": 4096, "fenetre_pleine": True}
     assert ia.appels[0]["options"]["num_ctx"] == 4096
     assert [ligne for ligne in journal if "Fenêtre de contexte pleine" in ligne] and len(
         [ligne for ligne in journal if "Fenêtre" in ligne]) == 1             # l'extraction tenait dans la fenêtre
@@ -33,12 +35,12 @@ def test_description_coupee_journal_et_marque(ia, monkeypatch):
     import offres.analyse as A
     journal = []
     monkeypatch.setattr(A, "journaliser", journal.append)
-    monkeypatch.setenv("IA_LONGUEUR_DESCRIPTION", "2000")
+    monkeypatch.setenv("IA_LONGUEUR_DESCRIPTION", "2000")              # plafond de sécurité abaissé pour le test
     ia.file = [_extraction(), _jugement()]
     offre = {"titre": "Stage web", "description": "mot " * 1000, "marques": ["niveau_different"]}
     r = analyser_offre_v2(offre, PROFIL, "stage")
-    assert r["description_coupee"] == {"longueur": 3999, "lus": {"extraction": 3999, "jugement": 2000}}
-    assert any("Description coupée pour l'IA" in ligne and "jugement 2000" in ligne for ligne in journal)
+    assert r["description_coupee"] == {"longueur": 3999, "lus": {"extraction": 2000, "jugement": 2000}}
+    assert any("Plafond de sécurité atteint" in ligne and "jugement 2000" in ligne for ligne in journal)
     appliquer_analyse(offre, r, mode="stage", verbeux=False)
     assert offre["marques"] == ["niveau_different", "description_coupee:2000"]
     assert "Description longue : l'IA en a lu les 2 000 premiers caractères sur 3 999 pour la note" in \
@@ -61,3 +63,16 @@ def test_num_ctx_jamais_trop_petit(monkeypatch):
     assert shared.ia.num_ctx_pour([{"role": "user", "content": "x" * 90000}]) == 16384   # plafond
     monkeypatch.setenv("IA_NUM_CTX", "8192")
     assert shared.ia.num_ctx_pour(long) == 8192                       # IA_NUM_CTX plus grand : gardé
+
+
+def test_description_entiere_sous_le_plafond_et_num_ctx_unique(monkeypatch):
+    from offres.analyse_v2 import _num_ctx_analyse, num_ctx_analyse
+    monkeypatch.delenv("IA_LONGUEUR_DESCRIPTION", raising=False)
+    monkeypatch.setenv("IA_NUM_CTX", "4096")
+    from shared.config import ia_longueur_description
+    assert ia_longueur_description() == 20000
+    n = num_ctx_analyse()
+    assert 4096 < n <= 16384 and n % 1024 == 0
+    # Plus grand prompt possible (description au plafond, profil maximal) compté à 3 caractères par token
+    assert _num_ctx_analyse(20000, 4096, 3.0, 1024, 16384) == n
+    assert _num_ctx_analyse(60000, 4096, 3.0, 1024, 16384) == 16384      # plafond

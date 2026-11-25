@@ -67,8 +67,8 @@ def coupure_description(offre: dict, **limites) -> dict | None:
 def journaliser_coupure(offre: dict, coupure: dict | None):
     if coupure:
         detail = ", ".join(f"{appel} {lus}" for appel, lus in coupure["lus"].items())
-        journaliser(f"  ✂️  Description coupée pour l'IA ({offre.get('titre', '')[:50]}) : {coupure['longueur']} "
-                    f"caractères, lus : {detail}")
+        journaliser(f"  ⚠️  Plafond de sécurité atteint, description coupée pour l'IA ({offre.get('titre', '')[:50]}) : "
+                    f"{coupure['longueur']} caractères, lus : {detail} (IA_LONGUEUR_DESCRIPTION)")
 
 
 def _court(texte, longueur=LONGUEUR_CHAMP) -> str:
