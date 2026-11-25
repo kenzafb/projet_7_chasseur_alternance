@@ -39,7 +39,7 @@ from database.dates import maintenant_utc
 from database.entreprises_db import a_scraper, lire_entreprises, sauvegarder_enrichissement
 from spontanees.lecture_site import MAX_PAGES, categorie, formulaires, liens_du_sitemap, liens_utiles
 from spontanees.noms_entreprise import completer as completer_noms
-from spontanees.site_officiel import SOURCES, autres_noms, domaine_interdit, identifier
+from spontanees.site_officiel import SOURCES, autres_noms, domaine_interdit, identifier, site_deja_verifie
 from shared.journal import journaliser
 from shared.modes import MODE_DEFAUT
 
@@ -52,7 +52,16 @@ DEBUG = os.getenv("DEBUG_SCRAPER", "false").lower() == "true"
 PAUSE_DDG        = (3, 6)
 PAUSE_LONGUE_N   = 15
 PAUSE_LONGUE     = 45
-PAUSE_RATELIMIT  = 90
+
+# Recherche web (D187) : moteurs de ddgs essayés dans l'ordre, le suivant
+# seulement si le précédent échoue ou ne trouve rien ; RECHERCHE_BACKENDS
+# (.env) remplace l'ordre par défaut. Après ECHECS_AVANT_ARRET requêtes
+# d'affilée sans réponse d'aucun moteur, la recherche web s'arrête pour le
+# lancement (plus d'attente de 90 s par requête).
+BACKENDS_DEFAUT    = "brave, mojeek, duckduckgo, yahoo, yandex"
+REGION_RECHERCHE   = "fr-fr"
+TIMEOUT_MOTEUR     = 10
+ECHECS_AVANT_ARRET = 5
 
 PREFIXES_RH      = ["recrutement", "rh", "alternance", "stage", "emploi", "jobs", "career", "cv"]
 PREFIXES_CONTACT = ["contact", "info", "accueil", "administration", "bonjour", "hello"]
@@ -114,7 +123,10 @@ _EXTENSIONS_FICHIERS_NON_HTML = {
 }
 
 _compteur_ddg = 0
-erreurs_ddg = 0      # requêtes de recherche web en échec depuis le démarrage
+erreurs_ddg = 0      # requêtes de recherche web en échec (aucun moteur) depuis le démarrage
+_echecs_affilee = 0  # requêtes en échec d'affilée, remis à zéro par un succès
+recherche_arretee = False   # vrai après ECHECS_AVANT_ARRET échecs d'affilée, jusqu'au lancement suivant
+echecs_par_moteur: dict[str, int] = {}
 
 
 def dbg(msg):
@@ -370,24 +382,59 @@ def construire_requetes(entreprise, analyse):
 
 # ─── DuckDuckGo ──────────────────────────────────────────────────────────────
 
+def backends_recherche() -> list[str]:
+    """Moteurs de ddgs à essayer, dans l'ordre : RECHERCHE_BACKENDS du .env
+    (« brave, mojeek, duckduckgo »), sinon BACKENDS_DEFAUT. Un nom inconnu
+    de ddgs est ignoré (journalisé) ; aucun nom valable : l'ordre par défaut."""
+    from ddgs.engines import ENGINES
+    connus = ENGINES["text"]
+    demandes = [b.strip().lower() for b in (os.getenv("RECHERCHE_BACKENDS") or "").split(",") if b.strip()]
+    gardes = [b for b in dict.fromkeys(demandes) if b in connus]
+    if inconnus := [b for b in demandes if b not in connus]:
+        journaliser(f"  [⚠️  RECHERCHE_BACKENDS : moteur(s) inconnu(s) ignoré(s) : {', '.join(inconnus)} ; "
+                    f"connus : {', '.join(sorted(connus))}]")
+    return gardes or [b.strip() for b in BACKENDS_DEFAUT.split(",")]
+
+
+def reinitialiser_recherche():
+    """Début d'un lancement : la recherche web est de nouveau permise."""
+    global _echecs_affilee, recherche_arretee
+    _echecs_affilee, recherche_arretee = 0, False
+
+
 def _resultats_ddg(requete):
-    """Résultats d'une requête DuckDuckGo ({href, title, body}), une nouvelle
-    tentative après un refus pour excès de requêtes."""
-    global erreurs_ddg
-    for essai in (1, 2):
+    """Résultats d'une requête de recherche web ({href, title, body}) : le
+    premier moteur de backends_recherche() qui répond ; aucun : requête en
+    échec (journalisée), et la recherche s'arrête pour le lancement après
+    ECHECS_AVANT_ARRET échecs d'affilée (D187)."""
+    global erreurs_ddg, _echecs_affilee, recherche_arretee
+    if recherche_arretee:
+        return []
+    pause_ddg()
+    moteurs, raisons = backends_recherche(), []
+    for moteur in moteurs:
         try:
-            pause_ddg()
-            with DDGS() as ddg:
-                return [r for r in ddg.text(requete, max_results=10) if r.get("href")]
-        except Exception as e:   # refus pour excès de requêtes, moteur injoignable...
-            # Jamais en silence : à l'audit, une panne du moteur laissait 13
-            # entreprises de suite sans aucun candidat, comptées « sans site »
-            erreurs_ddg += 1
-            if essai == 2:
-                journaliser(f"  [⚠️  Recherche web en échec ({type(e).__name__}), requête abandonnée : {requete}]")
-                return []
-            journaliser(f"  [⚠️  Recherche web en échec ({type(e).__name__}) — attente {PAUSE_RATELIMIT}s...]")
-            time.sleep(PAUSE_RATELIMIT)
+            with DDGS(timeout=TIMEOUT_MOTEUR) as ddg:
+                resultats = [r for r in ddg.text(requete, region=REGION_RECHERCHE, backend=moteur, max_results=10)
+                             if r.get("href")]
+            if resultats:
+                _echecs_affilee = 0
+                dbg(f"{moteur} : {len(resultats)} résultat(s)")
+                return resultats
+            raisons.append(f"{moteur} : aucun résultat")
+        except Exception as e:   # refus pour excès de requêtes, moteur injoignable, aucun résultat...
+            echecs_par_moteur[moteur] = echecs_par_moteur.get(moteur, 0) + 1
+            raisons.append(f"{moteur} : {type(e).__name__} {str(e)[:60]}".strip())
+    # Jamais en silence : à l'audit, une panne du moteur laissait 13
+    # entreprises de suite sans aucun candidat, comptées « sans site »
+    erreurs_ddg += 1
+    _echecs_affilee += 1
+    journaliser(f"  [⚠️  Recherche web en échec ({' ; '.join(raisons)}) : {requete}]")
+    if _echecs_affilee >= ECHECS_AVANT_ARRET:
+        recherche_arretee = True
+        journaliser(f"  [⛔ Recherche web arrêtée pour ce lancement : {_echecs_affilee} requêtes d'affilée sans "
+                    f"réponse de {', '.join(moteurs)}. Les autres sources du site (Wikidata, LBA, offres, "
+                    "domaines devinés) restent essayées.]")
     return []
 
 
@@ -436,12 +483,32 @@ def meilleurs_emails(emails, domaine=None):
 ORDRE_PAGES = ("contact", "recrutement", "mentions", "a_propos")
 
 
+# Page carrières (D191) : mots préférés, dans l'adresse ou le texte du lien
+MOTS_CARRIERES = ("carriere", "careers", "career", "recrutement", "recrute", "jobs", "rejoindre", "rejoignez",
+                  "join-us", "join us")
+
+
+def page_carrieres(liens_recrutement: list[str]) -> str:
+    """Page carrières ou recrutement parmi les liens de la catégorie
+    « recrutement » : un lien aux mots préférés d'abord (pas « stage »,
+    « alternance » ou « talent » seuls), sinon le premier ; "" sans lien."""
+    from spontanees.lecture_site import _simple
+    return next((u for u in liens_recrutement if any(m in _simple(u) for m in MOTS_CARRIERES)), "") \
+        or (liens_recrutement[0] if liens_recrutement else "")
+
+
+def liens_du_site(verification) -> tuple[dict, dict]:
+    """(liens de l'accueil, liens du sitemap), par catégorie, lus une fois."""
+    if getattr(verification, "_liens", None) is None:
+        accueil, html = next(iter(verification.pages.items()))
+        verification._liens = (liens_utiles(html, accueil), liens_du_sitemap(verification.lecteur))
+    return verification._liens
+
+
 def pages_a_lire(verification) -> list[str]:
     """Pages utiles du site, liens réels de l'accueil puis du sitemap, par
     catégorie (contact, recrutement et carrières, mentions légales, à propos)."""
-    accueil, html = next(iter(verification.pages.items()))
-    liens = liens_utiles(html, accueil)
-    plan = liens_du_sitemap(verification.lecteur)
+    liens, plan = liens_du_site(verification)
     ordre = []
     for cat in ORDRE_PAGES:
         for url in liens[cat][:2] + plan[cat][:2]:
@@ -489,6 +556,8 @@ def scraper_et_extraire(verification, nom_entreprise, dirigeant=None, ia=True):
         "contact_rh": None,
         "url_finale": next(iter(pages)),
         "formulaires": list(formes.values()),
+        "page_carrieres": page_carrieres(liens_du_site(verification)[0]["recrutement"]
+                                         + liens_du_site(verification)[1]["recrutement"]),
         "pages_lues": [u for u, _ in lecteur.lues],
         "interdites_robots": list(lecteur.interdites),
         "robots": lecteur.robots,
@@ -515,10 +584,18 @@ def _sans_resultat(e: dict):
     e["emails_douteux"] = []
     e["emails_non_valides"] = False
     e["formulaires_contact"] = []
+    e["page_carrieres"] = ""
     e["telephones"] = []
     e["telephone"] = None
     e["contact_rh"] = None
     e["traite"] = True
+
+
+def est_grande(e: dict) -> bool:
+    """500 salariés et plus (D191) : l'absence d'email n'est pas un échec."""
+    from shared.tailles import grande_entreprise
+    extra = e.get("_extra") or {}
+    return grande_entreprise(e.get("taille") or extra.get("taille"), e.get("categorie") or extra.get("categorie"))
 
 
 def charger_entreprises(user_id, mode=MODE_DEFAUT):
@@ -541,6 +618,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
     """Cherche site, emails et contact des entreprises pas encore traitées,
     au plus max_scrapees par lancement (None : toutes)."""
     _log = log_fn or journaliser
+    reinitialiser_recherche()
     ia_configuree = analyse_ia_active()   # ANALYSE_IA=false : lecture directe seulement
     modele = modele_ia("extraction") if ia_configuree else "désactivée"
     _log(f"Trouver leurs emails | IA pour les emails douteux = {modele} | site vérifié (SIREN ou nom) exigé "
@@ -569,6 +647,11 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
 
     traites_ce_run = 0
     sites_offres = sites_des_offres(user_id)   # sites donnés par les offres France Travail et LBA
+    # Sites déclarés dans Wikidata, demandés par lots avant toute recherche web (D188)
+    from spontanees import wikidata
+    sans_site = [e.get("siren") for e in a_traiter if not site_deja_verifie(e)]
+    if sans_site:
+        _log(f"Wikidata : {wikidata.precharger(sans_site)} site(s) officiel(s) trouvé(s) pour {len(sans_site)} SIREN")
     # Coupée pour tout le lancement sur une erreur bloquante de l'IA, ou d'emblée sans IA
     ia_active = ia_configuree
     if not ia_configuree:
@@ -634,7 +717,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
                 _log(f"  ❔ {', '.join(douteux)} (non validés : à valider)")
             if resultat.get("ecartes"):
                 _log("  🚫 Écartés : " + ", ".join(f"{a} ({r})" for a, r in resultat["ecartes"]))
-            if not emails:
+            if not emails and not (est_grande(e) and resultat.get("page_carrieres")):
                 _log("  ⚠️  Aucun email")
 
             e["emails_trouves"]   = emails
@@ -650,8 +733,11 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
             e["url_scrapee"]      = resultat.get("url_finale") or verification.url
             e["source_recherche"] = source_site
             e["formulaires_contact"] = resultat.get("formulaires", [])
+            e["page_carrieres"] = resultat.get("page_carrieres") or ""
             if e["formulaires_contact"] and not emails:
                 _log(f"  📝 Formulaire de contact : {e['formulaires_contact'][0]['page']}")
+            if e["page_carrieres"] and not emails and est_grande(e):
+                _log(f"  💼 Grande entreprise, candidature sur son site carrières : {e['page_carrieres']}")
             e["traite"]           = True
             traites_ce_run += 1
 
@@ -667,8 +753,11 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
 
     sauvegarder(user_id, entreprises)
     avec_email = sum(1 for e in entreprises if e.get("emails_trouves"))
-    _log(f"✅ Scraping terminé — {avec_email}/{total} avec email")
-    _log(f"   Recherche web : {_compteur_ddg} requêtes" + (f", {erreurs_ddg} en échec" if erreurs_ddg else ""))
+    carrieres = sum(1 for e in entreprises if not e.get("emails_trouves") and e.get("page_carrieres") and est_grande(e))
+    _log(f"✅ Scraping terminé — {avec_email}/{total} avec email"
+         + (f", {carrieres} grandes entreprises à contacter sur leur site carrières" if carrieres else ""))
+    _log(f"   Recherche web : {_compteur_ddg} requêtes" + (f", {erreurs_ddg} en échec" if erreurs_ddg else "")
+         + (" (arrêtée en cours de lancement après des échecs d'affilée)" if recherche_arretee else ""))
 
 
 def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=None, mode=MODE_DEFAUT):

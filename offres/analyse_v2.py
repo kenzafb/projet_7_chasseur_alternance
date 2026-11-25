@@ -6,7 +6,7 @@ Prompt d'analyse v2 (phase 15, étape 3, D170), en deux appels :
   1. extraction : ce que dit le texte de l'offre (niveau, durée, dates,
      alternance seulement, exigences d'expérience, de permis, de
      certification, de diplôme d'État), SANS le profil, sur la description
-     entière (jusqu'à LONGUEUR_EXTRACTION caractères) ; chaque valeur est
+     entière (plafond de sécurité IA_LONGUEUR_DESCRIPTION, D193) ; chaque valeur est
      ensuite contrôlée contre le texte en Python (D98) ;
   2. jugement : l'adéquation au profil, en un mot (Très bien, Bien, Moyen,
      Faible, Hors sujet), par un arbre de décision ordonné : hors sujet ou
@@ -21,13 +21,14 @@ Moyen au plus).
 import re
 import time
 
-from offres.analyse import (POINTS_FORTS, REGLES, SYSTEME, _court, appliquer_eligibilite, score_to_verdict)
+from offres.analyse import (POINTS_FORTS, REGLES, SYSTEME, _court, appliquer_eligibilite, coupure_description,
+                            journaliser_coupure, score_to_verdict)
 from shared.erreurs import exiger_profil
 from shared.exigences import PERMIS_SANS_CATEGORIE, annees_dans_texte
 from shared.ia import appeler_structure
+from shared.journal import journaliser
 from shared.schemas_ia import ExtractionOffre, JugementOffre
 
-LONGUEUR_EXTRACTION = 8000         # caractères de description lus par l'extraction
 NOTES = {"Très bien": 9, "Bien": 7, "Moyen": 5, "Faible": 3, "Hors sujet": 1}
 PLAFOND_NIVEAU_SOUHAITE = "Moyen"
 
@@ -55,8 +56,10 @@ EXTRACTION = (
 )
 
 
-def messages_extraction(offre: dict) -> list[dict]:
-    description = _court(offre.get("description"), LONGUEUR_EXTRACTION)
+def messages_extraction(offre: dict, longueur: int | None = None) -> list[dict]:
+    from shared.config import ia_longueur_description
+    longueur = longueur or ia_longueur_description()
+    description = _court(offre.get("description"), longueur)
     texte = (f"=== TEXTE DE L'OFFRE ===\nTitre : {offre.get('titre', '')}\n"
              f"Description : {description}\n=== FIN ===\n\n{EXTRACTION}")
     return [{"role": "system", "content": "Tu recopies des informations d'une offre d'emploi. Tu réponds uniquement "
@@ -187,18 +190,46 @@ def appliquer_plafonds(result: dict, profil: dict) -> dict:
     return result
 
 
+NUM_CTX_ANALYSE = 4096       # D194 : plus grand prompt mesuré 2 271 tokens, réponse 265 au plus
+SORTIE_ANALYSE = 512         # tokens réservés à la réponse (265 au plus mesurés)
+
+
+def num_ctx_offre(messages_par_appel) -> int:
+    """num_ctx unique des deux appels d'une offre (D194) : NUM_CTX_ANALYSE,
+    relevé au millier supérieur seulement si le plus grand prompt estimé
+    (shared.ia.CARACTERES_PAR_TOKEN) plus la réponse n'y tient pas ; jamais
+    plus que PLAFOND_NUM_CTX. Le même pour les deux appels : Ollama ne
+    recharge pas le modèle entre eux."""
+    from shared.ia import CARACTERES_PAR_TOKEN, PLAFOND_NUM_CTX
+    plus_grand = max(sum(len(m["content"]) for m in messages) for messages in messages_par_appel)
+    besoin = int(plus_grand / CARACTERES_PAR_TOKEN) + SORTIE_ANALYSE
+    if besoin <= NUM_CTX_ANALYSE:
+        return NUM_CTX_ANALYSE
+    num_ctx = min(-(-besoin // 1024) * 1024, PLAFOND_NUM_CTX)
+    journaliser(f"  ℹ️  Prompt long (environ {besoin} tokens avec la réponse) : num_ctx porté de {NUM_CTX_ANALYSE} "
+                f"à {num_ctx} pour cette offre")
+    return num_ctx
+
+
 def analyser_offre_v2(offre, profil, mode="alternance", modele=None, essais=2, temperature=0.1,
-                      longueur_jugement=None) -> dict:
+                      longueur_jugement=None, longueur_extraction=None, num_ctx=None) -> dict:
     """Analyse v2 : même format de résultat que offres.analyse.analyser_offre,
-    plus « categorie », « extraction », « secondes » (des deux appels)."""
+    plus « categorie », « extraction », « secondes » (des deux appels). Les
+    deux appels lisent la description entière, sous le plafond de sécurité
+    IA_LONGUEUR_DESCRIPTION, avec le même num_ctx (num_ctx_offre, D194). num_ctx=0 : un
+    num_ctx par appel, comme avant D193 (mesure seulement)."""
     from shared.config import ia_longueur_description
     exiger_profil(profil)
     debut = time.monotonic()
-    extraction = appeler_structure(messages_extraction(offre), ExtractionOffre, usage="analyse", modele=modele,
-                                   essais=essais, temperature=temperature).model_dump()
-    jugement = appeler_structure(messages_jugement(offre, profil, mode, longueur_jugement or ia_longueur_description()),
-                                 JugementOffre, usage="analyse", modele=modele, essais=essais,
-                                 temperature=temperature).model_dump()
+    longueur_jugement = longueur_jugement or ia_longueur_description()
+    longueur_extraction = longueur_extraction or ia_longueur_description()
+    m_extraction = messages_extraction(offre, longueur_extraction)
+    m_jugement = messages_jugement(offre, profil, mode, longueur_jugement)
+    num_ctx = num_ctx_offre((m_extraction, m_jugement)) if num_ctx is None else num_ctx
+    extraction = appeler_structure(m_extraction, ExtractionOffre, usage="analyse", modele=modele, essais=essais,
+                                   temperature=temperature, num_ctx=num_ctx).model_dump()
+    jugement = appeler_structure(m_jugement, JugementOffre, usage="analyse", modele=modele, essais=essais,
+                                 temperature=temperature, num_ctx=num_ctx).model_dump()
     # Hors sujet sans phrase du profil qui l'impose : Faible (le petit modèle en abusait, D170)
     if jugement["categorie"] == "Hors sujet" and not hors_sujet_justifie(jugement["hors_sujet_car"], profil, mode):
         jugement["categorie"] = "Faible"
@@ -221,5 +252,9 @@ def analyser_offre_v2(offre, profil, mode="alternance", modele=None, essais=2, t
         appliquer_plafonds(result, profil)
         result["verdict"] = score_to_verdict(result["score"])
     result["exigences_extraites"] = lignes
+    # Description plus longue que ce que lit un des deux appels (D189)
+    result["description_coupee"] = coupure_description(offre, extraction=longueur_extraction,
+                                                       jugement=longueur_jugement)
+    journaliser_coupure(offre, result["description_coupee"])
     result["secondes"] = round(time.monotonic() - debut, 2)
     return result

@@ -26,6 +26,15 @@ function rendreTags(champ) {
     c.appendChild(el);
   });
 }
+/* Ajoute la saisie en cours comme étiquette (sans doublon) et vide le champ */
+function validerSaisieTag(champ, input) {
+  const v = (input?.value || "").trim();
+  if (v && !(_tags[champ] || []).some(t => t.toLowerCase() === v.toLowerCase())) {
+    (_tags[champ] = _tags[champ] || []).push(v);
+    rendreTags(champ);
+  }
+  if (input) input.value = "";
+}
 function brancherTags(champ) {
   const input = document.querySelector(`[data-tags-input="${champ}"]`);
   const c = document.querySelector(`[data-tags="${champ}"]`);
@@ -33,14 +42,17 @@ function brancherTags(champ) {
   input.addEventListener("keydown", e => {
     if (e.key === "Enter") {
       e.preventDefault();
-      const v = input.value.trim();
-      if (v && !(_tags[champ] || []).includes(v)) {
-        (_tags[champ] = _tags[champ] || []).push(v);
-        rendreTags(champ);
-      }
-      input.value = "";
+      validerSaisieTag(champ, input);
     }
   });
+  // Choix dans la liste suggérée (datalist) : pas de touche Entrée, la
+  // valeur arrive d'un coup ; elle devient une étiquette tout de suite
+  input.addEventListener("input", e => {
+    const options = input.list ? [...input.list.options].map(o => o.value) : [];
+    if (e.inputType !== "insertText" && options.includes(input.value)) validerSaisieTag(champ, input);
+  });
+  // Champ quitté avec une saisie non validée : elle n'est pas perdue
+  input.addEventListener("change", () => validerSaisieTag(champ, input));
   c.addEventListener("click", e => {
     const i = e.target.closest("[data-rm]")?.dataset.rm;
     if (i !== undefined) {
@@ -49,6 +61,13 @@ function brancherTags(champ) {
       input.focus();   // le bouton retiré disparaît : le focus revient au champ
     }
   });
+}
+
+function avecSaisieEnCours(champ) {
+  const liste = [...(_tags[champ] || [])];
+  const v = (document.querySelector(`[data-tags-input="${champ}"]`)?.value || "").trim();
+  if (v && !liste.some(t => t.toLowerCase() === v.toLowerCase())) liste.push(v);
+  return liste;
 }
 
 /* ── Projets ───────────────────────────────────────────────────────────── */
@@ -337,18 +356,33 @@ async function rendrePermis(coches) {
   const sugg = document.querySelector("[data-certifications-suggerees]");
   if (sugg) sugg.innerHTML = (o.certifications || []).map(x => `<option value="${esc(x)}"></option>`).join("");
   c.innerHTML = [{ code: "aucun", libelle: "Aucun permis" }, ...(o.permis || [])].map(p =>
-    `<label class="case"><input type="checkbox" value="${esc(p.code)}" ${choisis.has(p.code) ? "checked" : ""}>
+    `<label class="domaine-case"><input type="checkbox" value="${esc(p.code)}" ${choisis.has(p.code) ? "checked" : ""}>
        <span>${p.code === "aucun" ? "Aucun permis" : `${esc(p.code)} <small>${esc(p.libelle)}</small>`}</span></label>`).join("");
+  majPermis(c);
   if (!c.dataset.branche) {
     c.dataset.branche = "1";
     c.addEventListener("change", e => {
       const box = e.target.closest("input[type=checkbox]");
-      if (!box?.checked) return;
-      c.querySelectorAll("input").forEach(x => {
-        if (box.value === "aucun" ? x.value !== "aucun" : x.value === "aucun") x.checked = false;
-      });
+      if (box?.checked && box.value !== "aucun") caseAucunPermis(c).checked = false;
+      majPermis(c);
     });
   }
+}
+
+/* « Aucun permis » coché : les autres cases sont décochées et grisées
+   (comme les domaines avec « Indifférent ») ; cases cochées surlignées */
+function caseAucunPermis(c) {
+  return [...c.querySelectorAll("input")].find(x => x.value === "aucun") || {};
+}
+function majPermis(c) {
+  const aucun = caseAucunPermis(c).checked;
+  c.querySelectorAll("input").forEach(x => {
+    if (x.value !== "aucun") {
+      if (aucun) x.checked = false;
+      x.disabled = !!aucun;
+    }
+    x.closest(".domaine-case")?.classList.toggle("is-checked", x.checked);
+  });
 }
 
 async function rendreOptions(rech, mode) {
@@ -407,6 +441,16 @@ async function rendreOptions(rech, mode) {
       <p class="profil-card__sub" style="margin:4px 0 10px;">Entreprises cherchées sur Sirene. Rien de coché : toute l'Île-de-France.</p>
       <div class="domaines-choix">${o.departements.map(d => caseOption("data-departement-case", d.code, `${d.code} · ${d.libelle}`, departements.has(d.code))).join("")}</div>
     </div>
+    <div class="options-bloc">
+      <span class="field__label">Candidatures spontanées : grandes entreprises hors de ton secteur</span>
+      <div class="domaines-choix" style="margin-top:8px;">
+        <label class="domaine-case domaine-case--petit">
+          <input type="checkbox" data-inclure-transverses ${rech.inclure_transverses !== false ? "checked" : ""}>
+          <span>Inclure les grandes entreprises qui ont un service interne de ton domaine (banque, assurance, sièges sociaux…)</span>
+        </label>
+      </div>
+      <p class="profil-card__sub" style="margin:8px 0 10px;">250 salariés et plus, cherchées sur Sirene après celles de ton secteur. Décoché : seulement les entreprises de ton secteur.</p>
+    </div>
     <div class="options-bloc" data-bloc-tous-secteurs>
       <span class="field__label">Candidatures spontanées : tous les secteurs</span>
       <div class="domaines-choix" style="margin-top:8px;">
@@ -441,6 +485,8 @@ function lireOptions(mode) {
   const coches = attribut => [...c.querySelectorAll(`[${attribut}]:checked`)].map(i => i.value);
   const out = { secteurs: coches("data-secteur-case"),
                 tous_secteurs: !!c.querySelector("[data-tous-secteurs]")?.checked };
+  const transverses = c.querySelector("[data-inclure-transverses]");
+  if (transverses) out.inclure_transverses = transverses.checked;
   if (c.querySelector("[data-taille-inconnue]")) {
     out.tailles = coches("data-taille-case");
     out.taille_inconnue = c.querySelector("[data-taille-inconnue]").checked;
@@ -631,7 +677,9 @@ export const Profil = {
       if (!_champVisible(el)) return;        // ignore les doublons masqués (évite d'écraser)
       data[el.dataset.profil] = el.value;
     });
-    data.competences = [...(_tags["competences"] || [])];
+    // Saisie d'étiquette en cours (pas encore validée par Entrée) : comptée
+    // aussi, pour qu'« Enregistrer » ne la perde pas
+    data.competences = avecSaisieEnCours("competences");
     lireProjetsDepuisDOM();
     data.projets = _projets.filter(p => p.nom || p.url || p.description).map(p => ({ ...p }));
 
@@ -648,7 +696,7 @@ export const Profil = {
     Object.assign(rech, lireOptions(_modeProfilCourant));
     // Permis et certifications (D169), communs aux trois modes
     rech.permis = [...document.querySelectorAll("[data-permis] input:checked")].map(c => c.value);
-    rech.certifications = [...(_tags["certifications"] || [])];
+    rech.certifications = avecSaisieEnCours("certifications");
     data.recherche = rech;
     return data;
   },

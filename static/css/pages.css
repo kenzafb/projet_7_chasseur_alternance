@@ -95,7 +95,7 @@
 }
 
 /* Tags (compétences) */
-.tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.tags { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
 .tag {
   display: inline-flex; align-items: center; gap: 4px;
   background: var(--accent-doux); color: var(--accent-survol);
@@ -107,7 +107,7 @@
 }
 .tag__x:hover { background: #CFE7E3; }
 .tags__input { max-width: 100%; }
-.tags:empty { margin-bottom: 0; }
+.tags:empty { display: none; }   /* pas de zone vide tant qu'aucune étiquette (D185) */
 
 /* Projets (liste de cartes éditables) */
 .projets { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
@@ -497,9 +497,11 @@
 .reglages__cases { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
 .case { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; }
 .case input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
-/* Permis du profil (D169) */
-.cases { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 16px; margin-top: 6px; }
-.cases small { color: var(--texte-3); }
+/* Permis du profil (D169, D185) : un groupe de cases sans le cadre du
+   navigateur, titre au-dessus, cases arrondies comme celles des domaines */
+.champ-groupe { border: 0; margin: 0; padding: 0; min-width: 0; }
+.champ-groupe > legend { padding: 0; margin-bottom: 5px; }
+.domaine-case small { color: var(--texte-3); }
 .reglages__info { margin-top: 14px; font-size: 14px; color: var(--texte-2); }
 
 /* ════════════ CANDIDATURES : tableau en colonnes (D146) ════════════ */
@@ -572,6 +574,8 @@
 .partie [data-mode-section] { display: flex; flex-direction: column; gap: 18px; }
 .partie .profil-grid[data-mode-section] { display: grid; }
 .profil-bloc { display: flex; flex-direction: column; gap: 8px; }
+/* Texte d'aide collé à son titre, comme dans un champ simple (D185) */
+.partie [data-mode-section] > .field__label + .field__hint { margin-top: -11px; }
 .profil-aide summary { cursor: pointer; font-weight: 600; font-size: 14px; color: var(--texte-3); }
 .pj-add { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 @media (max-width: 720px) {
@@ -636,6 +640,7 @@
 .ent__corps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .ent__nom { font-weight: 700; }
 .ent__detail { font-size: 14px; color: var(--texte-2); overflow-wrap: anywhere; }
+.ent__etablissement { font-weight: 400; color: var(--texte-2); }   /* enseigne ou établissement (D192) */
 .ent__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
 .ent__lien { font-size: 14px; font-weight: 600; }
 .ent__adresses summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--texte-3); }

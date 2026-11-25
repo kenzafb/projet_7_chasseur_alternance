@@ -161,6 +161,9 @@ def ia_base_url() -> str:
         url = url[:-3]
     return url
 
+PLAFOND_DESCRIPTION = 20000
+
+
 def ia_num_ctx() -> int:
     """Taille du contexte demandée à Ollama (options.num_ctx, défaut 8192) :
     le défaut d'Ollama peut tronquer en silence un prompt plus long."""
@@ -202,10 +205,11 @@ def ia_version_analyse() -> str:
 
 
 def ia_longueur_description() -> int:
-    """Caractères de la description d'une offre envoyés à l'IA (défaut
-    2000) : sur processeur, chaque millier de caractères coûte une dizaine
-    de secondes de lecture."""
-    return int(_reel("IA_LONGUEUR_DESCRIPTION", 2000, 200))
+    """Plafond de sécurité de la description d'une offre envoyée à l'IA
+    (défaut 20 000 caractères, D193) : les deux appels de l'analyse lisent
+    la description entière ; le plafond ne coupe qu'un texte anormalement
+    long, et le journalise."""
+    return int(_reel("IA_LONGUEUR_DESCRIPTION", PLAFOND_DESCRIPTION, 200))
 
 def ia_reflexion() -> bool:
     """Mode de réflexion des modèles qui en ont un (Qwen 3...) : coupé par

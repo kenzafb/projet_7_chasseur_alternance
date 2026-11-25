@@ -107,3 +107,19 @@ def garder_selon_taille(taille: str | None, tailles: list[str], inconnue_ok: boo
     if taille is None:
         return inconnue_ok or not tailles
     return taille in tailles_effectives(tailles)
+
+
+# Grandes entreprises (D191) : 500 salariés et plus, ou catégorie GE de Sirene.
+# Leur moyen de candidature est souvent leur site carrières, pas un email.
+SEUIL_GRANDE = 500
+
+
+def grande_entreprise(taille, categorie="") -> bool:
+    """taille : tranche lue (« 500-999 », « 10000+ », code INSEE « 41 »)."""
+    if str(categorie or "").upper() == "GE":
+        return True
+    t = str(taille or "").strip()
+    if t in TRANCHES_INSEE:
+        return TRANCHES_INSEE[t] >= SEUIL_GRANDE
+    m = re.match(r"(\d[\d\s]*)", t)
+    return bool(m) and int(re.sub(r"\s", "", m.group(1))) >= SEUIL_GRANDE

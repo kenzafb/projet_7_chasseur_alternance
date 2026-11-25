@@ -35,14 +35,16 @@ FICHIER_INTERDITS = Path(__file__).resolve().parent.parent / "shared" / "referen
 
 LBA, FRANCE_TRAVAIL, RECHERCHE, VERIFIE = "lba", "france_travail", "recherche", "deja_verifie"
 DEVINE = "domaine_devine"
+WIKIDATA = "wikidata"
 SOURCES = {LBA: "La Bonne Alternance", FRANCE_TRAVAIL: "offre France Travail", RECHERCHE: "recherche web",
-           VERIFIE: "site déjà vérifié", DEVINE: "domaine deviné d'après le nom"}
+           VERIFIE: "site déjà vérifié", DEVINE: "domaine deviné d'après le nom", WIKIDATA: "Wikidata"}
 # Domaines devinés (D168) : nom simplifié + extension, avant toute recherche
 EXTENSIONS_DEVINEES = (".fr", ".com", ".eu", ".io")
 MAX_DOMAINES_DEVINES = 8
 PREUVES = {"siren": "SIREN", "siret": "SIRET", "tva": "numéro de TVA", "nom_titre": "nom dans le titre du site",
            "nom_mentions": "nom dans les mentions légales",
-           "domaine_adresse": "domaine au nom de l'entreprise et adresse sur le site"}
+           "domaine_adresse": "domaine au nom de l'entreprise et adresse sur le site",
+           "wikidata": "site officiel déclaré dans Wikidata pour le SIREN"}
 MAX_CANDIDATS_RECHERCHE = 8      # domaines de la recherche web essayés au plus (4 avant D171)
 MOTS_DISTINCTIFS_MIN = 2         # preuve par le nom : au moins 2 mots distinctifs, sinon SIREN (D172)
 
@@ -350,8 +352,9 @@ def domaines_devines(entreprise: dict) -> list[str]:
 
 
 def candidats(entreprise: dict, sites_france_travail: dict, recherche=None, sites_export=None):
-    """(url, source) dans l'ordre : déjà vérifié, LBA, France Travail, domaines
-    devinés (D168), recherche web (générateur)."""
+    """(url, source) dans l'ordre : déjà vérifié, Wikidata (D188), LBA,
+    France Travail, domaines devinés (D168), recherche web (générateur)."""
+    from spontanees.wikidata import sites_wikidata
     vus = set()
 
     def nouveau(url):
@@ -361,9 +364,15 @@ def candidats(entreprise: dict, sites_france_travail: dict, recherche=None, site
         vus.add(d)
         return True
 
-    for url, source in ((site_deja_verifie(entreprise), VERIFIE), (site_lba(entreprise, sites_export), LBA)):
-        if url and nouveau(url):
-            yield (url if "://" in url else "https://" + url), source
+    url = site_deja_verifie(entreprise)
+    if url and nouveau(url):
+        yield (url if "://" in url else "https://" + url), VERIFIE
+    for url in sites_wikidata(entreprise):
+        if not domaine_interdit(url) and nouveau(url):
+            yield url, WIKIDATA
+    url = site_lba(entreprise, sites_export)
+    if url and nouveau(url):
+        yield (url if "://" in url else "https://" + url), LBA
     for nom in {nom_normalise(entreprise.get(c) or "") for c in ("nom_commercial", "nom")} - {""}:
         for url in sites_france_travail.get(nom, []):
             if nouveau(url):
@@ -395,6 +404,10 @@ def identifier(entreprise: dict, sites_france_travail: dict | None = None, reche
             if domaine_interdit(racine):
                 continue
             v = verifier(racine, entreprise, source, lecteur_cls)
+            if source == WIKIDATA and not v.verifie and v.pages:
+                # Site déclaré dans Wikidata pour ce SIREN : vérifié dès que
+                # son accueil se lit, sans autre preuve (D188)
+                v.verifie, v.preuve, v.detail = True, "wikidata", "site officiel déclaré dans Wikidata pour le SIREN"
             if source == DEVINE and not v.verifie and v.detail.startswith(("accueil illisible", "accueil interdit")):
                 continue          # domaine inexistant : pas noté parmi les essais, il y en a beaucoup
             essais.append(v.resume())

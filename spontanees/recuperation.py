@@ -144,7 +144,10 @@ def plan_sirene(profil: dict, log=journaliser) -> list[tuple[str, str]]:
         groupes.append((nom, codes["coeurs" if nom == "cœurs" else "secteurs"], filtre_tailles(tailles)))
         if inconnus:
             groupes.append((nom, codes["coeurs" if nom == "cœurs" else "secteurs"], inconnus))
-    if codes["transverses"]:
+    if codes["transverses"] and rech.get("inclure_transverses") is False:
+        log("ℹ️  Sirene : grandes entreprises hors de tes secteurs (service interne) non cherchées, "
+            "option du profil")
+    elif codes["transverses"]:
         grandes = filtre_grandes(tailles)
         if grandes:
             groupes.append(("transverses", codes["transverses"], grandes))

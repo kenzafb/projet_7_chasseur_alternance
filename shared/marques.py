@@ -26,6 +26,8 @@ FICHIER = Path(__file__).resolve().parent / "referentiels" / "organismes_formati
 
 NIVEAU_DIFFERENT = "niveau_different"
 ORGANISME_FORMATION = "organisme_formation"
+# Posée par l'analyse (D189) : « description_coupee:<caractères lus> »
+DESCRIPTION_COUPEE = "description_coupee"
 MARQUES = {
     NIVEAU_DIFFERENT: "Niveau différent du tien",
     ORGANISME_FORMATION: "Offre déposée par un organisme de formation",
@@ -95,9 +97,26 @@ def ajouter_marque(offre: dict, cle: str) -> dict:
     return offre
 
 
+def marquer_description_coupee(offre: dict, lus: int | None) -> dict:
+    """Pose (lus : caractères lus par l'IA pour la note) ou retire la marque
+    de description coupée : une nouvelle analyse la remet à jour."""
+    marques = [m for m in offre.get("marques") or [] if not str(m).startswith(DESCRIPTION_COUPEE)]
+    offre["marques"] = marques + ([f"{DESCRIPTION_COUPEE}:{lus}"] if lus else [])
+    return offre
+
+
+def _milliers(n: int) -> str:
+    return f"{n:,}".replace(",", "\u202f")
+
+
 def etiquettes(offre: dict) -> list[str]:
     """Textes affichés sur l'offre : ses marques, puis les indices d'école."""
     out = [MARQUES[m] for m in offre.get("marques") or [] if m in MARQUES]
+    for m in offre.get("marques") or []:
+        if str(m).startswith(DESCRIPTION_COUPEE + ":") and str(m).split(":", 1)[1].isdigit():
+            total = len(" ".join(str(offre.get("description") or "").split()))
+            out.append(f"Description longue : l'IA en a lu les {_milliers(int(m.split(':', 1)[1]))} premiers "
+                       f"caractères sur {_milliers(total)} pour la note")
     if ORGANISME_FORMATION not in (offre.get("marques") or []) and (mots := indices_ecole(offre)):
         out.append("Indice d'école ou de CFA : « " + " », « ".join(mots) + " »")
     return out

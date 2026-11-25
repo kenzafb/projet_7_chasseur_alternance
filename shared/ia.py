@@ -98,6 +98,60 @@ class IADesactivee(ErreurIABloquante):
 
 # Un seul appel à la fois dans tout le processus
 verrou = threading.Lock()
+# Compteurs du dernier appel réussi de ce fil (D189) : prompt_eval_count et
+# eval_count d'Ollama (prompt_tokens et completion_tokens d'une API OpenAI),
+# num_ctx demandé. Ollama coupe sans prévenir un prompt plus long que num_ctx.
+_dernier = threading.local()
+MARGE_FENETRE = 32          # tokens : en deçà, la fenêtre est considérée pleine
+# num_ctx jamais trop petit (D189) : estimation prudente du prompt (mesuré
+# avec ministral-3:3b : 4,1 à 4,3 caractères par token en français), plus
+# la réponse, arrondie au millier ; jamais moins que IA_NUM_CTX, jamais plus
+# que PLAFOND_NUM_CTX (16 384 : 3,3 Go pour ministral-3:3b, mesuré)
+CARACTERES_PAR_TOKEN = 3.0
+SORTIE_PREVUE = 1024
+PLAFOND_NUM_CTX = 16384
+
+
+def num_ctx_pour(messages, max_tokens=None) -> int:
+    """num_ctx à demander à Ollama : IA_NUM_CTX, ou davantage si le prompt
+    estimé n'y tient pas avec sa réponse (multiple de 1024, plafonné)."""
+    caracteres = sum(len(str(m.get("content") or "")) for m in messages)
+    besoin = int(caracteres / CARACTERES_PAR_TOKEN) + (max_tokens or SORTIE_PREVUE)
+    besoin = -(-besoin // 1024) * 1024
+    if besoin > PLAFOND_NUM_CTX:
+        journaliser(f"  ⚠️  Prompt d'environ {int(caracteres / CARACTERES_PAR_TOKEN)} tokens : au-delà de "
+                    f"{PLAFOND_NUM_CTX}, Ollama risque de le couper.")
+    return min(max(ia_num_ctx(), besoin), max(ia_num_ctx(), PLAFOND_NUM_CTX))
+
+
+def dernier_appel() -> dict:
+    """{"prompt_eval_count", "eval_count", "num_ctx", "fenetre_pleine"} du
+    dernier appel réussi de ce fil ({} avant le premier)."""
+    return dict(getattr(_dernier, "infos", {}))
+
+
+def _noter_compteurs(reponse: httpx.Response, corps: dict, modele: str):
+    try:
+        donnees = reponse.json()
+    except ValueError:
+        return
+    if not isinstance(donnees, dict):
+        return
+    usage = donnees.get("usage") if isinstance(donnees.get("usage"), dict) else {}
+    prompt = donnees.get("prompt_eval_count", usage.get("prompt_tokens"))
+    sortie = donnees.get("eval_count", usage.get("completion_tokens"))
+    num_ctx = (corps.get("options") or {}).get("num_ctx")
+    pleine = bool(num_ctx and isinstance(prompt, int) and prompt + (sortie or 0) >= num_ctx - MARGE_FENETRE)
+    # load_duration (ns) : temps de chargement du modèle pour cet appel ; plus
+    # d'une seconde, Ollama a (re)chargé le modèle (num_ctx changé, D193)
+    chargement = donnees.get("load_duration")
+    _dernier.infos = {"prompt_eval_count": prompt, "eval_count": sortie, "num_ctx": num_ctx, "fenetre_pleine": pleine,
+                      "load_duration_s": round(chargement / 1e9, 2) if isinstance(chargement, (int, float)) else None,
+                      "total_duration_s": round(donnees["total_duration"] / 1e9, 2)
+                      if isinstance(donnees.get("total_duration"), (int, float)) else None}
+    if pleine:
+        journaliser(f"  ⚠️  Fenêtre de contexte pleine pour « {modele} » : {prompt} tokens lus + {sortie} écrits, "
+                    f"num_ctx {num_ctx}. Ollama a pu couper le prompt sans prévenir : augmente IA_NUM_CTX.")
 
 
 def _poster(url: str, corps: dict, entetes: dict, delai: float) -> httpx.Response:
@@ -197,9 +251,11 @@ def _requete(modele: str, messages, schema_json: dict | None, options: dict) -> 
     if "tools" in options and schema_json is not None:
         raise ValueError("« tools » et un format de sortie ne s'envoient jamais ensemble.")
     temperature, max_tokens = options.pop("temperature", None), options.pop("max_tokens", None)
+    num_ctx = options.pop("num_ctx", None)     # imposé par l'appelant (analyse, D193)
     base = ia_base_url()
     if ia_api() == "ollama":
-        reglages = {"num_ctx": ia_num_ctx()}
+        # num_ctx imposé par l'appelant (analyse, D194) : tel quel ; sinon estimé
+        reglages = {"num_ctx": num_ctx or num_ctx_pour(messages, max_tokens)}
         if temperature is not None:
             reglages["temperature"] = temperature
         if max_tokens:
@@ -299,6 +355,7 @@ def appeler_ia(messages, *, usage="analyse", modele=None, tentatives=2, attente=
         else:
             if reponse.status_code < 400:
                 texte, reflexion = _contenu(reponse)
+                _noter_compteurs(reponse, corps, modele)
                 if reflexion and not ia_reflexion():
                     raise ErreurIABloquante(
                         f"La réflexion de « {modele} » n'est pas coupée malgré la demande (texte de réflexion "

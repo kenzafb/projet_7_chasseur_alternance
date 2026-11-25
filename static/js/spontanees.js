@@ -8,7 +8,7 @@ let stats = null;
 let compte = null;    // compte d'envoi (mode test affiché en bandeau)
 let aValider = [];    // entreprises aux emails non validés par l'IA
 let filtre = "pretes";
-let source = "all";   // all | sirene | lba
+let source = "all";   // origine : all | coeur | transverse | lba | autre (D190)
 const aujourdhui = () => new Date().toLocaleDateString("sv-SE");   // AAAA-MM-JJ, jour local
 
 /* Contacts de l'entreprise dans les autres modes : simple étiquette,
@@ -55,24 +55,30 @@ function boutonLba(e) {
 }
 
 /* Onglet d'une entreprise à contacter : email trouvé, formulaire LBA, ou rien */
-const ongletDe = e => e.email ? "pretes" : e.lba?.formulaire ? "lba" : "aucun";
+const ongletDe = e => e.email ? "pretes" : e.lba?.formulaire ? "lba" : lienSur(e.carrieres) ? "carrieres" : "aucun";
 const AIDES = {
   pretes: "Leur email est trouvé : le Chasseur peut leur envoyer ta candidature (étape 3).",
   lba: "Pas d'email, mais un formulaire sur La Bonne Alternance. Postule là-bas, puis indique-le ici.",
+  carrieres: "Grandes entreprises (500 salariés et plus) : elles recrutent par leur site carrières. Postule là-bas, ce n'est pas un échec.",
   aucun: "Pas d'email gardé : site non vérifié, ou formulaire de contact seulement (lien sur l'entreprise).",
   faites: "Elles sont aussi dans tes Candidatures, où tu suis leurs réponses.",
 };
-const SOURCES = { sirene: "Sirene", lba: "La Bonne Alternance" };
+/* Pourquoi l'entreprise est là (D190) : origines calculées par le serveur */
+const deLOrigine = e => source === "all" || !Array.isArray(e.origines)
+  || e.origines.some(o => o.cle === source || (source === "autre" && ["secteur", "tous", "sirene"].includes(o.cle)));
+const CLASSE_ORIGINE = { coeur: "chip--vert", transverse: "chip--gris", lba: "chip--lba" };
+const etiquettesOrigine = e => (e.origines || []).map(o =>
+  ` <span class="chip ${CLASSE_ORIGINE[o.cle] || "chip--gris"}">${esc(o.texte)}</span>`).join("");
 const ETAPES_SUIVI = { envoye: "envoyée", a_relancer: "à relancer", relancee: "relancée", entretien: "entretien",
   reponse: "réponse reçue", acceptee: "acceptée", refus: "refusée", bounce: "adresse invalide" };
 let contactees = [];   // candidatures spontanées envoyées (suivi)
 
 function ligne(e) {
-  const sources = (e.sources || []).map(s => SOURCES[s] || s).join(" et ");
   const onglet = ongletDe(e);
   const detail = onglet === "pretes"
     ? `Email trouvé : ${esc(e.email)}${e.email_lba ? " (fourni par La Bonne Alternance)" : ""}`
     : onglet === "lba" ? "Formulaire de candidature sur La Bonne Alternance"
+    : onglet === "carrieres" ? "Grande entreprise : candidature sur son site carrières"
     : (e.adresses || []).length ? "Adresses à vérifier, voir plus haut"
     : e.formulaire ? "Pas d'email, mais un formulaire de contact sur son site"
     : e.site_non_verifie ? "Site non vérifié : ni son SIREN ni son nom trouvés sur un site, aucun email gardé"
@@ -84,11 +90,13 @@ function ligne(e) {
   return `<li class="ent" data-search-text="${esc(recherche)}">
       <span class="ent__initiale" aria-hidden="true">${esc((e.nom || "?").trim()[0] || "?")}</span>
       <div class="ent__corps">
-        <p class="ent__nom">${esc(e.nom || "Entreprise sans nom")}${etiquettesAutresModes(e)}</p>
-        <p class="ent__detail">${detail}${sources ? ` · ${esc(sources)}` : ""}${e.ville ? ` · ${esc(e.ville)}` : ""}</p>
+        <p class="ent__nom">${esc(e.nom || "Entreprise sans nom")}${e.nom_etablissement ? ` <span class="ent__etablissement">· ${esc(e.nom_etablissement)}</span>` : ""}${etiquettesAutresModes(e)}</p>
+        <p class="ent__detail ent__origines">${etiquettesOrigine(e)}</p>
+        <p class="ent__detail">${detail}${e.ville ? ` · ${esc(e.ville)}` : ""}</p>
         ${onglet === "pretes" && (e.adresses || []).length > 1 ? `<details class="ent__adresses"><summary>Ses ${e.adresses.length} adresses</summary>${listeAdresses(e.adresses)}</details>`
           : onglet === "pretes" && (e.adresses || []).length ? `<p class="ent__detail">${etiquetteAdresse(e.adresses[0])}</p>` : ""}
         ${boutonLba(e)}
+        ${onglet === "carrieres" ? `<div class="ent__actions"><a class="btn btn--sm" href="${esc(lienSur(e.carrieres))}" target="_blank" rel="noopener">Postuler sur leur site carrières<span class="visuellement-cache"> (nouvel onglet)</span></a></div>` : ""}
         ${formulaire}
       </div>
     </li>`;
@@ -113,7 +121,7 @@ function rendreTable() {
   // Les prochaines entreprises (ordre de la recherche d'emails et de l'envoi) ;
   // une fois contactées, elles sont dans Candidatures (D110)
   const prochaines = stats.prochaines || [];
-  const compte = { pretes: 0, lba: 0, aucun: 0, faites: contactees.length };
+  const compte = { pretes: 0, lba: 0, carrieres: 0, aucun: 0, faites: contactees.length };
   prochaines.forEach(e => { compte[ongletDe(e)]++; });
   for (const [k, n] of Object.entries(compte)) {
     const nb = document.querySelector(`[data-sp-nombre="${k}"]`);
@@ -123,9 +131,8 @@ function rendreTable() {
     b.setAttribute("aria-pressed", String(b.dataset.filter === filtre)));
   const aide = document.querySelector("[data-sp-aide]");
   if (aide) aide.textContent = AIDES[filtre] || "";
-  const deSource = e => source === "all" || (e.sources || []).includes(source);
-  const items = filtre === "faites" ? contactees.filter(deSource).map(ligneContactee)
-    : prochaines.filter(e => ongletDe(e) === filtre && deSource(e)).map(ligne);
+  const items = filtre === "faites" ? contactees.filter(deLOrigine).map(ligneContactee)
+    : prochaines.filter(e => ongletDe(e) === filtre && deLOrigine(e)).map(ligne);
   el.innerHTML = items.length ? items.join("") : '<li class="ent-liste__vide">Rien ici pour l\'instant.</li>';
 }
 
