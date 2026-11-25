@@ -5,7 +5,7 @@
 
 /* ── Boutons ─────────────────────────────────────────────────────────────── */
 /* Secondaire par défaut (blanc, bordure) ; une seule action principale
-   (verte, .btn--primary) par écran. .btn--signal : ancien nom du vert. */
+   (couleur du mode, .btn--primary) par écran. .btn--signal : son ancien nom. */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 40px; padding: 8px 14px;
@@ -40,7 +40,7 @@
 }
 .chip--ft { background: var(--accent-doux);    color: var(--accent-survol); }
 .chip--lba { background: var(--fond-neutre);    color: var(--texte-3); }
-.chip--vert { background: var(--accent-doux);    color: var(--accent-survol); }
+.chip--vert { background: var(--succes-fond);    color: var(--succes-texte); }
 .chip--ambre { background: var(--attention-fond); color: var(--attention); }
 .chip--rouge { background: var(--refus-fond);     color: var(--refus); }
 .chip--gris { background: var(--neutre-fond);    color: var(--neutre); }
@@ -69,7 +69,7 @@
 .runbar.is-on .runbar__progress { display: flex; }
 .runbar__progress-track {
   flex: 1; height: 6px; border-radius: var(--r-pill);
-  background: #C6E2DE; overflow: hidden;
+  background: var(--accent-bordure); overflow: hidden;
 }
 .runbar__progress-bar {
   height: 100%; width: 0%;

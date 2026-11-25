@@ -6,7 +6,7 @@
 :root {
   --fond: #F7F8F7; --surface: #FFFFFF; --bordure-champ: #D7DDDB;
   --texte: #17201F; --texte-2: #56625F;
-  --accent: #0F766E; --accent-survol: #0B5A54; --accent-doux: #E3F1EF;
+  /* --accent* : modes.css */
   --clair-sur-vert: #EEF8F6;   /* 5,0:1 sur l'accent (les verts pâles de la maquette sont sous 4,5:1) */
   --refus: #8A2E2E; --refus-fond: #F3E8E8;
   --attention: #7A4A00; --attention-fond: #FCEFD8;
@@ -27,7 +27,7 @@ a:hover { color: var(--accent-survol); }
 }
 .auth__panneau :focus-visible { outline-color: #FFFFFF; }
 .auth__marque { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 22px; letter-spacing: -0.02em; }
-.auth__logo { width: 38px; height: 38px; border-radius: 11px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; }
+.auth__logo { width: 38px; height: 38px; border-radius: 11px; background: #FFFFFF; color: var(--accent); display: flex; align-items: center; justify-content: center; }
 .auth__logo svg { width: 20px; height: 20px; }
 .auth__accroche { max-width: 460px; display: flex; flex-direction: column; gap: 18px; font-size: 17px; color: var(--clair-sur-vert); }
 .auth__phrase { font-size: 38px; line-height: 1.12; font-weight: 700; letter-spacing: -0.025em; color: #FFFFFF; }
@@ -59,13 +59,15 @@ a:hover { color: var(--accent-survol); }
 .auth__lien-bouton { background: none; border: 0; padding: 8px; font: inherit; font-weight: 600; color: var(--accent); cursor: pointer; text-decoration: underline; }
 
 .auth__modes { list-style: none; display: flex; flex-direction: column; gap: 10px; }
-.auth__mode {
+.auth__mode {   /* chaque mode dans sa couleur (data-mode-lien, modes.css) */
   display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border-radius: 14px;
-  border: 1px solid var(--bordure-champ); background: var(--surface); color: var(--texte); text-decoration: none; font-weight: 400;
+  border: 1px solid var(--accent-bordure); border-left: 5px solid var(--accent);
+  background: var(--surface); color: var(--texte); text-decoration: none; font-weight: 400;
 }
-.auth__mode strong { font-size: 17px; }
+.auth__mode strong { font-size: 17px; color: var(--accent); }
 .auth__mode span { font-size: 14px; color: var(--texte-2); }
-.auth__mode:hover { border-color: var(--accent); color: var(--texte); }
+.auth__mode:hover { border-color: var(--accent); background: var(--accent-doux); color: var(--texte); }
+.auth__mode:hover strong { color: var(--accent-survol); }
 .auth__badge { align-self: flex-start; margin-top: 4px; padding: 1px 8px; border-radius: 999px;
   background: var(--attention-fond); color: var(--attention) !important; font-weight: 700; }
 

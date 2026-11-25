@@ -16,7 +16,6 @@ MODES = {
     "alternance": {
         "label": "Chasseur d'Alternance",
         "mot_poste": "alternance",        # pour les textes ("offre d'alternance"...)
-        "couleur": "bleu",
         "sources": ["france_travail", "lba"],   # les deux sources
         # France Travail (SPEC_SOURCES 2.1) : apprentissage et professionnalisation,
         # aucun filtre de qualification ; domaines du profil (indifférent : aucun)
@@ -26,7 +25,6 @@ MODES = {
     "job": {
         "label": "Chasseur de Job",
         "mot_poste": "job",               # "offre de job", "mission"...
-        "couleur": "orange",
         "sources": ["france_travail"],    # FT seulement (pas d'alternance → pas de LBA)
         # France Travail : CDD, intérim, saisonnier ; aucun filtre de qualification
         # (qualification=0 écartait les offres « X », 61 % du total en IDF) ni
@@ -39,7 +37,6 @@ MODES = {
     "stage": {
         "label": "Chasseur de Stage",
         "mot_poste": "stage",
-        "couleur": "vert",
         # Pas de LBA (alternance uniquement). France Travail n'a ni type ni
         # nature de contrat « stage » : mots-clés « stage » et « stagiaire »,
         # une requête chacun, réunies et dédoublonnées (D152), alternance

@@ -77,7 +77,7 @@ def test_page_stage(stagiaire):
     assert 'data-mode-section="stage"' in page and 'type="date" data-profil="date_debut"' in page
     assert "{date_debut}" in page and "{duree_semaines}" in page       # aide des balises du stage
     assert "La Bonne Alternance (fort potentiel" not in page            # pas de LBA en stage
-    assert client.get("/api/mode").json() == {"mode": "stage", "label": "Chasseur de Stage", "couleur": "vert"}
+    assert client.get("/api/mode").json() == {"mode": "stage", "label": "Chasseur de Stage"}
 
 
 def test_balises_du_stage_absentes_ailleurs(utilisateur):

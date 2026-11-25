@@ -1104,3 +1104,9 @@ Une certification choisie dans la liste suggérée remplissait le champ sans tou
 
 ### D209. Description France Travail : coupure journalisée
 - La limite de 10 000 caractères reste ; pour chaque nouvelle offre coupée, une ligne dans le journal de la recherche (longueur et caractères gardés).
+
+### D210. Une couleur d'accent par mode
+- Alternance inchangée (#0F766E), stage violet (#534AB7), job terracotta (#993C1D). Valeurs dans `static/css/modes.css`, chargé par `base.html` et `auth_base.html` ; le reste du CSS n'utilise que les variables. Tableau et contrastes dans DESIGN.md.
+- Plusieurs états empruntaient l'accent (note « Bien », ✓ « Ce qui colle », messages de réussite, « validée », « complet », confirmation de lancement). Ils ont leurs propres variables `--succes*`, vertes dans tous les modes.
+- Champ `couleur` de `shared/modes.py` (bleu, orange, vert) supprimé, ainsi que dans la réponse de `/api/mode` : l'interface n'en lisait que le mode. La couleur d'un mode n'est plus écrite que dans `modes.css`.
+- Remplace D143 sur ce point (« un seul accent vert »).

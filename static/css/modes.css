@@ -1,0 +1,31 @@
+/* ============================================================================
+   modes.css — couleur d'accent de chaque mode
+   Chargé en premier par base.html et auth_base.html. Seul endroit où les
+   teintes d'accent sont écrites. <html data-mode="…"> colore la page ; les
+   liens vers un mode (data-mode-btn du sélecteur, data-mode-lien du choix du
+   mode) prennent la couleur de LEUR mode, quelle que soit la page.
+   Sans mode (connexion, inscription, choix du mode) : celle de l'alternance.
+   Les états (--succes, --attention, --refus) ne dépendent pas du mode.
+   ============================================================================ */
+:root,
+[data-mode="alternance"], [data-mode-btn="alternance"], [data-mode-lien="alternance"] {
+  --accent:         #0F766E;   /* 5,5:1 sur blanc, 4,7:1 sur le fond doux */
+  --accent-survol:  #0B5A54;   /* aussi le texte sur fond doux : 6,9:1 */
+  --accent-doux:    #E3F1EF;   /* fond pâle */
+  --accent-moyen:   #CFE7E3;   /* survol du fond pâle */
+  --accent-bordure: #C6E2DE;   /* bordure et piste de jauge sur fond pâle */
+}
+[data-mode="stage"], [data-mode-btn="stage"], [data-mode-lien="stage"] {
+  --accent:         #534AB7;   /* 6,9:1 sur blanc, 6,0:1 sur le fond doux */
+  --accent-survol:  #3C3489;   /* 8,9:1 sur le fond doux */
+  --accent-doux:    #EEEDFE;
+  --accent-moyen:   #DEDCFB;
+  --accent-bordure: #CECBF6;
+}
+[data-mode="job"], [data-mode-btn="job"], [data-mode-lien="job"] {
+  --accent:         #993C1D;   /* 7,0:1 sur blanc, 6,0:1 sur le fond doux */
+  --accent-survol:  #712B13;   /* 8,9:1 sur le fond doux */
+  --accent-doux:    #FAECE7;
+  --accent-moyen:   #F5DCD2;
+  --accent-bordure: #F2CDBE;
+}

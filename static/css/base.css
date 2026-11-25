@@ -2,7 +2,7 @@
    base.css — Chasseur
    Jetons · reset · typographie · en-tête et cadre de page (D143)
    Référence : docs/maquettes/DESIGN.md. Simple et lisible, une action
-   principale verte par écran, contraste du texte d'au moins 4,5:1.
+   principale (couleur du mode) par écran, contraste du texte d'au moins 4,5:1.
    ============================================================================ */
 
 /* ── Jetons ──────────────────────────────────────────────────────────────── */
@@ -19,10 +19,10 @@
   --texte-2:        #56625F;   /* secondaire (6,3:1 sur blanc) */
   --texte-3:        #3E4846;   /* tertiaire */
 
-  /* Action et accent */
-  --accent:         #0F766E;   /* 5,5:1 avec du texte blanc */
-  --accent-survol:  #0B5A54;
-  --accent-doux:    #E3F1EF;
+  /* Action et accent : --accent*, par mode, dans modes.css */
+
+  /* Réussite, note « Bien » : vert dans tous les modes */
+  --succes:         #0F766E;  --succes-texte:   #0B5A54;  --succes-fond: #E3F1EF;
 
   /* Attention (à relancer, à compléter), refus, note neutre */
   --attention:      #7A4A00;  --attention-fond: #FCEFD8;
@@ -83,16 +83,17 @@ ul { list-style: none; }
 .marque__logo svg { width: 18px; height: 18px; }
 .marque__nom { font-weight: 700; font-size: 20px; letter-spacing: -0.02em; }
 
-/* Sélecteur de mode en pilule, point de couleur sur le mode ouvert */
+/* Sélecteur de mode en pilule : chaque mode dans sa couleur (modes.css),
+   point de couleur sur le mode ouvert */
 .modes { display: flex; gap: 2px; padding: 4px; background: var(--fond-neutre); border-radius: var(--r-pill); }
 .modes__lien {
   display: flex; align-items: center; gap: 7px;
   padding: 7px 14px; border-radius: var(--r-pill);
-  color: var(--texte-2); text-decoration: none; font-weight: 600; font-size: 14px;
+  color: var(--accent); text-decoration: none; font-weight: 600; font-size: 14px;
 }
-.modes__lien:hover { color: var(--texte); }
+.modes__lien:hover { color: var(--accent-survol); }
 .modes__lien[aria-current] {
-  background: var(--surface); color: var(--texte); font-weight: 700;
+  background: var(--surface); color: var(--accent-survol); font-weight: 700;
   box-shadow: 0 1px 2px rgba(23,32,31,.12);
 }
 .modes__lien[aria-current]::before {
@@ -124,7 +125,7 @@ ul { list-style: none; }
   background: var(--accent-doux); color: var(--accent-survol);
   font-weight: 700; font-size: 14px;
 }
-.compte__rond:hover, .compte__rond[aria-expanded="true"] { background: #CFE7E3; }
+.compte__rond:hover, .compte__rond[aria-expanded="true"] { background: var(--accent-moyen); }
 .compte__menu {
   position: absolute; right: 0; top: calc(100% + 8px); z-index: 30;
   min-width: 220px; padding: 6px;
@@ -174,7 +175,7 @@ ul { list-style: none; }
   display: none; flex-wrap: wrap; align-items: center; gap: 10px 14px;
   padding: 12px 16px; margin-bottom: 16px;
   background: var(--accent-doux); color: var(--accent-survol);
-  border: 1px solid #C6E2DE; border-radius: var(--r-carte);
+  border: 1px solid var(--accent-bordure); border-radius: var(--r-carte);
   font-size: 14px;
 }
 .runbar.is-on { display: flex; }
@@ -210,7 +211,7 @@ ul { list-style: none; }
     border: 1px solid var(--bordure); border-radius: var(--r-carte); box-shadow: var(--ombre-menu);
   }
   .modes-tel__lien { display: block; min-height: 44px; padding: 11px 12px; border-radius: var(--r-champ);
-    color: var(--texte); font-weight: 600; text-decoration: none; }
+    color: var(--accent); font-weight: 600; text-decoration: none; }
   .modes-tel__lien[aria-current] { background: var(--accent-doux); color: var(--accent-survol); }
 
   /* Barre d'onglets en bas */
