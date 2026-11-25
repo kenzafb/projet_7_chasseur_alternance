@@ -162,6 +162,17 @@ def domaine_dans_texte(domaine, texte: str) -> str:
     return domaine if _fenetres(domaine, texte) else ""
 
 
+def texte_sans_souhait(texte: str) -> str:
+    """Le texte sans ses phrases qui parlent d'expérience au souhait seulement
+    (« 2 ans d'expérience souhaités », « idéalement 3 ans ») : une durée qui
+    n'est écrite que là n'est pas exigée (D212 ; alternance inchangée)."""
+    from shared.eligibilite import MARQUEURS_SOUHAIT
+    from shared.exigences import MARQUEURS_EXIGENCE
+    phrases = re.split(r"\n|(?<=[.!?;])\s", texte)
+    return "\n".join(p for p in phrases
+                     if not MARQUEURS_SOUHAIT.search(p.lower()) or MARQUEURS_EXIGENCE.search(p.lower()))
+
+
 def ligne_domaine(domaine: str, texte: str) -> str:
     """Ligne d'un domaine extrait sans nombre d'années : complète la ligne
     « exigée » de France Travail, ou seule si le passage porte un mot
@@ -178,7 +189,7 @@ def ligne_domaine(domaine: str, texte: str) -> str:
     return ""
 
 
-def lignes_extraites(extraction: dict, offre: dict) -> list[str]:
+def lignes_extraites(extraction: dict, offre: dict, mode: str = "") -> list[str]:
     """Exigences extraites, gardées seulement si le texte de l'offre les porte,
     écrites comme les lignes structurées (shared/exigences.py)."""
     from shared.exigences import DIPLOME_ETAT, familles
@@ -188,7 +199,8 @@ def lignes_extraites(extraction: dict, offre: dict) -> list[str]:
     annees = extraction.get("experience_exigee_annees")
     domaine = domaine_dans_texte(extraction.get("experience_exigee_domaine"), texte)
     suite = f" - {domaine}" if domaine else ""
-    if annees and int(annees) in annees_dans_texte(texte):   # en chiffres, en lettres, en fourchette (D176)
+    if annees and int(annees) in annees_dans_texte(
+            texte if mode == "alternance" else texte_sans_souhait(texte)):   # en chiffres, en lettres, en fourchette (D176)
         out.append(f"Expérience : {int(annees)} An(s){suite} (exigée)")
     elif domaine and (ligne := ligne_domaine(domaine, texte)):
         out.append(ligne)
@@ -301,7 +313,7 @@ def analyser_offre_v2(offre, profil, mode="alternance", modele=None, essais=2, t
     }
     result["verdict"] = score_to_verdict(result["score"])
     # Exigences extraites du texte libre : contrôlées, puis jugées par les mêmes règles Python
-    lignes = lignes_extraites(extraction, offre)
+    lignes = lignes_extraites(extraction, offre, mode)
     offre_vue = {**offre, "description": (offre.get("description") or "") + "".join(f"\n{x}" for x in lignes)}
     appliquer_eligibilite(result, offre_vue, profil, mode, malus_souhait=False)
     if result["eligible"]:

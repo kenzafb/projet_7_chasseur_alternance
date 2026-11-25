@@ -16,7 +16,8 @@ Les offres La Bonne Alternance, dans offer.access_conditions (lignes
 
 Profil (profils.recherche, communs aux trois modes, D169) : permis (codes,
 ou « aucun »), experience_mois (total), certifications (libellés) ; en job,
-experience_domaines (mois par domaine, D211) remplace experience_mois. Une
+experience_domaines (mois par domaine, D211) remplace experience_mois ; en
+stage, experience_mois est le plafond (D212). Une
 information absente de l'offre ne bloque jamais ; un permis ou une
 expérience non renseignés dans le profil non plus. Les certifications
 exigées absentes du profil bloquent : le profil les liste toutes.
@@ -292,6 +293,23 @@ def raison_experience_domaine(offre: dict, domaines: dict[str, int]) -> str:
     return ""
 
 
+_ZERO = re.compile(r"(?<!\d)0\s*(?:an|mois)", re.I)
+
+
+def raison_experience_totale(offre: dict, mois_profil: int | None) -> str:
+    """Stage (D212) : raison d'inéligibilité d'une offre qui exige
+    plus que « Expérience professionnelle, en mois », ou "". Champ vide, débutant
+    accepté, expérience souhaitée, « 0 An(s) » ou sans durée : rien."""
+    description = offre.get("description") or ""
+    exigee = experience_demandee(description)
+    if mois_profil is None or exigee is None or any(
+            _exigee(x) and _ZERO.search(x) for x in _lignes(description, "Expérience : ")):
+        return ""
+    if exigee[0] > mois_profil:
+        return f"Expérience exigée trop longue ({_duree(exigee[0])}, {_duree(mois_profil)} au plus)"
+    return ""
+
+
 def raisons(offre: dict, profil: dict, mode: str, crans_profil: int | None) -> list[str]:
     """Raisons d'inéligibilité tirées des exigences structurées de l'offre."""
     description = offre.get("description") or ""
@@ -320,6 +338,8 @@ def raisons(offre: dict, profil: dict, mode: str, crans_profil: int | None) -> l
     if mode == "job" and p["experience_domaines"]:
         if raison := raison_experience_domaine(offre, p["experience_domaines"]):
             out.append(raison)
+    elif mode == "stage" and (raison := raison_experience_totale(offre, p["experience_mois"])):
+        out.append(raison)
     elif mois is not None:
         if mode == "alternance" and mois >= ANNEES_ALTERNANCE:
             out.append(f"{mois // 12} ans d'expérience exigés : ce n'est pas une alternance")
