@@ -25,7 +25,7 @@ def _config(**env):
 def test_defauts():
     c = _config()
     assert c == {"data": str(RACINE / "data"), "uploads": str(RACINE / "data" / "uploads"),
-                 "pdf": str(RACINE / "lettres_pdf"), "db": f"sqlite:///{RACINE / 'data' / 'chasseur_v2.db'}"}
+                 "pdf": str(RACINE / "data" / "lettres_pdf"), "db": f"sqlite:///{RACINE / 'data' / 'chasseur_v2.db'}"}
     assert "chasseur.db" not in c["db"].replace("chasseur_v2.db", "")   # jamais l'ancienne base
 
 
@@ -33,6 +33,7 @@ def test_dossiers_reglables(tmp_path):
     c = _config(DATA_DIR=str(tmp_path / "donnees"), LETTRES_PDF_DIR="pdf_local")
     assert c["data"] == str(tmp_path / "donnees")
     assert c["uploads"] == str(tmp_path / "donnees" / "uploads")          # suit DATA_DIR
+    assert _config(DATA_DIR=str(tmp_path / "donnees"))["pdf"] == str(tmp_path / "donnees" / "lettres_pdf")   # D197
     assert c["pdf"] == str(RACINE / "pdf_local")                          # relatif : depuis le projet
     assert c["db"] == f"sqlite:///{tmp_path / 'donnees' / 'chasseur_v2.db'}"
     c = _config(DATA_DIR=str(tmp_path), UPLOADS_DIR=str(tmp_path / "pj"), DATABASE_URL="sqlite:////ailleurs/b.db")

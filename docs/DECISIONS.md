@@ -1041,3 +1041,8 @@ Une certification choisie dans la liste suggérée remplissait le champ sans tou
 - `audit_exports/` est ignoré par git : aucune référence n'était versionnée.
 - `scraper_reference.json` (entreprises, SIREN, sites officiels : données publiques) passe dans `scripts/references/`, versionné ; `audit_scraper.py`, `mesurer_wikidata.py` et `mesurer_moteurs_recherche.py` le lisent là par défaut (`audit_commun.REFERENCES`).
 - Non versionnées, laissées dans `audit_exports/` : `banc_reference.json`, `banc_reglage.json`, `banc_test.json`, `banc_test_profils_a_jour.json` (profils complets des utilisateurs 1, 3, 4 et 5, état des candidatures) et `banc_emails_reference.json` (adresse nominative d'un tiers). Les scripts qui les lisent les reçoivent en argument : rien à changer.
+
+### D197. Lettres PDF rangées dans DATA_DIR/lettres_pdf (ménage)
+- Défaut de `LETTRES_PDF_DIR` : `DATA_DIR/lettres_pdf` au lieu de `lettres_pdf/` à la racine ; une valeur dans le `.env` reste prioritaire.
+- La base stocke le chemin relatif à ce dossier (`candidatures.lettre_pdf`, « user_<id>/lettre_<hex>.pdf ») : aucune migration, seuls les fichiers bougent.
+- `scripts/deplacer_lettres_pdf.py` : lecture seule par défaut (4 fichiers de user_1 à déplacer chez toi), `--appliquer` déplace, sous-dossiers compris, sans jamais écraser un fichier déjà présent ; application arrêtée.
