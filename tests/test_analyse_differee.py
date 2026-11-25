@@ -144,7 +144,7 @@ def test_offre_deplacee_par_l_utilisateur_pas_archivee(alice, ia):
         '"niveau_exigence": "non_precise"', '"niveau_exigence": "exige"')
     lancer(client, uid)
     o = lire_candidature(uid, "A")
-    assert (o["statut"], o["score"], o["verdict"]) == ("en_cours", 3, "ineligible")
+    assert (o["statut"], o["score"], o["verdict"]) == ("en_cours", None, "ineligible")
 
 
 # ─── Échecs : rien d'inventé ─────────────────────────────────────────────────
@@ -320,7 +320,7 @@ def test_mots_cles_avant_l_ia(alice, ia):
     assert len(ia.appels) == 1 and "Poste A" in texte_envoye(ia.appels[0])
     b = lire_candidature(uid, "B")
     assert (b["statut"], b["raison_archivage"], b["verdict"]) == ("archive", "public_specifique", "non_analysee")
-    assert "1 archivées par mots-clés sans IA" in etat["message"]
+    assert "1 archivées par les règles sans IA" in etat["message"]
 
 
 @pytest.mark.parametrize("mode", ["alternance", "job", "stage"])

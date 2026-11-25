@@ -44,7 +44,8 @@ from database.dates import instant_depuis_api
 from offres import parametres_lba as P
 from shared.liens import lien_http
 from shared.marques import NIVEAU_DIFFERENT, ORGANISME_FORMATION, ajouter_marque
-from shared.config import DEPTS_IDF, DEPTS_PETITE_COURONNE, LBA_CENTRES, LBA_RAYON_MIN_KM, LBA_REQUETES_MAX
+from shared.config import (DEPTS_IDF, DEPTS_PETITE_COURONNE, LBA_CENTRES, LBA_RAYON_MIN_KM, LBA_REQUETES_MAX,
+                           ia_longueur_description)
 from shared.criteres import normaliser_recherche
 from shared.domaines import codes_metiers, domaines_du_profil
 from shared.niveaux import NIVEAUX, niveau_europeen
@@ -95,6 +96,17 @@ def _localiser(adresse: str):
 
 
 # ─── Normalisation ────────────────────────────────────────────────────────────
+def _description(offer: dict, titre: str) -> str:
+    """Description de l'offre, sous le même plafond de sécurité que celle lue
+    par l'IA (IA_LONGUEUR_DESCRIPTION, D206) ; une coupure est journalisée."""
+    texte = offer.get("description") or ""
+    plafond = ia_longueur_description()
+    if len(texte) > plafond:
+        journaliser(f"  ⚠️  Description LBA coupée ({titre[:50]}) : {len(texte)} caractères, gardés : {plafond} "
+                    "(IA_LONGUEUR_DESCRIPTION)")
+    return texte[:plafond]
+
+
 def _normaliser_offre_lba(offre: dict) -> dict | None:
     """Offre au format des candidatures ; None hors IDF ou sans titre."""
     workplace = offre.get("workplace") or {}
@@ -119,7 +131,7 @@ def _normaliser_offre_lba(offre: dict) -> dict | None:
         "domaine":      "Non analysé",
         "lien":         lien,
         "source":       "La Bonne Alternance",
-        "description":  ((offer.get("description") or "")[:5000]
+        "description":  (_description(offer, titre)
                          + (f"\n{LIGNE_SITE}{site}" if (site := lien_http(workplace.get("website"))) else "")
                          + "".join(f"\n{x}" for x in lignes_experience(offer.get("access_conditions")))),
         "date_trouvee": instant_depuis_api((offer.get("publication") or {}).get("creation")),

@@ -1068,3 +1068,28 @@ Une certification choisie dans la liste suggérée remplissait le champ sans tou
 - Constat : en stage, `criteres_eviter` était admis comme preuve d'un « Hors sujet » (`CHAMPS_EXCLUSION`), mais n'était ni affiché dans « Mon profil » ni envoyé à l'IA.
 - Même colonne qu'en alternance (pas de migration), propre au mode (jamais copiée). Profil, « Ce que tu cherches » : « Ce que tu préfères éviter ». Remplie, elle part dans le contexte du stage (« Préfère éviter », v1 et v2) et l'étape 1 du jugement v2 en fait un motif de hors sujet, comme en alternance ; vide, le prompt est inchangé.
 - Mesure (4 offres RH, marketing, comptabilité, jugement seul, température 0,1, champ rempli en mémoire ; 2 passages, décision finale relevée au second) : « Hors sujet » 4/4, mais la phrase citée vient encore des missions visées 3 fois sur 4 et Python rétrograde ces 3 offres en « Faible ». Le champ ne suffit donc pas seul.
+
+### D202. Stage : niveau minimal au-dessus de Bac+3 = inéligible
+- Demande : stages de 1re ou 2e année, 3e au plus. En mode stage, si `niveau_detecte` (Python, borne basse d'une fourchette) dépasse Bac+3, exigé ou souhaité, l'offre est inéligible (« Bac+5 souhaité, Bac+3 au plus en stage »). Sans niveau écrit, rien ne bloque. Un profil déjà au-dessus de Bac+3 garde son propre niveau comme plafond. La règle d'avant (deux crans au-dessus, exigé) reste.
+- Banc (27 stages) : 19 touchées, toutes annotées Bac+4 ou plus ; 12 déjà annotées inéligibles, 7 écartées en plus (dont la n° 13, Bien, et la n° 137, Moyen : accepté).
+
+### D203. Stage : code métier ROME enregistré, hors informatique archivé
+- `romeCode` est donné par l'API pour chaque offre (audit du 23/11 : 600/600 job, 56/56 alternance, 140/140 stage). Il est enregistré à la récupération dans `candidatures.code_rome` (migration 0018, vide pour les lignes existantes).
+- Mode stage : code connu hors de M18, ou cartographie et météo (M1808, M1809, M1888, M1890, M1891, M1893), archivé sans IA avec la raison `hors_informatique` et la marque « Hors informatique (code métier) », filtrable dans les écartées. Gardée si l'intitulé contient un mot informatique entier ; code inconnu : gardée. Règle dans `shared/metiers_informatique.py`, appliquée à la récupération et avant l'analyse ; le bouton « Faire noter à nouveau » n'en dépend pas.
+- Un profil de stage qui a choisi des domaines sans M18 n'est pas concerné ; avec M18 et d'autres domaines, ceux-ci sont gardés.
+- Mesure sur les 50 offres de la base (codes lus sur les pages publiques à l'étape précédente, la base n'en avait pas) : 37 archivées, 13 gardées dont 7 par leur intitulé (trois offres « Développement RH » en profitent). Banc : 1 Hors sujet écarté (n° 123), aucun autre.
+
+### D204. Règles Python avant l'IA
+- Ordre : mots-clés et code métier, puis `raisons_sans_ia` (exigences structurées, niveau, niveau maximal en stage, diplôme préparé en alternance, durée et début en stage quand Python les lit seul), puis l'IA si l'offre reste éligible. Une offre écartée ainsi a le verdict `ineligible`, ses raisons dans « Ce qui coince », et pas de note (`score` vide, affiché « – »).
+- Durée et début lus seulement dans une tournure sûre (« stage de 6 mois », « durée : 4 à 6 mois » : borne basse, « à partir de janvier 2027 ») ; une durée plus courte ailleurs, une souplesse (« flexible », « ou février ») ou un mois de la période du profil dans le texte laissent l'offre à l'IA.
+- Banc (137 offres), règles Python seules : aucun faux inéligible en job (3 écartées) ni en alternance (5) ; en stage 19 écartées, dont les 7 de D202.
+- Temps mesuré, les 50 offres de stage, une à une, hors base : avant 1 244 s (50 offres lues par l'IA, 24,9 s chacune) ; après 88 s (37 écartées par le code métier, 8 par les règles, 5 lues par l'IA, 17,7 s chacune). Codes métier fournis à la mesure : les 50 lignes de la base n'en ont pas. Sans eux, l'IA lirait 16 offres sur 50, qui ont pris 373 s dans la mesure « avant ». Profil modifié par l'utilisatrice entre les deux mesures (M18 recoché, « à éviter » rempli) : cela touche le prompt de jugement, pas les offres écartées.
+- `analyser_offre(regles_d_abord=False)` pour les scripts qui mesurent le modèle (`verifier_ia_locale`, `tracer_niveau`) ; les bancs appellent directement la v2.
+
+### D205. Champs de l'IA gardés jusqu'à la base
+- `points_forts` n'était pas perdu : vide parce que le modèle n'en donne pas pour une offre hors sujet (vérifié sur la réponse brute). Un test couvre le trajet.
+- `hors_sujet_car` était perdu entre la réponse et la base : gardé dans `candidatures.hors_sujet_car` (migration 0018), même quand Python rétrograde le Hors sujet en Faible ; « aucune » donne vide.
+- Missions visées comme preuve de Hors sujet en stage : mesuré, **non codé** (condition non remplie). Profil du banc (M18, anciennes missions) : aucun changement (5 justes, 6 faux, moitié test 2 et 4). Profil actuel (domaines indifférents) : 0 gardé avant, après 5 justes et 11 faux (moitié test 2 et 6), dont le stage C++ (n° 17), le front-end (n° 137) et les stages cyber (n° 127, 130).
+
+### D206. Description LBA : plafond IA_LONGUEUR_DESCRIPTION, coupure journalisée
+- La récupération LBA coupait à 5 000 caractères en silence. Elle garde maintenant la description sous le plafond de l'IA (20 000 par défaut), et une coupure est journalisée. Les offres déjà en base ne changent pas.

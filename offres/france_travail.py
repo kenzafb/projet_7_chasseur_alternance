@@ -317,6 +317,13 @@ def _normaliser(bruts: list, log=journaliser) -> list:
     return offres
 
 
+def code_rome(offre: dict) -> str:
+    """Code métier ROME de l'offre (romeCode, donné par l'API pour chaque
+    offre), "" s'il manque ou n'a pas la forme attendue (D203)."""
+    code = str(offre.get("romeCode") or "").strip().upper()
+    return code if re.fullmatch(r"[A-Z]\d{4}", code) else ""
+
+
 def _normaliser_une(offre: dict) -> dict | None:
     """Offre au format des candidatures, None hors IDF."""
     # Lien de l'offre d'origine, seulement s'il est http(s) (D132)
@@ -395,6 +402,7 @@ def _normaliser_une(offre: dict) -> dict | None:
         "lien":         lien,
         "source":       "France Travail",
         "description":  desc,
+        "code_rome":    code_rome(offre),
         "date_trouvee": instant_depuis_api(offre.get("dateCreation")),
         "score":        0,
         "lettre":       "",

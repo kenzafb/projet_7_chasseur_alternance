@@ -251,6 +251,9 @@ def analyser_offre_v2(offre, profil, mode="alternance", modele=None, essais=2, t
         **{k: extraction[k] for k in ("niveau_requis", "niveau_exigence", "duree_mois", "date_debut_offre",
                                       "alternance_seulement")},
         "extraction": extraction,
+        # Gardée même rétrogradée en Faible (D205) ; « aucune » : rien
+        "hors_sujet_car": "" if jugement["hors_sujet_car"].strip(" .«»").lower() in ("aucune", "aucun")
+        else jugement["hors_sujet_car"].strip(),
     }
     result["verdict"] = score_to_verdict(result["score"])
     # Exigences extraites du texte libre : contrôlées, puis jugées par les mêmes règles Python

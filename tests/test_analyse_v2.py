@@ -44,7 +44,7 @@ def test_mot_converti_en_note():
 def test_plafond_niveau_souhaite(ia):
     ia.file = [_extraction(niveau_requis="bac+5", niveau_exigence="souhaite"), _jugement("Très bien")]
     offre = {"titre": "Stage", "description": "Idéalement en école d'ingénieurs (Bac+5)."}
-    r = analyser_offre_v2(offre, PROFIL, "stage")
+    r = analyser_offre_v2(offre, PROFIL, "job")        # en stage : inéligible (D202)
     assert (r["score"], r["eligible"]) == (5, True) and r["points_faibles"][0] == "Bac+5 souhaité, profil Bac+2"
 
 

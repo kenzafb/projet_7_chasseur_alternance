@@ -18,6 +18,7 @@ const aujourdhui = () => new Date().toLocaleDateString("sv-SE");   // AAAA-MM-JJ
 const RAISONS_CHASSEUR = {
   ineligible: "conditions non remplies", note_basse: "note trop basse", hors_domaine: "hors de tes domaines",
   ecole_cfa: "école ou CFA", public_specifique: "réservée à un public", stage: "pas un stage",
+  hors_informatique: "hors informatique (code métier)",
 };
 
 let cache = [];                  // offres chargées
@@ -37,10 +38,14 @@ function ongletDe(o) {
   return "avoir";
 }
 
+/* Décidée par les règles Python avant l'IA (D204) : pas de note */
+const sansNote = o => o.verdict !== NON_ANALYSEE && o.score == null;
+
 /* Note : 6 et plus vert (Bien), 4 et 5 ambre (Moyen), moins de 4 neutre
    (Faible), toujours avec un mot (DESIGN.md) */
 function ton(o) {
   if (o.verdict === NON_ANALYSEE) return { classe: "attente", mot: "Pas notée", verdict: "Pas encore notée par le Chasseur" };
+  if (sansNote(o)) return { classe: "faible", mot: "Écartée", verdict: "Écartée par les règles, sans être notée" };
   const n = o.score ?? 0;
   if (n >= 6) return { classe: "bien", mot: "Bien", verdict: "Correspond assez bien à ton profil" };
   if (n >= 4) return { classe: "moyen", mot: "Moyen", verdict: "Correspond en partie à ton profil" };
@@ -74,7 +79,7 @@ function passeFiltres(o) {
   if (filtres.marque === "sans_organisme" && marques.includes("organisme_formation")) return false;
   if (!["all", "sans_organisme"].includes(filtres.marque) && !marques.includes(filtres.marque)) return false;
   if (filtres.score !== "all") {
-    if (o.verdict === NON_ANALYSEE) return false;
+    if (o.verdict === NON_ANALYSEE || sansNote(o)) return false;
     const n = o.score ?? 0;
     if (filtres.score === "haut" && n < 6) return false;
     if (filtres.score === "moyen" && (n < 4 || n > 5)) return false;
@@ -107,11 +112,11 @@ function ligne(o) {
   return `<li class="offres__item" data-id="${esc(o.id)}" data-search-text="${esc(recherche)}">
     <button type="button" class="offre-ligne${nonVue ? " offre-ligne--nouvelle" : ""}" data-ouvrir
             ${o.id === choisie ? 'aria-current="true"' : ""}>
-      <span class="note note--${t.classe}" aria-hidden="true">${o.verdict === NON_ANALYSEE ? "?" : esc(o.score ?? 0)}</span>
+      <span class="note note--${t.classe}" aria-hidden="true">${o.verdict === NON_ANALYSEE ? "?" : sansNote(o) ? "–" : esc(o.score ?? 0)}</span>
       <span class="offre-ligne__txt">
         <span class="offre-ligne__titre">${esc(o.titre || "Offre sans titre")}</span>
         <span class="offre-ligne__lieu">${esc(lieu)}</span>
-        <span class="visuellement-cache">${o.verdict === NON_ANALYSEE ? "Pas encore notée"
+        <span class="visuellement-cache">${o.verdict === NON_ANALYSEE ? "Pas encore notée" : sansNote(o) ? "Écartée sans être notée"
           : `Notée ${esc(o.score ?? 0)} sur 10, ${t.mot.toLowerCase()}`}${nonVue ? ", pas encore vue" : ""}</span>
       </span>
       ${nonVue ? '<span class="offre-ligne__point" aria-hidden="true"></span>' : ""}
@@ -180,7 +185,7 @@ function rendreVolet() {
       ${o.etiquettes.map(e => `<li class="etiquette">${esc(e)}</li>`).join("")}</ul>` : ""}
 
     <div class="verdict verdict--${t.classe}">
-      ${nonNotee ? "" : `<span class="verdict__note">${esc(o.score ?? 0)}<small>/10</small></span>`}
+      ${nonNotee || sansNote(o) ? "" : `<span class="verdict__note">${esc(o.score ?? 0)}<small>/10</small></span>`}
       <span class="verdict__txt"><strong>${esc(t.mot)}</strong> · ${esc(t.verdict)}</span>
       ${nonNotee && IA_ACTIVE ? '<button type="button" class="btn btn--sm" data-act="analyser">Noter cette offre</button>' : ""}
     </div>
@@ -189,7 +194,7 @@ function rendreVolet() {
     ${o.statut === "archive" ? `<p class="volet__ecartee">${raison === "manuel" ? "Écartée par toi."
       : `Écartée par le Chasseur : ${esc(RAISONS_CHASSEUR[raison] || raison)}.`}</p>` : ""}
 
-    ${nonNotee ? "" : `
+    ${nonNotee || sansNote(o) ? "" : `
     <div class="volet__colonnes">
       <section><h3 class="volet__h3">Ce qui colle</h3>${liste(colle, "Rien de particulier.", "colle")}</section>
       <section><h3 class="volet__h3">Ce qui coince</h3>${liste(coince, "Rien de particulier.", "coince")}</section>

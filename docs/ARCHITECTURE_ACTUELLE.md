@@ -1,11 +1,11 @@
 # Architecture actuelle : le Chasseur
 
-État au 25 novembre 2026, après les phases 15 et 16 et le ménage (branche `menage`). L'état des lieux du 7 octobre, d'avant la refonte, est dans `docs/historique/ARCHITECTURE_2026-10-07.md`. Les raisons de chaque choix sont dans `docs/DECISIONS.md` (D1 à D201).
+État au 25 novembre 2026, après les phases 15 et 16 et le ménage (branche `menage`). L'état des lieux du 7 octobre, d'avant la refonte, est dans `docs/historique/ARCHITECTURE_2026-10-07.md`. Les raisons de chaque choix sont dans `docs/DECISIONS.md` (D1 à D206).
 
 ## 1. En bref
 - Application web FastAPI multi-utilisateurs : `venv/bin/uvicorn main:app --port 5002`. Pages Jinja et modules JavaScript, sans framework.
 - Trois modes par utilisateur : alternance, job et stage. Chaque mode a son profil, ses offres, ses entreprises et son suivi.
-- Base SQLite par SQLAlchemy 2, schéma tenu par Alembic (migrations 0001 à 0017). Les données hors dépôt sont dans `DATA_DIR` (défaut `data/`).
+- Base SQLite par SQLAlchemy 2, schéma tenu par Alembic (migrations 0001 à 0018). Les données hors dépôt sont dans `DATA_DIR` (défaut `data/`).
 - IA locale par Ollama (`ministral-3:3b` pour l'analyse et les emails, `ministral-3:8b` pour la lettre) ; un serveur compatible OpenAI est possible (`IA_API`).
 
 ## 2. Arborescence
@@ -42,9 +42,10 @@ shared/                 Règles sans IA et outils communs
   validation_emails.py    Tri des adresses : règles d'abord, l'IA seulement pour les douteuses
   naf.py, domaines.py     Domaines du profil -> codes NAF Sirene ; origine d'une entreprise (D190)
   marques.py              Étiquettes des offres (niveau différent, organisme de formation, description longue)
+  metiers_informatique.py  Stage : code métier ROME hors informatique (D203)
   referentiels/           Données versionnées : correspondance NAF, domaines interdits, métiers de conduite...
 templates/, static/     Pages Jinja (partials par page) ; JS en modules ES, un par page ; CSS en trois fichiers
-alembic/                Migrations 0001 à 0017
+alembic/                Migrations 0001 à 0018
 scripts/                Outils lancés à la main, jamais par l'application
   audit_*.py, mesurer_*.py  Mesures de la phase 15 et 16 (lecture seule, sorties dans audit_exports/)
   banc_ia/                Bancs de l'IA (analyse, emails, lettre), voir_texte_ia.py

@@ -40,7 +40,7 @@ StatutCandidature = Literal["nouveau", "en_cours", "gardee", "envoye", "a_relanc
                             "reponse", "acceptee", "refus", "archive"]
 # « a_relancer » : statut de suivi commun aux offres et aux spontanées (D107)
 RaisonArchivage = Literal["manuel", "note_basse", "ineligible", "ecole_cfa", "hors_domaine", "public_specifique",
-                          "stage"]
+                          "stage", "hors_informatique"]
 
 class MajStatut(BaseModel):
     model_config = ConfigDict(extra="forbid")

@@ -59,7 +59,9 @@ def _lancer_analyse(user_id: int, mode: str, maximum: int, note: str = "") -> bo
             fin = (f"{bilan['analysees']} offres analysées, {bilan['archivees']} archivées, "
                    f"{bilan['sautees']} sautées")
             if bilan["mots_cles"]:
-                fin += f", {bilan['mots_cles']} archivées par mots-clés sans IA"
+                fin += f", {bilan['mots_cles']} archivées par les règles sans IA"
+            if bilan["sans_ia"]:
+                fin += f", {bilan['sans_ia']} inéligibles sans IA"
             commun.pipelines.maj(ANALYSE, user_id, message=("Arrêtée : " if bilan["arret"] else "Terminée : ") + fin)
             log(f"✅ Analyse terminée : {fin}")
         except ErreurIABloquante as e:

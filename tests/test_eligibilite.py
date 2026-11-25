@@ -97,7 +97,8 @@ def reponse(score, **champs):
 def test_analyse_plafonnee_avec_la_raison(ia):
     ia.reponse = reponse(9, niveau_requis="bac+5", duree_mois=6, date_debut_offre="janvier 2027",
                          niveau_exigence="exige")
-    a = analyser_offre({"titre": "Stage ingénieur", "description": O1_TEXTE}, BUT2, mode="stage")
+    a = analyser_offre({"titre": "Stage ingénieur", "description": O1_TEXTE}, BUT2, mode="stage",
+                       regles_d_abord=False)
     assert (a["score"], a["eligible"], a["verdict"]) == (3, False, "ineligible")
     assert a["raison_ineligibilite"].startswith("Bac+5 exigé, profil Bac+2 ; 6 mois demandés")
     assert a["points_faibles"][0] == "Inéligible : Bac+5 exigé, profil Bac+2" and a["points_faibles"][-1] == "b"
@@ -142,7 +143,8 @@ def test_archive_ineligible_motif_filtre_et_retour(utilisateur, ia):
     ia.reponse = reponse(8, niveau_requis="bac+5", niveau_exigence="exige")
     assert client.post("/api/analyser", json={"id": "O1"}).status_code == 200
     o = lire_candidature(uid, "O1", mode="stage")
-    assert (o["statut"], o["raison_archivage"], o["score"]) == ("archive", "ineligible", 3)
+    assert (o["statut"], o["raison_archivage"], o["score"]) == ("archive", "ineligible", None)   # sans IA (D204)
+    assert ia.appels == []
     assert o["points_faibles"][0] == "Inéligible : Bac+5 exigé, profil Bac+2"
     # Remise dans les offres actives
     assert client.post("/api/offre/archivage", json={"id": "O1", "desarchiver": True}).json()["ok"]
@@ -165,7 +167,7 @@ MOSS = ("Missions : supervision réseau, scripts d'exploitation. Profil : vous �
 
 def test_ohana_niveau_souhaite_eligible(ia):
     ia.reponse = reponse(8, niveau_requis="bac+5", niveau_exigence="exige")    # le modèle se trompe d'exigence
-    a = analyser_offre({"titre": "Stage DevOps", "description": OHANA}, BUT2, mode="stage")
+    a = analyser_offre({"titre": "DevOps", "description": OHANA}, BUT2, mode="job")
     assert (a["eligible"], a["niveau_exigence"], a["raison_ineligibilite"]) == (True, "souhaite", "")
     assert a["score"] == 6 and a["points_faibles"][0] == "Bac+5 souhaité, profil Bac+2"   # 3 crans : -2
 
@@ -175,7 +177,7 @@ def test_moss_derniere_annee_d_ecole_d_ingenieurs_exige(ia):
     d'ingénieurs ou Master 2 » vaut Bac+5 exigé, sans mot d'exigence :
     inéligible pour un BUT2."""
     ia.reponse = reponse(8, niveau_requis="bac+5", niveau_exigence="souhaite")
-    a = analyser_offre({"titre": "Stage réseau", "description": MOSS}, BUT2, mode="stage")
+    a = analyser_offre({"titre": "Stage réseau", "description": MOSS}, BUT2, mode="stage", regles_d_abord=False)
     assert (a["eligible"], a["niveau_exigence"], a["score"]) == (False, "exige", 3)
     assert a["raison_ineligibilite"] == "Bac+5 exigé, profil Bac+2"
 
@@ -184,7 +186,8 @@ def test_moss_derniere_annee_d_ecole_d_ingenieurs_exige(ia):
                                     "Bac+5 impérativement.", "Niveau requis : Bac+5.", "Bac+5 indispensable."])
 def test_marqueur_explicite_exige_ineligible(ia, phrase):
     ia.reponse = reponse(8, niveau_requis="bac+5", niveau_exigence="souhaite")
-    a = analyser_offre({"titre": "Stage réseau", "description": MOSS + " " + phrase}, BUT2, mode="stage")
+    a = analyser_offre({"titre": "Stage réseau", "description": MOSS + " " + phrase}, BUT2, mode="stage",
+                       regles_d_abord=False)
     assert (a["eligible"], a["niveau_exigence"], a["score"]) == (False, "exige", 3)
     assert a["raison_ineligibilite"] == "Bac+5 exigé, profil Bac+2"
 
@@ -208,7 +211,7 @@ def test_duree_du_profil_recopiee_ecartee(ia):
                        mode="stage")
     assert a["duree_mois"] is None and a["extraits_ecartes"] == ["duree_mois 2.5 absente de l'offre"]
     ia.reponse = reponse(8, duree_mois=6)
-    a = analyser_offre({"titre": "Stage", "description": "Stage de 6 mois."}, BUT2, mode="stage")
+    a = analyser_offre({"titre": "Stage", "description": "Stage de 6 mois."}, BUT2, mode="stage", regles_d_abord=False)
     assert a["duree_mois"] == 6 and not a["eligible"]
 
 
@@ -269,7 +272,7 @@ def test_souhait_a_deux_crans_un_point():
 def test_ohana_non_precise_par_le_modele_bac5_souhaite(ia):
     """Cas réel : OHana ressort non_precise chez les deux modèles."""
     ia.reponse = reponse(8)                                   # niveau_requis non_precise
-    a = analyser_offre({"titre": "Stage DevOps", "description": OHANA}, BUT2, mode="stage")
+    a = analyser_offre({"titre": "DevOps", "description": OHANA}, BUT2, mode="job")
     assert (a["niveau_requis"], a["niveau_exigence"], a["eligible"]) == ("bac+5", "souhaite", True)
     assert a["score"] == 6 and a["points_faibles"][0] == "Bac+5 souhaité, profil Bac+2"
     assert "remplacé par bac+5 (souhaite)" in a["extraits_ecartes"][0]
@@ -278,7 +281,7 @@ def test_ohana_non_precise_par_le_modele_bac5_souhaite(ia):
 def test_moss_non_precise_par_le_modele_bac5_exige(ia):
     """Secours D100 : le modèle ne lit rien, Python lit Bac+5, exigé (D177)."""
     ia.reponse = reponse(8)
-    a = analyser_offre({"titre": "Stage réseau", "description": MOSS}, BUT2, mode="stage")
+    a = analyser_offre({"titre": "Stage réseau", "description": MOSS}, BUT2, mode="stage", regles_d_abord=False)
     assert (a["niveau_requis"], a["niveau_exigence"], a["eligible"]) == ("bac+5", "exige", False)
 
 
