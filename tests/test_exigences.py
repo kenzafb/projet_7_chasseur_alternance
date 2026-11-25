@@ -235,3 +235,31 @@ def test_permis_implicite_et_aucun_permis():
     assert X.raisons(bus, _profil(permis=["aucun"]), "job", 0) == ["permis exigé, tu n'as pas de permis"]
     assert X.raisons(bus, _profil(permis=["D"]), "job", 0) == []
     assert X.raisons(bus, _profil(), "job", 0) == []
+
+
+# ─── D195 : diplôme préparé lu par Python, en alternance ────────────────────
+def test_diplome_prepare_lu_par_python():
+    from shared.eligibilite import niveau_prepare
+    texte = ("Dans le cadre de la préparation du titre Architecte des Systèmes d'Information - Bac+5, niveau 7, "
+             "nous recherchons un(e) alternant(e). Vous êtes titulaire d'un Bac+3 en informatique.")
+    assert niveau_prepare(texte) == "bac+5"
+    assert niveau_prepare("Vous souhaitez poursuivre vos études en Bac+5 - Architecte SI.") == "bac+5"
+    assert niveau_prepare("Vous préparez un BTS SIO en alternance.") == "bac+2"
+    # Niveau d'entrée seul, sans diplôme préparé : rien
+    assert niveau_prepare("Vous êtes titulaire d'un Bac+3. Préparation des commandes.") is None
+    # Indice dans une autre phrase que le déclencheur : rien
+    assert niveau_prepare("Vous préparez les livraisons. Un Master est un plus.") is None
+
+
+def test_architecte_bac5_prepare_ineligible_sans_l_ia():
+    from shared.eligibilite import raisons_ineligibilite
+    offre = {"titre": "Architecte logiciel et développement applicatif (H/F)",
+             "description": "Dans le cadre de la préparation du titre Architecte des Systèmes d'Information - Bac+5, "
+                            "niveau 7, nous recherchons un(e) alternant(e). Vous êtes titulaire d'un Bac+3."}
+    profil = {"niveau_vise": "DEUST (Bac+2)", "niveau_etudes": "Bac"}
+    # L'IA lit « bac+3 souhaité » : Python lit quand même le Bac+5 préparé
+    extraits = {"niveau_requis": "bac+3", "niveau_exigence": "souhaite"}
+    assert "diplôme préparé Bac+5, niveau visé Bac+2" in raisons_ineligibilite(extraits, profil, "alternance", offre)
+    # Profil qui vise un Bac+4 : un cran d'écart, toléré (D178)
+    assert not [r for r in raisons_ineligibilite(extraits, {"niveau_vise": "Master 1"}, "alternance", offre)
+                if "préparé" in r]

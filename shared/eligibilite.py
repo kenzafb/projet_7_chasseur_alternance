@@ -266,6 +266,26 @@ def lire_debut_offre(texte) -> tuple[date, bool] | None:
 
 
 ECART_ALTERNANCE_PREPARE = 1      # crans au-dessus du niveau visé tolérés en alternance (D178)
+# Diplôme préparé lu par Python (D195) : un indice de niveau dans la même phrase,
+# peu après « préparation (du titre, du diplôme...) », « préparer »,
+# « préparez », « préparant » ou « poursuivre vos études en »
+DECLENCHEUR_PREPARE = re.compile(r"\bpr[ée]par(?:ation|er|ez|ant|e)\b|\bpoursuivre (?:vos|ses|tes|leurs|son|votre) [ée]tudes en\b")
+FENETRE_PREPARE = 100
+
+
+def niveau_prepare(texte: str) -> str | None:
+    """Plus haut niveau du diplôme préparé que nomme la description
+    (« préparation du titre Architecte des SI - Bac+5 », « poursuivre vos
+    études en Bac+5 ») ; None sans mention. Fenêtre coupée à la fin de la
+    phrase : « titulaire d'un Bac+3 » plus loin ne compte pas."""
+    texte = texte.replace("’", "'")
+    niveaux = []
+    for m in DECLENCHEUR_PREPARE.finditer(texte.lower()):
+        fenetre = texte[m.end():m.end() + FENETRE_PREPARE]
+        fenetre = re.split(r"[.!?;]\s|\n|\*\*\*", fenetre)[0]
+        niveaux += [max(permis, key=CRANS.get) for _, permis in _indices(fenetre)]
+    return max(niveaux, key=CRANS.get) if niveaux else None
+
 
 
 def raisons_ineligibilite(extraits: dict, profil: dict, mode: str, offre: dict | None = None) -> list[str]:
@@ -284,6 +304,10 @@ def raisons_ineligibilite(extraits: dict, profil: dict, mode: str, offre: dict |
     if mode == "alternance" and not niveau_bloque:
         vise = crans_texte(profil.get("niveau_vise") or "")
         requis = CRANS.get(extraits.get("niveau_requis") or "non_precise")
+        # Diplôme préparé lu par Python, sans dépendre de l'IA (D195) : le plus haut des deux
+        prepare = CRANS.get(niveau_prepare(_texte(offre)) or "non_precise") if offre is not None else None
+        if prepare is not None and (requis is None or prepare > requis):
+            requis = prepare
         if requis is not None and vise and requis - max(vise) > ECART_ALTERNANCE_PREPARE:
             raisons.append(f"diplôme préparé {LIBELLES[requis]}, niveau visé {LIBELLES[max(vise)]}")
     if mode in ("stage", "job") and extraits.get("alternance_seulement"):
