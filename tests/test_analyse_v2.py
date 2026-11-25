@@ -116,3 +116,27 @@ def test_v2_par_defaut_dans_l_application(ia, monkeypatch):
     assert (r["categorie"], r["score"], len(ia.appels)) == ("Bien", 7, 2)
     monkeypatch.setenv("IA_VERSION_ANALYSE", "v1")
     assert ia_version_analyse() == "v1"
+
+
+def test_stage_ce_qu_il_prefere_eviter(ia):
+    """D201 : le champ « à éviter » du stage est envoyé au jugement et peut
+    rendre une offre hors sujet ; vide, le prompt est inchangé."""
+    from offres.analyse_v2 import EVITER_STAGE, hors_sujet_justifie, messages_jugement
+    offre = {"titre": "Stage RH", "description": "Recrutement."}
+    vide = messages_jugement(offre, {**PROFIL, "criteres_eviter": ""}, "stage", 2000)[1]["content"]
+    assert vide == messages_jugement(offre, PROFIL, "stage", 2000)[1]["content"]
+    assert "Préfère éviter" not in vide and EVITER_STAGE not in vide
+    profil = {**PROFIL, "criteres_eviter": "ressources humaines, marketing, commerce"}
+    rempli = messages_jugement(offre, profil, "stage", 2000)[1]["content"]
+    assert "- Préfère éviter : ressources humaines, marketing, commerce" in rempli and EVITER_STAGE in rempli
+    assert hors_sujet_justifie("Préfère éviter : ressources humaines", profil, "stage")
+    # Les autres modes gardent leur règle
+    job = messages_jugement(offre, profil, "job", 2000)[1]["content"]
+    assert EVITER_STAGE not in job and "Préfère éviter" not in job
+
+
+def test_stage_champ_eviter_enregistre(utilisateur):
+    client, _ = utilisateur("a@test.fr", prenom="Ada")
+    client.post("/api/profil?mode=stage", json={"criteres_eviter": "marketing"})
+    assert client.get("/api/profil?mode=stage").json()["criteres_eviter"] == "marketing"
+    assert client.get("/api/profil?mode=alternance").json()["criteres_eviter"] == ""

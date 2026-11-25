@@ -143,6 +143,7 @@ def contexte_stage(profil) -> str:
         ("Expérience", _court(profil.get("experience"))),
         ("Projets", _projets(profil)),
         ("Période du stage", periode or "non précisée"),
+        ("Préfère éviter", _court(profil.get("criteres_eviter"))),
         ("Domaines recherchés", _domaines(profil) or "ceux qui correspondent aux missions visées"),
     ])
 

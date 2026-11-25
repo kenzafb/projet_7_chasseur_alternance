@@ -1,6 +1,6 @@
 # Architecture actuelle : le Chasseur
 
-État au 25 novembre 2026, après les phases 15 et 16 et le ménage (branche `menage`). L'état des lieux du 7 octobre, d'avant la refonte, est dans `docs/historique/ARCHITECTURE_2026-10-07.md`. Les raisons de chaque choix sont dans `docs/DECISIONS.md` (D1 à D200).
+État au 25 novembre 2026, après les phases 15 et 16 et le ménage (branche `menage`). L'état des lieux du 7 octobre, d'avant la refonte, est dans `docs/historique/ARCHITECTURE_2026-10-07.md`. Les raisons de chaque choix sont dans `docs/DECISIONS.md` (D1 à D201).
 
 ## 1. En bref
 - Application web FastAPI multi-utilisateurs : `venv/bin/uvicorn main:app --port 5002`. Pages Jinja et modules JavaScript, sans framework.
