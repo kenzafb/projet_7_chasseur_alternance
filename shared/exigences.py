@@ -15,7 +15,8 @@ Les offres La Bonne Alternance, dans offer.access_conditions (lignes
 « Conditions d'accès : ... », exigées par nature).
 
 Profil (profils.recherche, communs aux trois modes, D169) : permis (codes,
-ou « aucun »), experience_mois (total), certifications (libellés). Une
+ou « aucun »), experience_mois (total), certifications (libellés) ; en job,
+experience_domaines (mois par domaine, D211) remplace experience_mois. Une
 information absente de l'offre ne bloque jamais ; un permis ou une
 expérience non renseignés dans le profil non plus. Les certifications
 exigées absentes du profil bloquent : le profil les liste toutes.
@@ -25,6 +26,8 @@ import re
 import unicodedata
 from functools import lru_cache
 from pathlib import Path
+
+from shared import domaines_experience
 
 # Niveaux des formations France Travail (référentiel niveauxFormations) -> crans (bac = 0)
 NIVEAUX_FORMATION = {
@@ -123,6 +126,34 @@ def experience_exigee(description: str) -> int | None:
     return None
 
 
+_DUREE_LIGNE = re.compile(r"(\d+(?:[.,]\d+)?)\s*(?:(an)(?:\(s\)|n[ée]es?|s)?|mois)(?![a-zé])", re.I)
+_SANS_EXIGENCE = re.compile(r"^(?:d[ée]butant accept[ée]|exp[ée]rience souhait[ée]e)|\((?:souhait[ée]e|d[ée]butant accept[ée])\)\s*$",
+                            re.I)
+
+
+def experience_demandee(description: str) -> tuple[int, str] | None:
+    """(mois, domaine écrit) de l'expérience exigée (D211) ; 0 mois sans durée,
+    "" sans domaine ; None si rien n'est exigé, si un débutant est accepté ou
+    si l'expérience est seulement souhaitée. La ligne de France Travail
+    (« 2 An(s) - En cuisine collective (exigée) ») passe avant celle de
+    l'extraction, qui complète la durée ou le domaine manquant."""
+    lignes = list(_lignes(description, "Expérience : "))
+    if any(_SANS_EXIGENCE.search(x) for x in lignes):
+        return None
+    exigees = [x for x in lignes if _exigee(x) or x.lower().startswith("expérience exigée")]
+    if not exigees:
+        return None
+    mois, domaine = 0, ""
+    for ligne in exigees:
+        texte = re.sub(r"\((?:exig[ée]e?|indispensable)\)\s*$", "", ligne)
+        if (m := _DUREE_LIGNE.search(texte)) and not mois:
+            n = float(m.group(1).replace(",", "."))
+            mois = round(n * 12 if m.group(2) else n)
+        texte = re.sub(r"^\s*exp[ée]rience exig[ée]e", "", _DUREE_LIGNE.sub(" ", texte), flags=re.I).strip(" -–:")
+        domaine = domaine or texte
+    return mois, domaine
+
+
 def formations_exigees(description: str) -> list[tuple[int, str]]:
     """(crans, libellé) des formations exigées (« (indispensable) »)."""
     out = []
@@ -174,7 +205,8 @@ def annees_dans_texte(texte: str) -> set[int]:
 # ─── Profil ───────────────────────────────────────────────────────────────────
 def du_profil(profil: dict) -> dict:
     """{permis: set | None (non renseigné), experience_mois: int | None,
-    certifications: set de familles, diplome_etat: bool}."""
+    experience_domaines: {domaine: mois} (job, D211), certifications: set de
+    familles, diplome_etat: bool}."""
     rech = (profil or {}).get("recherche") or {}
     permis = rech.get("permis")
     texte = " ".join(str(profil.get(c) or "") for c in ("formation", "niveau_etudes"))
@@ -182,6 +214,8 @@ def du_profil(profil: dict) -> dict:
     return {
         "permis": None if not permis else ({p for p in permis if p != "aucun"}),
         "experience_mois": rech.get("experience_mois") if isinstance(rech.get("experience_mois"), int) else None,
+        "experience_domaines": {e["domaine"]: e["mois"] for e in domaines_experience.normaliser(
+            rech.get("experience_domaines"))},
         "certifications": set().union(*(familles(c) for c in certifs)) if certifs else set(),
         "diplome_etat": bool(DIPLOME_ETAT.search(texte) or any(DIPLOME_ETAT.search(c) for c in certifs)),
     }
@@ -198,10 +232,10 @@ PLAFOND_RESERVE = 5        # note de « Moyen »
 def reserves(offre: dict, profil: dict, mode: str) -> list[str]:
     """Exigences qui ne rendent pas inéligible mais plafonnent la note à
     Moyen, avec leur message pour « Ce qui coince » (D174)."""
-    if mode != "job":
+    p = du_profil(profil)
+    if mode != "job" or p["experience_domaines"]:      # par domaine (D211) : exigée et tenue, ou inéligible
         return []
     mois = experience_exigee(offre.get("description") or "")
-    p = du_profil(profil)
     if mois and p["experience_mois"] is not None and 0 < mois - p["experience_mois"] <= ECART_EXPERIENCE_JOB_MOIS:
         return [f"Expérience demandée : {_duree(mois)}"]
     return []
@@ -238,6 +272,26 @@ def poste_senior(offre: dict, mode: str) -> bool:
     return bool(POSTE_SENIOR.search(offre.get("titre") or ""))
 
 
+def raison_experience_domaine(offre: dict, domaines: dict[str, int]) -> str:
+    """Job, « Mon expérience par domaine » rempli (D211) : raison
+    d'inéligibilité, ou "". Domaine exigé (à défaut celui de l'intitulé) parmi
+    les miens et durée tenue dans ce domaine ; domaine inconnu : durée comparée
+    à mon maximum. Aucune tolérance."""
+    exigee = experience_demandee(offre.get("description") or "")
+    if exigee is None:
+        return ""
+    mois, texte = exigee
+    reconnus, precise = domaines_experience.classer(texte, offre.get("titre") or "")
+    if precise and not reconnus & set(domaines):
+        ecrit = texte if domaines_experience.classer(texte)[1] else f"intitulé {offre.get('titre') or ''}"
+        detail = ", ".join(x for x in (_duree(mois) if mois else "", ecrit) if x)
+        return f"Expérience exigée dans un autre domaine ({detail})"
+    maximum = max(m for d, m in domaines.items() if not precise or d in reconnus)
+    if mois > maximum:
+        return f"Expérience exigée trop longue ({_duree(mois)}, {_duree(maximum)} au plus)"
+    return ""
+
+
 def raisons(offre: dict, profil: dict, mode: str, crans_profil: int | None) -> list[str]:
     """Raisons d'inéligibilité tirées des exigences structurées de l'offre."""
     description = offre.get("description") or ""
@@ -263,7 +317,10 @@ def raisons(offre: dict, profil: dict, mode: str, crans_profil: int | None) -> l
     if mode != "alternance" and diplome_etat_exige(description) and not p["diplome_etat"]:
         out.append("diplôme d'État exigé")
     mois = experience_exigee(description)
-    if mois is not None:
+    if mode == "job" and p["experience_domaines"]:
+        if raison := raison_experience_domaine(offre, p["experience_domaines"]):
+            out.append(raison)
+    elif mois is not None:
         if mode == "alternance" and mois >= ANNEES_ALTERNANCE:
             out.append(f"{mois // 12} ans d'expérience exigés : ce n'est pas une alternance")
         elif (mode == "job" and p["experience_mois"] is not None

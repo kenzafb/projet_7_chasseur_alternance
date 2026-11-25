@@ -215,7 +215,7 @@ def test_poste_senior_d_un_organisme_de_formation_garde():
 def test_m2_cite_sans_contexte_n_est_pas_exige():
     """D180 (cas Adjoint en scolarité) : « entrée en Master 1 et Master 2 » n'exige rien."""
     from shared.eligibilite import niveau_detecte
-    assert niveau_detecte("Gérer les dossiers d'entrée en Master 1 et Master 2.")[1] == "souhaite"
+    assert niveau_detecte("Gérer les dossiers d'entrée en Master 1 et Master 2.") is None       # une mission (D211)
     assert niveau_detecte("Les étudiants de M1 et M2 suivent le cours.") == ("bac+4", "souhaite")
 
 

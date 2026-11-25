@@ -1,0 +1,26 @@
+# Domaines d'expérience (D211) : « Mon expérience par domaine » du profil job,
+# comparé au domaine d'expérience qu'une offre exige.
+# Une ligne par domaine : clé | libellé affiché | synonymes séparés par des virgules.
+# Synonymes comparés en minuscules et sans accents, sur des mots entiers, au
+# singulier comme au pluriel. Un texte peut relever de plusieurs domaines.
+# Tests : tests/test_job_plafonds.py.
+relation_client | Relation client (accueil, vente, caisse, téléphone) | relation client, relation clientele, contact client, contact clientele, service client, service clientele, accueil, vente, vendeur, vendeuse, caisse, caissier, caissiere, encaissement, hote, hotesse, conseiller, conseillere, conseil client, conseil clientele, charge de clientele, chargee de clientele, commerce, commercial, commerciale, grande distribution, boutique, standard, standardiste, receptionniste, telephonie, teleconseil, teleconseiller, teleconseillere, televente, televendeur, televendeuse, teleenquete, tele enquete, teleenqueteur, teleenquetrice, enqueteur, enquetrice, enquete telephonique, centre d'appels, centre d'appel
+manutention | Manutention et logistique | manutention, manutentionnaire, logistique, preparation de commande, preparateur de commande, preparatrice de commande, magasinier, magasiniere, cariste, entrepot, inventaire, mise en rayon, gestion de stock, chargement, dechargement, conditionnement, emballage, port de charge, agent de quai
+restauration | Restauration | restauration, restaurant, cuisine, cuisinier, cuisiniere, serveur, serveuse, service en salle, service a table, chef de rang, barman, barmaid, barista, plonge, plongeur, plongeuse, commis, traiteur, crepier, crepiere
+hotellerie | Hôtellerie | hotellerie, hotel, femme de chambre, valet de chambre, gouvernante
+metiers_bouche | Boulangerie, boucherie, métiers de bouche | boulangerie, boulanger, boulangere, patisserie, patissier, patissiere, boucherie, boucher, bouchere, charcuterie, charcutier, charcutiere, poissonnerie, poissonnier, poissonniere, fromagerie
+nettoyage | Nettoyage et entretien des locaux | nettoyage, menage, entretien des locaux, agent d'entretien, agente d'entretien, proprete, bio nettoyage
+administratif | Administratif et secrétariat | administratif, administrative, administration, secretariat, secretaire, assistanat, saisie, saisie de donnees, bureautique, classement, archivage
+comptabilite | Comptabilité, gestion, banque, assurance | comptabilite, comptable, paie, facturation, gestion de patrimoine, banque, bancaire, assurance, finance
+ressources_humaines | Ressources humaines, insertion | ressources humaines, recrutement, insertion professionnelle, insertion sociale
+informatique | Informatique | informatique, developpement web, developpeur, developpeuse, support informatique, reseau informatique, base de donnees, programmation
+communication | Communication, marketing, événementiel | communication, marketing, evenementiel, community management, graphisme
+enfance | Enfance et animation | garde d'enfant, petite enfance, enfance, enfant, animation, animateur, animatrice, baby sitting, babysitting, periscolaire, centre de loisirs, creche, puericulture
+aide_personne | Aide à la personne | aide a domicile, aide a la personne, service a la personne, auxiliaire de vie, personne agee, handicap, accompagnement social
+sante | Santé et soins | sante, soin, aide soignant, aide soignante, infirmier, infirmiere, medical, medicale, pharmacie, hospitalier, hospitaliere, clinique
+enseignement | Enseignement et formation | enseignement, enseignant, enseignante, professeur, professeure, formateur, formatrice, soutien scolaire, aide aux devoirs
+batiment | Bâtiment et travaux | batiment, btp, travaux, chantier, maconnerie, macon, peinture en batiment, peintre, plomberie, plombier, electricite, electricien, electricienne, menuiserie, menuisier, menuisiere
+production | Production, industrie, maintenance | production, usine, fabrication, industrie, industriel, industrielle, soudure, soudeur, soudeuse, metallerie, metallier, metalliere, mecanique, mecanicien, mecanicienne, maintenance, assemblage, controle qualite
+transport | Conduite, livraison, transport | conduite, chauffeur, chauffeuse, livraison, livreur, livreuse, transport, coursier, coursiere
+securite | Sécurité et surveillance | agent de securite, agente de securite, securite privee, securite incendie, gardiennage, surveillance
+espaces_verts | Espaces verts, agriculture | espace vert, jardinage, jardinier, jardiniere, paysagiste, agriculture, agricole, maraichage

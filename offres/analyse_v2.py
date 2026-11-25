@@ -23,6 +23,7 @@ import time
 
 from offres.analyse import (POINTS_FORTS, REGLES, SYSTEME, _court, appliquer_eligibilite, coupure_description,
                             journaliser_coupure, score_to_verdict)
+from shared.domaines_experience import simplifier as simplifier_texte
 from shared.erreurs import exiger_profil
 from shared.exigences import PERMIS_SANS_CATEGORIE, annees_dans_texte
 from shared.ia import appeler_structure
@@ -46,12 +47,14 @@ EXTRACTION = (
     "- alternance_seulement : true si l'offre n'est proposée qu'en alternance ou apprentissage ;\n"
     "- experience_exigee_annees : années d'expérience exigées (« 2 ans minimum », « 3 ans d'expérience exigée ») ; "
     "null si elle est seulement souhaitée ou si un débutant est accepté ;\n"
+    "- experience_exigee_domaine : métier ou secteur de l'expérience exigée, recopié mot pour mot du texte, sans la "
+    "durée ; null si le texte n'en donne pas ;\n"
     "- permis_exige : code du permis exigé (B, C, CE...) ; null s'il est seulement souhaité ;\n"
     "- certifications_exigees : certifications exigées (CACES et sa catégorie, SSIAP, carte professionnelle, BAFA, "
     "PSC1, habilitation électrique...) ;\n"
     "- diplome_etat_exige : true si un diplôme d'État est exigé.\n\n"
     'Réponds uniquement avec cet objet JSON : {"niveau_requis": ..., "niveau_exigence": ..., "duree_mois": ..., '
-    '"date_debut_offre": ..., "alternance_seulement": ..., "experience_exigee_annees": ..., "permis_exige": ..., '
+    '"date_debut_offre": ..., "alternance_seulement": ..., "experience_exigee_annees": ..., "experience_exigee_domaine": ..., "permis_exige": ..., '
     '"certifications_exigees": [...], "diplome_etat_exige": ...}'
 )
 
@@ -138,6 +141,43 @@ def messages_jugement(offre: dict, profil: dict, mode: str, longueur: int) -> li
 
 
 # ─── Python : contrôle, éligibilité, note, plafonds ───────────────────────────
+FENETRE_EXPERIENCE = (120, 80)     # caractères avant et après le domaine extrait
+_MOIS_ECRITS = re.compile(r"(\d{1,3})\s*mois\b")
+
+
+def _fenetres(domaine: str, texte: str) -> list[str]:
+    """Passages du texte (minuscules, sans accents) autour du domaine qui parlent d'expérience."""
+    t, d = simplifier_texte(texte), simplifier_texte(domaine)
+    avant, apres = FENETRE_EXPERIENCE
+    passages = [t[max(0, m.start() - avant):m.end() + apres] for m in re.finditer(rf"(?<![a-z0-9]){re.escape(d)}(?![a-z0-9])", t)]
+    return [p for p in passages if "experience" in p]
+
+
+def domaine_dans_texte(domaine, texte: str) -> str:
+    """Domaine extrait, gardé seulement si le texte l'écrit tel quel près du
+    mot « expérience » (D211) ; "" sinon."""
+    domaine = " ".join(str(domaine or "").replace("(", " ").replace(")", " ").split()).strip(" .,;:-")
+    if domaine.lower() in ("", "null", "aucun", "aucune") or len(domaine) > 80:
+        return ""
+    return domaine if _fenetres(domaine, texte) else ""
+
+
+def ligne_domaine(domaine: str, texte: str) -> str:
+    """Ligne d'un domaine extrait sans nombre d'années : complète la ligne
+    « exigée » de France Travail, ou seule si le passage porte un mot
+    d'exigence et aucun mot de souhait (mois lus dans ce passage)."""
+    from shared.eligibilite import MARQUEURS_SOUHAIT
+    from shared.exigences import MARQUEURS_EXIGENCE, experience_demandee
+    if experience_demandee(texte) is not None:
+        return f"Expérience : Expérience exigée - {domaine} (exigée)"
+    for passage in _fenetres(domaine, texte):
+        if MARQUEURS_EXIGENCE.search(passage) and not MARQUEURS_SOUHAIT.search(passage):
+            m = _MOIS_ECRITS.search(passage)
+            return f"Expérience : {m.group(1)} Mois - {domaine} (exigée)" if m else \
+                f"Expérience : Expérience exigée - {domaine} (exigée)"
+    return ""
+
+
 def lignes_extraites(extraction: dict, offre: dict) -> list[str]:
     """Exigences extraites, gardées seulement si le texte de l'offre les porte,
     écrites comme les lignes structurées (shared/exigences.py)."""
@@ -146,8 +186,12 @@ def lignes_extraites(extraction: dict, offre: dict) -> list[str]:
     bas = texte.lower()
     out = []
     annees = extraction.get("experience_exigee_annees")
+    domaine = domaine_dans_texte(extraction.get("experience_exigee_domaine"), texte)
+    suite = f" - {domaine}" if domaine else ""
     if annees and int(annees) in annees_dans_texte(texte):   # en chiffres, en lettres, en fourchette (D176)
-        out.append(f"Expérience : {int(annees)} An(s) (exigée)")
+        out.append(f"Expérience : {int(annees)} An(s){suite} (exigée)")
+    elif domaine and (ligne := ligne_domaine(domaine, texte)):
+        out.append(ligne)
     permis = (extraction.get("permis_exige") or "").strip().upper()
     if re.fullmatch(r"[A-Z][A-Z0-9]{0,2}", permis) and re.search(rf"permis\s*(?:de conduire\s*)?{permis.lower()}\b", bas):
         out.append(f"Permis : {permis} (exigé)")
