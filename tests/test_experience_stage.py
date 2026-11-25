@@ -1,4 +1,4 @@
-"""D212 : stage et alternance, expérience exigée au-delà de « Expérience
+"""D212 : stage seulement, expérience exigée au-delà de « Expérience
 professionnelle, en mois »."""
 
 import pytest
@@ -22,29 +22,27 @@ def offre(ligne):
     return {"id": "S1", "titre": "Développeur web", "description": f"Missions.\nExpérience : {ligne}"}
 
 
-@pytest.mark.parametrize("mode", ["stage", "alternance"])
 @pytest.mark.parametrize("ligne, raison", [
     ("1 An(s) (exigée)", TROP_LONGUE),
     ("6 Mois (exigée)", "Expérience exigée trop longue (6 mois, 3 mois au plus)"),
     ("3 Mois (exigée)", ""), ("0 An(s) (exigée)", ""), ("0 An(s)", ""), ("Expérience exigée", ""),
     ("1 An(s) (souhaitée)", ""), ("Débutant accepté", ""), ("1 An(s) (débutant accepté)", ""),
 ])
-def test_experience_exigee(mode, ligne, raison):
-    assert el.raisons_sans_ia(offre(ligne), profil(), mode) == ([raison] if raison else [])
+def test_experience_exigee(ligne, raison):
+    assert el.raisons_sans_ia(offre(ligne), profil(), "stage") == ([raison] if raison else [])
 
 
 def test_champ_vide_aucune_regle_et_zero_mois():
     assert el.raisons_sans_ia(offre("1 An(s) (exigée)"), profil(None), "stage") == []
-    assert el.raisons_sans_ia(offre("1 An(s) (exigée)"), profil(None), "alternance") == []
     assert el.raisons_sans_ia(offre("3 Mois (exigée)"), profil(0), "stage") == [
         "Expérience exigée trop longue (3 mois, aucune au plus)"]
 
 
-def test_alternance_deux_ans_une_seule_raison():
-    """La règle de D169 (2 ans : pas une alternance) reste, sans doublon."""
-    assert el.raisons_sans_ia(offre("2 An(s) (exigée)"), profil(), "alternance") == [
-        "Expérience exigée trop longue (2 ans, 3 mois au plus)"]
-    for mois in (None, 30):
+def test_alternance_seulement_la_regle_des_deux_ans():
+    """D169, comme avant, quels que soient les mois du profil (banc n° 8 : 1 an exigé, gardée)."""
+    for mois in (None, 0, 3, 30):
+        assert el.raisons_sans_ia(offre("1 An(s) (exigée)"), profil(mois), "alternance") == []
+        assert el.raisons_sans_ia(offre("6 Mois (exigée)"), profil(mois), "alternance") == []
         assert el.raisons_sans_ia(offre("2 An(s) (exigée)"), profil(mois), "alternance") == [
             "2 ans d'expérience exigés : ce n'est pas une alternance"]
 
@@ -53,12 +51,11 @@ def test_job_inchange():
     assert el.raisons_sans_ia(offre("1 An(s) (exigée)"), profil(), "job") == []        # D174 : 9 mois d'écart
 
 
-@pytest.mark.parametrize("mode", ["stage", "alternance"])
-def test_avant_l_ia_raison_enregistree(utilisateur, ia, mode):
+def test_avant_l_ia_raison_enregistree(utilisateur, ia):
     _, uid = utilisateur("a@test.fr", prenom="Ada")
-    ajouter_candidature(uid, marquer_non_analysee(offre("1 An(s) (exigée)"), mode=mode), mode=mode)
-    analyser_en_attente(uid, mode, profil(), 1, log=lambda m: None)
-    o = lire_candidature(uid, "S1", mode=mode)
+    ajouter_candidature(uid, marquer_non_analysee(offre("1 An(s) (exigée)"), mode="stage"), mode="stage")
+    analyser_en_attente(uid, "stage", profil(), 1, log=lambda m: None)
+    o = lire_candidature(uid, "S1", mode="stage")
     assert ia.appels == [] and (o["verdict"], o["score"]) == ("ineligible", None)
     assert o["points_faibles"] == [f"Inéligible : {TROP_LONGUE}"]
 
@@ -80,9 +77,16 @@ def test_souhait_et_exigence_dans_des_phrases_differentes():
     assert lignes_extraites({"experience_exigee_annees": 2}, {"description": texte}) == [
         "Expérience : 2 An(s) (exigée)"]
     assert lignes_extraites({"experience_exigee_annees": 5}, {"description": texte}) == []
+    assert lignes_extraites({"experience_exigee_annees": 5}, {"description": texte}, "alternance") == [
+        "Expérience : 5 An(s) (exigée)"]                                            # inchangée en alternance
 
 
 def test_texte_d_aide(utilisateur):
+    """Les deux textes sont dans la page, chacun dans la section de son mode."""
     client, _ = utilisateur("a@test.fr", prenom="Ada")
-    assert client.get("/stage").text.count("Une offre qui exige davantage d'expérience est écartée ; "
-                                           "vide : jamais écartée pour ça.") == 2
+    page = client.get("/stage").text
+    stage = "Une offre qui exige davantage d'expérience est écartée ; vide : jamais écartée pour ça."
+    alternance = "Une offre qui exige 2 ans d'expérience ou plus est écartée : ce n'est pas une alternance."
+    for texte, mode in ((stage, "stage"), (alternance, "alternance")):
+        assert page.count(texte) == 1
+        assert page[:page.index(texte)].rsplit('data-mode-section="', 1)[1].startswith(f'{mode}"')
