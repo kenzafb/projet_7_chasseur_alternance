@@ -49,7 +49,7 @@ def preparer(args) -> Campagne:
                                 "(docs/CAMPAGNE.md).")
     if telegram is None and reglages.fin in ("eteindre", "veille"):
         raise ErreurUtilisateur(f"CAMPAGNE_FIN={reglages.fin} demande Telegram : sans lui, impossible d'annuler.")
-    return Campagne(args.utilisateur, modes, reglages, telegram)
+    return Campagne(args.utilisateur, modes, reglages, telegram, ecoute=True)
 
 
 def main(argv=None) -> int:

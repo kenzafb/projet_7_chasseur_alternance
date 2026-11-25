@@ -20,7 +20,9 @@ pendant une recherche ou un envoi, pas pendant l'attente d'une réponse.
 """
 
 import os
+import queue
 import secrets
+import threading
 import time
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta
@@ -46,6 +48,7 @@ PAUSE_ENVOIS = (120, 300)        # secondes entre deux mails
 ATTENTE_INTERFACE_S = 15 * 60    # l'interface tient le verrou : attente au plus
 ATTENTE_TELEGRAM_S = 25          # interrogation longue
 DELAI_EXTINCTION_S = 120
+REPRISE_ECOUTE_S = 5             # Telegram injoignable : avant de réessayer
 VALIDATIONS = ("telegram", "auto")
 FINS = ("demander", "eteindre", "veille", "rien")
 LIBELLES_FIN = {extinction.ETEINDRE: "Extinction", extinction.VEILLE: "Mise en veille"}
@@ -123,6 +126,12 @@ class Attente:
     jeton: str = field(default_factory=lambda: secrets.token_hex(6))
     message_id: int = 0
 
+    @property
+    def annonce(self) -> str:
+        """Où partiront les mails, à côté de chaque bouton « Envoyer »."""
+        return ("🧪 MODE ESSAI : les mails arriveront chez toi" if self.test
+                else "🔴 ENVOI RÉEL aux entreprises")
+
 
 class _ArretRecherche:
     """stop_event d'une recherche : arrêt demandé, durée écoulée, ou recherche
@@ -158,15 +167,46 @@ class _ArretEnvoi:
         return self.is_set()
 
 
+class _Ecoute(threading.Thread):
+    """Lit les clics et y répond dès leur réception, quoi que fasse la campagne
+    (recherche d'emails, envoi, pause) : Telegram refuse une réponse tardive.
+    Les actions restent à la boucle principale."""
+
+    def __init__(self, campagne: "Campagne"):
+        super().__init__(name="ecoute-telegram", daemon=True)
+        self.campagne, self.fin = campagne, threading.Event()
+
+    def run(self):
+        en_panne = False
+        while not self.fin.is_set():
+            try:
+                self.campagne.recevoir(ATTENTE_TELEGRAM_S)
+                en_panne = False
+            except Exception as e:   # l'écoute ne doit jamais s'arrêter en silence
+                if self.fin.is_set():
+                    return
+                if not en_panne:     # une ligne par panne, pas une par essai
+                    self.campagne.log(f"⚠️  {e if isinstance(e, ErreurTelegram) else type(e).__name__}")
+                en_panne = True
+                self.fin.wait(REPRISE_ECOUTE_S)
+
+
 # ─── Campagne ─────────────────────────────────────────────────────────────────
 class Campagne:
-    def __init__(self, user_id: int, modes, reglages: Reglages, telegram: Telegram | None, horloge=None):
+    """ecoute : clics lus par un fil à part (_Ecoute) ; sinon, par la boucle
+    principale quand elle attend (tests)."""
+
+    def __init__(self, user_id: int, modes, reglages: Reglages, telegram: Telegram | None, horloge=None,
+                 ecoute: bool = False):
         self.user_id, self.modes, self.reglages = user_id, list(modes), reglages
         self.telegram, self.horloge = telegram, horloge or Horloge()
         self.arret = False                 # SIGTERM, Ctrl+C
         self.bilan = {}                    # mode -> chiffres
         self.attentes: dict[str, Attente] = {}
-        self._clics: list[Clic] = []       # clics à traiter par la boucle principale
+        self._recus = queue.SimpleQueue()  # clics auxquels il a été répondu, pas encore relevés
+        self._clics: list[Clic] = []       # clics relevés, à traiter par la boucle principale
+        self._avec_ecoute = ecoute
+        self._ecoute: _Ecoute | None = None
         self._jeton_fin = secrets.token_hex(6)
         self._message_fin = 0
         self._envoi_en_cours = False
@@ -206,38 +246,71 @@ class Campagne:
             self._telegram(lambda: self.telegram.retirer_boutons(message_id))
 
     # ─── Clics ────────────────────────────────────────────────────────────────
-    def relever(self, attente: int = 0):
-        """Lit les clics et y répond aussitôt ; ceux qui demandent une action
-        attendent la boucle principale."""
-        clics = self._telegram(lambda: self.telegram.clics(attente)) if self.telegram else None
-        if clics is None:
-            if attente:      # pas de bot, ou Telegram injoignable : pas de boucle serrée
-                self.horloge.dormir(attente)
-            return
-        for clic in clics:
-            self._accuser(clic)
+    def recevoir(self, attente: int = 0):
+        """Lit les clics, répond à TOUS avant quoi que ce soit d'autre, puis met
+        de côté ceux qui demandent une action. ErreurTelegram si la lecture échoue."""
+        a_traiter = []
+        for clic in self.telegram.clics(attente):
+            reponse, action = self._reponse(clic)
+            self._telegram(lambda c=clic, r=reponse: self.telegram.accuser(c, r))
+            if action:
+                a_traiter.append(clic)
+        for clic in a_traiter:
+            self._recus.put(clic)
 
-    def _accuser(self, clic: Clic):
+    def _reponse(self, clic: Clic) -> tuple[str, bool]:
+        """(texte affiché sur le téléphone, le clic demande une action)."""
         action, _, jeton = clic.donnee.partition(":")
-        attente = next((a for a in self.attentes.values() if a.jeton == jeton), None)
-        if action in ("envoyer", "voir") and attente:
-            if action == "voir":
-                self._telegram(lambda: self.telegram.accuser(clic, "Rien n'est parti."))
-                self._voir(attente)
-                return
+        attente = self._attente_du(jeton)
+        if action == "voir" and attente:
+            return "Rien n'est parti.", True
+        if action == "envoyer" and attente:
             if self.horloge.maintenant() >= self.limite:
-                self._telegram(lambda: self.telegram.accuser(clic, "Heure limite passée : rien n'est envoyé."))
-                return
-            self._telegram(lambda: self.telegram.accuser(clic, "Envoi noté."))
-            self._clics.append(clic)
-        elif action in (extinction.ETEINDRE, extinction.VEILLE, "annuler") and jeton == self._jeton_fin:
+                return "Heure limite passée : rien n'est envoyé.", False
+            return "Envoi noté.", True
+        if action in (extinction.ETEINDRE, extinction.VEILLE, "annuler") and jeton == self._jeton_fin:
             if self._envoi_en_cours or (action != "annuler" and not self._message_fin):
-                self._telegram(lambda: self.telegram.accuser(clic, "Campagne en cours : proposé à la fin."))
-                return
-            self._telegram(lambda: self.telegram.accuser(clic))
-            self._clics.append(clic)
+                return "Campagne en cours : proposé à la fin.", False
+            return "", True
+        return "Ce bouton n'est plus valable.", False
+
+    def _attente_du(self, jeton: str) -> Attente | None:
+        return next((a for a in list(self.attentes.values()) if a.jeton == jeton), None)
+
+    def relever(self, attente: int = 0):
+        """Relève les clics reçus, en attendant au plus `attente` secondes qu'il
+        en vienne un ; « Voir d'abord » est fait tout de suite, le reste attend
+        la boucle principale."""
+        if self._ecoute is not None:
+            self._attendre_un_clic(attente)
+        elif not self.telegram:
+            self.horloge.dormir(attente)
         else:
-            self._telegram(lambda: self.telegram.accuser(clic, "Ce bouton n'est plus valable."))
+            try:
+                self.recevoir(attente)
+            except ErreurTelegram as e:
+                self.log(f"⚠️  {e}")
+                self.horloge.dormir(attente)      # pas de boucle serrée
+        self._ranger_recus()
+
+    def _ranger_recus(self):
+        while not self._recus.empty():
+            clic = self._recus.get()
+            action, _, jeton = clic.donnee.partition(":")
+            if action != "voir":
+                self._clics.append(clic)
+            elif vue := self._attente_du(jeton):
+                self._voir(vue)
+
+    def _attendre_un_clic(self, attente: float):
+        fin = self.horloge.maintenant() + timedelta(seconds=attente)
+        while self._recus.empty() and not self.arret and self.horloge.maintenant() < fin:
+            self.horloge.dormir(0.2)
+
+    def _arreter_ecoute(self):
+        if self._ecoute is not None:
+            self._ecoute.fin.set()
+            self._ecoute = None
 
     def patienter(self, secondes: float):
         """Attend en relevant les clics."""
@@ -271,6 +344,9 @@ class Campagne:
             self.limite = self.horloge.maintenant().replace(hour=heures, minute=minutes, second=0, microsecond=0)
             if self.telegram:
                 self._telegram(lambda: self.telegram.clics(0))     # clics d'une campagne passée : oubliés
+                if self._avec_ecoute:
+                    self._ecoute = _Ecoute(self)
+                    self._ecoute.start()
             self.notifier(f"▶️ Campagne commencée : {', '.join(self.modes)}, {self.reglages.cible} entreprises par mode"
                           + (f". Réponse attendue avant {self.reglages.heure_limite}."
                              if self.reglages.validation == "telegram" else ". Envoi automatique."))
@@ -294,6 +370,7 @@ class Campagne:
                 campagnes_db.enregistrer_bilan(self._id, self.bilan, "erreur")
             raise
         finally:
+            self._arreter_ecoute()
             verrou.liberer()
 
     def _noter(self, mode: str, **champs):
@@ -405,12 +482,11 @@ class Campagne:
             self.notifier(f"⏹️ {attente.mode} : {len(attente.liste)} emails prêts, mais l'heure limite "
                           f"({self.reglages.heure_limite}) est passée. Rien n'est envoyé.")
             return
-        essai = "\n🧪 MODE ESSAI : tout partira vers ton adresse." if attente.test else ""
         # Enregistrée avant le message : un clic immédiat est reconnu
         self.attentes[attente.mode] = attente
         attente.message_id = self.notifier(
-            f"📬 {attente.mode} : {len(attente.liste)} emails prêts. Réponse avant {self.reglages.heure_limite}.{essai}\n\n"
-            + self._lignes(attente),
+            f"📬 {attente.mode} : {len(attente.liste)} emails prêts. Réponse avant {self.reglages.heure_limite}.\n"
+            f"{attente.annonce}\n\n{self._lignes(attente)}\n\n{attente.annonce}",
             [("Envoyer", f"envoyer:{attente.jeton}"), ("Voir d'abord", f"voir:{attente.jeton}")])
         if not attente.message_id:
             del self.attentes[attente.mode]
@@ -421,7 +497,7 @@ class Campagne:
         profil = lire_profil(self.user_id, mode=attente.mode)
         objet, corps = envoi.objet_et_corps(profil, attente.mode)
         pieces = ", ".join(p.get("nom") or "?" for p in profil.get("pieces_jointes") or []) or "aucune"
-        self.notifier(f"👀 {attente.mode}, rien n'est parti.\nObjet : {objet}\nPièces jointes : {pieces}\n\n{corps}\n\n"
+        self.notifier(f"👀 {attente.mode}, rien n'est parti.\n{attente.annonce}\nObjet : {objet}\nPièces jointes : {pieces}\n\n{corps}\n\n"
                       f"Entreprises et adresses : page « Entreprises à contacter » de l'application. "
                       f"« Envoyer » reste valable jusqu'à {self.reglages.heure_limite}.",
                       [("Envoyer", f"envoyer:{attente.jeton}")])
@@ -431,6 +507,9 @@ class Campagne:
         while self.attentes and not self.arret:
             if not self._clics:
                 if self.horloge.maintenant() >= self.limite:
+                    self._ranger_recus()      # « Envoi noté. » répondu juste avant l'heure : il compte
+                    if self._clics:
+                        continue
                     break
                 self.relever(max(1, min(ATTENTE_TELEGRAM_S,
                                         int((self.limite - self.horloge.maintenant()).total_seconds()))))
@@ -527,6 +606,18 @@ class Campagne:
         """Ce qui tourne encore (application, autre campagne), ou ""."""
         return ", ".join(occupes(sauf=(CAMPAGNE,)))
 
+    def _annulation(self) -> bool:
+        """« Annuler » cliqué, ou « Envoyer » : le PC doit rester allumé."""
+        self._ranger_recus()
+        return any(c.donnee.startswith(("annuler:", "envoyer:")) for c in self._clics)
+
+    def _annulee(self, libelle: str) -> bool:
+        annule = self._annulation() or self.arret
+        self._clics = [c for c in self._clics if c.donnee.startswith("envoyer:")]
+        if annule:
+            self.notifier(f"↩️ {libelle} annulée.")
+        return annule
+
     def _compte_a_rebours(self, action: str) -> bool:
         """Deux minutes pour annuler, puis extinction ou veille. Vrai si elle a
         été demandée au système. Rien sans message reçu : pas d'annulation
@@ -543,22 +634,20 @@ class Campagne:
             if not message:
                 raise extinction.ErreurExtinction("message Telegram non parti, donc pas d'annulation possible.")
             fin = self.horloge.maintenant() + timedelta(seconds=DELAI_EXTINCTION_S)
-            annule = False
-            while not (annule or self.arret) and self.horloge.maintenant() < fin:
+            while not (self._annulation() or self.arret) and self.horloge.maintenant() < fin:
                 self.relever(max(1, min(10, int((fin - self.horloge.maintenant()).total_seconds()))))
-                # « Envoyer » vaut aussi annulation : le PC doit rester allumé
-                annule = any(c.donnee.startswith(("annuler:", "envoyer:")) for c in self._clics)
-            self._clics = [c for c in self._clics if c.donnee.startswith("envoyer:")]
             self._sans_boutons(message)
-            if annule or self.arret:
-                self.notifier(f"↩️ {libelle} annulée.")
+            if self._annulee(libelle):
                 return False
             if occupe := self._occupe():
                 raise extinction.ErreurExtinction(f"un traitement a démarré entre-temps ({occupe}).")
             extinction.verifier(action)
+            if self._annulee(libelle):      # clic auquel il vient d'être répondu
+                return False
             if self.attentes:
                 self._abandonner("extinction demandée")
                 campagnes_db.enregistrer_bilan(self._id, self.bilan, "terminee")
+            self._arreter_ecoute()
             if self.telegram:
                 self._telegram(self.telegram.confirmer_lecture)
             self.log(f"🔌 {libelle}")
