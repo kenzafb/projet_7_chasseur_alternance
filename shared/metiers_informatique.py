@@ -22,8 +22,11 @@ from shared.marques import simplifier
 FAMILLE = "M18"
 # Cartographe, météorologue, modélisation climatique, station, prévisionniste, technicien de la météorologie
 HORS_INFORMATIQUE = frozenset({"M1808", "M1809", "M1888", "M1890", "M1891", "M1893"})
+# « Développement RH », « développement commercial »... : pas de l'informatique (D207)
+_SAUF = (r"(?!\s+(?:rh|des\s+ressources\s+humaines|commercia(?:l|le|ux|les)|business|durables?|personnels?"
+         r"|des\s+competences)(?![a-z0-9]))")
 _MOTS = re.compile(
-    r"(?<![a-z0-9])(?:informatiques?|developpeu(?:r|rs|se|ses)|developpements?|logiciels?|reseaux?|systemes?"
+    r"(?<![a-z0-9])(?:informatiques?|developpeu(?:r|rs|se|ses)|developpements?" + _SAUF + r"|logiciels?|reseaux?|systemes?"
     r"|bases? de donnees|web|cyber[\s-]?securite|devops|cloud|ia|data)(?![a-z0-9])")
 
 

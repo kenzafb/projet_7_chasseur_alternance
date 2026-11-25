@@ -1,6 +1,6 @@
 # Architecture actuelle : le Chasseur
 
-État au 25 novembre 2026, après les phases 15 et 16 et le ménage (branche `menage`). L'état des lieux du 7 octobre, d'avant la refonte, est dans `docs/historique/ARCHITECTURE_2026-10-07.md`. Les raisons de chaque choix sont dans `docs/DECISIONS.md` (D1 à D206).
+État au 25 novembre 2026, après les phases 15 et 16 et le ménage (branche `menage`). L'état des lieux du 7 octobre, d'avant la refonte, est dans `docs/historique/ARCHITECTURE_2026-10-07.md`. Les raisons de chaque choix sont dans `docs/DECISIONS.md` (D1 à D209).
 
 ## 1. En bref
 - Application web FastAPI multi-utilisateurs : `venv/bin/uvicorn main:app --port 5002`. Pages Jinja et modules JavaScript, sans framework.
@@ -52,7 +52,8 @@ scripts/                Outils lancés à la main, jamais par l'application
   verifier_*.py, explorer_france_travail.py  Vérification des API ; sorties dans scripts/verifications/
   references/             Références annotées sans donnée personnelle (scraper_reference.json)
   *.py de maintenance     Lecture seule par défaut, --appliquer pour écrire (revalider_emails_en_base,
-                          completer_denominations, renommer_pieces_jointes, deplacer_lettres_pdf, remettre_a_zero...)
+                          completer_denominations, renommer_pieces_jointes, deplacer_lettres_pdf, remettre_a_zero,
+                          completer_codes_rome...)
 tests/                  pytest, sous systemd-run MemoryMax=2G ; aucun appel réseau ni à la vraie base
 docs/                   DECISIONS.md, CONFIGURATION.md, SPEC_SOURCES.md, RECETTE.md, ce fichier,
                         referentiels/ (référentiels France Travail et table NAF de l'INSEE, lus par le code),

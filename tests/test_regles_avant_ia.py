@@ -76,6 +76,15 @@ def test_code_rome_enregistre(utilisateur):
     ("F1112", "Stage - Développement Contrôle-Commande", False),               # mot informatique du titre
     ("M1211", "Chargé de base de données en stage", False), ("K1", "Data analyst", False),
     ("M1501", "Chargé.e des RÉSEAUX sociaux", False), ("D1401", "Cyber-sécurité", False),
+    # « développement » suivi d'un mot qui n'est pas informatique (D207)
+    ("M1508", "Chargé.e de Développement RH - STAGE H/F", True),
+    ("M1501", "Assistant(e) Recrutement & Développement RH (H/F)", True),
+    ("M1508", "Développement des ressources humaines", True), ("D1401", "Développement commercial", True),
+    ("D1401", "Développements commerciaux", True), ("D1401", "Développement Business", True),
+    ("M1413", "Développement durable", True), ("K1", "Développement personnel", False),
+    ("K2111", "Développement personnel", True), ("M1502", "Développement des compétences", True),
+    ("M1508", "Développement RH et data", False),            # un autre mot informatique suffit
+    ("F1112", "Développement rhéologique", False), ("D1401", "Développement des applications", False),
 ])
 def test_hors_informatique(code, titre, hors):
     assert hors_informatique({"code_rome": code, "titre": titre}) is hors
@@ -194,3 +203,16 @@ def test_description_lba_entiere_ou_coupure_journalisee(monkeypatch):
     monkeypatch.setenv("IA_LONGUEUR_DESCRIPTION", "300")
     assert len(lba._description({"description": "a" * 12000}, "Dev")) == 300
     assert "12000 caractères, gardés : 300" in lignes[0]
+
+
+# ─── D209 : description France Travail ────────────────────────────────────────
+def test_coupure_france_travail_journalisee(utilisateur, monkeypatch):
+    _, uid = utilisateur("a@test.fr")
+    longues = [{**offre_ft(1), "description": "a" * 12000}, {**offre_ft(2), "description": "court"}]
+    monkeypatch.setattr(france_travail, "recuperer_offres", lambda *a, **k: longues)
+    lignes = []
+    offres = france_travail.chercher_offres(uid, mode="alternance", log=lignes.append)
+    coupures = [x for x in lignes if "coupée" in x]
+    assert len(offres) == 2 and len(coupures) == 1
+    assert "12000 caractères, gardés : " in coupures[0]
+    assert max(len(o["description"]) for o in offres) == france_travail.LONGUEUR_DESCRIPTION

@@ -1093,3 +1093,14 @@ Une certification choisie dans la liste suggérée remplissait le champ sans tou
 
 ### D206. Description LBA : plafond IA_LONGUEUR_DESCRIPTION, coupure journalisée
 - La récupération LBA coupait à 5 000 caractères en silence. Elle garde maintenant la description sous le plafond de l'IA (20 000 par défaut), et une coupure est journalisée. Les offres déjà en base ne changent pas.
+
+### D207. Titre informatique : « développement » pas compté devant certains mots
+- Complète D203 : « développement » ne compte pas s'il est suivi de « RH », « des ressources humaines », « commercial » (et ses accords), « business », « durable », « personnel » ou « des compétences ». Un autre mot informatique du titre garde toujours l'offre.
+- Mesure sur les 50 offres de stage (codes des pages publiques) : 40 archivées au lieu de 37 ; les 3 « Développement RH » le sont, le stage simulateur reste gardé.
+
+### D208. scripts/completer_codes_rome.py
+- Offres France Travail sans `code_rome` : une requête à l'API par identifiant (lu dans le lien, vérifié contre `ref_offre`), seul `code_rome` est écrit. Lecture seule par défaut ; `--appliquer` refuse si l'application est lancée (avant et après les requêtes) et écrit en une transaction. Offre disparue (204, 404 ou 410), sans code, en erreur ou au lien d'un site partenaire : laissée telle quelle et comptée. Accès refusé : rien n'est écrit.
+- Les codes de réponse d'une offre disparue n'ont pas été vérifiés sur la vraie API (identifiants non lus) : dans tous les cas le code reste vide.
+
+### D209. Description France Travail : coupure journalisée
+- La limite de 10 000 caractères reste ; pour chaque nouvelle offre coupée, une ligne dans le journal de la recherche (longueur et caractères gardés).
