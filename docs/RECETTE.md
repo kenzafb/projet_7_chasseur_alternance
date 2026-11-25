@@ -8,7 +8,7 @@ Pour chaque étape : **Faire**, **Observer** (ce qui doit se passer), **Échec s
 
 ## 0. Préparation (avant la recette)
 
-1. Fusionner la branche `phase-4-recette` (voir `docs/PHASE_4_RAPPORT.md`, section « Avant la recette »), application arrêtée.
+1. Fusionner la branche `phase-4-recette` (voir `docs/historique/PHASE_4_RAPPORT.md`, section « Avant la recette »), application arrêtée.
 2. Sauvegarder la base puis la migrer :
    ```bash
    cd /home/kenza/Bureau/chasseur_alternance

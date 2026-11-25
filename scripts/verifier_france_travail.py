@@ -34,7 +34,7 @@ ses identifiants (FT_CLIENT_ID, FT_CLIENT_SECRET du .env) :
    l'humain avant de brancher France Travail dans le mode stage.
    --stage : cette étape seulement (une quarantaine de requêtes).
 
-Résultat détaillé dans docs/referentiels/france_travail/verification_api.json
+Résultat détaillé dans scripts/verifications/france_travail/verification_api.json
 (--sortie pour un autre dossier), sans identifiant ni token. À la fin, les
 valeurs à reporter dans offres/parametres_france_travail.py, seul endroit du
 code qui dépend de ces réponses. Une centaine de requêtes, une à deux
@@ -51,7 +51,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from offres import parametres_france_travail as parametres_api  # noqa: E402
 from scripts.explorer_france_travail import (  # noqa: E402
-    DOSSIER_SORTIE, PAUSE_S, ROUTE_RECHERCHE, ErreurToken, Explorateur, _message, _total)
+    DOSSIER_VERIFICATIONS, PAUSE_S, ROUTE_RECHERCHE, ErreurToken, Explorateur, _message, _total)
 from shared import referentiels  # noqa: E402
 from shared.config import DEPTS_IDF, FT_REGION  # noqa: E402
 from shared.tailles import taille_depuis_tranche  # noqa: E402
@@ -395,7 +395,7 @@ def verifier_stage(v: Verificateur, afficher=print):
              "dans le mode stage.")
 
 
-def main(session=None, sortie=DOSSIER_SORTIE, pause=PAUSE_S, afficher=print, seulement_stage=False) -> int:
+def main(session=None, sortie=DOSSIER_VERIFICATIONS, pause=PAUSE_S, afficher=print, seulement_stage=False) -> int:
     ex = Explorateur(session=session, sortie=sortie, pause=pause, afficher=afficher)
     try:
         ex.obtenir_token()
@@ -429,7 +429,7 @@ def main(session=None, sortie=DOSSIER_SORTIE, pause=PAUSE_S, afficher=print, seu
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Vérification des points ouverts de l'API France Travail.")
-    parser.add_argument("--sortie", type=Path, default=DOSSIER_SORTIE, help="dossier du fichier produit")
+    parser.add_argument("--sortie", type=Path, default=DOSSIER_VERIFICATIONS, help="dossier du fichier produit")
     parser.add_argument("--stage", action="store_true", help="seulement l'essai motsCles=stage (étape 5)")
     args = parser.parse_args()
     sys.exit(main(sortie=args.sortie, seulement_stage=args.stage))

@@ -1,6 +1,6 @@
 """Règle des intitulés du mode stage (shared/referentiels/intitules_stage.txt),
 sur les 20 intitulés d'exemple de l'essai motsCles=stage du 9 octobre 2026
-(docs/referentiels/france_travail/verification_stage.json)."""
+(scripts/verifications/france_travail/verification_stage.json)."""
 
 import json
 
@@ -9,7 +9,7 @@ import pytest
 from shared.config import BASE_DIR
 from shared.intitules_stage import designe_un_stage
 
-ESSAI = BASE_DIR / "docs" / "referentiels" / "france_travail" / "verification_stage.json"
+ESSAI = BASE_DIR / "scripts" / "verifications" / "france_travail" / "verification_stage.json"
 
 # Les 20 intitulés de l'essai : gardé (le stage est le poste) ou écarté (il en est l'objet)
 EXEMPLES = {

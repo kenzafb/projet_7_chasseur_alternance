@@ -12,7 +12,7 @@ Pour les trancher, lancer (clé INSEE_API_KEY dans le .env) :
 puis reporter ici les valeurs que le script affiche à la fin.
 
 Valeurs vérifiées sur la vraie API le 9 octobre 2026 (détail dans
-docs/referentiels/insee/verification_api.json, décision D54).
+scripts/verifications/insee/verification_api.json, décision D54).
 """
 
 URL_RECHERCHE = "https://api.insee.fr/api-sirene/3.11/siret"

@@ -174,7 +174,7 @@ def _libelle(code: str) -> str:
 # Volume montré à côté de la case « tous les secteurs » : sièges actifs
 # d'Île-de-France sans filtre d'activité, mesurés par
 # scripts/verifier_sirene.py --tous-secteurs le 9 octobre 2026
-# (docs/referentiels/insee/verification_tous_secteurs.json)
+# (scripts/verifications/insee/verification_tous_secteurs.json)
 VOLUME_TOUS_SECTEURS = ("382 663 entreprises en Île-de-France hors « sans salarié », dont 67 755 à partir "
                         "de 10 salariés ; mesure Sirene du 9 octobre 2026")
 

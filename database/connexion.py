@@ -3,7 +3,7 @@ database/connexion.py
 =====================
 Moteur de base de données + session.
 
-Aujourd'hui : SQLite (fichier local data/chasseur.db).
+Aujourd'hui : SQLite (DATABASE_URL, défaut DATA_DIR/chasseur_v2.db, shared/config.py).
 Le schéma est créé et mis à jour par Alembic (alembic upgrade head),
 jamais par ce module.
 Le jour du déploiement : il suffira de changer DATABASE_URL
