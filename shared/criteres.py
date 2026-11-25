@@ -84,6 +84,9 @@ def normaliser_recherche(recherche) -> dict:
         out["departements"] = sorted(_liste(out["departements"], DEPTS_IDF))
     if "tous_secteurs" in out:
         out["tous_secteurs"] = out["tous_secteurs"] is True
+    if "inclure_transverses" in out:
+        # Grandes entreprises hors des secteurs du domaine (D190) : oui par défaut
+        out["inclure_transverses"] = out["inclure_transverses"] is not False
     if "domaines_indifferent" in out:
         # Indifférent et des domaines cochés ne vont pas ensemble
         out["domaines_indifferent"] = out["domaines_indifferent"] is True and not out.get("domaines")

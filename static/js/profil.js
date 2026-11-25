@@ -441,6 +441,16 @@ async function rendreOptions(rech, mode) {
       <p class="profil-card__sub" style="margin:4px 0 10px;">Entreprises cherchées sur Sirene. Rien de coché : toute l'Île-de-France.</p>
       <div class="domaines-choix">${o.departements.map(d => caseOption("data-departement-case", d.code, `${d.code} · ${d.libelle}`, departements.has(d.code))).join("")}</div>
     </div>
+    <div class="options-bloc">
+      <span class="field__label">Candidatures spontanées : grandes entreprises hors de ton secteur</span>
+      <div class="domaines-choix" style="margin-top:8px;">
+        <label class="domaine-case domaine-case--petit">
+          <input type="checkbox" data-inclure-transverses ${rech.inclure_transverses !== false ? "checked" : ""}>
+          <span>Inclure les grandes entreprises qui ont un service interne de ton domaine (banque, assurance, sièges sociaux…)</span>
+        </label>
+      </div>
+      <p class="profil-card__sub" style="margin:8px 0 10px;">250 salariés et plus, cherchées sur Sirene après celles de ton secteur. Décoché : seulement les entreprises de ton secteur.</p>
+    </div>
     <div class="options-bloc" data-bloc-tous-secteurs>
       <span class="field__label">Candidatures spontanées : tous les secteurs</span>
       <div class="domaines-choix" style="margin-top:8px;">
@@ -475,6 +485,8 @@ function lireOptions(mode) {
   const coches = attribut => [...c.querySelectorAll(`[${attribut}]:checked`)].map(i => i.value);
   const out = { secteurs: coches("data-secteur-case"),
                 tous_secteurs: !!c.querySelector("[data-tous-secteurs]")?.checked };
+  const transverses = c.querySelector("[data-inclure-transverses]");
+  if (transverses) out.inclure_transverses = transverses.checked;
   if (c.querySelector("[data-taille-inconnue]")) {
     out.tailles = coches("data-taille-case");
     out.taille_inconnue = c.querySelector("[data-taille-inconnue]").checked;

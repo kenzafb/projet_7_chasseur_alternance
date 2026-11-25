@@ -31,7 +31,7 @@ from pathlib import Path
 
 from shared import referentiels
 from shared.config import BASE_DIR, nomenclature_naf
-from shared.domaines import domaines_du_grand_domaine, est_grand_domaine, normaliser_domaines
+from shared.domaines import domaines_du_grand_domaine, domaines_du_profil, est_grand_domaine, normaliser_domaines
 
 FICHIER = Path(__file__).resolve().parent / "referentiels" / "correspondance_naf.json"
 TABLE_INSEE = BASE_DIR / "docs" / "referentiels" / "insee" / "correspondance_naf_rev2_naf2025.csv"
@@ -214,3 +214,49 @@ def sirene_pour_profil(profil: dict) -> dict:
     rien = not (tous or codes["coeurs"] or codes["secteurs"] or codes["transverses"])
     return {"avertissement": avertissement_sirene(domaines, secteurs, tous), "rien_a_chercher": rien,
             "tous_secteurs": tous}
+
+
+# ─── Origine d'une entreprise à contacter (D190) ──────────────────────────────
+# Pourquoi elle est là, déduit à la lecture : sources (LBA, Sirene), code NAF
+# de l'entreprise (rév. 2 et 2025) comparé aux secteurs du profil actuel.
+ORIGINE_LBA = ("lba", "La Bonne Alternance, recrute des alternants dans ton métier")
+ORIGINE_SECTEUR = ("secteur", "Secteur choisi dans ton profil")
+ORIGINE_TOUS = ("tous", "Tous les secteurs")
+ORIGINE_SIRENE = ("sirene", "Sirene, hors des secteurs actuels de ton profil")
+
+
+def codes_par_origine(profil: dict) -> dict:
+    """{code NAF (les deux nomenclatures): (clé, texte)} pour les domaines et
+    secteurs du profil : cœurs (« Informatique »), transverses (« Grande
+    entreprise, service informatique interne »), secteurs choisis."""
+    from shared.criteres import normaliser_recherche
+    rech = normaliser_recherche((profil or {}).get("recherche") or {})
+    domaines = normaliser_domaines(domaines_du_profil(profil or {}))
+    table = correspondance()["domaines"]
+    out: dict[str, tuple[str, str]] = {}
+    for code in domaines:
+        for d in _domaines_cherches(code):
+            libelle = table[d].get("libelle_court") or _libelle(d)
+            for nomenclature in ("NAFRev2", "NAF2025"):
+                for e in table[d]["coeurs"]:
+                    for c in _codes(e, nomenclature):
+                        out.setdefault(c, ("coeur", libelle))
+                for e in table[d]["transverses"]:
+                    for c in _codes(e, nomenclature):
+                        out.setdefault(c, ("transverse", f"Grande entreprise, service {libelle.lower()} interne"))
+    for nomenclature in ("NAFRev2", "NAF2025"):
+        for c in secteurs_sirene(domaines, rech.get("secteurs") or [], nomenclature)["secteurs"]:
+            out.setdefault(c, ORIGINE_SECTEUR)
+    out["_tous"] = ORIGINE_TOUS if rech.get("tous_secteurs") else ORIGINE_SIRENE
+    return out
+
+
+def origines(sources, naf_rev2: str, naf_2025: str, codes: dict) -> list[dict]:
+    """[{cle, texte}] d'une entreprise : LBA, puis son origine Sirene
+    (codes : codes_par_origine du profil)."""
+    out = []
+    if "lba" in (sources or []):
+        out.append(ORIGINE_LBA)
+    if "sirene" in (sources or []):
+        out.append(codes.get(naf_2025 or "") or codes.get(naf_rev2 or "") or codes.get("_tous", ORIGINE_SIRENE))
+    return [{"cle": cle, "texte": texte} for cle, texte in out]

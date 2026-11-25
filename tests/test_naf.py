@@ -21,7 +21,7 @@ def test_codes_naf_2025_tires_de_la_table_officielle():
     multiples (et elles seules) sont à valider, avec une note."""
     table = _table_officielle()
     doc = naf.correspondance()
-    entrees = doc["exclusions"] + [e for g in doc["domaines"].values() for liste in g.values() for e in liste]
+    entrees = doc["exclusions"] + [e for g in doc["domaines"].values() for liste in g.values() if isinstance(liste, list) for e in liste]
     assert len(entrees) == 3 + 18 + 6 + 8 + 3
     for e in entrees:
         officielles = {l["naf_2025"] for l in table[e["naf_rev2"]]}

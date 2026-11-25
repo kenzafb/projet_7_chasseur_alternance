@@ -50,6 +50,7 @@
  ],
  "domaines": {
   "M18": {
+   "libelle_court": "Informatique",
    "coeurs": [
     {
      "naf_rev2": "62.01Z",
@@ -466,6 +467,7 @@
    ]
   },
   "C15": {
+   "libelle_court": "Immobilier",
    "coeurs": [
     {
      "naf_rev2": "68.31Z",

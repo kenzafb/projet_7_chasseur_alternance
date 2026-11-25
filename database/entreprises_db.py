@@ -189,6 +189,10 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
         recentes = sorted(((e, m) for e, m in paires if m.mail_envoye),
                           key=lambda p: (_date_envoi(p[1]), p[1].id), reverse=True)[:5]
         ailleurs = contacts_autres_modes(db, user_id, mode, [e for e, _ in prochaines_paires + recentes])
+        # Pourquoi chaque entreprise est là (D190), d'après le profil actuel
+        from database.profil_db import lire_profil
+        from shared.naf import codes_par_origine, origines
+        codes = codes_par_origine(lire_profil(user_id, mode=mode))
 
         # 5 dernières entreprises contactées : les plus récentes par date d'envoi
         # (à date égale, la dernière sélectionnée d'abord)
@@ -202,6 +206,7 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
                 "historique": bool(m.historique),
                 "date":   en_texte(m.mail_envoye_le, JOUR_HEURE),
                 "sources": list(e.sources or []),
+                "origines": origines(e.sources, e.naf_rev2, e.naf_2025, codes),
                 "contacts_autres_modes": ailleurs.get(e.id, []),
             }
             for e, m in recentes
@@ -215,6 +220,7 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
                 "email":     (e.emails_trouves or [""])[0] if e.emails_trouves else "",
                 "envoye":    False,
                 "sources":   list(e.sources or []),
+                "origines":  origines(e.sources, e.naf_rev2, e.naf_2025, codes),
                 "email_lba": bool(set(e.emails_trouves or []) & set((e.extra or {}).get("emails_lba") or [])),
                 "adresses":  adresses(e),
                 "contacts_autres_modes": ailleurs.get(e.id, []),
