@@ -26,6 +26,15 @@ function rendreTags(champ) {
     c.appendChild(el);
   });
 }
+/* Ajoute la saisie en cours comme étiquette (sans doublon) et vide le champ */
+function validerSaisieTag(champ, input) {
+  const v = (input?.value || "").trim();
+  if (v && !(_tags[champ] || []).some(t => t.toLowerCase() === v.toLowerCase())) {
+    (_tags[champ] = _tags[champ] || []).push(v);
+    rendreTags(champ);
+  }
+  if (input) input.value = "";
+}
 function brancherTags(champ) {
   const input = document.querySelector(`[data-tags-input="${champ}"]`);
   const c = document.querySelector(`[data-tags="${champ}"]`);
@@ -33,14 +42,17 @@ function brancherTags(champ) {
   input.addEventListener("keydown", e => {
     if (e.key === "Enter") {
       e.preventDefault();
-      const v = input.value.trim();
-      if (v && !(_tags[champ] || []).includes(v)) {
-        (_tags[champ] = _tags[champ] || []).push(v);
-        rendreTags(champ);
-      }
-      input.value = "";
+      validerSaisieTag(champ, input);
     }
   });
+  // Choix dans la liste suggérée (datalist) : pas de touche Entrée, la
+  // valeur arrive d'un coup ; elle devient une étiquette tout de suite
+  input.addEventListener("input", e => {
+    const options = input.list ? [...input.list.options].map(o => o.value) : [];
+    if (e.inputType !== "insertText" && options.includes(input.value)) validerSaisieTag(champ, input);
+  });
+  // Champ quitté avec une saisie non validée : elle n'est pas perdue
+  input.addEventListener("change", () => validerSaisieTag(champ, input));
   c.addEventListener("click", e => {
     const i = e.target.closest("[data-rm]")?.dataset.rm;
     if (i !== undefined) {
@@ -49,6 +61,13 @@ function brancherTags(champ) {
       input.focus();   // le bouton retiré disparaît : le focus revient au champ
     }
   });
+}
+
+function avecSaisieEnCours(champ) {
+  const liste = [...(_tags[champ] || [])];
+  const v = (document.querySelector(`[data-tags-input="${champ}"]`)?.value || "").trim();
+  if (v && !liste.some(t => t.toLowerCase() === v.toLowerCase())) liste.push(v);
+  return liste;
 }
 
 /* ── Projets ───────────────────────────────────────────────────────────── */
@@ -631,7 +650,9 @@ export const Profil = {
       if (!_champVisible(el)) return;        // ignore les doublons masqués (évite d'écraser)
       data[el.dataset.profil] = el.value;
     });
-    data.competences = [...(_tags["competences"] || [])];
+    // Saisie d'étiquette en cours (pas encore validée par Entrée) : comptée
+    // aussi, pour qu'« Enregistrer » ne la perde pas
+    data.competences = avecSaisieEnCours("competences");
     lireProjetsDepuisDOM();
     data.projets = _projets.filter(p => p.nom || p.url || p.description).map(p => ({ ...p }));
 
@@ -648,7 +669,7 @@ export const Profil = {
     Object.assign(rech, lireOptions(_modeProfilCourant));
     // Permis et certifications (D169), communs aux trois modes
     rech.permis = [...document.querySelectorAll("[data-permis] input:checked")].map(c => c.value);
-    rech.certifications = [...(_tags["certifications"] || [])];
+    rech.certifications = avecSaisieEnCours("certifications");
     data.recherche = rech;
     return data;
   },

@@ -965,3 +965,6 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 ### D183. Expérience exigée sans durée, poste « débutant accepté » : aucun changement (phase 15, étape 3)
 - « Expérience : Expérience exigée » sans durée (Conseiller en gestion de patrimoine) ne rend pas inéligible : sans durée écrite, la règle job (D174) ne s'applique pas.
 - « Responsable commercial Clients Directs Ouest », dont le titre ne dit pas « confirmé » et dont le texte indique « Débutant accepté », reste éligible. Ces offres restent comptées faux éligibles dans le banc : décision de l'utilisatrice.
+
+### D184. Étiquettes du profil : la suggestion choisie et la saisie en cours sont gardées (phase 16)
+Une certification choisie dans la liste suggérée remplissait le champ sans touche Entrée : aucune étiquette n'était créée et « Enregistrer » envoyait une liste vide (le serveur, lui, enregistrait bien). Désormais une valeur égale à une suggestion devient une étiquette dès qu'elle est choisie, une saisie non validée le devient quand on quitte le champ, et `collecter()` compte la saisie en cours (compétences et certifications). Test : enregistrer puis relire par l'API dans les trois modes (`tests/test_profil_parcours.py`).
