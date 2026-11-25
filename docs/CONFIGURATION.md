@@ -30,6 +30,7 @@ La base, `UPLOADS_DIR` et `LETTRES_PDF_DIR` sont à sauvegarder ensemble.
 | `FT_CLIENT_SECRET` | Secret associé à `FT_CLIENT_ID`. | vide |
 | `LBA_API_KEY` | Clé de l'API de La Bonne Alternance (api.apprentissage.beta.gouv.fr), mode alternance. | vide |
 | `INSEE_API_KEY` | Clé de l'API Sirene 3.11 (portail-api.insee.fr), pour les entreprises à contacter. | vide |
+| `RECHERCHE_BACKENDS` | Moteurs de recherche web (bibliothèque ddgs) essayés dans l'ordre pour trouver le site d'une entreprise, séparés par des virgules ; le suivant seulement si le précédent refuse ou ne trouve rien (D187). Noms : `brave`, `mojeek`, `duckduckgo`, `yahoo`, `yandex`, `google`. | `brave, mojeek, duckduckgo, yahoo, yandex` |
 | `NOMENCLATURE_NAF` | `NAFRev2` ou `NAF2025` pour forcer la nomenclature cherchée sur Sirene. Vide (conseillé) : NAF rév. 2 jusqu'au 31 décembre 2026, NAF 2025 à partir du 1er janvier 2027. | vide |
 
 ## IA locale

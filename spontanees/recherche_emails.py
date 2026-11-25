@@ -52,7 +52,16 @@ DEBUG = os.getenv("DEBUG_SCRAPER", "false").lower() == "true"
 PAUSE_DDG        = (3, 6)
 PAUSE_LONGUE_N   = 15
 PAUSE_LONGUE     = 45
-PAUSE_RATELIMIT  = 90
+
+# Recherche web (D187) : moteurs de ddgs essayés dans l'ordre, le suivant
+# seulement si le précédent échoue ou ne trouve rien ; RECHERCHE_BACKENDS
+# (.env) remplace l'ordre par défaut. Après ECHECS_AVANT_ARRET requêtes
+# d'affilée sans réponse d'aucun moteur, la recherche web s'arrête pour le
+# lancement (plus d'attente de 90 s par requête).
+BACKENDS_DEFAUT    = "brave, mojeek, duckduckgo, yahoo, yandex"
+REGION_RECHERCHE   = "fr-fr"
+TIMEOUT_MOTEUR     = 10
+ECHECS_AVANT_ARRET = 5
 
 PREFIXES_RH      = ["recrutement", "rh", "alternance", "stage", "emploi", "jobs", "career", "cv"]
 PREFIXES_CONTACT = ["contact", "info", "accueil", "administration", "bonjour", "hello"]
@@ -114,7 +123,10 @@ _EXTENSIONS_FICHIERS_NON_HTML = {
 }
 
 _compteur_ddg = 0
-erreurs_ddg = 0      # requêtes de recherche web en échec depuis le démarrage
+erreurs_ddg = 0      # requêtes de recherche web en échec (aucun moteur) depuis le démarrage
+_echecs_affilee = 0  # requêtes en échec d'affilée, remis à zéro par un succès
+recherche_arretee = False   # vrai après ECHECS_AVANT_ARRET échecs d'affilée, jusqu'au lancement suivant
+echecs_par_moteur: dict[str, int] = {}
 
 
 def dbg(msg):
@@ -370,24 +382,59 @@ def construire_requetes(entreprise, analyse):
 
 # ─── DuckDuckGo ──────────────────────────────────────────────────────────────
 
+def backends_recherche() -> list[str]:
+    """Moteurs de ddgs à essayer, dans l'ordre : RECHERCHE_BACKENDS du .env
+    (« brave, mojeek, duckduckgo »), sinon BACKENDS_DEFAUT. Un nom inconnu
+    de ddgs est ignoré (journalisé) ; aucun nom valable : l'ordre par défaut."""
+    from ddgs.engines import ENGINES
+    connus = ENGINES["text"]
+    demandes = [b.strip().lower() for b in (os.getenv("RECHERCHE_BACKENDS") or "").split(",") if b.strip()]
+    gardes = [b for b in dict.fromkeys(demandes) if b in connus]
+    if inconnus := [b for b in demandes if b not in connus]:
+        journaliser(f"  [⚠️  RECHERCHE_BACKENDS : moteur(s) inconnu(s) ignoré(s) : {', '.join(inconnus)} ; "
+                    f"connus : {', '.join(sorted(connus))}]")
+    return gardes or [b.strip() for b in BACKENDS_DEFAUT.split(",")]
+
+
+def reinitialiser_recherche():
+    """Début d'un lancement : la recherche web est de nouveau permise."""
+    global _echecs_affilee, recherche_arretee
+    _echecs_affilee, recherche_arretee = 0, False
+
+
 def _resultats_ddg(requete):
-    """Résultats d'une requête DuckDuckGo ({href, title, body}), une nouvelle
-    tentative après un refus pour excès de requêtes."""
-    global erreurs_ddg
-    for essai in (1, 2):
+    """Résultats d'une requête de recherche web ({href, title, body}) : le
+    premier moteur de backends_recherche() qui répond ; aucun : requête en
+    échec (journalisée), et la recherche s'arrête pour le lancement après
+    ECHECS_AVANT_ARRET échecs d'affilée (D187)."""
+    global erreurs_ddg, _echecs_affilee, recherche_arretee
+    if recherche_arretee:
+        return []
+    pause_ddg()
+    moteurs, raisons = backends_recherche(), []
+    for moteur in moteurs:
         try:
-            pause_ddg()
-            with DDGS() as ddg:
-                return [r for r in ddg.text(requete, max_results=10) if r.get("href")]
-        except Exception as e:   # refus pour excès de requêtes, moteur injoignable...
-            # Jamais en silence : à l'audit, une panne du moteur laissait 13
-            # entreprises de suite sans aucun candidat, comptées « sans site »
-            erreurs_ddg += 1
-            if essai == 2:
-                journaliser(f"  [⚠️  Recherche web en échec ({type(e).__name__}), requête abandonnée : {requete}]")
-                return []
-            journaliser(f"  [⚠️  Recherche web en échec ({type(e).__name__}) — attente {PAUSE_RATELIMIT}s...]")
-            time.sleep(PAUSE_RATELIMIT)
+            with DDGS(timeout=TIMEOUT_MOTEUR) as ddg:
+                resultats = [r for r in ddg.text(requete, region=REGION_RECHERCHE, backend=moteur, max_results=10)
+                             if r.get("href")]
+            if resultats:
+                _echecs_affilee = 0
+                dbg(f"{moteur} : {len(resultats)} résultat(s)")
+                return resultats
+            raisons.append(f"{moteur} : aucun résultat")
+        except Exception as e:   # refus pour excès de requêtes, moteur injoignable, aucun résultat...
+            echecs_par_moteur[moteur] = echecs_par_moteur.get(moteur, 0) + 1
+            raisons.append(f"{moteur} : {type(e).__name__} {str(e)[:60]}".strip())
+    # Jamais en silence : à l'audit, une panne du moteur laissait 13
+    # entreprises de suite sans aucun candidat, comptées « sans site »
+    erreurs_ddg += 1
+    _echecs_affilee += 1
+    journaliser(f"  [⚠️  Recherche web en échec ({' ; '.join(raisons)}) : {requete}]")
+    if _echecs_affilee >= ECHECS_AVANT_ARRET:
+        recherche_arretee = True
+        journaliser(f"  [⛔ Recherche web arrêtée pour ce lancement : {_echecs_affilee} requêtes d'affilée sans "
+                    f"réponse de {', '.join(moteurs)}. Les autres sources du site (LBA, offres, "
+                    "domaines devinés) restent essayées.]")
     return []
 
 
@@ -541,6 +588,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
     """Cherche site, emails et contact des entreprises pas encore traitées,
     au plus max_scrapees par lancement (None : toutes)."""
     _log = log_fn or journaliser
+    reinitialiser_recherche()
     ia_configuree = analyse_ia_active()   # ANALYSE_IA=false : lecture directe seulement
     modele = modele_ia("extraction") if ia_configuree else "désactivée"
     _log(f"Trouver leurs emails | IA pour les emails douteux = {modele} | site vérifié (SIREN ou nom) exigé "
@@ -668,7 +716,8 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
     sauvegarder(user_id, entreprises)
     avec_email = sum(1 for e in entreprises if e.get("emails_trouves"))
     _log(f"✅ Scraping terminé — {avec_email}/{total} avec email")
-    _log(f"   Recherche web : {_compteur_ddg} requêtes" + (f", {erreurs_ddg} en échec" if erreurs_ddg else ""))
+    _log(f"   Recherche web : {_compteur_ddg} requêtes" + (f", {erreurs_ddg} en échec" if erreurs_ddg else "")
+         + (" (arrêtée en cours de lancement après des échecs d'affilée)" if recherche_arretee else ""))
 
 
 def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=None, mode=MODE_DEFAUT):
