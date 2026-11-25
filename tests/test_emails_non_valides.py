@@ -7,9 +7,15 @@ import pytest
 import spontanees.envoi as envoyeur
 import spontanees.recherche_emails as se
 from database.dedup_db import lire_emails_contactes
-from database.entreprises_db import lire_entreprises, sauvegarder_enrichissement
+from database.entreprises_db import (
+    compter_a_valider,
+    lire_entreprises,
+    sauvegarder_enrichissement,
+    valider_adresse,
+    valider_emails,
+)
 from offres.analyse import reserve_public_specifique
-from shared import config
+from shared import config, validation_emails
 from tests.conftest import compte_verifie
 from tests.test_envoyeur import attendre, entreprises
 from tests.test_ia import INTROUVABLE, echouer, erreur_http
@@ -250,3 +256,88 @@ def test_validation_d_une_seule_douteuse(alice):
     e = lire_entreprises(user_id)[1]
     assert e["emails_douteux"] == ["b@gmail.com"] and e["emails_non_valides"] is True
     assert envoyeur.emails_valides(e) == ["a@gmail.com"]
+
+
+# ─── D215 : site hors .fr vérifié par son titre seul ──────────────────────────
+TITRE_EU = {"url": "https://www.ent.eu", "domaine": "ent.eu", "source": "recherche", "verifie": True, "preuve": "nom_titre"}
+
+
+@pytest.mark.parametrize("site, attendu", [
+    (TITRE_EU, True),
+    ({**TITRE_EU, "domaine": "ent.fr"}, False),
+    ({**TITRE_EU, "domaine": "www.ENT.FR"}, False),
+    ({**TITRE_EU, "preuve": "siren"}, False),
+    ({**TITRE_EU, "preuve": "wikidata"}, False),
+    ({**TITRE_EU, "verifie": False}, False),
+    ({**TITRE_EU, "domaine": "ent.fr:443"}, False),
+    (None, False)])
+def test_titre_seul_hors_fr(site, attendu):
+    assert validation_emails.titre_seul_hors_fr(site) is attendu
+
+
+def _eu(user_id, provenance, **champs):
+    liste = lire_entreprises(user_id)
+    liste[0].update(emails_trouves=["contact@ent.eu"], emails_douteux=[], emails_non_valides=False,
+                    validation_emails=provenance, site_verifie=TITRE_EU, **champs)
+    sauvegarder_enrichissement(user_id, liste[:1])
+    return liste[0]["_id"]
+
+
+@pytest.mark.parametrize("provenance", ["regle", "ia"])
+def test_adresse_d_avant_jamais_envoyee_puis_validee_a_la_main(alice, smtp_simule, provenance):
+    """Adresse déjà validée d'office en base (konicaminolta.eu) : ni l'envoi
+    groupé ni la liste de la campagne, mais visible et validable."""
+    client, user_id, _ = alice
+    ident = _eu(user_id, {"contact@ent.eu": provenance})
+    assert envoyeur.pretes(user_id, "alternance") == [] and envoyeur.compter_a_envoyer(user_id, "alternance") == 0
+    assert envoyeur.main(user_id, limite=10)["envoyes"] == 0 and smtp_simule.messages == []
+    ligne = next(x for x in client.get("/api/spontanees/a_valider").json() if x["id"] == ident)
+    assert ligne["emails"] == ["contact@ent.eu"] and ligne["a_la_main"] and ligne["adresses"][0]["validation"] == "douteuse"
+    assert valider_adresse(user_id, ident, "contact@ent.eu")
+    assert [p["adresses"] for p in envoyeur.pretes(user_id, "alternance")] == [["contact@ent.eu"]]
+
+
+def test_tout_valider_a_la_main(alice):
+    _, user_id, _ = alice
+    ident = _eu(user_id, {"contact@ent.eu": "regle"})
+    assert valider_emails(user_id, ident) and [p["id"] for p in envoyeur.pretes(user_id, "alternance")] == [ident]
+
+
+def test_l_ia_ne_les_revoit_pas(alice, monkeypatch):
+    _, user_id, _ = alice
+    avant = compter_a_valider(user_id, "alternance")
+    _eu(user_id, {"contact@ent.eu": "regle"})
+    assert compter_a_valider(user_id, "alternance") == avant            # le maximum d'une revalidation
+    vues = []
+    monkeypatch.setattr(config, "ANALYSE_IA", True, raising=False)
+    monkeypatch.setattr(se, "analyse_ia_active", lambda: True)
+    monkeypatch.setattr(se, "trier", lambda emails, *a, **k: vues.append(emails) or {
+        "valides": [], "douteux": list(emails), "contextes": {}, "provenance": {}, "ecartes_ia": [], "ecartes": [],
+        "meilleur_contact": None})
+    se.revalider(user_id)
+    assert vues and ["contact@ent.eu"] not in vues
+
+
+def test_adresse_de_la_bonne_alternance_pas_concernee():
+    e = {"emails_trouves": ["rh@ent.eu"], "emails_douteux": [], "validation_emails": {}, "site_verifie": TITRE_EU}
+    assert validation_emails.emails_valides(e) == ["rh@ent.eu"]
+
+
+def test_lecture_du_site_rien_de_valide_sans_appel_a_l_ia(monkeypatch):
+    monkeypatch.setattr(validation_emails, "avis_ia", lambda *a, **k: pytest.fail("IA appelée"))
+    tri = validation_emails.trier(["contact@ent.eu", "camille@ent.eu", "x@autre.fr"], "ent.eu", nom="Ent", verifie=True,
+                                  a_la_main=True)
+    assert tri["valides"] == [] and tri["douteux"] == ["contact@ent.eu", "camille@ent.eu"]
+    assert [a for a, _ in tri["ecartes"]] == ["x@autre.fr"]
+
+
+def test_le_scraper_les_met_a_valider(monkeypatch):
+    import spontanees.site_officiel as S
+    from tests.faux_web import FauxWeb, brancher, site
+    for racine, attendu in (("https://acme-labo.eu", True), ("https://acme-labo.fr", False)):
+        mail = f"contact@{racine.split('//')[1]}"
+        brancher(monkeypatch, FauxWeb(site(racine=racine, nom="ACME LABO", siren_dans_mentions=False, emails=(mail,))))
+        v = S.verifier(racine, {"nom": "ACME LABO", "siren": "123456789"}, S.RECHERCHE)
+        assert v.preuve == "nom_titre"
+        r = se.scraper_et_extraire(v, "ACME LABO", ia=True)
+        assert r["emails"] == [mail] and (r["douteux"] == [mail]) is attendu

@@ -403,8 +403,9 @@ def _douteux(e: Entreprise) -> list[str]:
     """Adresses douteuses de l'entreprise, pas encore validées (phase 7)."""
     from shared.validation_emails import emails_douteux
     extra = e.extra or {}
-    return emails_douteux({"emails_trouves": e.emails_trouves or [], "emails_douteux": extra.get("emails_douteux"),
-                           "emails_non_valides": extra.get("emails_non_valides")})
+    return emails_douteux({"emails_trouves": e.emails_trouves or [],
+                           **{c: extra.get(c) for c in ("emails_douteux", "emails_non_valides", "site_verifie",
+                                                        "validation_emails")}})
 
 
 def adresses(e: Entreprise) -> list[dict]:
@@ -428,7 +429,7 @@ def adresses(e: Entreprise) -> list[dict]:
 def _en_attente_de_validation(e: Entreprise, m: EntrepriseMode) -> bool:
     """Adresses douteuses pas encore validées, entreprise pas encore envoyée
     dans ce mode (D15)."""
-    return bool((e.extra or {}).get("emails_non_valides")) and bool(_douteux(e)) and not m.mail_envoye
+    return bool(_douteux(e)) and not m.mail_envoye
 
 
 def _ecartees_ia(e: Entreprise) -> list[str]:
@@ -438,13 +439,17 @@ def _ecartees_ia(e: Entreprise) -> list[str]:
 def lire_a_valider(user_id: int, mode: str = MODE_DEFAUT) -> list[dict]:
     """Entreprises du mode, pas encore envoyées, qui ont des adresses
     douteuses (à valider à la main ou par l'IA) ou écartées par l'IA
-    (visibles, validables quand même). La validation vaut pour tous les modes."""
+    (visibles, validables quand même). La validation vaut pour tous les
+    modes. a_la_main : l'IA n'y touche pas (site vérifié par son titre seul,
+    hors .fr, D215)."""
+    from shared.validation_emails import titre_seul_hors_fr
     db = SessionLocal()
     try:
         return [{"id": e.id, "nom": noms_affiches(e)[0],
                  "ville": e.ville or "", "site": e.site_web or "", "emails": _douteux(e),
                  "valides": [a for a in e.emails_trouves or [] if a not in _douteux(e)],
-                 "ecartees_ia": _ecartees_ia(e), "adresses": adresses(e)}
+                 "ecartees_ia": _ecartees_ia(e), "adresses": adresses(e),
+                 "a_la_main": titre_seul_hors_fr((e.extra or {}).get("site_verifie"))}
                 for e, m in _du_mode(db, user_id, mode)
                 if _en_attente_de_validation(e, m) or (_ecartees_ia(e) and not m.mail_envoye)]
     finally:
@@ -453,7 +458,7 @@ def lire_a_valider(user_id: int, mode: str = MODE_DEFAUT) -> list[dict]:
 
 def compter_a_valider(user_id: int, mode: str = MODE_DEFAUT) -> int:
     """Entreprises aux adresses douteuses (le maximum d'une revalidation)."""
-    return sum(1 for e in lire_a_valider(user_id, mode) if e["emails"])
+    return sum(1 for e in lire_a_valider(user_id, mode) if e["emails"] and not e["a_la_main"])
 
 
 def valider_adresse(user_id: int, entreprise_id: int, adresse: str) -> bool:
@@ -496,7 +501,7 @@ def valider_emails(user_id: int, entreprise_id: int) -> bool:
     db = SessionLocal()
     try:
         e = db.query(Entreprise).filter_by(user_id=user_id, id=entreprise_id).first()
-        if not e or not ((e.extra or {}).get("emails_non_valides") and _douteux(e)):
+        if not e or not _douteux(e):
             return False
         extra = dict(e.extra or {})
         extra["validation_emails"] = {**(extra.get("validation_emails") or {}),

@@ -200,8 +200,18 @@ def avis_ia(nom: str, domaine_site: str | None, douteuses: list[str], trouvees: 
     return valides, meilleur
 
 
+def titre_seul_hors_fr(site: dict | None) -> bool:
+    """Site (extra.site_verifie) vérifié par son titre seul et hors .fr : sans
+    doute une maison mère ou un homonyme (konicaminolta.eu). Ses adresses
+    restent à valider à la main, ni les règles ni l'IA n'en décident (D215)."""
+    site = site or {}
+    return (bool(site.get("verifie", True)) and site.get("preuve") == "nom_titre"
+            and not str(site.get("domaine") or "").lower().split(":")[0].endswith(".fr"))
+
+
 def trier(emails, domaine_site: str | None, nom: str = "", texte: str = "", ia: bool = True,
-          contextes: dict | None = None, log=None, deja_valides=(), verifie: bool = False) -> dict:
+          contextes: dict | None = None, log=None, deja_valides=(), verifie: bool = False,
+          a_la_main: bool = False) -> dict:
     """Trie des adresses : règles, puis un appel à l'IA (ia=True) pour toutes
     les douteuses de l'entreprise.
     texte : texte des pages lues (pour l'extrait autour de chaque adresse) ;
@@ -212,7 +222,9 @@ def trier(emails, domaine_site: str | None, nom: str = "", texte: str = "", ia: 
     l'IA n'a pas retenues), "contextes" (des douteuses restantes),
     "meilleur_contact", "ia_bloquee" ou "erreur_ia" (message) si l'IA a
     échoué : les douteuses le restent. verifie : domaine_site est le site
-    vérifié de l'entreprise (D160) ; sinon toutes les adresses sont écartées."""
+    vérifié de l'entreprise (D160) ; sinon toutes les adresses sont écartées.
+    a_la_main : le site ne prouve pas assez (titre_seul_hors_fr), aucune
+    adresse n'est validée et l'IA n'est pas appelée."""
     from shared.ia import ErreurIABloquante, ErreurIAPassagere
     contextes = dict(contextes or {})
     resultat = {"valides": [], "provenance": {}, "douteux": [], "ecartes": [], "ecartes_ia": [],
@@ -222,14 +234,14 @@ def trier(emails, domaine_site: str | None, nom: str = "", texte: str = "", ia: 
         decision, raison = classer(email, domaine_site, verifie)
         if decision == ECARTE:
             resultat["ecartes"].append((email, raison))
-        elif decision == VALIDE:
+        elif decision == VALIDE and not a_la_main:
             resultat["valides"].append(email)
             resultat["provenance"][email] = REGLE
         else:
             raisons[email] = raison
             resultat["contextes"][email] = contextes.get(email) or contexte(email, texte)
     douteuses = list(raisons)
-    if ia and douteuses:
+    if ia and douteuses and not a_la_main:
         try:
             retenues, meilleur = avis_ia(nom, domaine_site, douteuses, [*deja_valides, *resultat["valides"]],
                                          resultat["contextes"])
@@ -261,8 +273,13 @@ def emails_douteux(entreprise: dict) -> list[str]:
     trouves = entreprise.get("emails_trouves") or []
     if entreprise.get("emails_douteux") is not None:
         douteux = set(entreprise["emails_douteux"])
-        return [e for e in trouves if e in douteux]
-    return list(trouves) if entreprise.get("emails_non_valides") else []
+    else:
+        douteux = set(trouves) if entreprise.get("emails_non_valides") else set()
+    # Adresses d'avant D215, validées par les règles ou l'IA : à valider aussi
+    if titre_seul_hors_fr(entreprise.get("site_verifie")):
+        provenance = entreprise.get("validation_emails") or {}
+        douteux |= {a for a in trouves if provenance.get(a) in (REGLE, IA)}
+    return [e for e in trouves if e in douteux]
 
 
 def emails_valides(entreprise: dict) -> list[str]:

@@ -66,7 +66,7 @@
   <!-- Emails douteux que ni les règles ni l'IA n'ont validés : jamais envoyés tels quels -->
   <section class="carte-verif" data-a-valider aria-labelledby="verif-titre" hidden>
     <h2 class="carte-verif__titre" id="verif-titre"><span data-a-valider-nombre>0</span> entreprises ont des adresses à vérifier</h2>
-    <p class="carte-verif__aide">Adresses douteuses (autre domaine que le site, messagerie grand public, adresse nominative) que ni les règles ni l'IA n'ont pu valider : elles ne partent jamais seules. Valide-les une à une, ou fais-les revoir par l'IA. Les adresses déjà validées de l'entreprise partent normalement.</p>
+    <p class="carte-verif__aide">Adresses douteuses (autre domaine que le site, messagerie grand public, adresse nominative) que ni les règles ni l'IA n'ont pu valider, ou site hors .fr reconnu à son titre seul (maison mère, homonyme : à valider à la main, l'IA n'y touche pas) : elles ne partent jamais seules. Valide-les une à une, ou fais revoir les autres par l'IA. Les adresses déjà validées de l'entreprise partent normalement.</p>
     {% if analyse_ia|default(true) %}
     <button type="button" class="btn btn--sm" data-action="revalider">Faire revoir par l'IA</button>
     {% else %}
