@@ -68,6 +68,7 @@ class ExtractionOffre(_Reponse):
     date_debut_offre: str | None = Field(description="Début écrit dans l'offre, ou null")
     alternance_seulement: bool = Field(description="Vrai si l'offre n'existe qu'en alternance ou apprentissage")
     experience_exigee_annees: float | None = Field(description="Années d'expérience exigées, ou null")
+    experience_exigee_domaine: str | None = Field(description="Domaine de l'expérience exigée, recopié du texte, ou null")
     permis_exige: str | None = Field(description="Code du permis exigé (B, C...), ou null")
     certifications_exigees: list[str] = Field(description="Certifications exigées (CACES, SSIAP...)")
     diplome_etat_exige: bool = Field(description="Vrai si un diplôme d'État est exigé")

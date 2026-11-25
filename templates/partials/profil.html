@@ -195,12 +195,6 @@
             <p class="field__hint">Une offre qui exige un permis que tu n'as pas est écartée. Coche « Aucun permis » si c'est le cas.</p>
             <div class="domaines-choix" data-permis></div>
           </fieldset>
-          <label class="field">
-            <span class="field__label">Expérience professionnelle, en mois</span>
-            <span class="field__hint">Total des stages, jobs et emplois. Une offre de job qui exige davantage est écartée ; vide : jamais écartée pour ça.</span>
-            <input class="field__input" type="number" min="0" max="600" step="1" inputmode="numeric"
-                   data-rech="experience_mois" placeholder="Ex. 6">
-          </label>
           <div class="field">
             <label class="field__label" for="certification-ajout">Certifications</label>
             <p class="field__hint">CACES, SSIAP, carte professionnelle… Tape et appuie sur Entrée, ou choisis dans la liste. Une offre qui exige une certification absente d'ici est écartée.</p>
@@ -219,6 +213,12 @@
         </div>
 
         <div class="profil-grid" data-mode-section="alternance">
+          <label class="field">
+            <span class="field__label">Expérience professionnelle, en mois</span>
+            <span class="field__hint">Total des stages, jobs et emplois.</span>
+            <input class="field__input" type="number" min="0" max="600" step="1" inputmode="numeric"
+                   data-rech="experience_mois" placeholder="Ex. 6">
+          </label>
           <label class="field field--full">
             <span class="field__label">Formation</span>
             <span class="field__hint">Une ligne par diplôme : niveau, intitulé, établissement, dates.</span>
@@ -244,6 +244,12 @@
         </div>
 
         <div class="profil-grid" data-mode-section="stage">
+          <label class="field">
+            <span class="field__label">Expérience professionnelle, en mois</span>
+            <span class="field__hint">Total des stages, jobs et emplois.</span>
+            <input class="field__input" type="number" min="0" max="600" step="1" inputmode="numeric"
+                   data-rech="experience_mois" placeholder="Ex. 6">
+          </label>
           <label class="field field--full">
             <span class="field__label">Expérience</span>
             <span class="field__hint">Stages, jobs, missions. Utilisée pour noter les offres et écrire la lettre.</span>
@@ -259,6 +265,27 @@
             <input class="field__input" type="text" data-profil="niveau_etudes" placeholder="Ex. Bac, Bac+2…">
           </label>
           <p class="domaines-vide" data-niveau-avert hidden></p>
+          <label class="field field--full">
+            <span class="field__label">Niveau maximal demandé par l'offre</span>
+            <span class="field__hint">Une offre qui demande plus, même seulement souhaité, est écartée. Une offre sans niveau indiqué passe.</span>
+            <select class="field__input" data-rech="niveau_max_offre">
+              <option value="">Sans limite</option>
+              <option value="aucun">Aucun diplôme</option>
+              <option value="cap">CAP/BEP</option>
+              <option value="bac">Bac</option>
+              <option value="bac+2">Bac+2</option>
+              <option value="bac+3">Bac+3</option>
+              <option value="bac+5">Bac+5</option>
+            </select>
+          </label>
+          <!-- Job : expérience par domaine (D211) ; total en mois gardé pour la règle D174 tant que la liste est vide -->
+          <input type="hidden" data-rech="experience_mois">
+          <div class="field field--full">
+            <span class="field__label">Mon expérience par domaine</span>
+            <span class="field__hint">Une offre qui exige de l'expérience est gardée si c'est dans un de ces domaines et pas plus longtemps que toi. « Débutant accepté » passe toujours.</span>
+            <div class="experiences" data-experiences></div>
+            <div><button class="btn btn--sm" type="button" data-experience-add>Ajouter un domaine</button></div>
+          </div>
           <label class="field field--full">
             <span class="field__label">Expérience</span>
             <span class="field__hint">Tout ce que tu as fait, même court.</span>

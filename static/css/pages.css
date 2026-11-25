@@ -120,6 +120,13 @@
 .projet__rm { align-self: flex-end; font-size: 13px; color: var(--refus); }
 .projet__rm:hover { opacity: 1; }
 
+/* Mon expérience par domaine (job, D211) */
+.experiences { display: flex; flex-direction: column; gap: 8px; }
+.experiences:empty { display: none; }
+.experience { display: grid; grid-template-columns: minmax(0, 1fr) 110px auto; gap: 8px; align-items: center; }
+@media (max-width: 480px) { .experience { grid-template-columns: minmax(0, 1fr) auto; }
+  .experience select { grid-column: 1 / -1; } }
+
 /* Bloc d'aide (placeholders lettre) */
 .profil-aide {
   background: var(--attention-fond); border: 1px solid var(--attention);

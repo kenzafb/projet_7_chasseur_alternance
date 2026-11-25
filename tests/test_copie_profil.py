@@ -252,12 +252,16 @@ def test_portfolio_du_stage_conserve_et_copiable(utilisateur):
 
 
 def test_permis_experience_certifications_copies(utilisateur):
-    """D169 : communs aux trois modes, rangés dans recherche, copiés sans toucher au reste de recherche."""
+    """D169 : rangés dans recherche, copiés sans toucher au reste de recherche ; l'expérience en mois
+    n'est pas copiée vers le job, qui a son expérience par domaine (D211)."""
     from database.profil_db import copier_sections, lire_profil, sauvegarder_profil
     _, uid = utilisateur("a@test.fr", prenom="Alice")
     sauvegarder_profil(uid, {"recherche": {"permis": ["B"], "experience_mois": 8, "certifications": ["CACES R489"],
-                                           "domaines": ["M18"]}}, mode="job")
+                                           "domaines": ["M18"]}}, mode="alternance")
     sauvegarder_profil(uid, {"recherche": {"domaines": ["K21"]}}, mode="stage")
-    copier_sections(uid, "job", "stage", ["atouts"])
+    copier_sections(uid, "alternance", "stage", ["atouts"])
     r = lire_profil(uid, mode="stage")["recherche"]
     assert (r["permis"], r["experience_mois"], r["certifications"], r["domaines"]) == (["B"], 8, ["CACES R489"], ["K21"])
+    copier_sections(uid, "alternance", "job", ["atouts"])
+    r = lire_profil(uid, mode="job")["recherche"]
+    assert r["permis"] == ["B"] and "experience_mois" not in r

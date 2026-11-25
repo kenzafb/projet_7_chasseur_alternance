@@ -37,7 +37,8 @@ MODES_DU_CHAMP = {
     "lettre_type": TOUS,
     "email_objet": TOUS, "email_type": TOUS,
     "pieces_jointes": TOUS,
-    "permis": TOUS, "experience_mois": TOUS, "certifications": TOUS,   # D169, dans profils.recherche
+    "permis": TOUS, "certifications": TOUS,   # D169, dans profils.recherche
+    "experience_mois": frozenset({"alternance", "stage"}),   # job : par domaine (D211)
 }
 
 # (clé, libellé, champs), dans l'ordre de la page Profil

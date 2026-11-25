@@ -115,6 +115,51 @@ function brancherProjets() {
   });
 }
 
+/* ── Job : mon expérience par domaine (D211) ───────────────────────────── */
+let _experiences = [];
+let _domainesExperience = [];
+
+function rendreExperiences() {
+  const c = document.querySelector("[data-experiences]");
+  if (!c) return;
+  c.innerHTML = _experiences.map((x, i) => `
+    <div class="experience">
+      <select class="field__input" data-exp="${i}:domaine" aria-label="Domaine ${i + 1}">
+        <option value="">Choisis un domaine</option>
+        ${_domainesExperience.map(d => `<option value="${esc(d.cle)}"${d.cle === x.domaine ? " selected" : ""}>${esc(d.libelle)}</option>`).join("")}
+      </select>
+      <input class="field__input" type="number" min="1" max="600" step="1" inputmode="numeric" data-exp="${i}:mois"
+             aria-label="Mois d'expérience, domaine ${i + 1}" placeholder="Mois" value="${esc(x.mois ?? "")}">
+      <button class="btn btn--sm btn--ghost" type="button" data-experience-rm="${i}" aria-label="Retirer le domaine ${i + 1}">Retirer</button>
+    </div>`).join("");
+}
+
+function lireExperiences() {
+  document.querySelectorAll("[data-exp]").forEach(el => {
+    const [i, champ] = el.dataset.exp.split(":");
+    if (_experiences[i]) _experiences[i][champ] = el.value;
+  });
+  return _experiences.filter(x => x.domaine && x.mois).map(x => ({ domaine: x.domaine, mois: Number(x.mois) }));
+}
+
+function brancherExperiences() {
+  document.querySelector("[data-experience-add]")?.addEventListener("click", () => {
+    lireExperiences();
+    _experiences.push({ domaine: "", mois: "" });
+    rendreExperiences();
+  });
+  document.querySelector("[data-experiences]")?.addEventListener("click", e => {
+    const i = e.target.closest("[data-experience-rm]")?.dataset.experienceRm;
+    if (i !== undefined) { lireExperiences(); _experiences.splice(Number(i), 1); rendreExperiences(); }
+  });
+}
+
+async function chargerExperiences(liste) {
+  try { _domainesExperience = (await api.criteresOptions()).experience_domaines || []; } catch (_) { _domainesExperience = []; }
+  _experiences = (Array.isArray(liste) ? liste : []).map(x => ({ ...x }));
+  rendreExperiences();
+}
+
 /* ── Les cinq parties (D147) : une affichée à la fois, état de chacune ─── */
 const PARTIES = ["toi", "mode", "parcours", "recherche", "documents"];
 let _partie = "toi";
@@ -608,6 +653,7 @@ export const Profil = {
     _tags["certifications"] = Array.isArray(p.recherche?.certifications) ? [...p.recherche.certifications] : [];
     rendreTags("certifications");
     await rendrePermis(p.recherche?.permis || []);
+    await chargerExperiences(p.recherche?.experience_domaines);
 
     _projets = Array.isArray(p.projets) ? p.projets.map(x => ({ nom: x.nom || "", url: x.url || "", description: x.description || "" })) : [];
     rendreProjets();
@@ -659,6 +705,7 @@ export const Profil = {
             brancherTags("competences");
       brancherTags("certifications");
       brancherProjets();
+      brancherExperiences();
       brancherPiecesJointes();
       brancherParties();
       montrerPartie(_partie);
@@ -697,6 +744,7 @@ export const Profil = {
     // Permis et certifications (D169), communs aux trois modes
     rech.permis = [...document.querySelectorAll("[data-permis] input:checked")].map(c => c.value);
     rech.certifications = avecSaisieEnCours("certifications");
+    if (_modeProfilCourant === "job") rech.experience_domaines = lireExperiences();
     data.recherche = rech;
     return data;
   },

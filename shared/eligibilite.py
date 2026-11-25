@@ -26,6 +26,8 @@ Règles (une information non précisée ne rend jamais inéligible) :
     4 semaines, ou début de l'offre incompatible avec les dates du profil ;
   - mode stage : niveau minimal lu par Python au-dessus de Bac+3, exigé ou
     souhaité (D202) ;
+  - mode job : niveau minimal demandé au-dessus du maximum choisi dans le
+    profil, exigé ou souhaité (D211) ;
   - modes stage et job : offre en alternance seulement.
 
 raisons_sans_ia applique les mêmes règles à ce que Python lit seul, avant
@@ -96,9 +98,47 @@ def _indices(texte: str) -> list[tuple[tuple[int, int], set[str]]]:
     return trouves
 
 
+# ─── Diplôme demandé au candidat, ou objet d'une mission (D211) ───────────────
+# Un indice de niveau ne compte que dans une phrase de recrutement ; « examens
+# d'entrée en Master 1 », « scolarité de 4 masters » disent le travail, pas le niveau.
+_FIN_PHRASE = re.compile(r"\n|[.!?;](?=\s|$)")
+_RECRUTEMENT = re.compile(
+    r"\bniveaux?\b|titulaire|dipl[ôo]m|formation|profil|\bvous\b|[ée]tudiant|requi[st]|souhait|exig|obligatoire"
+    r"|indispensable|imp[ée]rati|minimum|id[ée]alement|appr[ée]ci|[ée]quivalent|pr[ée]par(?:ez|ant)|cursus|[ée]tudes"
+    r"|[ée]l[èe]ves?\b|\bissue?s?\b|\b[ée]coles?\b|universit|dipl[ôo]mant|derni[èe]re ann[ée]e|fin d.[ée]tude|c[ée]sure")
+# Objet d'une mission avant le diplôme, sans rien qui s'adresse au candidat
+_OBJET_MISSION = re.compile(r"examens?|auditions?|concours|jurys?|scolarit[ée]|brochures?|dossiers?|inscriptions?"
+                            r"|emplois? du temps|soutenances?|plaquettes?")
+_CANDIDAT = re.compile(r"\bniveaux?\b|titulaire|dipl[ôo]m[é]e?s?\b|\bprofil|\bvous\b|[ée]tudiante?\b|requi[st]"
+                       r"|souhait|exig|obligatoire|indispensable|imp[ée]rati|minimum|id[ée]alement|appr[ée]ci"
+                       r"|pr[ée]par(?:ez|ant)")
+# Ligne qui commence par le diplôme (« - BTS SIO », « CAP ou BTS ») : une exigence en liste
+_DEBUT_LISTE = re.compile(r"(?:[^a-zà-ÿ]|\b(?:de|du|un|une|le|la|ou|et|à|en|cap|bep|bac|bts|dut|but|deug|licences?"
+                          r"|bachelors?|masters?|m1|m2|msc)\b)*")
+
+
+def _de_recrutement(texte: str, a: int, b: int) -> bool:
+    """Le diplôme écrit en texte[a:b] est demandé au candidat : sa phrase est
+    de recrutement, ou commence par lui ; pas l'objet d'une mission."""
+    debut = max((m.end() for m in _FIN_PHRASE.finditer(texte, 0, a)), default=0)
+    fin = _FIN_PHRASE.search(texte, b)
+    phrase = texte[debut:fin.start() if fin else len(texte)].lower()
+    avant = texte[debut:a].lower()
+    if _DEBUT_LISTE.fullmatch(avant):
+        return True
+    if _OBJET_MISSION.search(avant) and not _CANDIDAT.search(phrase):
+        return False
+    return bool(_RECRUTEMENT.search(phrase))
+
+
+def _indices_demandes(texte: str) -> list[tuple[tuple[int, int], set[str]]]:
+    """Indices de niveau demandés au candidat."""
+    return [(pos, permis) for pos, permis in _indices(texte) if _de_recrutement(texte, *pos)]
+
+
 def niveaux_dans_texte(texte: str) -> tuple[set[str], list[tuple[int, int]]]:
     """(niveaux que la description permet, positions des indices)."""
-    trouves = _indices(texte)
+    trouves = _indices_demandes(texte)
     return set().union(*(p for _, p in trouves)) if trouves else set(), [pos for pos, _ in trouves]
 
 
@@ -130,7 +170,7 @@ def niveau_detecte(texte: str) -> tuple[str, str] | None:
     indice. Chaque indice vaut son niveau le plus haut (« Master » = bac+5) ;
     plusieurs indices (« BTS ou licence ») : le plus bas, celui qui suffit.
     Exigence : exigence_detectee (exige seulement avec un marqueur clair)."""
-    trouves = _indices(texte)
+    trouves = _indices_demandes(texte)
     if not trouves:
         return None
     niveau = min((max(permis, key=CRANS.get) for _, permis in trouves), key=CRANS.get)
@@ -310,6 +350,49 @@ def niveau_trop_haut_stage(offre: dict, profil: dict) -> str:
     return f"{LIBELLES[crans]} {'exigé' if detecte[1] == 'exige' else 'souhaité'}, {LIBELLES[maximum]} au plus en stage"
 
 
+# Job (D211) : « Niveau maximal demandé par l'offre » du profil, en crans ; vide : sans limite
+NIVEAUX_MAX_OFFRE = {"aucun": (-3, "aucun diplôme"), "cap": (-1, "CAP/BEP"), "bac": (0, "Bac"), "bac+2": (2, "Bac+2"),
+                     "bac+3": (3, "Bac+3"), "bac+5": (5, "Bac+5")}
+# Sous le bac, que l'énumération de l'IA ne connaît pas : le bas d'une fourchette (« CAP à Bac+2 »)
+_CAP_BEP = re.compile(r"\b(?:CAP|BEP)\b(?!\s+(?i:emploi))")       # en majuscules : pas « garder le cap »
+_SANS_DIPLOME = re.compile(r"(?:sans|aucun) dipl[ôo]me|aucune formation scolaire"
+                           r"|dipl[ôo]me (?:non|pas) (?:exig[ée]|requis|obligatoire|n[ée]cessaire)")
+# Faux indices des offres de job : surface (« 500 m2 ») et licence d'un débit de boissons
+_SURFACE = re.compile(r"\d\s*$")
+_LICENCE_EXPLOITATION = re.compile(r"\s+(?:iv|4|de d[ée]bit|d.exploitation|de taxi)\b")
+
+
+def niveau_minimal_job(texte: str) -> int | None:
+    """Niveau minimal demandé par une offre de job, en crans : la lecture de
+    niveau_detecte (borne basse, exigé ou souhaité), plus CAP/BEP et « sans
+    diplôme », moins les faux indices du mode job. None sans niveau écrit."""
+    bas = texte.lower()
+    crans = []
+    for (a, b), permis in _indices_demandes(texte):
+        mot = bas[a:b]
+        if re.fullmatch(r"m\s?2", mot) and _SURFACE.search(bas[:a]):
+            continue
+        if mot.startswith("licence") and _LICENCE_EXPLOITATION.match(bas[b:]):
+            continue
+        crans.append(max(CRANS[n] for n in permis))
+    if any(_de_recrutement(texte, *m.span()) for m in _CAP_BEP.finditer(texte)):
+        crans.append(-1)
+    if _SANS_DIPLOME.search(bas):
+        crans.append(-3)
+    return min(crans) if crans else None
+
+
+def niveau_trop_haut_job(offre: dict, profil: dict) -> str:
+    """Raison d'inéligibilité d'une offre de job dont le niveau minimal demandé
+    dépasse le maximum choisi dans le profil ; "" sinon, ou sans niveau écrit."""
+    plafond = NIVEAUX_MAX_OFFRE.get(((profil or {}).get("recherche") or {}).get("niveau_max_offre") or "")
+    crans = niveau_minimal_job(_texte(offre)) if plafond else None
+    if crans is None or crans <= plafond[0]:
+        return ""
+    libelle = "CAP/BEP" if crans == -1 else LIBELLES[crans]
+    return f"Niveau demandé trop élevé ({libelle} demandé, {plafond[1]} au plus)"
+
+
 # ─── Ce que Python lit seul, sans l'IA (D204) ─────────────────────────────────
 # Durée et début ne sont sûrs que dans une tournure qui ne peut désigner que le
 # stage, sans mention contraire ailleurs dans le texte ; sinon l'IA les lit.
@@ -399,7 +482,10 @@ def raisons_ineligibilite(extraits: dict, profil: dict, mode: str, offre: dict |
         raisons += raisons_exigences(offre, profil, mode, niveau_du_profil(profil)["crans"])
     ecart = ecart_niveau(extraits, profil)
     niveau_bloque = bool(ecart and ecart[0] >= ECART_NIVEAU_BLOQUANT and extraits.get("niveau_exigence") == "exige")
-    if niveau_bloque:
+    trop_haut_job = niveau_trop_haut_job(offre, profil) if mode == "job" and offre is not None else ""
+    if trop_haut_job:
+        raisons.append(trop_haut_job)
+    elif niveau_bloque:
         raisons.append(f"{LIBELLES[ecart[1]]} exigé, profil {LIBELLES[ecart[2]]}")
     # Alternance : diplôme préparé à plus d'un niveau au-dessus du niveau visé (D178)
     if mode == "alternance" and not niveau_bloque:

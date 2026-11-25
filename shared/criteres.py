@@ -23,8 +23,11 @@ Critères de recherche du profil (profils.recherche, colonne JSON) :
   - permis (codes du référentiel France Travail, ou « aucun »),
     experience_mois (expérience professionnelle totale, en mois) et
     certifications (CACES R489, SSIAP 1...) : ce que la personne a, pour les
-    exigences des offres (shared/exigences.py, D169) ; communs aux trois
-    modes, copiables.
+    exigences des offres (shared/exigences.py, D169) ; copiables ;
+  - job (D211) : niveau_max_offre, niveau maximal demandé par l'offre (clé
+    de shared.eligibilite.NIVEAUX_MAX_OFFRE, absent : sans limite), et
+    experience_domaines, [{domaine, mois}] (shared.domaines_experience) ;
+    vide : règle D174 sur experience_mois.
 
 normaliser_recherche les remet en forme à l'enregistrement (valeurs
 inconnues retirées, types fixés) ; les autres clés (disponibilité, champs
@@ -32,9 +35,10 @@ en lecture seule) passent telles quelles. criteres_france_travail en tire
 la recherche d'un mode.
 """
 
-from shared import referentiels
+from shared import domaines_experience, referentiels
 from shared.config import DEPTS_IDF
 from shared.domaines import normaliser_domaines
+from shared.eligibilite import NIVEAUX_MAX_OFFRE
 from shared.exigences import SUGGESTIONS_CERTIFICATIONS
 from shared.modes import get_mode
 from shared.tailles import CLES_TAILLES, TAILLES
@@ -104,6 +108,10 @@ def normaliser_recherche(recherche) -> dict:
             out["experience_mois"] = None
         if out["experience_mois"] is None:
             del out["experience_mois"]
+    if "niveau_max_offre" in out and out["niveau_max_offre"] not in NIVEAUX_MAX_OFFRE:
+        del out["niveau_max_offre"]
+    if "experience_domaines" in out:
+        out["experience_domaines"] = domaines_experience.normaliser(out["experience_domaines"])
     if "certifications" in out:
         vues, certifs = set(), []
         for c in out["certifications"] if isinstance(out["certifications"], (list, tuple)) else []:
@@ -157,4 +165,5 @@ def options_du_profil() -> dict:
         # Permis et certifications du profil (D169)
         "permis": [dict(e) for e in referentiels.france_travail("permis")],
         "certifications": SUGGESTIONS_CERTIFICATIONS,
+        "experience_domaines": domaines_experience.options(),      # profil job (D211)
     }

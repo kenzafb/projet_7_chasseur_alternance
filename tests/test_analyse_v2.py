@@ -14,6 +14,7 @@ PROFIL = {"prenom": "Alice", "niveau_etudes": "Bac+2", "missions": "développeme
 def _extraction(**k):
     base = {"niveau_requis": "non_precise", "niveau_exigence": "non_precise", "duree_mois": None,
             "date_debut_offre": None, "alternance_seulement": False, "experience_exigee_annees": None,
+            "experience_exigee_domaine": None,
             "permis_exige": None, "certifications_exigees": [], "diplome_etat_exige": False}
     return json.dumps({**base, **k})
 
