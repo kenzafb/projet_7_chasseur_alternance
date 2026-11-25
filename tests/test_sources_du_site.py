@@ -55,9 +55,10 @@ def test_annuaire_lu_une_fois():
 # ─── A3 : domaines devinés (D168) ─────────────────────────────────────────────
 def test_domaines_devines():
     # « et » retiré : puceplume.fr, le vrai site de Groupe Puce et Plume
-    assert S.domaines_devines({"nom": "PUCE ET PLUME"})[:4] == [
-        "https://puceplume.fr", "https://puceplume.com", "https://puceplume.eu", "https://puceplume.io"]
-    assert "https://puce-plume.fr" in S.domaines_devines({"nom": "PUCE ET PLUME"})
+    # Le .fr de chaque forme d'abord (D215)
+    assert S.domaines_devines({"nom": "PUCE ET PLUME"}) == [
+        "https://puceplume.fr", "https://puce-plume.fr", "https://puceplume.com", "https://puceplume.eu",
+        "https://puceplume.io", "https://puce-plume.com", "https://puce-plume.eu", "https://puce-plume.io"]
     assert len(S.domaines_devines({"nom": "GROUPE PUCE ET PLUME SAS", "nom_commercial": "PUCE ET PLUME"})) == 8
     assert S.domaines_devines({"nom": "LE JU"}) == []               # aucun mot distinctif
     assert S.domaines_devines({"nom": "CARTADIS"})[0] == "https://cartadis.fr"
@@ -118,3 +119,63 @@ def test_domaine_au_nom():
     assert S.domaine_au_nom("https://wetradelocal.io", {"nom": "WETRADELOCAL"})
     assert not S.domaine_au_nom("https://olympic.fermat.edu.vn", {"nom": "FERMAT"})     # domaine principal : edu
     assert not S.domaine_au_nom("https://fondationpierrebellon.org", {"nom": "BELLON SA"})
+
+
+# ─── D215 : le .fr d'abord ────────────────────────────────────────────────────
+KONICA = {"nom": "KONICA MINOLTA BUSINESS SOLUTIONS FRANCE", "nom_commercial": "KONICA MINOLTA BUSINESS SOLUTIONS FRANCE",
+          "siren": "123456789", "autres_noms": ["KONICA MINOLTA"]}
+
+
+def test_fr_du_nom_court_devine_malgre_les_formes_longues():
+    devines = S.domaines_devines(KONICA)
+    assert "https://konicaminolta.fr" in devines and len(devines) == 8
+
+
+def test_domaine_en_fr():
+    for url, fr in {"https://www.konicaminolta.eu": "konicaminolta.fr", "https://acme.co.uk": "acme.fr",
+                    "https://embersgrillandburger.com.au": "embersgrillandburger.fr",
+                    "https://inaugurationsage.events.sage.com": "sage.fr", "https://www.acme.fr": "", "https://x.co": "x.fr"}.items():
+        assert S.domaine_en_fr(url) == fr
+
+
+def _eu_et_fr(monkeypatch, **fr):
+    pages = site(racine="https://konicaminolta.eu", nom="Konica Minolta", siren_dans_mentions=False)
+    if fr:
+        pages.update(site(nom="Konica Minolta", **{"racine": "https://konicaminolta.fr", **fr}))
+    web = brancher(monkeypatch, FauxWeb(pages))
+    monkeypatch.setattr(S, "domaines_devines", lambda e: [])
+    return web, S.identifier(KONICA, {}, lambda e: iter(["https://konicaminolta.eu"]), sites_export={})
+
+
+def test_le_fr_qui_porte_le_siren_est_prefere(monkeypatch):
+    _, (v, essais) = _eu_et_fr(monkeypatch, siren_dans_mentions=True)
+    assert v.url == "https://konicaminolta.fr" and v.preuve == "siren" and v.source == S.RECHERCHE
+    assert [x["domaine"] for x in essais] == ["konicaminolta.eu", "konicaminolta.fr"]
+
+
+def test_le_fr_sans_siren_n_est_pas_prefere(monkeypatch):
+    _, (v, _) = _eu_et_fr(monkeypatch, siren_dans_mentions=False)        # son nom est pourtant dans le titre
+    assert v.url == "https://konicaminolta.eu"
+
+
+def test_le_fr_absent(monkeypatch):
+    _, (v, _) = _eu_et_fr(monkeypatch)
+    assert v.url == "https://konicaminolta.eu" and v.preuve == "nom_titre"
+
+
+def test_le_fr_qui_redirige_hors_fr_ne_change_rien(monkeypatch):
+    pages = site(racine="https://acme.com", nom="Acme Labo")
+    pages["https://acme.fr"] = ("redirection", "https://acme.com")
+    brancher(monkeypatch, FauxWeb(pages))
+    monkeypatch.setattr(S, "domaines_devines", lambda e: [])
+    v, _ = S.identifier({"nom": "ACME LABO", "siren": "123456789"}, {}, lambda e: iter(["https://acme.com"]), sites_export={})
+    assert v.url == "https://acme.com" and v.preuve == "siren"
+
+
+def test_un_fr_deja_essaye_n_est_pas_relu(monkeypatch):
+    pages = site(racine="https://konicaminolta.eu", nom="Konica Minolta", siren_dans_mentions=False)
+    pages.update(site(racine="https://konicaminolta.fr", nom="Autre", siren_dans_mentions=False, titre="Autre"))
+    web = brancher(monkeypatch, FauxWeb(pages))
+    monkeypatch.setattr(S, "domaines_devines", lambda e: ["https://konicaminolta.fr"])
+    v, _ = S.identifier(KONICA, {}, lambda e: iter(["https://konicaminolta.eu"]), sites_export={})
+    assert v.domaine == "konicaminolta.eu" and web.demandes.count("https://konicaminolta.fr") == 1

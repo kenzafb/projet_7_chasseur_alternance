@@ -45,6 +45,7 @@ PREUVES = {"siren": "SIREN", "siret": "SIRET", "tva": "numéro de TVA", "nom_tit
            "nom_mentions": "nom dans les mentions légales",
            "domaine_adresse": "domaine au nom de l'entreprise et adresse sur le site",
            "wikidata": "site officiel déclaré dans Wikidata pour le SIREN"}
+PREUVES_NUMERO = ("siren", "siret", "tva")
 MAX_CANDIDATS_RECHERCHE = 8      # domaines de la recherche web essayés au plus (4 avant D171)
 MOTS_DISTINCTIFS_MIN = 2         # preuve par le nom : au moins 2 mots distinctifs, sinon SIREN (D172)
 
@@ -332,23 +333,21 @@ def site_deja_verifie(entreprise: dict) -> str:
 
 def domaines_devines(entreprise: dict) -> list[str]:
     """Accueils devinés d'après le nom (D168) : nom simplifié, mots collés
-    puis séparés d'un tiret, avec .fr, .com, .eu, .io ; sigle et autres noms
-    ensuite. Seulement des noms d'au moins 4 caractères qui ont un mot
-    distinctif (« groupe-services.fr » n'est pas deviné). Sans moteur de
-    recherche : aucune limite de requêtes, un domaine qui n'existe pas
-    échoue tout de suite."""
+    puis séparés d'un tiret ; sigle et autres noms ensuite. Le .fr de chaque
+    forme d'abord, puis leurs .com, .eu, .io (D215) : sinon deux formes
+    longues prenaient toutes les places. Seulement des noms d'au moins
+    4 caractères qui ont un mot distinctif (« groupe-services.fr » n'est pas
+    deviné). Sans moteur de recherche : aucune limite de requêtes, un domaine
+    qui n'existe pas échoue tout de suite."""
     formes = []
     for nom in variantes_du_nom(entreprise) + [simplifier(n) for n in autres_noms(entreprise)]:
         mots = [m for m in nom.split() if m not in FORMES]
         for forme in ("".join(mots), "-".join(mots)):
             if 4 <= len(forme) <= 40 and forme not in formes:
                 formes.append(forme)
-    out = []
-    for forme in formes:
-        for ext in EXTENSIONS_DEVINEES:
-            if len(out) < MAX_DOMAINES_DEVINES:
-                out.append(f"https://{forme}{ext}")
-    return out
+    out = [f"https://{forme}{EXTENSIONS_DEVINEES[0]}" for forme in formes]
+    out += [f"https://{forme}{ext}" for forme in formes for ext in EXTENSIONS_DEVINEES[1:]]
+    return out[:MAX_DOMAINES_DEVINES]
 
 
 def candidats(entreprise: dict, sites_france_travail: dict, recherche=None, sites_export=None):
@@ -393,6 +392,34 @@ def candidats(entreprise: dict, sites_france_travail: dict, recherche=None, site
                 return
 
 
+# ─── Le même domaine en .fr (D215) ────────────────────────────────────────────
+_SECONDS_NIVEAUX = {"com", "co", "org", "net", "gov", "edu", "ac"}      # acme.com.au, acme.co.uk
+
+
+def domaine_en_fr(url: str) -> str:
+    """konicaminolta.eu, www.konicaminolta.co.uk -> konicaminolta.fr ; "" si c'est déjà un .fr."""
+    parties = L.domaine(url).split(":")[0].split(".")
+    if len(parties) < 2 or parties[-1] == "fr":
+        return ""
+    if len(parties) >= 3 and len(parties[-1]) == 2 and parties[-2] in _SECONDS_NIVEAUX:
+        parties = parties[:-1]
+    return f"{parties[-2]}.fr"
+
+
+def preferer_fr(v: Verification, entreprise: dict, essais: list[dict], lecteur_cls=L.LecteurSite) -> Verification:
+    """Site retenu hors .fr : le même domaine en .fr à la place, s'il porte le
+    SIREN (SIRET, TVA). Sinon v, inchangée."""
+    fr = domaine_en_fr(v.url)
+    if not fr or domaine_interdit(fr) or any(x["domaine"] == fr for x in essais):
+        return v
+    for racine in (f"https://{fr}", f"https://www.{fr}"):
+        w = verifier(racine, entreprise, v.source, lecteur_cls)
+        if w.pages:
+            essais.append(w.resume())
+            return w if w.preuve in PREUVES_NUMERO and w.domaine.endswith(".fr") else v
+    return v
+
+
 def identifier(entreprise: dict, sites_france_travail: dict | None = None, recherche=None,
                lecteur_cls=L.LecteurSite, log=None, sites_export=None) -> tuple[Verification | None, list[dict]]:
     """(vérification retenue ou None, toutes les vérifications essayées)."""
@@ -414,5 +441,5 @@ def identifier(entreprise: dict, sites_france_travail: dict | None = None, reche
             if log:
                 log(f"    {'✔' if v.verifie else '✗'} {racine} ({SOURCES[source]}) : {v.detail}")
             if v.verifie:
-                return v, essais
+                return preferer_fr(v, entreprise, essais, lecteur_cls), essais
     return None, essais
