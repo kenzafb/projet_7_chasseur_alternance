@@ -1,0 +1,570 @@
+"""
+spontanees/campagne.py
+======================
+Campagne automatique d'entreprises à contacter (D213), lancée par
+scripts/campagne.py. Pour chaque mode, dans l'ordre :
+
+  1. préparation : recherche des emails par petits lots jusqu'à la cible ;
+     file vide : nouvelle recherche d'entreprises ; garde-fous (durée, nombre
+     d'entreprises, panne de la recherche web) ;
+  2. validation : CAMPAGNE_VALIDATION=telegram, la liste part sur Telegram et
+     rien n'est envoyé sans « Envoyer » avant l'heure limite ; auto, l'envoi
+     suit la préparation ;
+  3. envoi : spontanees.envoi.main, le même que l'interface, restreint à la
+     liste (entreprises ET adresses) montrée.
+
+Tous les modes sont préparés avant d'attendre les réponses : attendre le
+premier bloquerait le suivant. Verrous : la campagne (une seule à la fois) et
+« spontanees » de l'utilisateur, partagé avec l'interface et tenu seulement
+pendant une recherche ou un envoi, pas pendant l'attente d'une réponse.
+"""
+
+import os
+import secrets
+import time
+from dataclasses import dataclass, field, replace
+from datetime import datetime, timedelta
+
+from database import campagnes_db
+from database.compte_envoi_db import envois_du_jour
+from database.dates import maintenant_affichage
+from database.entreprises_db import compter_a_scraper, lire_entreprises
+from database.profil_db import lire_profil
+from shared import config, extinction
+from shared.chiffrement import ChiffrementIndisponible
+from shared.erreurs import ErreurUtilisateur
+from shared.journal import journaliser
+from shared.modes import get_mode
+from shared.pipelines import SPONTANEES
+from shared.telegram import Clic, ErreurTelegram, Telegram
+from shared.verrous import CAMPAGNE, Verrou, nom_pipeline, occupes
+from spontanees import envoi, recherche_emails, recuperation
+
+LOT = 5                          # entreprises par lot de recherche d'emails
+NOUVELLES_ENTREPRISES = 100      # par nouvelle recherche Sirene, LBA
+PAUSE_ENVOIS = (120, 300)        # secondes entre deux mails
+ATTENTE_INTERFACE_S = 15 * 60    # l'interface tient le verrou : attente au plus
+ATTENTE_TELEGRAM_S = 25          # interrogation longue
+DELAI_EXTINCTION_S = 120
+VALIDATIONS = ("telegram", "auto")
+FINS = ("demander", "eteindre", "veille", "rien")
+LIBELLES_FIN = {extinction.ETEINDRE: "Extinction", extinction.VEILLE: "Mise en veille"}
+
+
+class CampagneEnCours(Exception):
+    """Une autre campagne tient le verrou."""
+
+
+# ─── Réglages ─────────────────────────────────────────────────────────────────
+@dataclass(frozen=True)
+class Reglages:
+    cible: int = 30
+    validation: str = "telegram"
+    heure_limite: str = "16:00"
+    duree_max_min: int = 120
+    max_entreprises: int = 200
+    fin: str = "demander"
+    fin_attente_min: int = 60
+
+    def verifier(self) -> "Reglages":
+        if self.validation not in VALIDATIONS:
+            raise ErreurUtilisateur(f"CAMPAGNE_VALIDATION : {' ou '.join(VALIDATIONS)}, pas « {self.validation} ».")
+        if self.fin not in FINS:
+            raise ErreurUtilisateur(f"CAMPAGNE_FIN : {', '.join(FINS)}, pas « {self.fin} ».")
+        try:
+            datetime.strptime(self.heure_limite, "%H:%M")
+        except ValueError:
+            raise ErreurUtilisateur("CAMPAGNE_HEURE_LIMITE : une heure comme 16:00.") from None
+        if min(self.cible, self.duree_max_min, self.max_entreprises) < 1 or self.fin_attente_min < 0:
+            raise ErreurUtilisateur("Réglages de la campagne : des nombres positifs sont attendus.")
+        return self
+
+
+_VARIABLES = {"validation": "CAMPAGNE_VALIDATION", "heure_limite": "CAMPAGNE_HEURE_LIMITE",
+              "duree_max_min": "CAMPAGNE_DUREE_MAX_MIN", "max_entreprises": "CAMPAGNE_MAX_ENTREPRISES",
+              "fin": "CAMPAGNE_FIN", "fin_attente_min": "CAMPAGNE_FIN_ATTENTE_MIN"}
+
+
+def reglages_env(cible: int = 30) -> Reglages:
+    """Réglages des variables CAMPAGNE_* (vides : défauts). Une valeur
+    illisible arrête tout : mieux vaut ne rien lancer."""
+    r = Reglages(cible=cible)
+    for champ, variable in _VARIABLES.items():
+        texte = os.getenv(variable, "").strip()
+        if not texte:
+            continue
+        if isinstance(getattr(r, champ), int):
+            try:
+                valeur = int(texte)
+            except ValueError:
+                raise ErreurUtilisateur(f"{variable} : un nombre entier est attendu, pas « {texte} ».") from None
+        else:
+            valeur = texte if champ == "heure_limite" else texte.lower()
+        r = replace(r, **{champ: valeur})
+    return r.verifier()
+
+
+class Horloge:
+    """Le temps de la campagne (remplacé dans les tests)."""
+
+    def maintenant(self) -> datetime:
+        return maintenant_affichage()
+
+    def dormir(self, secondes: float):
+        time.sleep(secondes)
+
+
+@dataclass
+class Attente:
+    """Liste prête d'un mode, en attente de « Envoyer »."""
+    mode: str
+    liste: list[dict]
+    test: bool
+    jeton: str = field(default_factory=lambda: secrets.token_hex(6))
+    message_id: int = 0
+
+
+class _ArretRecherche:
+    """stop_event d'une recherche : arrêt demandé, durée écoulée, ou recherche
+    web en panne (D187). Regardé entre deux entreprises."""
+
+    def __init__(self, campagne: "Campagne", fin: datetime):
+        self.campagne, self.fin = campagne, fin
+
+    def raison(self) -> str:
+        if self.campagne.arret:
+            return "arrêt demandé"
+        if self.campagne.horloge.maintenant() >= self.fin:
+            return f"durée maximale atteinte ({self.campagne.reglages.duree_max_min} min)"
+        if recherche_emails.recherche_arretee:
+            return "recherche web en panne"
+        return ""
+
+    def is_set(self) -> bool:
+        return bool(self.raison())
+
+
+class _ArretEnvoi:
+    """stop_event d'un envoi : sa pause relève les clics Telegram."""
+
+    def __init__(self, campagne: "Campagne"):
+        self.campagne = campagne
+
+    def is_set(self) -> bool:
+        return self.campagne.arret
+
+    def wait(self, secondes: float) -> bool:
+        self.campagne.patienter(secondes)
+        return self.is_set()
+
+
+# ─── Campagne ─────────────────────────────────────────────────────────────────
+class Campagne:
+    def __init__(self, user_id: int, modes, reglages: Reglages, telegram: Telegram | None, horloge=None):
+        self.user_id, self.modes, self.reglages = user_id, list(modes), reglages
+        self.telegram, self.horloge = telegram, horloge or Horloge()
+        self.arret = False                 # SIGTERM, Ctrl+C
+        self.bilan = {}                    # mode -> chiffres
+        self.attentes: dict[str, Attente] = {}
+        self._clics: list[Clic] = []       # clics à traiter par la boucle principale
+        self._jeton_fin = secrets.token_hex(6)
+        self._message_fin = 0
+        self._envoi_en_cours = False
+        self._parti = False                # extinction ou veille demandée au système
+        self._id = None
+
+    # ─── Journal et messages ──────────────────────────────────────────────────
+    def log(self, message: str):
+        journaliser(f"[campagne] {message}")
+        if self._id is not None:
+            try:
+                campagnes_db.noter(self._id, message)
+            except Exception as e:   # la base occupée ne doit pas arrêter la campagne
+                journaliser(f"[campagne] journal non écrit ({type(e).__name__})")
+
+    def notifier(self, texte: str, boutons=None) -> int:
+        """Message Telegram ; 0 s'il n'est pas parti (la campagne continue)."""
+        self.log(f"📨 {texte.splitlines()[0]}")
+        if not self.telegram:
+            return 0
+        try:
+            return self.telegram.envoyer(texte, boutons)
+        except ErreurTelegram as e:
+            self.log(f"⚠️  {e}")
+            return 0
+
+    def _telegram(self, action):
+        """Appel Telegram accessoire : un échec est journalisé."""
+        try:
+            return action()
+        except ErreurTelegram as e:
+            self.log(f"⚠️  {e}")
+            return None
+
+    def _sans_boutons(self, message_id: int):
+        if message_id and self.telegram:
+            self._telegram(lambda: self.telegram.retirer_boutons(message_id))
+
+    # ─── Clics ────────────────────────────────────────────────────────────────
+    def relever(self, attente: int = 0):
+        """Lit les clics et y répond aussitôt ; ceux qui demandent une action
+        attendent la boucle principale."""
+        clics = self._telegram(lambda: self.telegram.clics(attente)) if self.telegram else None
+        if clics is None:
+            if attente:      # pas de bot, ou Telegram injoignable : pas de boucle serrée
+                self.horloge.dormir(attente)
+            return
+        for clic in clics:
+            self._accuser(clic)
+
+    def _accuser(self, clic: Clic):
+        action, _, jeton = clic.donnee.partition(":")
+        attente = next((a for a in self.attentes.values() if a.jeton == jeton), None)
+        if action in ("envoyer", "voir") and attente:
+            if action == "voir":
+                self._telegram(lambda: self.telegram.accuser(clic, "Rien n'est parti."))
+                self._voir(attente)
+                return
+            if self.horloge.maintenant() >= self.limite:
+                self._telegram(lambda: self.telegram.accuser(clic, "Heure limite passée : rien n'est envoyé."))
+                return
+            self._telegram(lambda: self.telegram.accuser(clic, "Envoi noté."))
+            self._clics.append(clic)
+        elif action in (extinction.ETEINDRE, extinction.VEILLE, "annuler") and jeton == self._jeton_fin:
+            if self._envoi_en_cours or (action != "annuler" and not self._message_fin):
+                self._telegram(lambda: self.telegram.accuser(clic, "Campagne en cours : proposé à la fin."))
+                return
+            self._telegram(lambda: self.telegram.accuser(clic))
+            self._clics.append(clic)
+        else:
+            self._telegram(lambda: self.telegram.accuser(clic, "Ce bouton n'est plus valable."))
+
+    def patienter(self, secondes: float):
+        """Attend en relevant les clics."""
+        fin = self.horloge.maintenant() + timedelta(seconds=secondes)
+        while not self.arret and (reste := (fin - self.horloge.maintenant()).total_seconds()) > 0:
+            if self.telegram:
+                self.relever(max(1, min(ATTENTE_TELEGRAM_S, int(reste))))
+            else:
+                self.horloge.dormir(min(reste, 5))
+
+    # ─── Verrou partagé avec l'interface ──────────────────────────────────────
+    def _verrou_spontanees(self) -> Verrou | None:
+        verrou = Verrou(nom_pipeline(SPONTANEES, self.user_id))
+        fin = self.horloge.maintenant() + timedelta(seconds=ATTENTE_INTERFACE_S)
+        while not verrou.prendre():
+            if self.arret or self.horloge.maintenant() >= fin:
+                return None
+            self.patienter(20)
+        return verrou
+
+    # ─── Déroulé ──────────────────────────────────────────────────────────────
+    def executer(self) -> dict:
+        """Toute la campagne. CampagneEnCours si une autre tourne."""
+        verrou = Verrou(CAMPAGNE)
+        if not verrou.prendre():
+            raise CampagneEnCours("Une campagne est déjà en cours.")
+        etat = "erreur"
+        try:
+            self._id = campagnes_db.ouvrir(self.user_id)
+            heures, minutes = map(int, self.reglages.heure_limite.split(":"))
+            self.limite = self.horloge.maintenant().replace(hour=heures, minute=minutes, second=0, microsecond=0)
+            if self.telegram:
+                self._telegram(lambda: self.telegram.clics(0))     # clics d'une campagne passée : oubliés
+            self.notifier(f"▶️ Campagne commencée : {', '.join(self.modes)}, {self.reglages.cible} entreprises par mode"
+                          + (f". Réponse attendue avant {self.reglages.heure_limite}."
+                             if self.reglages.validation == "telegram" else ". Envoi automatique."))
+            for mode in self.modes:
+                if self.arret:
+                    break
+                self._un_mode(mode)
+            if self.attentes and not self.arret:
+                self._proposer_fin()
+                self._attendre_validations()
+            etat = "arretee" if self.arret else "terminee"
+            campagnes_db.enregistrer_bilan(self._id, self.bilan, etat)
+            if self.arret:
+                self.notifier("⏹️ Campagne arrêtée. " + self._resume())
+            elif not self._parti:
+                self._fin()
+            return self.bilan
+        except Exception as e:
+            self.notifier(f"❌ Campagne interrompue par une erreur ({type(e).__name__}). Voir le journal.")
+            if self._id is not None:
+                campagnes_db.enregistrer_bilan(self._id, self.bilan, "erreur")
+            raise
+        finally:
+            verrou.liberer()
+
+    def _noter(self, mode: str, **champs):
+        self.bilan.setdefault(mode, {}).update(champs)
+        campagnes_db.enregistrer_bilan(self._id, self.bilan)
+
+    def _un_mode(self, mode: str):
+        try:
+            compte = envoi.verifier_avant_envoi(self.user_id, mode)
+        except (ErreurUtilisateur, ChiffrementIndisponible) as e:
+            self._noter(mode, erreur=str(e))
+            self.notifier(f"❌ {mode} : {e}")
+            return
+        self._preparer(mode)
+        if self.arret:
+            return
+        # Plafond du jour : ce qui reste, moins ce qui attend déjà une réponse
+        reste = config.PLAFOND_ENVOIS_JOUR - envois_du_jour(self.user_id) - sum(
+            len(a.liste) for a in self.attentes.values())
+        maximum = min(self.reglages.cible, max(0, reste), config.LIMITE_ENVOIS_PAR_LANCEMENT)
+        if maximum == 0:
+            self._noter(mode, plafond=True)
+            self.notifier(f"⏹️ {mode} : plafond de {config.PLAFOND_ENVOIS_JOUR} mails par jour atteint. "
+                          "La sélection reste prête dans l'interface.")
+            return
+        liste = envoi.pretes(self.user_id, mode, maximum)
+        self._noter(mode, proposees=len(liste))
+        if not liste:
+            self.notifier(f"ℹ️ {mode} : aucune entreprise prête, rien à envoyer.")
+            return
+        if maximum < self.reglages.cible:
+            self.log(f"{mode} : {maximum} mails possibles aujourd'hui (plafond de {config.PLAFOND_ENVOIS_JOUR})")
+        attente = Attente(mode, liste, bool(compte["mode_test"]))
+        if self.reglages.validation == "auto":
+            self._envoyer(attente)
+        else:
+            self._demander(attente)
+
+    # ─── 1. Préparation ───────────────────────────────────────────────────────
+    def _preparer(self, mode: str):
+        debut = self.horloge.maintenant()
+        verrou = self._verrou_spontanees()
+        if verrou is None:
+            self._noter(mode, raison="interface occupée")
+            if not self.arret:
+                self.notifier(f"⚠️ {mode} : une recherche ou un envoi tourne dans l'interface, préparation passée.")
+            return
+        examinees, raison = 0, "cible atteinte"
+        avant = len(envoi.pretes(self.user_id, mode))
+        try:
+            arret = _ArretRecherche(self, debut + timedelta(minutes=self.reglages.duree_max_min))
+            recherche_emails.reinitialiser_recherche()
+            while len(envoi.pretes(self.user_id, mode, self.reglages.cible)) < self.reglages.cible:
+                if raison_arret := arret.raison():
+                    raison = raison_arret
+                    break
+                reste = self.reglages.max_entreprises - examinees
+                if reste <= 0:
+                    raison = f"nombre maximal d'entreprises examinées atteint ({self.reglages.max_entreprises})"
+                    break
+                file = compter_a_scraper(self.user_id, mode)
+                if not file:
+                    if not self._nouvelles_entreprises(mode, arret):
+                        raison = arret.raison() or "plus d'entreprise à trouver"
+                        break
+                    continue
+                recherche_emails.main(self.user_id, stop_event=arret, log_fn=self.log,
+                                      max_scrapees=min(LOT, reste), mode=mode)
+                faites = file - compter_a_scraper(self.user_id, mode)
+                examinees += faites
+                self.relever()
+                if faites <= 0 and not arret.is_set():
+                    raison = "recherche d'emails sans progrès"
+                    break
+        except Exception as e:   # réseau, source... : le mode s'arrête là, ce qui est prêt reste prêt
+            raison = f"erreur pendant la recherche ({type(e).__name__})"
+            self.log(f"❌ {mode} : {type(e).__name__} : {e}")
+        finally:
+            verrou.liberer()
+        duree = round((self.horloge.maintenant() - debut).total_seconds() / 60)
+        toutes = len(envoi.pretes(self.user_id, mode))
+        self._noter(mode, examinees=examinees, emails_trouves=max(0, toutes - avant), pretes=toutes,
+                    duree_min=duree, raison=raison)
+        signe = "✅" if raison == "cible atteinte" else "⏹️"
+        self.notifier(f"{signe} {mode} : recherche finie ({raison}).\n{examinees} entreprises examinées, "
+                      f"{max(0, toutes - avant)} avec un email vérifié, {toutes} prêtes, {duree} min.")
+
+    def _nouvelles_entreprises(self, mode: str, arret) -> bool:
+        """Nouvelle recherche Sirene et LBA du profil ; vrai si le mode a gagné
+        des entreprises."""
+        from shared.naf import sirene_pour_profil
+        sirene = sirene_pour_profil(lire_profil(self.user_id, mode=mode))
+        if sirene["rien_a_chercher"] and "lba" not in get_mode(mode)["sources"]:
+            self.log(f"{mode} : {sirene['avertissement']}")
+            return False
+        avant = len(lire_entreprises(self.user_id, mode))
+        self.log(f"{mode} : file vide, nouvelle recherche d'entreprises")
+        recuperation.main(self.user_id, stop_event=arret, max_entreprises=NOUVELLES_ENTREPRISES, log_fn=self.log,
+                          mode=mode)
+        return len(lire_entreprises(self.user_id, mode)) > avant
+
+    # ─── 2. Validation ────────────────────────────────────────────────────────
+    def _lignes(self, attente: Attente) -> str:
+        return "\n".join(f"{i}. {e['nom']} : {', '.join(e['adresses'])}" for i, e in enumerate(attente.liste, 1))
+
+    def _demander(self, attente: Attente):
+        if self.horloge.maintenant() >= self.limite:
+            self._noter(attente.mode, validation="heure limite passée")
+            self.notifier(f"⏹️ {attente.mode} : {len(attente.liste)} emails prêts, mais l'heure limite "
+                          f"({self.reglages.heure_limite}) est passée. Rien n'est envoyé.")
+            return
+        essai = "\n🧪 MODE ESSAI : tout partira vers ton adresse." if attente.test else ""
+        # Enregistrée avant le message : un clic immédiat est reconnu
+        self.attentes[attente.mode] = attente
+        attente.message_id = self.notifier(
+            f"📬 {attente.mode} : {len(attente.liste)} emails prêts. Réponse avant {self.reglages.heure_limite}.{essai}\n\n"
+            + self._lignes(attente),
+            [("Envoyer", f"envoyer:{attente.jeton}"), ("Voir d'abord", f"voir:{attente.jeton}")])
+        if not attente.message_id:
+            del self.attentes[attente.mode]
+            self._noter(attente.mode, validation="message non parti")
+            self.log(f"{attente.mode} : liste non envoyée sur Telegram, donc rien ne sera envoyé")
+
+    def _voir(self, attente: Attente):
+        profil = lire_profil(self.user_id, mode=attente.mode)
+        objet, corps = envoi.objet_et_corps(profil, attente.mode)
+        pieces = ", ".join(p.get("nom") or "?" for p in profil.get("pieces_jointes") or []) or "aucune"
+        self.notifier(f"👀 {attente.mode}, rien n'est parti.\nObjet : {objet}\nPièces jointes : {pieces}\n\n{corps}\n\n"
+                      f"Entreprises et adresses : page « Entreprises à contacter » de l'application. "
+                      f"« Envoyer » reste valable jusqu'à {self.reglages.heure_limite}.",
+                      [("Envoyer", f"envoyer:{attente.jeton}")])
+
+    def _attendre_validations(self):
+        """Traite les clics jusqu'à l'heure limite ; sans réponse, rien ne part."""
+        while self.attentes and not self.arret:
+            if not self._clics:
+                if self.horloge.maintenant() >= self.limite:
+                    break
+                self.relever(max(1, min(ATTENTE_TELEGRAM_S,
+                                        int((self.limite - self.horloge.maintenant()).total_seconds()))))
+                continue
+            clic = self._clics.pop(0)
+            action, _, jeton = clic.donnee.partition(":")
+            if action == "envoyer":
+                attente = next((a for a in self.attentes.values() if a.jeton == jeton), None)
+                if attente:      # un second clic n'y trouve plus rien
+                    del self.attentes[attente.mode]
+                    self._sans_boutons(attente.message_id)
+                    self._envoyer(attente)
+            elif action in LIBELLES_FIN and self._compte_a_rebours(action):
+                return
+        self._abandonner("sans réponse" if not self.arret else "campagne arrêtée")
+
+    def _abandonner(self, raison: str):
+        for attente in list(self.attentes.values()):
+            self._sans_boutons(attente.message_id)
+            self._noter(attente.mode, validation=raison)
+            self.notifier(f"⏹️ {attente.mode} : {raison}, rien n'est envoyé. Les {len(attente.liste)} entreprises "
+                          "restent prêtes dans l'interface.")
+        self.attentes.clear()
+
+    # ─── 3. Envoi ─────────────────────────────────────────────────────────────
+    def _envoyer(self, attente: Attente):
+        mode = attente.mode
+        verrou = self._verrou_spontanees()
+        if verrou is None:
+            self._noter(mode, erreur="interface occupée")
+            self.notifier(f"⚠️ {mode} : une recherche ou un envoi tourne dans l'interface, rien n'est envoyé.")
+            return
+        self._envoi_en_cours = True
+        try:
+            compte = envoi.verifier_avant_envoi(self.user_id, mode)
+            if attente.test and not compte["mode_test"]:
+                raise ErreurUtilisateur("le mode essai a été coupé depuis le résumé : relance la campagne pour valider "
+                                        "un envoi réel.")
+            # Essai annoncé ou activé depuis : essai. Jamais réel sans l'avoir annoncé
+            r = envoi.main(self.user_id, limite=len(attente.liste), test=attente.test, stop_event=_ArretEnvoi(self),
+                           log_fn=self.log, mode=mode, pause=PAUSE_ENVOIS,
+                           autorises={e["id"]: e["adresses"] for e in attente.liste})
+            self._noter(mode, envoyes=r["envoyes"], echecs=r["echecs"], essai=bool(compte["mode_test"]))
+            suite = " Plafond du jour atteint." if r["arret"] == "plafond" else ""
+            self.notifier(f"✅ {mode} : {r['envoyes']} emails envoyés, {r['echecs']} échec(s)."
+                          + (" 🧪 Mode essai." if compte["mode_test"] else "") + suite)
+        except (ErreurUtilisateur, ChiffrementIndisponible, envoi.EnvoiInterrompu) as e:
+            self._noter(mode, erreur=str(e))
+            self.notifier(f"❌ {mode} : envoi arrêté. {e}")
+        finally:
+            self._envoi_en_cours = False
+            verrou.liberer()
+
+    # ─── Fin : extinction ou veille ───────────────────────────────────────────
+    def _resume(self) -> str:
+        lignes = []
+        for mode, b in self.bilan.items():
+            if "envoyes" in b:
+                fait = f"{b['envoyes']} envoyés"
+            elif mode in self.attentes:
+                fait = f"{b.get('proposees', 0)} en attente de ta validation"
+            else:
+                fait = b.get("erreur") or b.get("validation") or ("plafond atteint" if b.get("plafond") else "rien envoyé")
+            lignes.append(f"{mode} : {b.get('examinees', 0)} examinées, {b.get('pretes', 0)} prêtes, {fait}")
+        return "\n".join(lignes) or "Rien à signaler."
+
+    def _proposer_fin(self):
+        """Message de fin, avec les boutons si CAMPAGNE_FIN=demander."""
+        self._sans_boutons(self._message_fin)
+        boutons = [("Éteindre le PC", f"{extinction.ETEINDRE}:{self._jeton_fin}"),
+                   ("Mettre en veille jusqu'à la prochaine campagne", f"{extinction.VEILLE}:{self._jeton_fin}")]
+        titre = "⏳ Préparation terminée, en attente de ta réponse." if self.attentes else "🏁 Campagne terminée."
+        self._message_fin = self.notifier(f"{titre}\n{self._resume()}",
+                                          boutons if self.reglages.fin == "demander" else None)
+
+    def _fin(self):
+        self._proposer_fin()
+        if self.reglages.fin in LIBELLES_FIN:
+            self._compte_a_rebours(self.reglages.fin)
+            return
+        if self.reglages.fin != "demander" or not self._message_fin:
+            return
+        fin = self.horloge.maintenant() + timedelta(minutes=self.reglages.fin_attente_min)
+        while not self.arret and (self._clics or self.horloge.maintenant() < fin):
+            if not self._clics:
+                self.relever(max(1, min(ATTENTE_TELEGRAM_S, int((fin - self.horloge.maintenant()).total_seconds()))))
+                continue
+            action = self._clics.pop(0).donnee.partition(":")[0]
+            if action in LIBELLES_FIN and self._compte_a_rebours(action):
+                break
+        self._sans_boutons(self._message_fin)
+
+    def _occupe(self) -> str:
+        """Ce qui tourne encore (application, autre campagne), ou ""."""
+        return ", ".join(occupes(sauf=(CAMPAGNE,)))
+
+    def _compte_a_rebours(self, action: str) -> bool:
+        """Deux minutes pour annuler, puis extinction ou veille. Vrai si elle a
+        été demandée au système. Rien sans message reçu : pas d'annulation
+        possible. Rien si quelque chose tourne, avant comme après l'attente."""
+        libelle = LIBELLES_FIN[action]
+        try:
+            if occupe := self._occupe():
+                raise extinction.ErreurExtinction(f"un traitement tourne encore ({occupe}).")
+            reveil = extinction.verifier(action)
+            suite = f" Réveil le {reveil.strftime('%d/%m à %H:%M')}." if reveil else ""
+            en_attente = " Les envois en attente de ta réponse ne partiront pas." if self.attentes else ""
+            message = self.notifier(f"🔌 {libelle} dans 2 minutes.{suite}{en_attente}",
+                                    [("Annuler", f"annuler:{self._jeton_fin}")])
+            if not message:
+                raise extinction.ErreurExtinction("message Telegram non parti, donc pas d'annulation possible.")
+            fin = self.horloge.maintenant() + timedelta(seconds=DELAI_EXTINCTION_S)
+            annule = False
+            while not (annule or self.arret) and self.horloge.maintenant() < fin:
+                self.relever(max(1, min(10, int((fin - self.horloge.maintenant()).total_seconds()))))
+                # « Envoyer » vaut aussi annulation : le PC doit rester allumé
+                annule = any(c.donnee.startswith(("annuler:", "envoyer:")) for c in self._clics)
+            self._clics = [c for c in self._clics if c.donnee.startswith("envoyer:")]
+            self._sans_boutons(message)
+            if annule or self.arret:
+                self.notifier(f"↩️ {libelle} annulée.")
+                return False
+            if occupe := self._occupe():
+                raise extinction.ErreurExtinction(f"un traitement a démarré entre-temps ({occupe}).")
+            extinction.verifier(action)
+            if self.attentes:
+                self._abandonner("extinction demandée")
+                campagnes_db.enregistrer_bilan(self._id, self.bilan, "terminee")
+            if self.telegram:
+                self._telegram(self.telegram.confirmer_lecture)
+            self.log(f"🔌 {libelle}")
+            extinction.agir(action)
+            self._parti = True
+            return True
+        except extinction.ErreurExtinction as e:
+            self.notifier(f"⚠️ {libelle} impossible : {e}")
+            return False

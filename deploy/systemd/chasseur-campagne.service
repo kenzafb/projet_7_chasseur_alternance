@@ -1,0 +1,18 @@
+[Unit]
+Description=Chasseur : campagne automatique d'entreprises à contacter
+Documentation=file:%h/Bureau/workspace/chasseur/docs/CAMPAGNE.md
+# Lancé par chasseur-campagne.timer
+
+[Service]
+Type=oneshot
+# Adapter ce chemin si le projet est ailleurs
+WorkingDirectory=%h/Bureau/workspace/chasseur
+ExecStart=%h/Bureau/workspace/chasseur/venv/bin/python scripts/campagne.py --utilisateur 1 --modes stage,job --cible 30
+# 3 : une campagne tourne déjà, ce n'est pas un échec
+SuccessExitStatus=3
+# Au réveil, le réseau met un moment à revenir
+ExecStartPre=/bin/sh -c 'for i in $(seq 30); do getent hosts api.telegram.org >/dev/null && exit 0; sleep 4; done; exit 0'
+TimeoutStartSec=infinity
+TimeoutStopSec=120
+MemoryMax=2G
+Nice=10

@@ -21,6 +21,7 @@ import threading
 from database.dates import maintenant_affichage
 from shared.config import LOGS_MAX_PAR_UTILISATEUR
 from shared.journal import journaliser
+from shared.verrous import Verrou, nom_pipeline
 
 RECHERCHE = "recherche"
 ANALYSE = "analyse"
@@ -49,6 +50,7 @@ class Pipelines:
         self._etats = {type_: {} for type_ in ETATS_INITIAUX}   # type -> user_id -> dict
         self._arrets = {}                                         # (type, user_id) -> Event
         self._logs = {}                                           # user_id -> deque bornée
+        self._verrous = {}                                        # (type, user_id) -> Verrou entre processus (D213)
 
     # ─── États ────────────────────────────────────────────────────────────────
     def etat(self, type_: str, user_id: int) -> dict:
@@ -58,12 +60,17 @@ class Pipelines:
 
     def demarrer(self, type_: str, user_id: int, **champs) -> bool:
         """Marque le pipeline en cours, sauf s'il l'est déjà pour cet
-        utilisateur (vérification et marquage atomiques). Pour un pipeline
+        utilisateur (vérification et marquage atomiques), dans ce processus ou
+        dans un autre (campagne automatique, D213). Pour un pipeline
         arrêtable, réarme l'événement d'arrêt de l'utilisateur."""
         with self._verrou:
             actuel = self._etats[type_].get(user_id)
             if actuel and actuel["en_cours"]:
                 return False
+            verrou = Verrou(nom_pipeline(type_, user_id))
+            if not verrou.prendre():
+                return False
+            self._verrous[(type_, user_id)] = verrou
             self._etats[type_][user_id] = {**ETATS_INITIAUX[type_], **champs, "en_cours": True}
             if type_ in ARRETABLES:
                 self._arrets[(type_, user_id)] = threading.Event()
@@ -75,7 +82,11 @@ class Pipelines:
             etat.update(champs)
 
     def terminer(self, type_: str, user_id: int, **champs):
-        self.maj(type_, user_id, **champs, en_cours=False)
+        with self._verrou:
+            etat = self._etats[type_].setdefault(user_id, dict(ETATS_INITIAUX[type_]))
+            etat.update(champs, en_cours=False)
+            if verrou := self._verrous.pop((type_, user_id), None):
+                verrou.liberer()
 
     # ─── Arrêt (analyse, candidatures spontanées) ─────────────────────────────
     def evenement_arret(self, user_id: int, type_: str = SPONTANEES) -> threading.Event:

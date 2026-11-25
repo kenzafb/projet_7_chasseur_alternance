@@ -10,14 +10,14 @@ from sqlalchemy import select, text
 
 from database.connexion import SessionLocal, engine
 from database.dedup_db import lire_emails_contactes
-from database.models import (Base, Candidature, CompteEnvoi, CompteurEnvoi, EmailContacte, Entreprise,
+from database.models import (Base, Campagne, Candidature, CompteEnvoi, CompteurEnvoi, EmailContacte, Entreprise,
                              EntrepriseMode, OffreVue, Profil)
 from scripts import remettre_a_zero
 from scripts.remettre_a_zero import Refus, application_lancee, main
 from shared import config
 
 MODES = ("alternance", "job", "stage")
-EFFACEES = ("candidatures", "entreprises", "entreprises_modes", "offres_vues")
+EFFACEES = ("campagnes", "candidatures", "entreprises", "entreprises_modes", "offres_vues")
 
 
 def remplir(user_id: int):
@@ -39,7 +39,7 @@ def remplir(user_id: int):
             e.modes.append(EntrepriseMode(user_id=user_id, mode=mode, mail_envoye=True,
                                           mail_envoye_le=datetime(2026, 11, 1, tzinfo=timezone.utc),
                                           mail_destinataires=["rh@acme.fr"]))
-            db.add_all([p, e, OffreVue(user_id=user_id, mode=mode, ref_offre="r1"),
+            db.add_all([p, e, Campagne(user_id=user_id, debut=datetime(2026, 11, 1, tzinfo=timezone.utc)), OffreVue(user_id=user_id, mode=mode, ref_offre="r1"),
                         Candidature(user_id=user_id, mode=mode, ref_offre="r1", verdict="Bien", statut="archive",
                                     marques=["niveau_different"], lettre="Bonjour",
                                     lettre_pdf=f"user_{user_id}/lettre_1.pdf"),

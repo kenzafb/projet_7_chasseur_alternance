@@ -276,6 +276,22 @@ function rendreParSource(ps) {
       <td>${fmt(l.envoyes)}</td><td>${fmt(l.reponses)}</td><td>${fmt(l.entretiens)}</td></tr>`).join("");
 }
 
+/* Dernière campagne automatique (D213) */
+const ETATS_CAMPAGNE = { en_cours: "en cours", terminee: "terminée", arretee: "arrêtée", erreur: "en erreur", interrompue: "interrompue" };
+async function rendreCampagne() {
+  const bloc = document.querySelector("[data-campagne]");
+  if (!bloc) return;
+  let c = null;
+  try { c = await api.spCampagne(); } catch (_) { /* bloc masqué */ }
+  bloc.hidden = !c;
+  if (!c) return;
+  bloc.querySelector("[data-campagne-titre]").textContent = `${c.debut}, ${ETATS_CAMPAGNE[c.etat] || c.etat}`;
+  bloc.querySelector("[data-campagne-bilan]").innerHTML = Object.entries(c.bilan).map(([mode, b]) =>
+    `<li>${esc(mode)} : ${fmt(b.examinees)} examinées, ${fmt(b.emails_trouves)} emails trouvés, ${fmt(b.envoyes)} envoyés${
+      b.essai ? " (mode essai)" : ""}${b.erreur || b.validation || b.raison ? ` (${esc(b.erreur || b.validation || b.raison)})` : ""}</li>`).join("");
+  bloc.querySelector("[data-campagne-journal]").textContent = c.journal;
+}
+
 function fmt(n) { return (n ?? 0).toLocaleString("fr-FR"); }
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
@@ -292,6 +308,7 @@ export const Spontanees = {
       document.querySelector("[data-sp-source]")?.addEventListener("change", e => { source = e.target.value; rendreTable(); });
       this._brancheEssai = true;
     }
+    rendreCampagne();
     rendreAValider();
     if (!this._brancheValider) {
       const liste = document.querySelector('[data-list="a-valider"]');

@@ -118,6 +118,7 @@ docs/         décisions, sources, maquettes, configuration
 - [docs/SPEC_SOURCES.md](docs/SPEC_SOURCES.md) : comportement des API France Travail, La Bonne Alternance et Sirene.
 - [docs/maquettes/DESIGN.md](docs/maquettes/DESIGN.md) : principes de l'interface.
 - [docs/CONFIGURATION.md](docs/CONFIGURATION.md) : toutes les variables du fichier `.env`.
+- [docs/CAMPAGNE.md](docs/CAMPAGNE.md) : campagne automatique quotidienne, Telegram, extinction du PC.
 
 ## Limites et suite
 

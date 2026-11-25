@@ -54,7 +54,7 @@ from shared.erreurs import ErreurUtilisateur
 from shared.validation_emails import emails_douteux, emails_valides
 from database.compte_envoi_db import liberer_envoi, marquer_verification, reserver_envoi
 from database.dedup_db import ajouter_emails_contactes, lire_emails_contactes, normaliser_email
-from database.entreprises_db import lire_entreprises, sauvegarder_entreprises
+from database.entreprises_db import deja_envoyee, lire_entreprises, sauvegarder_entreprises
 from shared.journal import journaliser
 
 LIMITE_PAR_RUN    = config.LIMITE_ENVOIS_PAR_LANCEMENT
@@ -143,7 +143,9 @@ def charger_json(user_id, mode="alternance"):
 
 
 def sauvegarder_json(user_id, data, mode="alternance"):
-    """Réécrit l'état d'envoi (mail_envoye, etc.) dans ce mode, en BASE."""
+    """Réécrit l'état d'envoi (mail_envoye, etc.) dans ce mode, en BASE. data :
+    les seules entreprises touchées par l'envoi, jamais tout le mode : le reste
+    a pu changer dans un autre processus (D213)."""
     sauvegarder_entreprises(user_id, data, mode)
 
 
@@ -183,6 +185,38 @@ def compter_a_envoyer(user_id, mode) -> int:
                if envoyable(e) and adresses_nouvelles(e, deja))
 
 
+def pretes(user_id, mode, maximum=None) -> list[dict]:
+    """Entreprises que main() viserait maintenant, dans son ordre et avec son
+    anti-doublon : [{"id", "nom", "ville", "adresses"}]. Une adresse partagée
+    par deux entreprises ne compte qu'une fois."""
+    entreprises = charger_json(user_id, mode)
+    deja = adresses_deja_contactees(user_id, mode, entreprises)
+    out = []
+    for e in entreprises:
+        if maximum is not None and len(out) >= maximum:
+            break
+        nouvelles = adresses_nouvelles(e, deja) if envoyable(e) else []
+        if nouvelles:
+            deja.update(nouvelles)
+            out.append({"id": e["_id"], "nom": (e.get("nom_commercial") or e.get("nom") or "?")[:50],
+                        "ville": e.get("ville") or "", "adresses": nouvelles})
+    return out
+
+
+def verifier_avant_envoi(user_id, mode) -> dict:
+    """Refus clair AVANT tout envoi (interface et campagne) : pas de clé, pas
+    de compte ou compte jamais vérifié, plafond du jour atteint, balise
+    inconnue ou vide dans le profil. Retourne le compte d'envoi."""
+    from database.compte_envoi_db import envois_du_jour
+    from database.profil_db import lire_profil
+    compte = exiger_compte_verifie(user_id)
+    if envois_du_jour(user_id) >= config.PLAFOND_ENVOIS_JOUR:
+        raise ErreurUtilisateur(f"Plafond de {config.PLAFOND_ENVOIS_JOUR} mails par jour atteint : "
+                                "les envois reprendront demain.")
+    objet_et_corps(lire_profil(user_id, mode=mode), mode)
+    return compte
+
+
 # ─── Envoi mail ───────────────────────────────────────────────────────────────
 
 class EnvoiInterrompu(Exception):
@@ -212,11 +246,15 @@ def envoyer_mail(compte: dict, destinataires: list[str], objet: str, corps: str,
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
-def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=None, on_progress=None, mode="alternance"):
+def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=None, on_progress=None, mode="alternance",
+         pause=None, autorises=None):
     """Envoie les candidatures spontanées de l'utilisateur avec SON compte.
     Retourne {"envoyes", "echecs", "arret"} ; arret vaut None (file vidée),
     "limite", "plafond" ou "stop". Lève EnvoiInterrompu sur un problème
-    de compte, ErreurUtilisateur ou ChiffrementIndisponible avant tout envoi."""
+    de compte, ErreurUtilisateur ou ChiffrementIndisponible avant tout envoi.
+    pause : (min, max) secondes entre deux mails (défaut PAUSE_ENTRE_MAILS).
+    autorises : {id d'entreprise: adresses} ; rien d'autre ne part (liste
+    approuvée de la campagne, D213). None : toutes les entreprises."""
     _log = log_fn or journaliser
     plafond = config.PLAFOND_ENVOIS_JOUR
 
@@ -250,7 +288,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
          f"= {len(emails_deja_envoyes)} total")
 
     # ── Queue ─────────────────────────────────────────────────────────────────
-    a_envoyer = [e for e in entreprises if envoyable(e)]
+    a_envoyer = [e for e in entreprises if envoyable(e) and (autorises is None or e["_id"] in autorises)]
     non_valides = sum(1 for e in entreprises
                       if emails_douteux(e) and not emails_valides(e) and not e.get("mail_envoye"))
     if non_valides:
@@ -267,6 +305,13 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
     echecs  = 0
     traites = 0
 
+    touchees = []      # entreprises modifiées, pas encore écrites
+
+    def enregistrer():
+        if touchees:
+            sauvegarder_json(user_id, touchees, mode)
+            touchees.clear()
+
     def bilan_final(arret):
         bilan.update(envoyes=envoyes, echecs=echecs, arret=arret)
         return bilan
@@ -274,7 +319,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
     for e in entreprises:
         if stop_event and stop_event.is_set():
             _log("⏹️  Arrêt — sauvegarde en cours...")
-            sauvegarder_json(user_id, entreprises, mode)
+            enregistrer()
             return bilan_final("stop")
 
         if envoyes >= limite:
@@ -282,8 +327,10 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
             bilan["arret"] = "limite"
             break
 
-        if not envoyable(e):
+        if not envoyable(e) or (autorises is not None and e["_id"] not in autorises):
             continue
+        if deja_envoyee(user_id, e["_id"], mode):
+            continue   # contactée entre-temps, dans un autre processus
 
         nom = (e.get("nom_commercial") or e.get("nom", "?"))[:50]
 
@@ -293,6 +340,10 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
             if addr and addr.strip()
         ))
         emails_nouveaux = adresses_nouvelles(e, emails_deja_envoyes)
+        if autorises is not None and emails_nouveaux:
+            emails_nouveaux = [a for a in emails_nouveaux if a in autorises[e["_id"]]]
+            if not emails_nouveaux:
+                continue   # ses adresses ne sont plus celles approuvées
 
         if not emails_nouveaux:
             _log(f"  ⏭️  {nom} — tous les emails déjà contactés, skip")
@@ -303,6 +354,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
             e["mail_envoye_le"]     = maintenant_utc()
             e["mail_destinataires"] = []
             e["mail_note"]          = "skip — tous emails déjà contactés"
+            touchees.append(e)
             continue
 
         nb_ignores = len(emails_uniques) - len(emails_nouveaux)
@@ -337,7 +389,7 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
                 # Problème de compte ou de serveur : inutile d'essayer les suivantes
                 if erreur.categorie == smtp.AUTH:
                     marquer_verification(user_id, False)
-                sauvegarder_json(user_id, entreprises, mode)
+                enregistrer()
                 bilan_final("erreur")
                 conseil = (" Vérifie le compte d'envoi dans ton profil, puis relance "
                            "« Tester la connexion »." if erreur.categorie == smtp.AUTH else "")
@@ -355,6 +407,8 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
 
                 # Mise à jour immédiate de la déduplication (en base)
                 ajouter_emails_contactes(user_id, mode, destinataires)
+                touchees.append(e)
+                enregistrer()
             # En mémoire seulement en mode test : le lancement reste fidèle à un
             # envoi réel (une adresse partagée n'est visée qu'une fois)
             emails_deja_envoyes.update(emails_nouveaux)
@@ -371,16 +425,16 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
         traites += 1
 
         if traites % SAUVEGARDE_TOUS == 0:
-            sauvegarder_json(user_id, entreprises, mode)
-            _log(f"  💾 Sauvegarde — {envoyes} envoyés, {echecs} échecs")
+            _log(f"  💾 {envoyes} envoyés, {echecs} échecs")
 
         if envoyes < limite and traites < len(a_envoyer):
             if not (stop_event and stop_event.is_set()):
-                pause = random.uniform(*PAUSE_ENTRE_MAILS)
-                _log(f"  ⏸️  Pause {pause:.0f}s...")
-                time.sleep(pause)
+                duree = random.uniform(*(pause or PAUSE_ENTRE_MAILS))
+                _log(f"  ⏸️  Pause {duree:.0f}s...")
+                # Interrompue tout de suite par une demande d'arrêt
+                stop_event.wait(duree) if stop_event else time.sleep(duree)
 
-    sauvegarder_json(user_id, entreprises, mode)
+    enregistrer()
     _log(f"✅ Envoi terminé — {envoyes} envoyés, {echecs} échecs")
     if test:
         _log("🧪 Mode test : tous les mails sont partis vers l'adresse d'expédition, rien n'est enregistré.")

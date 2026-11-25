@@ -646,6 +646,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
         return
 
     traites_ce_run = 0
+    touchees = []   # seules écrites : les autres ont pu changer dans un autre processus (D213)
     sites_offres = sites_des_offres(user_id)   # sites donnés par les offres France Travail et LBA
     # Sites déclarés dans Wikidata, demandés par lots avant toute recherche web (D188)
     from spontanees import wikidata
@@ -672,7 +673,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
         for e in entreprises:
             if stop_event and stop_event.is_set():
                 _log("⏹️  Arrêt — sauvegarde en cours...")
-                sauvegarder(user_id, entreprises)
+                sauvegarder(user_id, touchees)
                 return
 
             if id(e) not in ids_a_traiter:
@@ -687,6 +688,7 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
                 pct = round(fait / len(a_traiter) * 100)
                 on_progress(min(pct, 100), f"{fait}/{len(a_traiter)} entreprises analysées")
 
+            touchees.append(e)
             completer_noms(e)   # sigle, dénominations usuelles, enseignes (D167)
             verification, essais = identifier(e, sites_offres, recherche=urls_recherche,
                                               log=_log if DEBUG else None)
@@ -742,16 +744,16 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
             traites_ce_run += 1
 
             if traites_ce_run % SAUVEGARDE_TOUS == 0:
-                sauvegarder(user_id, entreprises)
+                sauvegarder(user_id, touchees)
                 avec = sum(1 for x in entreprises if x.get("emails_trouves"))
                 _log(f"  💾 Sauvegarde — {idx}/{total} | {avec} avec email")
 
     except KeyboardInterrupt:
         _log("\n⏹️  Ctrl+C — sauvegarde en cours...")
-        sauvegarder(user_id, entreprises)
+        sauvegarder(user_id, touchees)
         return
 
-    sauvegarder(user_id, entreprises)
+    sauvegarder(user_id, touchees)
     avec_email = sum(1 for e in entreprises if e.get("emails_trouves"))
     carrieres = sum(1 for e in entreprises if not e.get("emails_trouves") and e.get("page_carrieres") and est_grande(e))
     _log(f"✅ Scraping terminé — {avec_email}/{total} avec email"
@@ -808,7 +810,7 @@ def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=Non
         validees += 1
         retenus = ", ".join(e["emails_trouves"]) or "aucun email retenu"
         _log(f"  ✅ {nom} : {retenus}")
-    sauvegarder(user_id, entreprises)
+    sauvegarder(user_id, cibles)
     _log(f"✅ Validation IA terminée : {validees}/{len(cibles)} entreprise(s) validée(s)")
 
 

@@ -20,7 +20,7 @@ Toutes les variables se règlent dans le fichier `.env`, copié depuis `.env.exa
 | `UPLOADS_DIR` | Pièces jointes envoyées par les utilisateurs (CV...). | `DATA_DIR/uploads` |
 | `LETTRES_PDF_DIR` | PDF des lettres de motivation générées (avant le ménage : `lettres_pdf/` à la racine, `scripts/deplacer_lettres_pdf.py` pour déplacer les fichiers). | `DATA_DIR/lettres_pdf` |
 
-La base, `UPLOADS_DIR` et `LETTRES_PDF_DIR` sont à sauvegarder ensemble.
+La base, `UPLOADS_DIR` et `LETTRES_PDF_DIR` sont à sauvegarder ensemble. La base est en mode WAL (D213) : la copier application et campagne arrêtées, ou avec `sqlite3 data/chasseur_v2.db ".backup copie.db"`.
 
 ## Sources
 
@@ -62,3 +62,18 @@ Sur une machine avec peu de mémoire, Ollama peut être limité à un modèle ch
 | `DEBUG_SCRAPER` | `true` pour des journaux détaillés de la recherche d'emails. | `false` |
 
 Chaque utilisateur configure son propre compte d'envoi (Gmail avec un mot de passe d'application, ou un serveur SMTP sur le port 465 ou 587) dans Paramètres. Les plafonds de chaque lancement se règlent par mode dans Paramètres, section Réglages avancés.
+
+## Campagne automatique
+
+Voir [CAMPAGNE.md](CAMPAGNE.md). Une valeur illisible empêche la campagne de démarrer.
+
+| Variable | Rôle | Défaut |
+|---|---|---|
+| `CAMPAGNE_VALIDATION` | `telegram` : rien n'est envoyé sans « Envoyer » ; `auto` : envoi sans attendre. | `telegram` |
+| `CAMPAGNE_HEURE_LIMITE` | Sans réponse à cette heure, rien n'est envoyé. | `16:00` |
+| `CAMPAGNE_DUREE_MAX_MIN` | Durée maximale de la recherche, par mode. | `120` |
+| `CAMPAGNE_MAX_ENTREPRISES` | Entreprises examinées au plus, par mode. | `200` |
+| `CAMPAGNE_FIN` | `demander` (boutons), `eteindre`, `veille` ou `rien`. | `demander` |
+| `CAMPAGNE_FIN_ATTENTE_MIN` | Durée de validité des boutons de fin, en minutes. | `60` |
+| `TELEGRAM_BOT_TOKEN` | Jeton du bot, secret. | vide |
+| `TELEGRAM_CHAT_ID` | Ton identifiant Telegram (nombre positif), seul accepté. | vide |
