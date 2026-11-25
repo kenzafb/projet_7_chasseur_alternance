@@ -5,7 +5,7 @@ import json
 import sys
 from pathlib import Path
 
-from offres.analyse_v2 import NOTES, analyser_offre_v2, lignes_extraites, num_ctx_analyse
+from offres.analyse_v2 import NOTES, NUM_CTX_ANALYSE, analyser_offre_v2, lignes_extraites
 
 PROFIL = {"prenom": "Alice", "niveau_etudes": "Bac+2", "missions": "développement web", "competences": ["Python"],
           "recherche": {"domaines": ["M18"]}}
@@ -34,7 +34,7 @@ def test_deux_appels_l_extraction_ne_voit_pas_le_profil(ia):
     assert (r["categorie"], r["score"], r["verdict"], r["eligible"]) == ("Très bien", 9, "excellent", True)
     assert r["description_coupee"] is None
     # Même num_ctx pour les deux appels : pas de rechargement du modèle entre eux
-    assert ia.appels[0]["options"]["num_ctx"] == ia.appels[1]["options"]["num_ctx"] == num_ctx_analyse()
+    assert ia.appels[0]["options"]["num_ctx"] == ia.appels[1]["options"]["num_ctx"] == NUM_CTX_ANALYSE == 4096
 
 
 def test_mot_converti_en_note():

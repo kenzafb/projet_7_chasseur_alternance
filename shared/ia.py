@@ -254,7 +254,8 @@ def _requete(modele: str, messages, schema_json: dict | None, options: dict) -> 
     num_ctx = options.pop("num_ctx", None)     # imposé par l'appelant (analyse, D193)
     base = ia_base_url()
     if ia_api() == "ollama":
-        reglages = {"num_ctx": max(num_ctx or 0, num_ctx_pour(messages, max_tokens))}
+        # num_ctx imposé par l'appelant (analyse, D194) : tel quel ; sinon estimé
+        reglages = {"num_ctx": num_ctx or num_ctx_pour(messages, max_tokens)}
         if temperature is not None:
             reglages["temperature"] = temperature
         if max_tokens:

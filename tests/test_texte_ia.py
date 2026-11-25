@@ -20,7 +20,6 @@ def test_compteurs_et_fenetre_pleine(ia, monkeypatch):
     journal = []
     monkeypatch.setattr(shared.ia, "journaliser", journal.append)
     monkeypatch.setenv("IA_NUM_CTX", "4096")
-    monkeypatch.setattr("offres.analyse_v2.num_ctx_analyse", lambda: 4096)
     ia.file = [_avec_compteurs(_extraction(), 1800, 120), _avec_compteurs(_jugement(), 4050, 60)]
     analyser_offre_v2({"titre": "Stage", "description": "Stage web."}, PROFIL, "stage")
     infos = shared.ia.dernier_appel()
@@ -65,14 +64,21 @@ def test_num_ctx_jamais_trop_petit(monkeypatch):
     assert shared.ia.num_ctx_pour(long) == 8192                       # IA_NUM_CTX plus grand : gardé
 
 
-def test_description_entiere_sous_le_plafond_et_num_ctx_unique(monkeypatch):
-    from offres.analyse_v2 import _num_ctx_analyse, num_ctx_analyse
+def test_num_ctx_unique_4096_releve_seulement_si_besoin(ia, monkeypatch):
+    import offres.analyse_v2 as V
     monkeypatch.delenv("IA_LONGUEUR_DESCRIPTION", raising=False)
-    monkeypatch.setenv("IA_NUM_CTX", "4096")
     from shared.config import ia_longueur_description
     assert ia_longueur_description() == 20000
-    n = num_ctx_analyse()
-    assert 4096 < n <= 16384 and n % 1024 == 0
-    # Plus grand prompt possible (description au plafond, profil maximal) compté à 3 caractères par token
-    assert _num_ctx_analyse(20000, 4096, 3.0, 1024, 16384) == n
-    assert _num_ctx_analyse(60000, 4096, 3.0, 1024, 16384) == 16384      # plafond
+    journal = []
+    monkeypatch.setattr(V, "journaliser", journal.append)
+    # Offre réelle la plus longue (environ 5 000 caractères) : 4 096, rien au journal
+    ia.file = [_extraction(), _jugement()]
+    analyser_offre_v2({"titre": "Stage", "description": "mot " * 1250}, PROFIL, "stage")
+    assert [a["options"]["num_ctx"] for a in ia.appels] == [4096, 4096] and not journal
+    # Description de 15 000 caractères : relevé pour les deux appels, journalisé
+    ia.appels.clear()
+    ia.file = [_extraction(), _jugement()]
+    analyser_offre_v2({"titre": "Stage", "description": "mot " * 3750}, PROFIL, "stage")
+    valeurs = [a["options"]["num_ctx"] for a in ia.appels]
+    assert valeurs[0] == valeurs[1] > 4096 and valeurs[0] % 1024 == 0
+    assert any("num_ctx porté de 4096" in ligne for ligne in journal)

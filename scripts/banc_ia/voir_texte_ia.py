@@ -123,13 +123,13 @@ def main(argv=None) -> int:
         activer_ia()                              # variables IA_* du .env seulement
         if args.num_ctx:
             os.environ["IA_NUM_CTX"] = str(args.num_ctx)
-    from offres.analyse_v2 import messages_extraction, messages_jugement, num_ctx_analyse
+    from offres.analyse_v2 import messages_extraction, messages_jugement
     from shared.config import ia_longueur_description
     max_extraction = args.max_extraction or ia_longueur_description()
     max_jugement = args.max_jugement or ia_longueur_description()
     offres, profil = lire_offres(args.base, args.mode, args.user, args.id, args.offres)
     print(f"Mode {args.mode}, {len(offres)} offre(s) ; extraction : {max_extraction} caractères, "
-          f"jugement : {max_jugement}" + (f", num_ctx {num_ctx_analyse()}" if args.analyser else ""))
+          f"jugement : {max_jugement}")
     for n, offre in enumerate(offres, 1):
         description = offre.get("description") or ""
         print(f"\n{'═' * 78}\n{n}. {offre.get('titre')} — {offre.get('entreprise')} (id {offre['id']})\n"
