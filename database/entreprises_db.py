@@ -170,6 +170,18 @@ def repartition_par_source(paires) -> dict:
     return out
 
 
+def noms_affiches(e) -> tuple[str, str]:
+    """(nom principal, nom secondaire) d'une entreprise (D192) : la
+    dénomination de l'unité légale d'abord (annuaire, ou Sirene), puis le
+    nom d'établissement ou l'enseigne s'il est différent."""
+    from spontanees.noms_entreprise import denomination_connue
+    extra = e.extra or {}
+    etablissement = (e.nom_commercial or extra.get("nom") or "").strip()
+    principal = denomination_connue({"_extra": extra, "sources": list(e.sources or [])}).strip() or etablissement
+    secondaire = etablissement if etablissement.casefold() != principal.casefold() else ""
+    return principal or "?", secondaire
+
+
 def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
     """Statistiques des entreprises sélectionnées dans un mode."""
     db = SessionLocal()
@@ -200,7 +212,8 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
         dernieres = [
             {
                 "id":     e.id,
-                "nom":    (e.nom_commercial or "?")[:40],
+                "nom":    noms_affiches(e)[0][:60],
+                "nom_etablissement": noms_affiches(e)[1][:60],
                 "ville":  e.ville or "",
                 "email":  (e.emails_trouves or [""])[0] if e.emails_trouves else "",
                 "envoye": True,
@@ -216,7 +229,8 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
         prochaines = [
             {
                 "id":        e.id,
-                "nom":       (e.nom_commercial or (e.extra or {}).get("nom", "") or "?")[:40],
+                "nom":       noms_affiches(e)[0][:60],
+                "nom_etablissement": noms_affiches(e)[1][:60],
                 "ville":     e.ville or "",
                 "email":     (e.emails_trouves or [""])[0] if e.emails_trouves else "",
                 "envoye":    False,
@@ -266,6 +280,7 @@ _CHAMPS_EXTRA_SCRAPER = ("telephone", "url_scrapee", "source_recherche", "tentat
                          # Phase 15 : site vérifié (D160) et essais, formulaires de contact (D161)
                          "site_verifie", "essais_site", "formulaires_contact",
                          "autres_noms",   # D167 : sigle, dénominations usuelles, enseignes
+                         "denomination",  # D192 : dénomination de l'unité légale (annuaire)
                          "adresse_siege",  # D173 : preuve du site par l'adresse
                          "page_carrieres")  # D191 : site carrières des grandes entreprises
 
@@ -426,7 +441,7 @@ def lire_a_valider(user_id: int, mode: str = MODE_DEFAUT) -> list[dict]:
     (visibles, validables quand même). La validation vaut pour tous les modes."""
     db = SessionLocal()
     try:
-        return [{"id": e.id, "nom": e.nom_commercial or (e.extra or {}).get("nom", "") or "?",
+        return [{"id": e.id, "nom": noms_affiches(e)[0],
                  "ville": e.ville or "", "site": e.site_web or "", "emails": _douteux(e),
                  "valides": [a for a in e.emails_trouves or [] if a not in _douteux(e)],
                  "ecartees_ia": _ecartees_ia(e), "adresses": adresses(e)}

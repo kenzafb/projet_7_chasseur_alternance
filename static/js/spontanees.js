@@ -90,7 +90,7 @@ function ligne(e) {
   return `<li class="ent" data-search-text="${esc(recherche)}">
       <span class="ent__initiale" aria-hidden="true">${esc((e.nom || "?").trim()[0] || "?")}</span>
       <div class="ent__corps">
-        <p class="ent__nom">${esc(e.nom || "Entreprise sans nom")}${etiquettesAutresModes(e)}</p>
+        <p class="ent__nom">${esc(e.nom || "Entreprise sans nom")}${e.nom_etablissement ? ` <span class="ent__etablissement">· ${esc(e.nom_etablissement)}</span>` : ""}${etiquettesAutresModes(e)}</p>
         <p class="ent__detail ent__origines">${etiquettesOrigine(e)}</p>
         <p class="ent__detail">${detail}${e.ville ? ` · ${esc(e.ville)}` : ""}</p>
         ${onglet === "pretes" && (e.adresses || []).length > 1 ? `<details class="ent__adresses"><summary>Ses ${e.adresses.length} adresses</summary>${listeAdresses(e.adresses)}</details>`

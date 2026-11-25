@@ -640,6 +640,7 @@
 .ent__corps { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .ent__nom { font-weight: 700; }
 .ent__detail { font-size: 14px; color: var(--texte-2); overflow-wrap: anywhere; }
+.ent__etablissement { font-weight: 400; color: var(--texte-2); }   /* enseigne ou établissement (D192) */
 .ent__actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 4px; }
 .ent__lien { font-size: 14px; font-weight: 600; }
 .ent__adresses summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--texte-3); }
