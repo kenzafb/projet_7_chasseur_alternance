@@ -968,3 +968,8 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 
 ### D184. Étiquettes du profil : la suggestion choisie et la saisie en cours sont gardées (phase 16)
 Une certification choisie dans la liste suggérée remplissait le champ sans touche Entrée : aucune étiquette n'était créée et « Enregistrer » envoyait une liste vide (le serveur, lui, enregistrait bien). Désormais une valeur égale à une suggestion devient une étiquette dès qu'elle est choisie, une saisie non validée le devient quand on quitte le champ, et `collecter()` compte la saisie en cours (compétences et certifications). Test : enregistrer puis relire par l'API dans les trois modes (`tests/test_profil_parcours.py`).
+
+### D185. « Ton parcours » : permis aligné sur les autres champs, aides sous le titre (phase 16)
+- Permis : le fieldset perd le cadre du navigateur (titre au-dessus, sans trait) ; les cases prennent le style des domaines (bords arrondis, case cochée surlignée). « Aucun permis » coché décoche et désactive (grise) les autres cases, comme « Indifférent » pour les domaines : pour cocher un permis, on décoche d'abord « Aucun permis ».
+- Certifications et compétences : la liste d'étiquettes vide est masquée, et le titre, l'aide et le champ sont regroupés comme un champ simple (5 px au lieu des 18 px qu'imposait l'espacement des blocs).
+- Texte d'aide : partout sous le titre, au-dessus du champ (14 aides déplacées qui étaient sous le champ) ; dans les blocs composés (projets, documents, domaines, mail), l'aide est collée à son titre.

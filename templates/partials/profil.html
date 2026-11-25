@@ -108,16 +108,16 @@
             </label>
             <label class="field">
               <span class="field__label">Niveau d'études actuel</span>
+              <span class="field__hint">Sert à écarter, sans IA, les offres qui exigent un niveau bien supérieur (deux crans ou plus).</span>
               <input class="field__input" type="text" data-profil="niveau_etudes"
                 placeholder="Ex. Bac+2 en cours (BUT2) ; vide : déduit de la formation">
-              <span class="field__hint">Sert à écarter, sans IA, les offres qui exigent un niveau bien supérieur (deux crans ou plus).</span>
             </label>
             <p class="domaines-vide" data-niveau-avert hidden></p>
             <label class="field field--full">
               <span class="field__label">Ce que tu aimerais faire pendant ce stage</span>
+              <span class="field__hint">Le Chasseur s'en sert pour noter les offres.</span>
               <textarea class="field__area" data-profil="missions" rows="3"
                 placeholder="Écris comme tu le dirais à quelqu'un."></textarea>
-              <span class="field__hint">Le Chasseur s'en sert pour noter les offres.</span>
             </label>
           </div>
         </div>
@@ -127,9 +127,9 @@
           <div class="profil-grid">
             <label class="field field--full">
               <span class="field__label">Formation visée</span>
+              <span class="field__hint">Le diplôme que cette alternance prépare. Sert à écarter les offres demandant un niveau trop élevé.</span>
               <input class="field__input" type="text" data-profil="niveau_vise"
                 placeholder="Ex. BTS SIO (Bac+2), Licence pro (Bac+3)">
-              <span class="field__hint">Le diplôme que cette alternance prépare. Sert à écarter les offres demandant un niveau trop élevé.</span>
             </label>
             <label class="field">
               <span class="field__label">Rythme</span>
@@ -141,9 +141,9 @@
             </label>
             <label class="field field--full">
               <span class="field__label">Ce que ta formation va t'apporter</span>
+              <span class="field__hint">Tu ne seras pas pénalisé sur ce que tu vas justement apprendre.</span>
               <textarea class="field__area" data-profil="formation_apporte" rows="3"
                 placeholder="Ce que prévoit le programme : bases de données, comptabilité, droit immobilier, négociation…"></textarea>
-              <span class="field__hint">Tu ne seras pas pénalisé sur ce que tu vas justement apprendre.</span>
             </label>
           </div>
         </div>
@@ -161,8 +161,8 @@
             </label>
             <label class="field field--full">
               <span class="field__label">Disponibilités horaires</span>
-              <input class="field__input" type="text" data-profil="dispo_horaires" placeholder="Ex. journée, soir et week-end OK">
               <span class="field__hint">Beaucoup de jobs d'été sont en horaires décalés (resto, événementiel…).</span>
+              <input class="field__input" type="text" data-profil="dispo_horaires" placeholder="Ex. journée, soir et week-end OK">
             </label>
             <label class="field field--full">
               <span class="field__label">Mobilité <span class="field__facultatif">(facultatif)</span></span>
@@ -179,32 +179,36 @@
         <p class="partie__manque" data-partie-manque="parcours" hidden></p>
 
         <div class="profil-bloc" data-mode-section="commun">
-          <label class="field__label" for="competence-ajout">Compétences</label>
-          <p class="field__hint">Tape une compétence et appuie sur Entrée. Trois au moins.</p>
-          <ul class="tags" data-tags="competences" aria-label="Tes compétences"></ul>
-          <input class="field__input tags__input" id="competence-ajout" data-tags-input="competences"
-                 type="text" placeholder="Ex. Excel, Python, accueil client…">
+          <div class="field">
+            <label class="field__label" for="competence-ajout">Compétences</label>
+            <p class="field__hint">Tape une compétence et appuie sur Entrée. Trois au moins.</p>
+            <ul class="tags" data-tags="competences" aria-label="Tes compétences"></ul>
+            <input class="field__input tags__input" id="competence-ajout" data-tags-input="competences"
+                   type="text" placeholder="Ex. Excel, Python, accueil client…">
+          </div>
         </div>
 
         <!-- Permis, expérience, certifications : comparés aux exigences des offres, sans IA (D169) -->
         <div class="profil-bloc" data-mode-section="commun">
-          <fieldset class="field field--full">
+          <fieldset class="field field--full champ-groupe">
             <legend class="field__label">Permis de conduire</legend>
             <p class="field__hint">Une offre qui exige un permis que tu n'as pas est écartée. Coche « Aucun permis » si c'est le cas.</p>
-            <div class="cases" data-permis></div>
+            <div class="domaines-choix" data-permis></div>
           </fieldset>
           <label class="field">
             <span class="field__label">Expérience professionnelle, en mois</span>
+            <span class="field__hint">Total des stages, jobs et emplois. Une offre de job qui exige davantage est écartée ; vide : jamais écartée pour ça.</span>
             <input class="field__input" type="number" min="0" max="600" step="1" inputmode="numeric"
                    data-rech="experience_mois" placeholder="Ex. 6">
-            <span class="field__hint">Total des stages, jobs et emplois. Une offre de job qui exige davantage est écartée ; vide : jamais écartée pour ça.</span>
           </label>
-          <label class="field__label" for="certification-ajout">Certifications</label>
-          <p class="field__hint">CACES, SSIAP, carte professionnelle… Tape et appuie sur Entrée. Une offre qui exige une certification absente d'ici est écartée.</p>
-          <ul class="tags" data-tags="certifications" aria-label="Tes certifications"></ul>
-          <input class="field__input tags__input" id="certification-ajout" data-tags-input="certifications"
-                 type="text" list="certifications-suggerees" placeholder="Ex. CACES R489">
-          <datalist id="certifications-suggerees" data-certifications-suggerees></datalist>
+          <div class="field">
+            <label class="field__label" for="certification-ajout">Certifications</label>
+            <p class="field__hint">CACES, SSIAP, carte professionnelle… Tape et appuie sur Entrée, ou choisis dans la liste. Une offre qui exige une certification absente d'ici est écartée.</p>
+            <ul class="tags" data-tags="certifications" aria-label="Tes certifications"></ul>
+            <input class="field__input tags__input" id="certification-ajout" data-tags-input="certifications"
+                   type="text" list="certifications-suggerees" placeholder="Ex. CACES R489">
+            <datalist id="certifications-suggerees" data-certifications-suggerees></datalist>
+          </div>
         </div>
 
         <div class="profil-bloc" data-mode-section="commun">
@@ -217,21 +221,21 @@
         <div class="profil-grid" data-mode-section="alternance">
           <label class="field field--full">
             <span class="field__label">Formation</span>
+            <span class="field__hint">Une ligne par diplôme : niveau, intitulé, établissement, dates.</span>
             <textarea class="field__area" data-profil="formation" rows="4"
               placeholder="- Diplôme en cours (niveau), établissement (années)&#10;- Diplôme préparé en alternance (niveau), établissement&#10;..."></textarea>
-            <span class="field__hint">Une ligne par diplôme : niveau, intitulé, établissement, dates.</span>
           </label>
           <label class="field">
             <span class="field__label">Niveau d'études actuel</span>
-            <input class="field__input" type="text" data-profil="niveau_etudes" placeholder="Ex. Bac+2 obtenu, Bac+3 en cours">
             <span class="field__hint">Sert à écarter, sans IA, les offres qui exigent un niveau bien supérieur (deux crans ou plus).</span>
+            <input class="field__input" type="text" data-profil="niveau_etudes" placeholder="Ex. Bac+2 obtenu, Bac+3 en cours">
           </label>
           <p class="domaines-vide" data-niveau-avert hidden></p>
           <label class="field field--full">
             <span class="field__label">Expérience</span>
+            <span class="field__hint">Stages, jobs, missions. Décris brièvement ce que tu as fait.</span>
             <textarea class="field__area" data-profil="experience" rows="4"
               placeholder="- Stage ou job (entreprise, année) : missions principales&#10;..."></textarea>
-            <span class="field__hint">Stages, jobs, missions. Décris brièvement ce que tu as fait.</span>
           </label>
           <label class="field field--full">
             <span class="field__label">Langues</span>
@@ -242,24 +246,24 @@
         <div class="profil-grid" data-mode-section="stage">
           <label class="field field--full">
             <span class="field__label">Expérience</span>
+            <span class="field__hint">Stages, jobs, missions. Utilisée pour noter les offres et écrire la lettre.</span>
             <textarea class="field__area" data-profil="experience" rows="4"
               placeholder="- Stage, job ou projet encadré (entreprise, année) : tâches principales&#10;..."></textarea>
-            <span class="field__hint">Stages, jobs, missions. Utilisée pour noter les offres et écrire la lettre.</span>
           </label>
         </div>
 
         <div class="profil-grid" data-mode-section="job">
           <label class="field field--full">
             <span class="field__label">Niveau d'études obtenu</span>
-            <input class="field__input" type="text" data-profil="niveau_etudes" placeholder="Ex. Bac, Bac+2…">
             <span class="field__hint">Les offres exigeant un niveau supérieur d'au moins deux crans sont écartées sans IA.</span>
+            <input class="field__input" type="text" data-profil="niveau_etudes" placeholder="Ex. Bac, Bac+2…">
           </label>
           <p class="domaines-vide" data-niveau-avert hidden></p>
           <label class="field field--full">
             <span class="field__label">Expérience</span>
+            <span class="field__hint">Tout ce que tu as fait, même court.</span>
             <textarea class="field__area" data-profil="experience" rows="4"
               placeholder="- 1 mois en relation client&#10;- petits jobs, stages…"></textarea>
-            <span class="field__hint">Tout ce que tu as fait, même court.</span>
           </label>
           <label class="field field--full">
             <span class="field__label">Atouts</span>
@@ -280,13 +284,13 @@
           <div class="profil-grid">
             <label class="field">
               <span class="field__label">Type de contrat</span>
-              <input class="field__input" type="text" data-rech="type_contrat" value="alternance" readonly>
               <span class="field__hint">Le Chasseur ne cherche que des alternances.</span>
+              <input class="field__input" type="text" data-rech="type_contrat" value="alternance" readonly>
             </label>
             <label class="field">
               <span class="field__label">Où</span>
-              <input class="field__input" type="text" data-rech="localisation" value="Île-de-France" readonly>
               <span class="field__hint">Pour l'instant, en Île-de-France seulement.</span>
+              <input class="field__input" type="text" data-rech="localisation" value="Île-de-France" readonly>
             </label>
             <label class="field field--full">
               <span class="field__label">Ce que tu préfères éviter <span class="field__facultatif">(facultatif)</span></span>
@@ -321,9 +325,9 @@
             </label>
             <label class="field field--full">
               <span class="field__label">Où de préférence <span class="field__facultatif">(facultatif)</span></span>
+              <span class="field__hint">La recherche reste en Île-de-France : ceci change seulement le tri des offres.</span>
               <input class="field__input" type="text" data-profil="localisation_pref"
                 placeholder="Ex. près de chez moi de préférence">
-              <span class="field__hint">La recherche reste en Île-de-France : ceci change seulement le tri des offres.</span>
             </label>
           </div>
           <div class="profil-bloc">

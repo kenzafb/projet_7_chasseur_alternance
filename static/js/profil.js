@@ -356,18 +356,33 @@ async function rendrePermis(coches) {
   const sugg = document.querySelector("[data-certifications-suggerees]");
   if (sugg) sugg.innerHTML = (o.certifications || []).map(x => `<option value="${esc(x)}"></option>`).join("");
   c.innerHTML = [{ code: "aucun", libelle: "Aucun permis" }, ...(o.permis || [])].map(p =>
-    `<label class="case"><input type="checkbox" value="${esc(p.code)}" ${choisis.has(p.code) ? "checked" : ""}>
+    `<label class="domaine-case"><input type="checkbox" value="${esc(p.code)}" ${choisis.has(p.code) ? "checked" : ""}>
        <span>${p.code === "aucun" ? "Aucun permis" : `${esc(p.code)} <small>${esc(p.libelle)}</small>`}</span></label>`).join("");
+  majPermis(c);
   if (!c.dataset.branche) {
     c.dataset.branche = "1";
     c.addEventListener("change", e => {
       const box = e.target.closest("input[type=checkbox]");
-      if (!box?.checked) return;
-      c.querySelectorAll("input").forEach(x => {
-        if (box.value === "aucun" ? x.value !== "aucun" : x.value === "aucun") x.checked = false;
-      });
+      if (box?.checked && box.value !== "aucun") caseAucunPermis(c).checked = false;
+      majPermis(c);
     });
   }
+}
+
+/* « Aucun permis » coché : les autres cases sont décochées et grisées
+   (comme les domaines avec « Indifférent ») ; cases cochées surlignées */
+function caseAucunPermis(c) {
+  return [...c.querySelectorAll("input")].find(x => x.value === "aucun") || {};
+}
+function majPermis(c) {
+  const aucun = caseAucunPermis(c).checked;
+  c.querySelectorAll("input").forEach(x => {
+    if (x.value !== "aucun") {
+      if (aucun) x.checked = false;
+      x.disabled = !!aucun;
+    }
+    x.closest(".domaine-case")?.classList.toggle("is-checked", x.checked);
+  });
 }
 
 async function rendreOptions(rech, mode) {
