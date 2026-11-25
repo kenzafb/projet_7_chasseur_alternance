@@ -22,7 +22,7 @@ taille, type, redirection, erreur, et si robots.txt l'interdit ; le temps
 passé en pauses ; puis, pour chaque page HTML reçue, les signes d'une page
 rendue en JavaScript, les formulaires de contact et les liens mailto.
 --sans-ddg : sans recherche web. IA coupée par défaut (--ia pour la
-validation des douteuses). Avec audit_exports/scraper_reference.json (ou
+validation des douteuses). Avec scripts/references/scraper_reference.json (ou
 --reference), chaque site retenu est comparé au site officiel : juste,
 faux, manqué, non tranché. Rien n'est écrit en base.
 
@@ -44,7 +44,7 @@ import urllib.robotparser
 from collections import Counter
 from urllib.parse import urlparse
 
-from audit_commun import Chrono, ecrire_json, lire_json, maintenant, pourcentage, session_lecture, SORTIE  # noqa: E402
+from audit_commun import REFERENCES, SORTIE, Chrono, ecrire_json, lire_json, maintenant, pourcentage, session_lecture  # noqa: E402
 
 TAILLE_ECHANTILLON = 40
 UA_ROBOTS = "*"
@@ -379,7 +379,7 @@ def main(argv=None) -> int:
     m.add_argument("--cache-recherche", help="JSON des résultats de recherche par requête, partagé entre mesures")
     m.add_argument("--nom-un-mot", action="store_true",
                    help="accepter la preuve par un nom d'un seul mot distinctif (sans D172, pour comparer)")
-    m.add_argument("--reference", default=str(SORTIE / "scraper_reference.json"),
+    m.add_argument("--reference", default=str(REFERENCES / "scraper_reference.json"),
                    help="sites officiels de référence (absent : pas de comparaison)")
     args = ap.parse_args(argv)
     if args.action == "echantillon":

@@ -1,0 +1,374 @@
+{
+ "version": 1,
+ "annote_par": "Claude",
+ "methode": "recherche web (sources officielles Insee, annuaire des entreprises) et connaissance des entreprises ; a_verifier = non tranché",
+ "entreprises": [
+  {
+   "id": 18,
+   "nom": "PLATEFORME DES DONNEES DE SANTE",
+   "siren": "130003783",
+   "site_officiel": "health-data-hub.fr",
+   "confiance": "haute",
+   "note": "Plateforme des données de santé = Health Data Hub",
+   "site_retenu_par_le_scraper": "https://gnius.esante.gouv.fr/fr/reglementation/fiches-reglementation/plateforme-des-donnees-de-sante"
+  },
+  {
+   "id": 20,
+   "nom": "FRANCE UNIVERSITE NUMERIQUE",
+   "siren": "130021256",
+   "site_officiel": [
+    "fun-mooc.fr",
+    "luniversitenumerique.fr"
+   ],
+   "confiance": "haute",
+   "note": "GIP France Université Numérique",
+   "site_retenu_par_le_scraper": "https://companyfrance.fr/fr/130021256/france-universite-numerique"
+  },
+  {
+   "id": 1,
+   "nom": "ORMA INFORMATIQUE",
+   "siren": "322095191",
+   "site_officiel": null,
+   "confiance": "a_verifier",
+   "note": "ETI de 20 à 49 salariés, site non identifié",
+   "site_retenu_par_le_scraper": "https://meilleurprestataireinformatique.fr/prestataire/orma-informatique-rejoint-koesio-valence"
+  },
+  {
+   "id": 2,
+   "nom": "INFO ADAPT SERVICES",
+   "siren": "331442475",
+   "site_officiel": null,
+   "confiance": "basse",
+   "note": "aucun site trouvé",
+   "site_retenu_par_le_scraper": "http://pros.informatique.free.fr/location_materiel_informatique/location_materiel_informatique-01.php"
+  },
+  {
+   "id": 3,
+   "nom": "1964",
+   "siren": "065805822",
+   "site_officiel": null,
+   "confiance": "basse",
+   "note": "aucun site trouvé",
+   "site_retenu_par_le_scraper": null
+  },
+  {
+   "id": 4,
+   "nom": "REGY",
+   "siren": "300209525",
+   "site_officiel": null,
+   "confiance": "a_verifier",
+   "note": "regy.eu ou regy.fr à confirmer",
+   "site_retenu_par_le_scraper": "https://regy.eu/8c34c0cf_7b8e_4ab7_a5da_ba907ac6be89.html"
+  },
+  {
+   "id": 5,
+   "nom": "THE BODY SHOP ( FRANCE )",
+   "siren": "414083881",
+   "site_officiel": "thebodyshop.com",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://www.thebodyshop.com/?lang=fr"
+  },
+  {
+   "id": 6,
+   "nom": "WETRADELOCAL",
+   "siren": "828469650",
+   "site_officiel": "wetradelocal.io",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://wetradelocal.io/"
+  },
+  {
+   "id": 19,
+   "nom": "PORTAIL DE LA PUBLICITE LEGALE DES ENTREPRISES",
+   "siren": "130019078",
+   "site_officiel": null,
+   "confiance": "a_verifier",
+   "note": "GIP PPLE, pas de site propre identifié",
+   "site_retenu_par_le_scraper": "https://annonces-legales.liberation.fr/annonces/paris/"
+  },
+  {
+   "id": 21,
+   "nom": "CENTRE D'ACCES SECURISE AUX DONNEES",
+   "siren": "130024573",
+   "site_officiel": "casd.eu",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://palaiseau.centreservices.fr/emploi"
+  },
+  {
+   "id": 22,
+   "nom": "OFFICE NATIONAL D'INFORMATION SUR LES ENSEIGNEMENTS ET LES PROFESSIONS",
+   "siren": "180043028",
+   "site_officiel": "onisep.fr",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": null
+  },
+  {
+   "id": 23,
+   "nom": "AGENCE MUTUALISATION UNIVERSITES ETS ENSEIGNEMENT SUP OU RECHERCHE ET SUPPORT A L ENSEIGNEMENT SUP OU LA RECHERCHE",
+   "siren": "180043127",
+   "site_officiel": "amue.fr",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://www.supinterim.fr/rejoignez-nous"
+  },
+  {
+   "id": 24,
+   "nom": "SYND INTERCOMMUNAL D'INFORMATIQUE",
+   "siren": "259300028",
+   "site_officiel": null,
+   "confiance": "moyenne",
+   "note": "syndicat mixte (SII Bobigny), pas de site propre identifié",
+   "site_retenu_par_le_scraper": "https://syndicate.io/"
+  },
+  {
+   "id": 25,
+   "nom": "DAM'S",
+   "siren": "300203379",
+   "site_officiel": null,
+   "confiance": "a_verifier",
+   "note": "ondamparis.com probablement faux",
+   "site_retenu_par_le_scraper": "https://www.ondamparis.com/fr/"
+  },
+  {
+   "id": 26,
+   "nom": "INSTITUT TECH FEDERATION FRANC BATIMENT",
+   "siren": "301652673",
+   "site_officiel": "ffbatiment.fr",
+   "confiance": "moyenne",
+   "note": "branche informatique de la FFB",
+   "site_retenu_par_le_scraper": "https://entreprises.lagazettefrance.fr/entreprise/institut-tech-federation-franc-batiment-301652673"
+  },
+  {
+   "id": 27,
+   "nom": "STIME",
+   "siren": "301850277",
+   "site_officiel": null,
+   "confiance": "a_verifier",
+   "note": "STIME, DSI des Mousquetaires, site propre à confirmer",
+   "site_retenu_par_le_scraper": null
+  },
+  {
+   "id": 7,
+   "nom": "PARIS HOTEL DE VILLE",
+   "siren": "552091795",
+   "site_officiel": null,
+   "confiance": "a_verifier",
+   "note": "entité financière (64.19Z), nom trompeur",
+   "site_retenu_par_le_scraper": "https://www.hotelriccione.com/ville-de-paris.it.html"
+  },
+  {
+   "id": 8,
+   "nom": "LE JU",
+   "siren": "483788766",
+   "site_officiel": null,
+   "confiance": "basse",
+   "note": "aucun site trouvé",
+   "site_retenu_par_le_scraper": null
+  },
+  {
+   "id": 9,
+   "nom": "THEATRE DE LA VILLE",
+   "siren": "775661721",
+   "site_officiel": "theatredelaville-paris.com",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://www.laurette-theatre.fr/bora-bora"
+  },
+  {
+   "id": 101,
+   "nom": "NEURONES",
+   "siren": "331408336",
+   "site_officiel": "neurones.net",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://www.neurones.net/fr"
+  },
+  {
+   "id": 11,
+   "nom": "GRILL BURGER",
+   "siren": "790129084",
+   "site_officiel": null,
+   "confiance": "basse",
+   "note": "SCI, pas de site",
+   "site_retenu_par_le_scraper": "https://restaurants.beburger.be/paris/1/"
+  },
+  {
+   "id": 12,
+   "nom": "VALEO COMFORT AND DRIVING ASSISTANCE",
+   "siren": "017251067",
+   "site_officiel": "valeo.com",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": null
+  },
+  {
+   "id": 13,
+   "nom": "ALLIANCE SANTE DISTRIBUTION",
+   "siren": "025420068",
+   "site_officiel": "alliance-healthcare.fr",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://sante.e-pro.fr/hauts-de-seine/attia-julie_f4452402"
+  },
+  {
+   "id": 15,
+   "nom": "BELLON SA",
+   "siren": "055812440",
+   "site_officiel": null,
+   "confiance": "moyenne",
+   "note": "holding familiale (Sodexo), pas de site propre",
+   "site_retenu_par_le_scraper": "https://bellon.by/"
+  },
+  {
+   "id": 16,
+   "nom": "FACTOFRANCE",
+   "siren": "063802466",
+   "site_officiel": "factofrance.com",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://www.factofrance.com/en/"
+  },
+  {
+   "id": 17,
+   "nom": "YVES ROCHER",
+   "siren": "903582104",
+   "site_officiel": [
+    "yves-rocher.fr",
+    "groupe-rocher.com"
+   ],
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://www.yves-rocher.fr/magasins-instituts-de-beaute/paris-montparnasse-sncf/S-FRYROC751"
+  },
+  {
+   "id": 223,
+   "nom": "PRODWARE SA",
+   "siren": "352335962",
+   "site_officiel": "prodwaregroup.com",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://www.prodwaregroup.com/fr-fr/temoignages/minakem/"
+  },
+  {
+   "id": 379,
+   "nom": "DEGETEL",
+   "siren": "423806884",
+   "site_officiel": "degetel.com",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://www.degetel.com/"
+  },
+  {
+   "id": 288,
+   "nom": "PENTALOG FRANCE",
+   "siren": "400300190",
+   "site_officiel": "pentalog.com",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://wwws.airfrance.fr/information"
+  },
+  {
+   "id": 32,
+   "nom": "ITHIS",
+   "siren": "304366990",
+   "site_officiel": null,
+   "confiance": "basse",
+   "note": "aucun site trouvé",
+   "site_retenu_par_le_scraper": "https://ithis.skyrock.com/"
+  },
+  {
+   "id": 33,
+   "nom": "DE PARTICULIER A PARTICULIER - EDITIONS NERESSIS",
+   "siren": "304555154",
+   "site_officiel": "pap.fr",
+   "confiance": "haute",
+   "note": "De Particulier à Particulier",
+   "site_retenu_par_le_scraper": null
+  },
+  {
+   "id": 208,
+   "nom": "GROUPE PUCE ET PLUME",
+   "siren": "350396081",
+   "site_officiel": "puceplume.fr",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://www.puceplume.fr/"
+  },
+  {
+   "id": 361,
+   "nom": "ALTIZEM",
+   "siren": "420934960",
+   "site_officiel": "altizem.com",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://altizem.com/ingenierie-travaux-neufs/"
+  },
+  {
+   "id": 37,
+   "nom": "CARTADIS",
+   "siren": "305585887",
+   "site_officiel": "cartadis.com",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://www.cartadis.com/fr/contact/"
+  },
+  {
+   "id": 245,
+   "nom": "LEXMARK INTERNATIONAL SAS",
+   "siren": "380827204",
+   "site_officiel": "lexmark.com",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://support.lexmark.com/"
+  },
+  {
+   "id": 41,
+   "nom": "TIDF",
+   "siren": "310370887",
+   "site_officiel": null,
+   "confiance": "a_verifier",
+   "note": "TIDF = Toshiba Île-de-France, site à confirmer",
+   "site_retenu_par_le_scraper": null
+  },
+  {
+   "id": 127,
+   "nom": "OPEN TEXT",
+   "siren": "337950737",
+   "site_officiel": "opentext.com",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://www.flamingtext.com/logo/Design-Open"
+  },
+  {
+   "id": 219,
+   "nom": "ABSCISSE INFORMATIQUE",
+   "siren": "351668413",
+   "site_officiel": null,
+   "confiance": "a_verifier",
+   "note": "abscisse-informatique, site à confirmer",
+   "site_retenu_par_le_scraper": null
+  },
+  {
+   "id": 305,
+   "nom": "FERMAT",
+   "siren": "404165946",
+   "site_officiel": "moodys.com",
+   "confiance": "moyenne",
+   "note": "SIREN 404165946 = Moody's Analytics (ancien nom FERMAT)",
+   "site_retenu_par_le_scraper": "https://www.fermat.app/"
+  },
+  {
+   "id": 134,
+   "nom": "MUREX",
+   "siren": "338695869",
+   "site_officiel": "murex.com",
+   "confiance": "haute",
+   "note": "",
+   "site_retenu_par_le_scraper": "https://www.murex.com/en/who-we-are/locations"
+  }
+ ],
+ "note_sites_multiples": "site_officiel peut être une liste : chacun des domaines compte comme juste (22 novembre 2026)"
+}
