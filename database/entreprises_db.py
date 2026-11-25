@@ -232,7 +232,8 @@ def calculer_stats(user_id: int, mode: str = MODE_DEFAUT) -> dict:
                 "nom":       noms_affiches(e)[0][:60],
                 "nom_etablissement": noms_affiches(e)[1][:60],
                 "ville":     e.ville or "",
-                "email":     (e.emails_trouves or [""])[0] if e.emails_trouves else "",
+                # Première adresse validée : une adresse à valider ne rend pas l'entreprise prête (D216)
+                "email":     next((a for a in e.emails_trouves or [] if a not in _douteux(e)), ""),
                 "envoye":    False,
                 "sources":   list(e.sources or []),
                 "origines":  origines(e.sources, e.naf_rev2, e.naf_2025, codes),
@@ -436,22 +437,29 @@ def _ecartees_ia(e: Entreprise) -> list[str]:
     return [a for a in (e.extra or {}).get("emails_ecartes_ia") or [] if a not in (e.emails_trouves or [])]
 
 
+def _rejetees(e: Entreprise) -> list[str]:
+    """Adresses rejetées à la main (D216) : jamais envoyées ni reprises par le scraper."""
+    return [a for a in (e.extra or {}).get("emails_rejetes") or [] if a not in (e.emails_trouves or [])]
+
+
 def lire_a_valider(user_id: int, mode: str = MODE_DEFAUT) -> list[dict]:
     """Entreprises du mode, pas encore envoyées, qui ont des adresses
-    douteuses (à valider à la main ou par l'IA) ou écartées par l'IA
-    (visibles, validables quand même). La validation vaut pour tous les
-    modes. a_la_main : l'IA n'y touche pas (site vérifié par son titre seul,
-    hors .fr, D215)."""
-    from shared.validation_emails import titre_seul_hors_fr
+    douteuses (à valider à la main ou par l'IA), écartées par l'IA ou
+    rejetées à la main (visibles, validables quand même). La validation et
+    le rejet valent pour tous les modes. a_la_main : l'IA n'y touche pas
+    (site vérifié par son titre seul, D216)."""
+    from shared.validation_emails import titre_seul
     db = SessionLocal()
     try:
         return [{"id": e.id, "nom": noms_affiches(e)[0],
                  "ville": e.ville or "", "site": e.site_web or "", "emails": _douteux(e),
                  "valides": [a for a in e.emails_trouves or [] if a not in _douteux(e)],
                  "ecartees_ia": _ecartees_ia(e), "adresses": adresses(e),
-                 "a_la_main": titre_seul_hors_fr((e.extra or {}).get("site_verifie"))}
+                 "rejetees": _rejetees(e),
+                 "preuve_site": ((e.extra or {}).get("site_verifie") or {}).get("detail") or "",
+                 "a_la_main": titre_seul((e.extra or {}).get("site_verifie"))}
                 for e, m in _du_mode(db, user_id, mode)
-                if _en_attente_de_validation(e, m) or (_ecartees_ia(e) and not m.mail_envoye)]
+                if _en_attente_de_validation(e, m) or ((_ecartees_ia(e) or _rejetees(e)) and not m.mail_envoye)]
     finally:
         db.close()
 
@@ -462,8 +470,8 @@ def compter_a_valider(user_id: int, mode: str = MODE_DEFAUT) -> int:
 
 
 def valider_adresse(user_id: int, entreprise_id: int, adresse: str) -> bool:
-    """Validation manuelle d'une seule adresse, douteuse ou écartée par l'IA
-    (elle rejoint alors les adresses envoyées). False si l'entreprise n'est
+    """Validation manuelle d'une seule adresse, douteuse, écartée par l'IA ou
+    rejetée à la main (elle rejoint alors les adresses envoyées). False si l'entreprise n'est
     pas à l'utilisateur ou si l'adresse n'attend rien."""
     adresse = (adresse or "").strip().lower()
     db = SessionLocal()
@@ -479,8 +487,10 @@ def valider_adresse(user_id: int, entreprise_id: int, adresse: str) -> bool:
             extra["contextes_emails"] = {a: t for a, t in (extra.get("contextes_emails") or {}).items()
                                          if a in restantes}
             extra["emails_non_valides"] = bool(restantes)
-        elif adresse in _ecartees_ia(e):
-            extra["emails_ecartes_ia"] = [a for a in extra["emails_ecartes_ia"] if a != adresse]
+        elif adresse in _ecartees_ia(e) or adresse in _rejetees(e):
+            for champ in ("emails_ecartes_ia", "emails_rejetes"):
+                if champ in extra:
+                    extra[champ] = [a for a in extra[champ] if a != adresse]
             e.emails_trouves = list(e.emails_trouves or []) + [adresse]
             if "emails_douteux" not in extra:   # entreprise d'avant : ses autres adresses restent en l'état
                 extra["emails_douteux"] = douteux
@@ -492,6 +502,53 @@ def valider_adresse(user_id: int, entreprise_id: int, adresse: str) -> bool:
         return True
     finally:
         db.close()
+
+
+def rejeter_adresse(user_id: int, entreprise_id: int, adresse: str) -> bool:
+    """Rejet manuel d'une adresse, douteuse ou écartée par l'IA : retirée de
+    l'entreprise et notée dans extra.emails_rejetes, aucune recherche ne la
+    reprend (D216). False si l'entreprise n'est pas à l'utilisateur ou si
+    l'adresse n'attend rien."""
+    adresse = (adresse or "").strip().lower()
+    db = SessionLocal()
+    try:
+        e = db.query(Entreprise).filter_by(user_id=user_id, id=entreprise_id).first()
+        if not e:
+            return False
+        douteux = _douteux(e)
+        if adresse not in douteux and adresse not in _ecartees_ia(e):
+            return False
+        extra = dict(e.extra or {})
+        extra["emails_rejetes"] = list(dict.fromkeys([*(extra.get("emails_rejetes") or []), adresse]))
+        restantes = [a for a in douteux if a != adresse]
+        if adresse in douteux:
+            extra["emails_douteux"], extra["emails_non_valides"] = restantes, bool(restantes)
+            extra["contextes_emails"] = {a: t for a, t in (extra.get("contextes_emails") or {}).items() if a in restantes}
+        e.emails_trouves, extra = _sans_rejetees(list(e.emails_trouves or []), extra)
+        e.extra = extra
+        db.commit()
+        return True
+    finally:
+        db.close()
+
+
+def _sans_rejetees(emails: list, extra: dict) -> tuple[list, dict]:
+    """(emails, extra) sans les adresses de extra.emails_rejetes."""
+    rejetes = set(extra.get("emails_rejetes") or [])
+    if not rejetes:
+        return emails, extra
+    extra = dict(extra)
+    for champ in ("emails_douteux", "emails_ecartes_ia"):
+        if extra.get(champ):
+            extra[champ] = [a for a in extra[champ] if a not in rejetes]
+    for champ in ("contextes_emails", "validation_emails"):
+        if extra.get(champ):
+            extra[champ] = {a: v for a, v in extra[champ].items() if a not in rejetes}
+    if extra.get("meilleur_contact") in rejetes:
+        extra["meilleur_contact"] = None
+    if extra.get("emails_douteux") == []:
+        extra["emails_non_valides"] = False
+    return [a for a in emails if a not in rejetes], extra
 
 
 def valider_emails(user_id: int, entreprise_id: int) -> bool:
@@ -594,6 +651,11 @@ def sauvegarder_enrichissement(user_id: int, liste: list[dict]):
             for champ in _CHAMPS_EXTRA_SCRAPER:
                 if champ in d and (d[champ] or champ in extra):
                     extra[champ] = d[champ]
+            # Une adresse rejetée à la main ne revient pas (D216), même relue
+            # par un autre processus qui avait l'ancienne liste
+            gardes, extra = _sans_rejetees(list(e.emails_trouves or []), extra)
+            if gardes != list(e.emails_trouves or []):
+                e.emails_trouves = gardes
             if extra != (e.extra or {}):
                 e.extra = extra
         db.commit()
@@ -747,7 +809,7 @@ def _fusionner_lba(e: Entreprise, infos_lba: dict, email: str) -> bool:
     extra["lba"] = infos_lba
     deux_sources = _avec_source(e, SOURCE_LBA)
     envoyee = any(m.mail_envoye for m in e.modes)
-    if email and not envoyee and email not in (e.emails_trouves or []):
+    if email and not envoyee and email not in (e.emails_trouves or []) and email not in _rejetees(e):
         e.emails_trouves = list(e.emails_trouves or []) + [email]
     if email:
         extra["emails_lba"] = sorted(set(extra.get("emails_lba") or []) | {email})

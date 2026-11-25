@@ -209,6 +209,7 @@ export const api = {
   spAValider:  ()      => get("/api/spontanees/a_valider"),
   spValider:   (id)    => post("/api/spontanees/valider", { id }),
   spValiderAdresse: (id, adresse) => post("/api/spontanees/valider_adresse", { id, adresse }),
+  spRejeterAdresse: (id, adresse) => post("/api/spontanees/rejeter_adresse", { id, adresse }),
   spRevalider: (max)   => post("/api/spontanees/revalider", { max_revalidations: max }),
 
   // Logs

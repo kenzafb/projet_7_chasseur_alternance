@@ -33,7 +33,7 @@ from shared.emails_exclus import email_exclu
 from bs4 import BeautifulSoup
 from ddgs import DDGS
 from shared.config import MESSAGE_IA_DESACTIVEE, analyse_ia_active, modele_ia
-from shared.validation_emails import emails_douteux, emails_valides, site_verifie, titre_seul_hors_fr, trier
+from shared.validation_emails import emails_douteux, emails_valides, site_verifie, titre_seul, trier
 from database.candidatures_db import sites_des_offres
 from database.dates import maintenant_utc
 from database.entreprises_db import a_scraper, lire_entreprises, sauvegarder_enrichissement
@@ -543,7 +543,7 @@ def scraper_et_extraire(verification, nom_entreprise, dirigeant=None, ia=True):
             formes.setdefault(f["page"], f)
     dbg(f"Emails bruts : {sorted(set(bruts))}")
     tri = trier(meilleurs_emails(list(set(bruts)), domaine), domaine, nom_entreprise, "\n\n".join(textes),
-                ia=ia, log=dbg, verifie=True, a_la_main=titre_seul_hors_fr(verification.resume()))
+                ia=ia, log=dbg, verifie=True, a_la_main=titre_seul(verification.resume()))
     resultat = {
         "emails":     tri["valides"] + tri["douteux"],
         "douteux":    tri["douteux"],
@@ -774,7 +774,7 @@ def revalider(user_id, stop_event=None, log_fn=None, on_progress=None, max_n=Non
         return
     entreprises = charger_entreprises(user_id, mode)
     cibles = [e for e in entreprises if emails_douteux(e) and not e.get("mail_envoye")
-              and not titre_seul_hors_fr(e.get("site_verifie"))]      # celles-là : à la main seulement (D215)
+              and not titre_seul(e.get("site_verifie"))]      # celles-là : à la main seulement (D216)
     if max_n:
         cibles = cibles[:max_n]
     _log(f"Validation IA | modèle = {modele_ia('extraction')} | {len(cibles)} entreprise(s)")

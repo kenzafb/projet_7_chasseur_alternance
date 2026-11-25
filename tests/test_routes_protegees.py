@@ -106,7 +106,8 @@ def test_inventaire_des_routes_du_mode():
             if isinstance(r, APIRoute) and r.path.startswith("/api/")} - chemins
     assert sans == {"/api/logs", "/api/statut_pipelines",
                     "/api/spontanees/stop", "/api/spontanees/campagne", "/api/spontanees/valider", "/api/analyse/stop",
-                    "/api/spontanees/valider_adresse", "/api/domaines", "/api/criteres_options",
+                    "/api/spontanees/valider_adresse", "/api/spontanees/rejeter_adresse",
+                    "/api/domaines", "/api/criteres_options",
                     "/api/compte_envoi", "/api/compte_envoi/supprimer", "/api/compte_envoi/tester",
                     "/api/compte_envoi/mode_test", "/api/compte_envoi/mail_test",
                     "/api/compte", "/api/compte/mot_de_passe", "/api/compte/email"}   # Paramètres (D122)

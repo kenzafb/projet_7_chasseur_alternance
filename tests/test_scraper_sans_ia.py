@@ -15,13 +15,13 @@ from shared.validation_emails import emails_douteux
 from tests.faux_web import FauxWeb, brancher
 from tests.test_ia import INTROUVABLE, echouer, erreur_http, texte_envoye
 
-# Accueil d'ACME n : titre au nom de l'entreprise, « Acme Robotique N » (deux mots
-# distinctifs : un seul ne prouverait rien, D172 ; site vérifié, D160)
+# Accueil d'ACME n : son SIREN et son nom (site vérifié, D160 ; par le titre seul,
+# rien ne serait validé d'office, D216)
 # Adresses du domaine du site, de contact : validées par les règles
-PAGE = ('<html><head><title>{nom}</title></head><body><h1>ACME</h1><p>Écrivez-nous : '
+PAGE = ('<html><head><title>{nom}</title></head><body><h1>ACME</h1><p>SIREN {siren}</p><p>Écrivez-nous : '
         '<a href="mailto:recrutement@{d}">recrutement</a> ou contact [at] {d}</p></body></html>')
 # Adresses d'un autre domaine (écartée par les règles, D162) et messagerie grand public (douteuse)
-PAGE_DOUTEUSE = ('<html><head><title>{nom}</title></head><body><h1>ACME</h1><p>Site réalisé par Pixel Agence, '
+PAGE_DOUTEUSE = ('<html><head><title>{nom}</title></head><body><h1>ACME</h1><p>SIREN {siren}</p><p>Site réalisé par Pixel Agence, '
                  'contact@pixel-agence.fr.</p><p>Pour nous joindre, écrivez au gérant : acme.gerant@gmail.com</p>'
                  '</body></html>')
 
@@ -39,7 +39,7 @@ def sites(monkeypatch, ia):
         def get(self, url, **kw):
             d = url.split("://", 1)[1].split("/", 1)[0].removeprefix("www.")
             self.pages[f"https://{d}"] = (PAGE_DOUTEUSE if d in etat.douteux else PAGE).format(
-                d=d, nom=f"ACME Robotique {d[4:-3]}")
+                d=d, nom=f"ACME Robotique {d[4:-3]}", siren=f"12345678{d[4:-3]}")
             return super().get(url, **kw)
 
     brancher(monkeypatch, Web())
@@ -53,7 +53,7 @@ def sites(monkeypatch, ia):
 @pytest.fixture
 def user_id(utilisateur):
     uid = utilisateur("a@test.fr", prenom="Alice")[1]
-    ajouter_entreprises(uid, [{"siret": f"S{i}", "nom": f"ACME Robotique {i}"} for i in range(1, 4)])
+    ajouter_entreprises(uid, [{"siret": f"S{i}", "siren": f"12345678{i}", "nom": f"ACME Robotique {i}"} for i in range(1, 4)])
     return uid
 
 
@@ -81,7 +81,7 @@ def test_douteux_tranches_par_l_ia(sites, user_id, ia):
     assert len(ia.appels) == 1 and ia.appels[0]["model"] == "ministral-3:3b"   # un appel pour l'entreprise
     assert "écrivez au gérant" in texte_envoye(ia.appels[0])
     assert "contact@pixel-agence.fr (autre domaine que le site vérifié)" in logs   # règles, pas l'IA (D162)
-    assert e["site_verifie"]["preuve"] == "nom_titre" and e["site_web"] == "https://acme1.fr"
+    assert e["site_verifie"]["preuve"] == "siren" and e["site_web"] == "https://acme1.fr"
 
 
 def test_erreur_passagere_douteux_gardes(sites, user_id, ia):
