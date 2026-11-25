@@ -33,6 +33,9 @@ for _var in ("CODE_INVITATION", "FT_CLIENT_ID", "FT_CLIENT_SECRET", "LBA_API_KEY
              "IA_DELAI_S", "IA_LONGUEUR_DESCRIPTION", "IA_REFLEXION", "IA_API", "IA_NUM_CTX",
              "IA_KEEP_ALIVE"):
     os.environ.pop(_var, None)
+# Les tests de l'analyse simulent la réponse en un appel du prompt v1 ; v2
+# (D170, défaut de l'application) a ses propres tests (test_analyse_v2.py)
+os.environ["IA_VERSION_ANALYSE"] = "v1"
 
 import httpx  # noqa: E402
 import pytest  # noqa: E402
@@ -56,6 +59,54 @@ MOT_DE_PASSE = "motdepasse-solide"
 # ─── Barrières réseau ─────────────────────────────────────────────────────────
 class _ReseauInterdit(Exception):
     pass
+
+
+# ─── Garde-fou : la suite ne touche jamais data/ ──────────────────────────────
+# Incident de la phase 15 : un test a écrit un fichier dans le vrai data/ (un
+# chemin figé à la définition d'une fonction). Empreinte de data/ (et de
+# DATA_DIR s'il est ailleurs) au début et à la fin de la session : un fichier
+# créé, modifié ou supprimé fait échouer la suite, avec la liste.
+def dossiers_proteges() -> list[Path]:
+    dossiers = [Path(__file__).resolve().parent.parent / "data", Path(config.DATA_DIR).resolve()]
+    return list(dict.fromkeys(d.resolve() for d in dossiers))
+
+
+def empreinte(dossier: Path) -> dict[str, tuple[int, int]]:
+    """{chemin relatif: (taille, date de modification en ns)} de tout le dossier."""
+    if not dossier.exists():
+        return {}
+    out = {}
+    for f in sorted(dossier.rglob("*")):
+        if f.is_file() or f.is_symlink():
+            st = f.lstat()
+            out[str(f.relative_to(dossier))] = (st.st_size, st.st_mtime_ns)
+    return out
+
+
+def differences(avant: dict, apres: dict) -> list[str]:
+    return ([f"créé : {c}" for c in sorted(apres.keys() - avant.keys())]
+            + [f"supprimé : {c}" for c in sorted(avant.keys() - apres.keys())]
+            + [f"modifié : {c}" for c in sorted(avant.keys() & apres.keys()) if avant[c] != apres[c]])
+
+
+def pytest_sessionstart(session):
+    session.config._empreintes_data = {d: empreinte(d) for d in dossiers_proteges()}
+
+
+def pytest_sessionfinish(session, exitstatus):
+    avant = getattr(session.config, "_empreintes_data", {})
+    ecarts = [f"{d}/ {x}" for d, e in avant.items() for x in differences(e, empreinte(d))]
+    if ecarts:
+        session.config._ecarts_data = ecarts
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    ecarts = getattr(config, "_ecarts_data", None)
+    if ecarts:
+        terminalreporter.section("data/ modifié par les tests", red=True)
+        for ligne in ecarts:
+            terminalreporter.line(ligne, red=True)
 
 
 @pytest.fixture(autouse=True)
@@ -178,6 +229,18 @@ def dossiers_temporaires(monkeypatch, tmp_path):
     """PDF et pièces jointes dans tmp_path, jamais dans le projet."""
     monkeypatch.setattr(config, "LETTRES_PDF_DIR", tmp_path / "pdf")
     monkeypatch.setattr(config, "UPLOADS_DIR", tmp_path / "uploads")
+    # Export LBA compact (D163) : jamais le fichier de DATA_DIR
+    from offres import export_lba
+    monkeypatch.setattr(export_lba, "FICHIER", tmp_path / "lba_recruteurs_idf.jsonl.gz")
+    monkeypatch.setattr(export_lba, "META", tmp_path / "lba_recruteurs_idf.json")
+    monkeypatch.setattr(export_lba, "SITES", tmp_path / "lba_sites_par_siren.json")
+    # Annuaire des entreprises (autres noms, D167) : jamais appelé par les tests
+    from spontanees import noms_entreprise
+    def hors_ligne(*a, **k):
+        raise noms_entreprise.requests.ConnectionError("annuaire non appelé pendant les tests")
+    monkeypatch.setattr(noms_entreprise, "requests", types.SimpleNamespace(
+        get=hors_ligne, RequestException=noms_entreprise.requests.RequestException,
+        ConnectionError=noms_entreprise.requests.ConnectionError))
 
 
 @pytest.fixture(autouse=True)

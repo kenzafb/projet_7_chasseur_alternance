@@ -753,3 +753,215 @@ Référence : `docs/maquettes/DESIGN.md` et les maquettes `*.dc.html` (reproduit
 ### D151. Destinataire de la lettre calé sur la marge droite (complète D141)
 - Le bloc destinataire (« À l'attention du service recrutement », ou nom puis adresse de l'entreprise) n'est plus décalé par une marge gauche de 55 % : il occupe la largeur du corps et son texte est aligné à droite, chaque ligne finissant au bord droit du corps de la lettre. Ni largeur fixe ni marge en pourcentage. Même HTML pour l'aperçu et le PDF (`lettres/pdf.py`) ; la date reste à gauche.
 - Vérifié pour une entreprise connue (trois lignes) et une inconnue : dans la mise en page WeasyPrint du PDF (test qui mesure chaque ligne, écart nul au bord droit) et dans l'aperçu du navigateur (écart nul).
+
+### D152. Stage France Travail : « stage » et « stagiaire », sans filtre de domaine (phase 15)
+- **Requêtes.** Une requête par mot-clé, `motsCles=stage` puis `motsCles=stagiaire` (`VALEURS_PAR_REQUETE["motsCles"] = 1`), réunies et dédoublonnées par identifiant comme toute collecte ; puis les filtres d'avant, inchangés : Île-de-France, alternance (E2, FS) écartée, `designe_un_stage` sur l'intitulé. L'audit de l'étape 1 avait montré que « stage » seul ratait les offres dont l'intitulé dit « stagiaire ».
+- **Domaines.** Le mode stage n'envoie plus les domaines du profil à France Travail (`ft_sans_domaine`) : la liste est courte (73 offres en IDF le 9 octobre 2026 avec « stage » seul, avant tout domaine) et 15 % des offres n'ont aucun domaine. Les domaines restent dans le prompt : l'IA met « Hors domaine » et une note basse, sans jamais archiver (D99, D102). Les secteurs d'activité, choisis explicitement, restent un filtre.
+- **Mesure.** `scripts/audit_france_travail.py --mode stage --user N`, section `avant_apres_D152` : offres gardées avec l'ancienne recherche (« stage » et domaines du profil) et la nouvelle, ajoutées et perdues, exemples.
+
+### D153. Offres France Travail de la région sans département gardées (phase 15)
+- **Constat** (audit du 22 novembre 2026, mode job) : 680 offres sur 19719 (3,4 %) ont pour lieu « Île-de-France » (649), « Ile-de-France » (23) ou « Île-de-France - … » (« Télétravail à 100% », « Région Parisienne »...), sans code commune. `detecter_zone` attendait « NN - » et les rejetait comme hors IDF alors que la recherche porte sur `region=11`.
+- **Règle.** Un lieu dont la partie avant « - » est « Île-de-France », accents et casse ignorés, est gardé avec la zone `ZONE_IDF_NON_PRECISE` = « Île-de-France (non précisé) » ; le libellé d'origine reste le lieu affiché. Le menu Lieu de la page Offres propose cette zone ; « Toute l'Île-de-France » la montre. Même règle pour l'adresse d'une offre LBA sans code postal.
+- **Mesure.** Les 680 libellés rejetés de l'audit sont tous gardés (contrôle hors ligne sur `audit_france_travail_job.json`) ; aucun en alternance (56 offres) ni en stage. Relancer `scripts/audit_france_travail.py` : `hors_idf` doit tomber à 0.
+
+### D157. Signature du README hors du contrôle des noms réels (phase 15)
+- `test_code_actif_sans_mention_d_un_utilisateur_reel` échouait depuis le README réécrit (019e0c4) : la section « Autrice » et l'adresse du dépôt à cloner (`github.com/kenzafb/projet_7_chasseur_alternance`) nomment l'autrice, volontairement. Le test retire du README cette section (jusqu'au titre suivant) et cette adresse exacte, puis cherche les noms comme avant dans tout le reste ; un test vérifie que rien d'autre n'est retiré. Le code actif reste contrôlé sans exception.
+
+### D154. La Bonne Alternance : niveau adjacent gardé et marqué ; migration 0017 (phase 15)
+- **Règle.** `filtrer_niveau` garde le niveau visé, les offres sans niveau (D38) et désormais les niveaux adjacents (visé ± 1, `ECART_NIVEAU_GARDE`), marqués `niveau_different` : une offre « BTS à Master » n'est codée qu'à un seul niveau. Plus d'un niveau d'écart : écartée comme avant. L'IA note ensuite l'offre normalement.
+- **Marques.** Nouvelle colonne `candidatures.marques` (JSON, `[]` par défaut, migration 0017, lignes existantes intactes, testée en montée et en descente), clés de `shared/marques.py`. La page Offres les affiche sous le titre (« Niveau différent du tien ») et propose un filtre « Particularités ».
+- **Mesure** (export du 22 novembre 2026, profil alternance Bac+2, 37 offres d'IDF de ses codes métiers hors France Travail) : 13 offres gardées avant, 23 après (+10, toutes de niveau 6). Exemples : Alternant Développeur et Maintenance Informatique (FM France), Apprenti Data Ingénieur (SPIE), Assistant·e Product Owner CRM (Etam), Apprenti Analyste Gouvernance Cybersécurité (SCOR)...
+
+### D155. La Bonne Alternance : offre déléguée à un organisme de formation gardée et marquée (phase 15)
+- `is_delegated` (OpenAPI : « offer management is delegated to a partner school » ; nom, SIRET et adresse sont alors ceux de l'organisme) devient la marque `organisme_formation`, affichée « Offre déposée par un organisme de formation » et filtrable (« Sans les offres d'organismes de formation », « Déposées par un organisme de formation »). Une offre marquée n'est jamais écartée « École ou CFA », même si elle nomme un organisme vérifié.
+- **Mesure** (export, IDF) : 456 offres déléguées sur 2407, dont 337 (73,9 %) étaient archivées par les mots-clés ; aucune maintenant.
+
+### D156. École ou CFA : seuls les organismes vérifiés écartent, les mots génériques sont des indices (phase 15)
+- **Liste.** `shared/referentiels/organismes_formation.txt` : « + nom » pour un organisme vérifié (ISCOD, Scholia, Studi, Aureis...), « ? mot » pour un indice (cfa, école, organisme de formation, centre de formation, la plateforme, business school). Comparaison sans accents ni casse, sur des mots entiers : « studi » ne trouve plus « studio », « nexa » plus « Nexans », « igs » plus « designs » ; « h3 », qui trouvait « 9h30 », est retiré ; « Groupe IGF », jamais trouvé (majuscules), l'est enfin.
+- **Indices.** Cherchés dans le titre et le nom de l'entreprise seulement (dans la description, « école » et « CFA » sont dans presque toutes les offres d'alternance), affichés « Indice d'école ou de CFA : « cfa » », sans effet sur l'archivage.
+- **Mesure.** Export LBA, offres d'IDF non déléguées : 1211 sur 1951 (62,1 %) archivées avant, 1 (0,1 %) après. Audit France Travail du 22 novembre, mode alternance : 12 offres sur 56 avant ; ISCOD et Scholia (10) le restent. En base, les 2 offres écartées « École ou CFA » le restent. Cas à trancher : les offres de CAPIVISION titrées « IGF ... - ALT », qui recrutent pour l'école IGF, ne sont plus écartées (tranché : voir ci-dessous).
+
+- **Intermédiaires d'écoles** (complément) : « = nom » dans le fichier, CAPIVISION pour commencer. Une offre qui les nomme n'est ni archivée ni mêlée aux offres normales : elle reçoit la marque `organisme_formation` (« Offre déposée par un organisme de formation »), comme une offre LBA déléguée, et se filtre de même.
+
+### D158. Entreprises à fort potentiel : l'export complet évalué, pas encore branché (phase 15)
+- `scripts/audit_lba_export.py` lit l'export déjà téléchargé en flux (824 Mo, 420627 objets, 57 s, moins de 2 Go). Pour le profil alternance (codes M18, départements 75, 92, 93, 94) : 11201 entreprises « recruteurs_lba » en IDF pour ses codes, 3888 après les filtres de taille et de départements du profil, contre 8 entreprises LBA en base. Ni site ni email dans l'export, comme dans la recherche.
+- La recherche de l'application avait reçu 8980 entreprises en 300 requêtes (382 s) et s'était arrêtée sur `LBA_REQUETES_MAX`, cercles au plafond de 150. La comparaison SIRET par SIRET avec la recherche se lance avec `--recherche` (clé et réseau). L'export n'est pas branché tant que ce gain n'est pas validé : téléchargement de 824 Mo une fois par jour, deux appels par minute, URL valable deux minutes.
+
+### D159. Sirene : établissements actifs d'Île-de-France, une entrée par entreprise (phase 15)
+- **Constat** (audit du 22 novembre 2026) : la recherche ne lisait que les sièges (`etablissementSiege:true`). Sur 3000 entreprises ayant un établissement actif non siège en IDF, 2999 avaient leur siège hors d'IDF : jamais trouvées. 161521 établissements actifs non sièges en IDF, toutes activités.
+- **Requête.** `periode(etatAdministratifEtablissement:A)` à la place du siège, avec comme avant `etatAdministratifUniteLegale:A`, le NAF, la tranche d'effectif et la catégorie de l'unité légale, et le code postal de l'établissement. `periode()` trouve aussi un établissement actif autrefois et fermé aujourd'hui : la période courante est contrôlée à la réception, et un établissement fermé est écarté et compté.
+- **Une entrée par entreprise.** Dans un lancement, un seul établissement par SIREN, avec son adresse francilienne : le premier reçu, remplacé par le siège s'il arrive ensuite et qu'il est en IDF. Les SIREN déjà en base restent dédoublonnés comme avant (D59). `extra` garde `siege` et `categorie_juridique`.
+- **Administrations.** La catégorie juridique de l'unité légale est enregistrée ; les 7xxx (personnes morales de droit public) sont comptées dans les logs (« dont N administrations publiques »), pas exclues.
+- **Mesure** : `scripts/audit_sirene.py`, section `avant_apres_D159` (clé INSEE) : entreprises distinctes avant et après, gagnées, part des 7xxx, exemples.
+
+### D160. Scraper : site de l'entreprise identifié puis vérifié, sinon aucun email (phase 15)
+- **Sources, dans l'ordre** (`spontanees/site_officiel.py`) : site déjà vérifié lors d'un passage précédent ; site fourni par La Bonne Alternance (`workplace.website`, désormais gardé dans `extra.lba.site_web`) ; site donné par une offre France Travail (`entreprise.url`) ou LBA de l'utilisateur au même nom (ligne « Site de l'entreprise : » ajoutée à la description de l'offre, sans migration, lue par `sites_des_offres`) ; puis la recherche web, au plus 4 domaines. Le site déjà en base, trouvé par l'ancienne recherche, n'est plus repris tel quel.
+- **Vérification.** Un candidat n'est retenu que si l'accueil ou les mentions légales (lien réel de l'accueil ou du sitemap) portent le SIREN, seul, dans un SIRET ou dans le numéro de TVA ; à défaut, le nom de l'entreprise (nom commercial ou raison sociale, sans forme juridique ni parenthèses, avec un mot distinctif d'au moins 4 lettres) dans le titre du site ou dans les mentions légales. Un sous-domaine est aussi essayé sur son domaine parent (support.lexmark.com, puis lexmark.com). Sinon « site non vérifié » : aucun email gardé, entreprise traitée, état affiché dans Entreprises à contacter.
+- **Domaines interdits.** `shared/referentiels/domaines_interdits.txt` remplace `DOMAINES_ANNUAIRES` : annuaires et registres (companyfrance, societe.com, pappers, pagesjaunes...), annonces légales, fiches d'un autre organisme (gnius.esante.gouv.fr), réseaux sociaux, emploi, moteurs de recherche, blogs. Jamais candidats.
+- **Enregistré** dans `extra` : `site_verifie` (url, domaine, source, preuve, date ; `{"verifie": false}` sinon) et `essais_site` (candidats essayés, raison du refus).
+- **Recherche web filtrée** : un résultat n'est vérifié que si son domaine ressemble au nom ou si son titre ou son extrait cite le nom ou le SIREN ; un moteur dégradé renvoyait des sites sans rapport (jeux, paroles, films) qui épuisaient les candidats.
+- **Mesure** : `scripts/audit_scraper.py mesure` compare à `audit_exports/scraper_reference.json` (juste, faux, manqué) ; chiffres dans le rapport de l'étape 2.
+- **Échecs de la recherche web jamais silencieux** (complément) : toute erreur du moteur est journalisée, suivie de la même pause qu'un refus pour excès de requêtes et d'un nouvel essai, puis comptée (« N en échec » en fin de lancement, `recherche_web_en_echec` dans la mesure). À la mesure du 22 novembre, une panne silencieuse avait laissé 13 entreprises de suite sans aucun candidat.
+- La nouvelle tentative de site « non fiable » (FIX 11) disparaît : `fiable` valait toujours vrai, elle ne se déclenchait jamais.
+
+### D161. Scraper : lecture par les liens réels, robots.txt, plafond de pages, formulaires de contact (phase 15)
+- `spontanees/lecture_site.py` : pages lues parmi les liens réels de l'accueil et du sitemap (robots.txt, puis /sitemap.xml), par catégorie : contact, recrutement et carrières, mentions légales, à propos. Plus d'adresses devinées (« /contact », « /careers »... : 594 réponses 404 sur 849 requêtes à l'audit).
+- robots.txt respecté comme le dit la RFC 9309 (règles de « ChasseurBot », sinon « * ») : page interdite jamais demandée ; robots.txt indisponible (4xx, 403 compris) : tout est permis ; erreur du serveur (5xx) ou site injoignable : rien.
+- Au plus `MAX_PAGES` = 8 pages HTML par site, vérification comprise, pause de 0,6 à 1,5 s entre deux pages.
+- Formulaires de contact ou de candidature (champ message ou fichier ; ni recherche, ni connexion, ni lettre d'information) enregistrés dans `extra.formulaires_contact` ; une entreprise sans email en montre le lien (« Ouvrir le formulaire de contact »).
+
+### D162. Emails : domaine du site vérifié exigé, adresses factices et mal formées écartées ; revalidation (phase 15)
+- **Règles** (`shared/validation_emails.classer`, avec le site vérifié) : écartée d'office une adresse de la liste d'exclusion (complétée des gabarits vus en base : monentreprise, votreentreprise, masociete...), mal formée (partie locale ou domaine mal écrits, extension ni à deux lettres ni dans la section `[extensions]` : « info+dpo@companyfrance.fr.nous »), à préfixe écarté, sans site vérifié, ou d'un autre domaine que le site vérifié. Validée d'office : domaine du site vérifié et préfixe de contact. Douteuse (l'IA ou la personne tranche) : même domaine mais adresse nominative, ou messagerie grand public trouvée sur le site vérifié. Avant, une adresse d'un autre domaine était douteuse et l'IA la validait (contact@health-data-hub.fr sur gnius.esante.gouv.fr, info+dpo@companyfrance.fr).
+- **Revalidation** sans rien envoyer : `scripts/revalider_emails_en_base.py`, lecture seule par défaut ; `--verifier-sites --recherche` cherche le site maintenant ; `--appliquer` écrit (adresses écartées retirées de `emails_trouves`, gardées dans `extra.emails_ecartes_revalidation`). Une adresse fournie par La Bonne Alternance est gardée ; une entreprise déjà contactée n'est pas touchée. La revalidation par l'IA (« Faire revoir par l'IA ») suit les mêmes règles, avec le site vérifié enregistré.
+
+### D163. Entreprises à fort potentiel de La Bonne Alternance tirées de l'export complet (phase 15)
+- **Mesure** (`scripts/audit_lba_export.py --recherche`, 22 novembre 2026, profil alternance M18, départements 75, 92, 93, 94) : 3888 entreprises après les filtres du profil par l'export, 2933 par la recherche par cercles, 955 en plus, aucune en moins. Les entreprises viennent désormais de l'export ; la recherche par cercles ne sert plus qu'aux offres (et à la comparaison de l'audit).
+- **Lecture en flux** (`offres/export_lba.py`) : l'export (environ 820 Mo, offres et recruteurs mêlés) n'est jamais chargé en entier ni écrit tel quel. Il est décodé objet par objet pendant la réception, et seules les entreprises « recruteurs_lba » d'Île-de-France sont gardées, normalisées comme celles de la recherche, avec leurs codes métiers, dans `DATA_DIR/lba_recruteurs_idf.jsonl.gz` (JSON Lines compressé, quelques Mo). Un seul fichier pour tous les profils : les codes métiers du profil (indifférent : tous), puis la taille et les départements des spontanées, filtrent à la relecture, ligne à ligne, et les entreprises passent à la base une à une.
+- **Rafraîchissement** au plus une fois tous les 7 jours (`FRAICHEUR_JOURS`), à la première étape « Trouver des entreprises » qui en a besoin ; un seul téléchargement à la fois. Export injoignable ou clé refusée : l'ancien fichier sert, avec un message ; sans fichier ni clé, aucune entreprise LBA pour ce lancement.
+- La limite et le partage avec Sirene (D44) ne changent pas. Les tests redirigent le fichier vers un dossier temporaire.
+
+### D164. Garde-fou : la suite de tests échoue si data/ change (phase 15)
+- Après l'incident de D163 (un test avait écrit un fichier factice dans le vrai `data/`, supprimé aussitôt), `tests/conftest.py` prend l'empreinte de `data/` et de `DATA_DIR` s'il est ailleurs (chemin, taille, date de modification de chaque fichier) au début et à la fin de la session. Un fichier créé, modifié ou supprimé fait échouer la suite (code de sortie 1) avec la liste des écarts. Vérifié avec un test temporaire qui écrivait dans un `DATA_DIR` de travail : code 1 et écart listé ; sans lui, code 0.
+
+### D165. Jamais de page ni d'email d'un sous-domaine de préproduction ou de test (phase 15)
+- **Constat** : à la mesure du 22 novembre 2026, le site vérifié de France Université Numérique était `prepod.fun.luniversitenumerique.fr` (son SIRET y figure, mais c'est une préproduction).
+- **Règle** (`shared/liens.py`) : un sous-domaine dont une étiquette, hors domaine principal, vaut preprod, pre-prod, prepod, staging, dev, test, tests, recette, qa ou demo (suivi ou non d'un chiffre ou d'un tiret : staging2, recette-v2) est de préproduction. Jamais lu : un candidat, un lien de l'accueil ou du sitemap, une page à lire est remplacé par la même adresse sur le domaine principal (étiquettes jusqu'à la dernière de préproduction retirées : prepod.fun.x.fr devient fun.x.fr) ; une page redirigée vers une préproduction est refusée. Une adresse email d'un tel domaine est écartée (« domaine de préproduction ou de test ») ; un site vérifié enregistré en préproduction compte sur son domaine principal. « test.fr » ou « developpement.acme.fr » ne sont pas concernés.
+
+### D166. Scraper, sources sûres : site de l'export LBA par SIREN, site des offres France Travail (phase 15, étape 3)
+- Avant toute recherche, le scraper essaie, dans l'ordre : le site déjà vérifié, le site La Bonne Alternance (celui de l'entreprise LBA, sinon celui de l'export pour son SIREN), puis le site donné par une offre France Travail ou LBA au même nom (D160). Tous passent par la même vérification (SIREN ou nom).
+- L'export LBA garde désormais, en le lisant, `{SIREN: workplace.website}` de toutes ses entrées (`DATA_DIR/lba_sites_par_siren.json`). Constat sur l'export du 22 novembre 2026 : 328 offres et aucun recruteur ont un site, soit 140 SIREN, dont aucun dans l'échantillon de 40. Le gain attendu est donc faible ; la source coûte une lecture de fichier.
+- Pour France Travail, `entreprise.url` est déjà mis dans la description de l'offre (D160). L'audit des champs du 23 novembre 2026 montre qu'aucune des 796 offres lues n'en donne : source sans effet aujourd'hui, gardée au cas où l'API le fournirait.
+
+### D167. Scraper, autres noms de l'entreprise : sigle, dénominations usuelles, enseignes (phase 15, étape 3)
+- La récupération Sirene garde le sigle, les trois dénominations usuelles de l'unité légale, les enseignes et la dénomination usuelle de l'établissement (`extra.autres_noms`).
+- Une entreprise qui ne les a pas (déjà en base, ou venue de LBA) les reçoit une fois de l'API publique Recherche d'entreprises (données Sirene, sans clé, seul le SIREN est envoyé), puis les garde ; si l'API ne répond pas, ils seront redemandés.
+- Ces noms servent à prouver le site (nom dans le titre ou les mentions légales) et ajoutent une requête de recherche chacun (trois au plus).
+- TIDF : ni sigle ni enseigne dans Sirene. « Toshiba Île-de-France » n'y figure pas, donc cette règle ne le trouve pas.
+
+### D169. Éligibilité par Python à partir des exigences structurées des offres (phase 15, étape 3)
+- **Constat** (banc de départ, 137 offres annotées) : 45 offres faussement éligibles, dont 34 en job sur 36 inéligibles attendues. Elles exigent un CACES, un diplôme d'État ou de l'expérience, ce qu'aucune règle Python ne regardait ; et un niveau « (indispensable) » restait souhaité à cause de « ou équivalents ».
+- **Offres France Travail.** Les champs structurés sont ajoutés en lignes à la fin de la description, jamais coupées (seule la description libre est raccourcie) :
+  - `Permis : B - Véhicule léger (exigé|souhaité)` ;
+  - `Expérience : 2 An(s) (exigée|souhaitée)`, d'après `experienceExige` (E, S, D) ;
+  - `Formation : … (indispensable|souhaitée)` ;
+  - `Compétence : … (indispensable|souhaitée)`.
+
+  Les noms et valeurs réels de ces champs restent à vérifier avec `scripts/audit_champs_france_travail.py` (clé France Travail). Déjà vus en base : les libellés d'expérience (« 2 An(s) », « 6 Mois », « Débutant accepté », « Expérience exigée »), les formations et les compétences avec leur exigence.
+- **Offres LBA.** Les fourchettes d'expérience de `access_conditions` (« 1-2 ans », « 3-5 ans ») deviennent la même ligne d'expérience exigée. Les textes génériques du métier (« Cet emploi est accessible avec un CAP… », 1 897 offres sur 12 507) ne sont pas repris : ils décrivent le métier, pas l'offre.
+- **Profil.** Nouveaux champs dans la partie « Ton parcours », communs aux trois modes et copiables (section « Permis, expérience en mois et certifications »), rangés dans `profils.recherche` (pas de migration) :
+  - permis en cases (référentiel France Travail, plus « Aucun permis ») ;
+  - expérience totale en mois ;
+  - certifications en étiquettes, avec suggestions (CACES R489, SSIAP 1, carte professionnelle de sécurité, BAFA, PSC1) et saisie libre.
+- **Règles** (`shared/exigences.py`, appelées par `raisons_ineligibilite`) :
+  - permis exigé que le profil n'a pas (« aucun » ou d'autres codes) : inéligible ; permis non renseigné : ne bloque pas ;
+  - formation exigée d'un niveau supérieur à celui du profil : inéligible ;
+  - diplôme d'État exigé (en toutes lettres ou par sigle, avec un mot d'exigence), absent de la formation et des certifications : inéligible, sauf en alternance où c'est souvent le diplôme préparé ;
+  - expérience exigée : en job, si elle dépasse celle du profil (non renseignée : ne bloque pas) ; en alternance, deux ans ou plus, ce n'est pas une alternance ;
+  - certification exigée (CACES, SSIAP, carte professionnelle de sécurité, BAFA, PSC1, SST, habilitation électrique, HACCP, FIMO/FCO ; « CASES », coquille vue en base, compte pour CACES), absente du profil : inéligible. Rapprochement par famille de certification, pas par catégorie.
+- Le modèle n'en décide pas : il n'extrait que ce que Python ne lit pas (niveau, durée et dates écrits en texte libre). Une offre d'avant D169, sans ces lignes, garde les règles d'avant.
+
+### D168. Scraper : domaines devinés d'après le nom, avant toute recherche web (phase 15, étape 3)
+- Après les sources sûres (D166) et avant la recherche web, le scraper essaie jusqu'à 8 domaines devinés : le nom simplifié (sans forme juridique ni mots de liaison : « Groupe Puce et Plume » donne puceplume), mots collés puis séparés d'un tiret, avec .fr, .com, .eu et .io, puis le sigle et les autres noms (D167). Chacun est essayé aussi avec « www. ».
+- Ils sont vérifiés comme les autres candidats : SIREN, SIRET ou numéro de TVA, sinon nom dans le titre ou les mentions légales (avec, pour un nom d'un seul mot, le SIREN obligatoire : D172).
+- **Redirection suivie** (complément, constaté à la mesure du groupe 2) : un domaine deviné qui redirige vers un autre domaine (cartadis.fr vers cartadis.com, prodware.fr vers prodwaregroup.com, theatredelaville.fr vers theatredelaville-paris.com) est vérifié, lu et retenu sur le domaine d'arrivée. Avant, le lecteur restait sur le domaine de départ : les mentions légales du vrai site n'étaient pas lues, et le site retenu ne correspondait pas au domaine des emails.
+- Sans moteur de recherche, donc sans limite de requêtes. Un domaine qui n'existe pas échoue tout de suite et n'est pas noté parmi les essais. Seuls les noms d'au moins 4 caractères avec un mot distinctif sont devinés.
+
+### D171. Scraper, recherche web : 8 candidats, domaines interdits écartés avant de compter, requête sans ville (phase 15, étape 3)
+- **Constat** (mesure de l'étape 2) : pour Murex, Cartadis, Prodware ou The Body Shop, le domaine officiel n'apparaissait jamais parmi les 4 candidats essayés ; les places étaient prises par des pages tierces qui citent le nom (doctrine.fr, jobted, usinenouvelle, infobel, xerfi, fusacq, clutch…).
+- **Règles.** Un domaine interdit est écarté avant d'être compté : seuls les candidats possibles prennent une place, et il y en a désormais 8 au lieu de 4. Une requête « "nom" site officiel », sans ville, s'ajoute après la première. Les agrégateurs vus à la mesure entrent dans `domaines_interdits.txt`.
+
+### D172. Nom d'un seul mot distinctif : SIREN obligatoire sur le site (phase 15, étape 3)
+- **Constat** : Fermat (olympic.fermat.edu.vn), Bellon (fondationpierrebellon.org) et Ithis (ithishospital.com) avaient été retenus sur leur seul nom dans un titre.
+- **Règle.** La preuve par le nom (titre du site ou mentions légales) n'est acceptée que pour un nom qui a au moins deux mots distinctifs (4 lettres ou plus, ni généraux, ni formes juridiques, ni nombres). Sinon il faut le SIREN, le SIRET ou le numéro de TVA. Cela vaut aussi pour les autres noms (D167) : « Toshiba Île-de-France » n'a qu'un mot distinctif.
+- **Effet attendu** : moins de faux, mais certains sites justes trouvés par le titre seul (Neurones, WeTradeLocal, Degetel…) exigent maintenant leur SIREN dans les mentions légales. La mesure le dira.
+
+### D170. Prompt d'analyse v2 : extraction sans le profil, jugement en un mot, Python note et plafonne (phase 15, étape 3)
+- **Constats** (banc de départ) : la catégorie n'est juste qu'à 36,7 % ; le modèle met rarement « Hors sujet » et sous-note les offres moyennes ; à l'étape 1, il recopiait le niveau du profil au lieu de celui de l'offre, et ne voyait que 2 000 caractères.
+- **Appel 1, extraction** (`offres/analyse_v2.py`) : il ne voit pas le profil et lit la description entière (jusqu'à 8 000 caractères). Il donne niveau et exigence, durée, date de début, alternance seulement, années d'expérience exigées, permis exigé, certifications exigées, diplôme d'État exigé. Python contrôle chaque valeur contre le texte (D98). Les exigences retrouvées dans le texte deviennent des lignes structurées, jugées par les mêmes règles que D169.
+- **Appel 2, jugement** : avec le profil, sur la description raccourcie (`IA_LONGUEUR_DESCRIPTION`), un mot parmi Très bien, Bien, Moyen, Faible et Hors sujet, chacun défini. L'arbre de décision est ordonné :
+  1. hors sujet (domaine, postes à éviter, ce n'est pas le bon contrat) ;
+  2. adéquation des missions ;
+  3. réserves, en descendant d'un cran une seule fois.
+
+  Niveau, durée, dates, permis et certifications ne comptent pas : ils sont vérifiés à part.
+- **Python** convertit le mot en note (Très bien 9, Bien 7, Moyen 5, Faible 3, Hors sujet 1), décide l'éligibilité (plafond 3 si inéligible) et plafonne : un niveau souhaité deux crans ou plus au-dessus du profil donne Moyen au plus, à la place du malus de 1 à 2 points de v1.
+- **Mesure** (D, `scripts/banc_ia/decouper.py`) : le jeu annoté est coupé en deux moitiés fixes (graine 15, réparties par mode), 69 offres de réglage et 68 de test. Le prompt ne s'ajuste que sur la moitié réglage. La moitié test sert à la mesure finale seulement : v1 contre v2 avec ministral-3:3b, puis v2 avec ministral-3:8b. Les bancs lisent les seules variables `IA_*` du `.env`. `banc_analyse.py --version v1|v2`.
+- **Réglage** (moitié réglage seulement, ministral-3:3b, 1 essai, 69 offres) :
+
+  | Passage | Éligibilité | Catégorie exacte | Écart moyen |
+  |---|---|---|---|
+  | 1 | 87 % | 26 % | 1,14 rang |
+  | 2 | 87 % | 36 % | 0,88 rang |
+  | 3 | 87 % | 49 % | 0,61 rang |
+
+  1. Arbre tel que conçu : le modèle met « Hors sujet » partout où le poste n'est pas dans les types de jobs qui conviennent.
+  2. Étape 1 resserrée : Hors sujet seulement pour ce que le profil écarte explicitement ; en cas de doute, étape 2.
+  3. Le modèle doit recopier la phrase du profil qui impose Hors sujet (`hors_sujet_car`) ; Python ne garde Hors sujet que si elle vient d'un champ d'exclusion (types de jobs à éviter, ce qu'il préfère éviter, domaines recherchés hors job), sinon Faible.
+- **Mesure finale** (moitié test, 68 offres jamais regardées avant, 1 essai, température 0, variables `IA_*` du `.env`) :
+
+  | | v1, 3b | v2, 3b | v2, 8b |
+  |---|---|---|---|
+  | Éligibilité juste | 60,3 % (26 faux éligibles) | 72,1 % (18) | 70,6 % (19) |
+  | Faux inéligibles | 1 | 1 | 1 |
+  | Niveau extrait juste | 86,8 % | 89,7 % | 86,8 % |
+  | Faux positifs de niveau | 0 | 0 | 0 |
+  | Catégorie exacte | 32,4 % | 51,5 % | 55,9 % |
+  | Écart moyen | 0,76 rang | 0,63 rang | 0,56 rang |
+  | Réponses à 2 rangs ou plus | 4 | 8 | 6 |
+  | Temps par offre | 23,3 s | 23,8 s | 50,2 s |
+  | Réponses invalides | 0 | 0 | 0 |
+- **Décision** : v2 devient le prompt de l'application (`IA_VERSION_ANALYSE`, défaut `v2`, `v1` pour revenir), avec ministral-3:3b. Le 8b gagne un peu en catégorie mais double le temps. Les tests d'avant restent épinglés sur v1, v2 a les siens.
+
+### D173. Nom d'un seul mot : site accepté sans SIREN si le domaine est le nom et si l'adresse Sirene y figure (phase 15, étape 3)
+- **Constat** (D172) : la règle « SIREN obligatoire pour un nom d'un seul mot distinctif » écartait Fermat et Bellon, mais aussi 7 sites justes (WeTradeLocal, AMUE, Theatre de la Ville, Degetel, Cartadis, Lexmark, Murex), dont les mentions légales n'affichent ni SIREN, ni RCS, ni TVA.
+- **Règle.** Un tel site est accepté sans SIREN aux deux conditions suivantes ; sinon, SIREN toujours obligatoire :
+  1. le domaine principal (sans sous-domaine ni extension) est exactement le nom distinctif simplifié (cartadis.com pour CARTADIS, lexmark.com pour LEXMARK INTERNATIONAL) ;
+  2. l'accueil, la page contact (lien réel de l'accueil, une page de plus) ou les mentions légales portent le code postal ou la voie (au moins 8 caractères) d'une adresse Sirene de l'entreprise : l'établissement francilien en base, ou le siège donné par l'API Recherche d'entreprises (gardé dans `extra.adresse_siege`, même appel que D167).
+- **Mesure** (groupe 4, mêmes recherches en cache) :
+  - 14 justes, 2 faux, 11 non trouvés, contre 12, 2 et 13 avec D172 strict ;
+  - Degetel et Cartadis retrouvés par leur code postal ;
+  - Fermat et Bellon ne reviennent pas ;
+  - 42,2 s par entreprise.
+- Preuve enregistrée : `domaine_adresse`, avec ce qui a été trouvé et où (« domaine au nom de l'entreprise et code postal 94120 dans la page contact »).
+
+### D174. Job : expérience exigée inéligible seulement au-delà de 12 mois d'écart (phase 15, étape 3)
+- **Constat** (remesure avec le profil rempli) : 5 offres job exigeant 1 ou 2 ans d'expérience, annotées éligibles (« vente en magasin, accepté par le profil »), étaient écartées pour un profil de 3 mois.
+- **Règle.** En job, l'offre est inéligible seulement si l'expérience exigée dépasse celle du profil de plus de 12 mois. Sinon elle reste éligible, plafonnée à Moyen (5), avec « Expérience demandée : 1 an » en tête de Ce qui coince (`shared/exigences.reserves`, appliqué par `appliquer_eligibilite`, en v1 comme en v2). La règle de l'alternance (2 ans ou plus) ne change pas.
+
+### D175. Aucun permis et permis exigé, toute catégorie : inéligible (phase 15, étape 3)
+- **Constat** (remesure) : pour 3 offres « Conducteur de bus », v2 extrayait « permis C » alors que le texte demande une autre catégorie ; le contrôle contre le texte rejetait la valeur, et l'offre restait éligible pour un profil sans permis.
+- **Règle.** Quand l'extraction donne un permis exigé dont la catégorie n'est pas retrouvée dans le texte, mais que le texte parle bien de permis, une ligne « Permis : * - catégorie non lue (exigé) » est ajoutée. Un profil « Aucun permis » est alors inéligible (« permis exigé, tu n'as pas de permis »), comme pour toute catégorie lue. Un profil qui a un permis n'est pas écarté sur une catégorie incertaine ; un permis non renseigné ne bloque jamais.
+
+### D176. Expérience écrite en lettres et en fourchettes (phase 15, étape 3)
+- **Constat** (remesure) : pour 2 offres « Conseiller en gestion de patrimoine », v2 extrayait 3 ans d'expérience, mais le contrôle contre le texte, qui cherchait « 3 ans », rejetait la valeur.
+- **Règle** (`shared/exigences.annees_dans_texte`) : le texte porte une durée d'expérience écrite en chiffres ou en lettres (un à dix), seule ou en fourchette (« 3 à 5 ans », « 3-5 ans » : la borne basse), avec ou sans « minimum » ou « au moins » (« 2 ans minimum », « au moins deux années »). L'extraction est gardée si son nombre d'années figure parmi celles-là.
+
+### D177. Bac+5 exigé : stage de fin d'études, dernière année d'école d'ingénieurs ou de master, M2 (phase 15, étape 3)
+- **Constat** (remesure) : 3 offres Bac+5 (un stage de fin d'études en école d'ingénieurs, deux alternances) restaient éligibles pour un profil Bac+2. Aucun mot d'exigence n'était écrit à côté du niveau, donc D103 les classait « souhaité » (plafond Moyen).
+- **Règle** (`shared/eligibilite.BAC5_EXIGE`) : « stage de fin d'études », « dernière année d'école d'ingénieurs », « dernière année de master » (ou du cycle ingénieur) et « M2 » (« Master 2 ») valent Bac+5 exigé, même sans mot d'exigence et même avec « ou équivalent ». Les autres indices suivent toujours D103 : « idéalement en école d'ingénieurs (Bac+5) » reste souhaité. Les tests MOSS, qui encodaient l'ancienne lecture de « dernière année d'école d'ingénieurs ou Master 2 », sont mis à jour.
+
+### D178. Alternance : diplôme préparé à plus d'un niveau au-dessus du niveau visé, inéligible (phase 15, étape 3)
+- **Constat** (remesure) : une alternance Product Owner préparant un Bac+4/5 (ISCOD) restait éligible pour un profil qui vise un DEUST (Bac+2).
+- **Règle.** En alternance, le niveau de l'offre (extrait puis contrôlé contre le texte) est celui du diplôme préparé. S'il dépasse de plus d'un cran le niveau visé du profil (champ « Niveau visé »), l'offre est inéligible (« diplôme préparé Bac+5, niveau visé Bac+2 »), qu'il soit exigé ou souhaité. Un cran au-dessus reste toléré (comme le niveau adjacent de D154). Un niveau visé non renseigné ne bloque pas.
+
+### D179. Job : poste confirmé, senior ou expérimenté, traité comme le poste senior de l'alternance (phase 15, étape 3)
+- **Constat** (remesure) : « Responsable commercial confirmé » restait éligible en job ; la règle « poste senior » n'existait que dans le prompt de l'alternance. Avec v2, un « Hors sujet » sans phrase du profil redescend à Faible, donc elle ne tenait plus non plus en alternance.
+- **Règle** (`shared/exigences.poste_senior`, appliquée par Python) : en job et en alternance, un intitulé qui contient « confirmé », « senior » ou « expérimenté » (et leurs accords) rend l'offre inéligible (« poste confirmé ou senior »), comme l'annotation la classe. « Responsable » seul ne compte pas. Exception reprise de l'alternance : une offre déposée par un organisme de formation (marque `organisme_formation`) n'est pas concernée.
+- Choix à confirmer : la règle de l'alternance donnait une note basse (0 à 2) ; ici l'offre devient inéligible, ce qui revient à la même catégorie (« Hors sujet ») et suit l'annotation.
+
+**Point 8 de la remesure, métiers qualifiés sans exigence écrite** (frigoriste, technicien CVC, gestion locative) : aucune règle, décision de l'utilisatrice ; ils restent jugés par l'IA.
+
+### D180. M2 exigé seulement après « en », « de », « niveau », « étudiant(e) », « préparez » (phase 15, étape 3)
+- **Constat** (remesure après D177) : l'offre « Adjoint en scolarité », dont les missions citent les « dossiers d'entrée en Master 1 et Master 2 », devenait inéligible pour un profil Bac+1.
+- **Règle.** « M2 » ou « Master 2 » reste un indice de niveau Bac+5. Il ne vaut exigé que précédé, à quelques mots près, de « en », « de », « niveau », « étudiant(e) », « préparez » ou « préparant », un article pouvant s'intercaler (« préparez un M2 », « étudiant en M2 », « niveau Master 2 »). Sinon D103 s'applique. « Stage de fin d'études » et « dernière année d'école d'ingénieurs ou de master » restent exigés (D177).
+
+### D181. Annotation : « Assistant(e) administratif(ve) polyvalent(e) », 2 ans exigés, inéligible (phase 15, étape 3)
+- Dans le jeu de référence (`banc_reference.json`) et la moitié test, l'offre job qui exige 2 ans d'expérience passe en attendu inéligible. Elle est cohérente avec D174 : 21 mois d'écart pour un profil de 3 mois, au-delà des 12 tolérés. Les autres offres qui exigent 1 an gardent leur annotation éligible (plafond Moyen par D174). Comme pour le CACES (point 2 de la remesure précédente), c'est l'annotation qui change, pas une règle.
+
+### D182. Permis implicite pour les métiers de conduite (phase 15, étape 3)
+- **Constat** (remesure) : 3 offres « Conducteur de bus » restaient éligibles pour un profil « Aucun permis » ; leur description stockée ne dit pas « permis ».
+- **Règle.** `shared/referentiels/metiers_conduite.txt` liste les métiers de conduite : conducteur ou conductrice de bus, de car, d'autocar ou de poids lourd, conducteur PL, SPL ou routier, chauffeur et chauffeuse (y compris chauffeur-livreur et VTC), ambulancier et ambulancière. Un intitulé qui en contient un, sur des mots entiers et sans tenir compte des accents ni du pluriel, vaut « permis exigé, catégorie non lue ». Un profil « Aucun permis » est inéligible ; un profil qui a un permis ne l'est pas ; un permis non renseigné ne bloque pas. « Conducteur de travaux » et « chauffagiste » ne sont pas concernés.
+
+### D183. Expérience exigée sans durée, poste « débutant accepté » : aucun changement (phase 15, étape 3)
+- « Expérience : Expérience exigée » sans durée (Conseiller en gestion de patrimoine) ne rend pas inéligible : sans durée écrite, la règle job (D174) ne s'applique pas.
+- « Responsable commercial Clients Directs Ouest », dont le titre ne dit pas « confirmé » et dont le texte indique « Débutant accepté », reste éligible. Ces offres restent comptées faux éligibles dans le banc : décision de l'utilisatrice.

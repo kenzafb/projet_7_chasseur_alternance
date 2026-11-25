@@ -110,7 +110,7 @@ def _jeu():
         etablissement(3, tranche=None),                     # sans tranche : effectif inconnu
         etablissement(4, tranche="03"),                     # moins de 10
         etablissement(5, cp="92100"),                       # hors département choisi
-        etablissement(6, siege=False),                      # pas le siège
+        etablissement(6, siege=False),                      # pas le siège, en IDF : gardé (D159)
         etablissement(7, actif=False),                      # cessée
         etablissement(8, naf="64.19Z", tranche="12"),       # transverse, petite : jamais
         etablissement(9, naf="64.19Z", tranche="42", categorie="ETI"),
@@ -130,22 +130,23 @@ def test_recuperer_selon_le_profil(utilisateur, sirene):
     sauvegarder_profil(uid, profil(tailles=["10_49"], departements=["75"]))
     logs = Journal()
     fetch.main(uid, log_fn=logs)
-    assert _sirets(uid) == [1, 3]                                         # inconnu gardé, NN non (D55)
+    assert _sirets(uid) == [1, 3, 6]                                      # inconnu gardé, NN non (D55)
     assert "secteurs transverses non cherchés" in logs.texte()
     assert all("75*" in r["q"] and "92*" not in r["q"] for r in api.recherches)
-    assert "Sirene : 2 nouvelles entreprises (2 cœurs)" in logs.texte()
+    assert "Sirene : 3 nouvelles entreprises (3 cœurs), dont 1 par un établissement d'IDF qui n'est pas le siège" \
+        in logs.texte()
     # « Sans salarié » cochée : NN gardé
     uid3 = utilisateur("c@test.fr", prenom="Carla")[1]
     sauvegarder_profil(uid3, profil(tailles=["sans_salarie", "10_49"], inconnue=False, departements=["75"]))
     fetch.main(uid3, log_fn=Journal())
-    assert _sirets(uid3) == [1, 2]
+    assert _sirets(uid3) == [1, 2, 6]
     assert "2 requêtes en 0 min" in logs.texte()                       # tranches, puis effectif inconnu
     # Effectifs inconnus refusés
     sauvegarder_profil(uid, profil(tailles=["10_49"], inconnue=False, departements=["75"]))
     uid2 = utilisateur("b@test.fr", prenom="Bob")[1]
     sauvegarder_profil(uid2, profil(tailles=["10_49"], inconnue=False, departements=["75"]))
     fetch.main(uid2, log_fn=Journal())
-    assert _sirets(uid2) == [1]
+    assert _sirets(uid2) == [1, 6]
 
 
 def test_toutes_tailles_et_transverses(utilisateur, sirene):
@@ -154,8 +155,8 @@ def test_toutes_tailles_et_transverses(utilisateur, sirene):
     sauvegarder_profil(uid, profil(departements=["75"]))
     logs = Journal()
     fetch.main(uid, log_fn=logs)
-    # Toutes les tailles sauf « sans salarié » : 1, 3, 4 ; transverses : 9 (tranche), 10 (catégorie GE)
-    assert _sirets(uid) == [1, 3, 4, 9, 10]
+    # Toutes les tailles sauf « sans salarié » : 1, 3, 4, 6 ; transverses : 9 (tranche), 10 (catégorie GE)
+    assert _sirets(uid) == [1, 3, 4, 6, 9, 10]
     assert "2 transverses" in logs.texte()
 
 
@@ -202,7 +203,7 @@ def test_pas_de_doublon_avec_lba_et_trace_des_deux_sources(utilisateur, sirene):
     logs = Journal()
     fetch.main(uid, log_fn=logs)
     ents = lire_entreprises(uid)
-    assert _sirets(uid) == [1, 3]
+    assert _sirets(uid) == [1, 3, 6]
     assert next(e for e in ents if e["_extra"]["siret"] == siret_sirene(1))["sources"] == ["lba", "sirene"]
     assert "1 déjà en base retrouvées" in logs.texte()
 
@@ -220,7 +221,7 @@ def test_meme_siren_autre_etablissement_pas_de_doublon(utilisateur, sirene):
     logs = Journal()
     fetch.main(uid, log_fn=logs)
     ents = lire_entreprises(uid)
-    assert sorted(e["_extra"]["siret"] for e in ents) == sorted([secondaire, siret_sirene(3)])
+    assert sorted(e["_extra"]["siret"] for e in ents) == sorted([secondaire, siret_sirene(3), siret_sirene(6)])
     assert next(e for e in ents if e["_extra"]["siret"] == secondaire)["sources"] == ["lba", "sirene"]
     assert "1 déjà en base retrouvées" in logs.texte()
     # Et dans l'autre sens : LBA retrouve un siège Sirene par le SIREN
@@ -328,6 +329,36 @@ def test_tailles_des_offres_et_des_spontanees_separees(utilisateur, sirene):
     sirene(FausseSirene(_jeu()))
     sauvegarder_profil(uid, p)
     fetch.main(uid, log_fn=Journal())
-    assert _sirets(uid) == [1]
+    assert _sirets(uid) == [1, 6]
     assert normaliser_recherche({"tailles_spontanees": ["10_49", "x"], "taille_inconnue_spontanees": 0}) == {
         "tailles_spontanees": ["10_49"], "taille_inconnue_spontanees": True}
+
+
+# ─── Établissements actifs d'IDF, sièges ou non (D159) ────────────────────────
+def test_etablissements_d_idf_une_entree_par_siren(utilisateur, sirene):
+    jeu = [
+        etablissement(1, siege=False, nic="00099", cp="75002"),   # secondaire d'abord...
+        etablissement(1, cp="75011"),                              # ... puis le siège : c'est lui qui reste
+        etablissement(2, siege=False, nic="00030"),                # siège hors IDF : son établissement parisien
+        etablissement(2, siege=False, nic="00031"),                # même entreprise : ignoré
+        etablissement(3, siege=False, nic="00040", etats=("F", "A")),   # fermé aujourd'hui, actif autrefois
+        etablissement(4, categorie_juridique="7389"),              # administration : comptée, gardée
+    ]
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    api = sirene(FausseSirene(jeu))
+    sauvegarder_profil(uid, profil(tailles=["10_49"], inconnue=False, departements=["75"]))
+    logs = Journal()
+    fetch.main(uid, log_fn=logs)
+    assert all("periode(etatAdministratifEtablissement:A)" in r["q"] and "etablissementSiege" not in r["q"]
+               for r in api.recherches)
+    ents = {e["_extra"]["siret"]: e for e in lire_entreprises(uid)}
+    assert sorted(ents) == [siret_sirene(1), f"{2:09d}00030", siret_sirene(4)]
+    assert ents[siret_sirene(1)]["_extra"]["siege"] is True
+    assert ents[f"{2:09d}00030"]["_extra"]["siege"] is False
+    assert ents[siret_sirene(4)]["_extra"]["categorie_juridique"] == "7389"
+    t = logs.texte()
+    assert "Sirene : 3 nouvelles entreprises (3 cœurs)" in t
+    assert "dont 1 par un établissement d'IDF qui n'est pas le siège" in t
+    assert "dont 1 administrations publiques (catégorie juridique 7…)" in t
+    assert "2 autres établissements des mêmes entreprises ignorés" in t
+    assert "1 établissements fermés écartés" in t

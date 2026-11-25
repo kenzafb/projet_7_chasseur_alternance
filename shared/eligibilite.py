@@ -51,8 +51,17 @@ PLAFOND_SCORE_INELIGIBLE = 3
 # Indices de niveau dans la description (jamais l'intitulé du poste : « Stage
 # Ingénieur/e Système » ne dit rien du niveau ; le mot « ingénieur » seul non
 # plus). Chaque indice autorise un ou plusieurs niveaux de l'énumération.
+# Bac+5 exigé sans mot d'exigence (D177) : stage de fin d'études, dernière année
+# d'école d'ingénieurs ou de master, M2
+BAC5_EXIGE = (r"stages? de fin d.[ée]tudes|derni[èe]re ann[ée]e (?:d.|de |du )(?:[ée]coles? d.ing[ée]nieurs?"
+              r"|cycle d.ing[ée]nieurs?|ing[ée]nieurs?|master)")
+M2 = r"\bm\s?2\b|master\s*2"
+# M2 ou Master 2 n'est exigé que précédé de « en », « de », « niveau »,
+# « étudiant(e) », « préparez », « préparant » (D180) : « dossiers d'entrée en
+# Master 1 et Master 2 » d'un poste de scolarité n'exige rien
+M2_EXIGE = re.compile(r"(?:\ben|\bde|\bniveau|[ée]tudiante?s?|pr[ée]parez|pr[ée]parant)\s+(?:(?:un|une|le|la|votre|son)\s+)?$")
 INDICES_NIVEAU = [
-    (r"bac\s*\+\s*5|\bm\s?2\b|master\s*2|[ée]coles? d.ing[ée]nieurs?|dipl[ôo]me d.ing[ée]nieurs?"
+    (BAC5_EXIGE + "|" + M2 + r"|bac\s*\+\s*5|[ée]coles? d.ing[ée]nieurs?|dipl[ôo]me d.ing[ée]nieurs?"
      r"|[ée]l[èe]ves?[- ]ing[ée]nieurs?|cycle (?:d.)?ing[ée]nieurs?|formation d.ing[ée]nieurs?", {"bac+5"}),
     (r"\bmasters?\b|\bmsc\b", {"bac+4", "bac+5"}),
     (r"bac\s*\+\s*4|\bm\s?1\b|master\s*1", {"bac+4"}),
@@ -100,6 +109,14 @@ def exigence_detectee(texte: str, positions) -> str:
     « souhaite » dans tous les autres cas."""
     if _pres(MARQUEURS_EXIGENCE, texte, positions) and not _pres(MARQUEURS_SOUHAIT, texte, positions):
         return "exige"
+    # Stage de fin d'études, dernière année d'école d'ingénieurs ou de master : exigé (D177) ;
+    # M2 seulement après « en », « de », « niveau », « étudiant », « préparez » (D180)
+    bas = texte.lower()
+    for a, b in positions:
+        if re.fullmatch(BAC5_EXIGE, bas[a:b]):
+            return "exige"
+        if re.fullmatch(M2, bas[a:b]) and M2_EXIGE.search(bas[max(0, a - 40):a]):
+            return "exige"
     return "souhaite"
 
 
@@ -248,12 +265,27 @@ def lire_debut_offre(texte) -> tuple[date, bool] | None:
     return None
 
 
-def raisons_ineligibilite(extraits: dict, profil: dict, mode: str) -> list[str]:
-    """Raisons d'inéligibilité établies en Python ; vide si rien ne bloque."""
+ECART_ALTERNANCE_PREPARE = 1      # crans au-dessus du niveau visé tolérés en alternance (D178)
+
+
+def raisons_ineligibilite(extraits: dict, profil: dict, mode: str, offre: dict | None = None) -> list[str]:
+    """Raisons d'inéligibilité établies en Python ; vide si rien ne bloque.
+    offre : ses exigences structurées (permis, formation, expérience,
+    certifications, shared/exigences.py, D169) comptent aussi."""
     raisons = []
+    if offre is not None:
+        from shared.exigences import raisons as raisons_exigences
+        raisons += raisons_exigences(offre, profil, mode, niveau_du_profil(profil)["crans"])
     ecart = ecart_niveau(extraits, profil)
-    if ecart and ecart[0] >= ECART_NIVEAU_BLOQUANT and extraits.get("niveau_exigence") == "exige":
+    niveau_bloque = bool(ecart and ecart[0] >= ECART_NIVEAU_BLOQUANT and extraits.get("niveau_exigence") == "exige")
+    if niveau_bloque:
         raisons.append(f"{LIBELLES[ecart[1]]} exigé, profil {LIBELLES[ecart[2]]}")
+    # Alternance : diplôme préparé à plus d'un niveau au-dessus du niveau visé (D178)
+    if mode == "alternance" and not niveau_bloque:
+        vise = crans_texte(profil.get("niveau_vise") or "")
+        requis = CRANS.get(extraits.get("niveau_requis") or "non_precise")
+        if requis is not None and vise and requis - max(vise) > ECART_ALTERNANCE_PREPARE:
+            raisons.append(f"diplôme préparé {LIBELLES[requis]}, niveau visé {LIBELLES[max(vise)]}")
     if mode in ("stage", "job") and extraits.get("alternance_seulement"):
         raisons.append("offre en alternance seulement")
     if mode == "stage":

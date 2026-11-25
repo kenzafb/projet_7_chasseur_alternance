@@ -6,6 +6,8 @@ et 0009, recherche d'offres qui n'en ajoute pas, étape « Récupérer »
 
 import sqlite3
 
+import pytest
+
 from alembic import command
 
 import offres.la_bonne_alternance as lba
@@ -183,25 +185,21 @@ def test_recuperer_partage_la_limite_entre_lba_et_sirene(utilisateur, monkeypatc
     from database.profil_db import sauvegarder_profil
     _, uid = utilisateur("a@test.fr", prenom="Alice")
     sauvegarder_profil(uid, {"recherche": {"domaines": ["M18"]}})
-    options = {}
     # Sirene simulé (test_limites) renvoie les SIRET 00000000000010, 00000000100010...
     lba_ents = [_norm(1, siret="00000000100010")] + [_norm(10 + i) for i in range(3)]
-
-    def faux(profil, log=print, stop_event=None, **kw):
-        options.update(kw)
-        return {"offres": [], "entreprises": lba_ents, "requetes": 42, "duree_s": 75.0}
-    monkeypatch.setattr(lba, "rechercher_pour_profil", faux)
+    # Entreprises à fort potentiel : export LBA (D163), plus la recherche par cercles
+    from offres import export_lba
+    monkeypatch.setattr(export_lba, "entreprises_pour_profil", lambda profil, log=print: iter(list(lba_ents)))
+    monkeypatch.setattr(lba, "rechercher_pour_profil", lambda *a, **k: pytest.fail("plus de recherche"))
     logs = []
     fetch.main(uid, max_entreprises=5, log_fn=logs.append)
-    assert options["redecouper_entreprises"] is True and options["objectif_entreprises"] == 3
     ents = lire_entreprises(uid)
     assert len(ents) == 5
     assert sum(e["sources"] == ["lba"] for e in ents) == 2
     assert next(e for e in ents if e["_extra"]["siret"] == "00000000100010")["sources"] == ["lba", "sirene"]
     assert sum(e["sources"] == ["sirene"] for e in ents) == 2
     texte = "\n".join(logs)
-    assert "La Bonne Alternance terminée : 42 requêtes en 1 min 15 s" in texte
-    assert "rayon minimal 1 km, au plus 300 requêtes" in texte
+    assert "La Bonne Alternance terminée en 0 min" in texte and "export complet" in texte
     assert "1 laissées pour le prochain lancement" in texte
     # Limite atteinte par LBA seule (limite de 1, part LBA 1) : Sirene n'est pas interrogé
     appels = sirene.appels

@@ -186,6 +186,27 @@
                  type="text" placeholder="Ex. Excel, Python, accueil client…">
         </div>
 
+        <!-- Permis, expérience, certifications : comparés aux exigences des offres, sans IA (D169) -->
+        <div class="profil-bloc" data-mode-section="commun">
+          <fieldset class="field field--full">
+            <legend class="field__label">Permis de conduire</legend>
+            <p class="field__hint">Une offre qui exige un permis que tu n'as pas est écartée. Coche « Aucun permis » si c'est le cas.</p>
+            <div class="cases" data-permis></div>
+          </fieldset>
+          <label class="field">
+            <span class="field__label">Expérience professionnelle, en mois</span>
+            <input class="field__input" type="number" min="0" max="600" step="1" inputmode="numeric"
+                   data-rech="experience_mois" placeholder="Ex. 6">
+            <span class="field__hint">Total des stages, jobs et emplois. Une offre de job qui exige davantage est écartée ; vide : jamais écartée pour ça.</span>
+          </label>
+          <label class="field__label" for="certification-ajout">Certifications</label>
+          <p class="field__hint">CACES, SSIAP, carte professionnelle… Tape et appuie sur Entrée. Une offre qui exige une certification absente d'ici est écartée.</p>
+          <ul class="tags" data-tags="certifications" aria-label="Tes certifications"></ul>
+          <input class="field__input tags__input" id="certification-ajout" data-tags-input="certifications"
+                 type="text" list="certifications-suggerees" placeholder="Ex. CACES R489">
+          <datalist id="certifications-suggerees" data-certifications-suggerees></datalist>
+        </div>
+
         <div class="profil-bloc" data-mode-section="commun">
           <span class="field__label">Projets</span>
           <p class="field__hint">Cours, perso, associatifs : cités dans la note des offres et dans la lettre.</p>

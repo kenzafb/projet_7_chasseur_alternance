@@ -102,3 +102,40 @@ def test_migration_0016_offres_existantes_vues(tmp_path):
     assert cx.execute("SELECT reglages FROM profils").fetchone() == ("{}",)
     cx.close()
     command.downgrade(cfg, "0015")
+
+
+def test_migration_0017_marques_des_offres(tmp_path):
+    """D154 : candidatures.marques, vide pour les lignes existantes, retirée en descente sans perte."""
+    from database.schema import config_alembic
+    chemin = tmp_path / "t.db"
+    cfg = config_alembic(f"sqlite:///{chemin}")
+    command.upgrade(cfg, "0016")
+    cx = sqlite3.connect(chemin)
+    cx.execute("INSERT INTO users (email, mot_de_passe_hash, mot_de_passe_temporaire) VALUES ('a@t.fr', 'x', 0)")
+    cx.executemany("INSERT INTO candidatures (user_id, mode, ref_offre, titre) VALUES (1, 'alternance', ?, ?)",
+                   [("R1", "Offre 1"), ("R2", "Offre 2")])
+    cx.commit()
+    cx.close()
+    command.upgrade(cfg, "0017")
+    cx = sqlite3.connect(chemin)
+    assert cx.execute("SELECT ref_offre, titre, marques FROM candidatures ORDER BY id").fetchall() == [
+        ("R1", "Offre 1", "[]"), ("R2", "Offre 2", "[]")]
+    cx.close()
+    command.downgrade(cfg, "0016")
+    cx = sqlite3.connect(chemin)
+    assert cx.execute("SELECT ref_offre, titre FROM candidatures ORDER BY id").fetchall() == [
+        ("R1", "Offre 1"), ("R2", "Offre 2")]
+    assert "marques" not in [c[1] for c in cx.execute("PRAGMA table_info(candidatures)")]
+    cx.close()
+
+
+def test_marques_enregistrees_et_affichees(utilisateur):
+    from database.candidatures_db import ajouter_candidature, lire_candidatures
+    _, uid = utilisateur("m@test.fr")
+    ajouter_candidature(uid, {"id": "o1", "titre": "Alternance dev", "entreprise": "CFA Machin",
+                              "marques": ["niveau_different"]})
+    ajouter_candidature(uid, {"id": "o2", "titre": "Alternance dev", "entreprise": "ACME"})
+    o1, o2 = sorted(lire_candidatures(uid), key=lambda c: c["id"])
+    assert o1["marques"] == ["niveau_different"]
+    assert o1["etiquettes"] == ["Niveau différent du tien", "Indice d'école ou de CFA : « cfa »"]
+    assert (o2["marques"], o2["etiquettes"]) == ([], [])

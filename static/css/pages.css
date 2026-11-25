@@ -450,6 +450,10 @@
 .volet__ok { margin-top: -8px; font-size: 14px; color: var(--texte-2); }
 .volet__alerte { padding: 10px 14px; border-radius: var(--r-champ); background: var(--refus-fond); color: var(--refus); font-size: 14px; }
 .volet__ecartee { font-size: 14px; color: var(--texte-3); }
+/* Marques et indices de l'offre (D154 à D156) : information, pas action */
+.volet__etiquettes { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 12px; padding: 0; list-style: none; }
+.etiquette { padding: 2px 10px; border-radius: var(--r-pill); background: var(--fond-neutre);
+  color: var(--texte-2); font-size: 13px; }
 .volet__colonnes { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .volet__h3 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
 .volet__points { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
@@ -493,6 +497,9 @@
 .reglages__cases { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
 .case { display: flex; align-items: flex-start; gap: 10px; font-size: 14px; }
 .case input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+/* Permis du profil (D169) */
+.cases { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 16px; margin-top: 6px; }
+.cases small { color: var(--texte-3); }
 .reglages__info { margin-top: 14px; font-size: 14px; color: var(--texte-2); }
 
 /* ════════════ CANDIDATURES : tableau en colonnes (D146) ════════════ */

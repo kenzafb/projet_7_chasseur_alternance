@@ -19,7 +19,12 @@ Critères de recherche du profil (profils.recherche, colonne JSON) :
   - domaines_indifferent : « indifférent » coché par la personne elle-même
     (domaines vides par choix, pas par oubli), pour la complétude du
     profil (D144) ; sans effet sur la recherche ;
-  - rythme : rythme de l'alternance (texte libre), pour la complétude.
+  - rythme : rythme de l'alternance (texte libre), pour la complétude ;
+  - permis (codes du référentiel France Travail, ou « aucun »),
+    experience_mois (expérience professionnelle totale, en mois) et
+    certifications (CACES R489, SSIAP 1...) : ce que la personne a, pour les
+    exigences des offres (shared/exigences.py, D169) ; communs aux trois
+    modes, copiables.
 
 normaliser_recherche les remet en forme à l'enregistrement (valeurs
 inconnues retirées, types fixés) ; les autres clés (disponibilité, champs
@@ -30,8 +35,12 @@ la recherche d'un mode.
 from shared import referentiels
 from shared.config import DEPTS_IDF
 from shared.domaines import normaliser_domaines
+from shared.exigences import SUGGESTIONS_CERTIFICATIONS
 from shared.modes import get_mode
 from shared.tailles import CLES_TAILLES, TAILLES
+
+# Permis : codes du référentiel France Travail, ou « aucun » (D169)
+AUCUN_PERMIS = "aucun"
 
 # Thèmes proposés en option du mode job (SPEC_SOURCES 2.1)
 THEMES_PROPOSES = ["13", "17"]
@@ -80,6 +89,26 @@ def normaliser_recherche(recherche) -> dict:
         out["domaines_indifferent"] = out["domaines_indifferent"] is True and not out.get("domaines")
     if "rythme" in out:
         out["rythme"] = str(out["rythme"] or "").strip()[:200]
+    # Permis, expérience et certifications (D169), communs aux trois modes
+    if "permis" in out:
+        permis = _liste(out["permis"], _codes_connus("permis") | {AUCUN_PERMIS})
+        out["permis"] = [AUCUN_PERMIS] if AUCUN_PERMIS in permis else permis
+    if "experience_mois" in out:
+        try:
+            mois = int(str(out["experience_mois"]).strip())
+            out["experience_mois"] = mois if 0 <= mois <= 600 else None
+        except (TypeError, ValueError):
+            out["experience_mois"] = None
+        if out["experience_mois"] is None:
+            del out["experience_mois"]
+    if "certifications" in out:
+        vues, certifs = set(), []
+        for c in out["certifications"] if isinstance(out["certifications"], (list, tuple)) else []:
+            c = " ".join(str(c).split())[:60]
+            if c and c.lower() not in vues:
+                vues.add(c.lower())
+                certifs.append(c)
+        out["certifications"] = certifs[:20]
     return out
 
 
@@ -97,7 +126,8 @@ def criteres_france_travail(profil: dict, mode: str) -> dict:
         filtres["theme"] = rech["themes"]
     return {
         "filtres": filtres,
-        "domaines": rech.get("domaines", []),
+        # Mode stage : domaines jugés par l'IA, pas filtrés à la source (D152)
+        "domaines": [] if cfg.get("ft_sans_domaine") else rech.get("domaines", []),
         "tailles": rech.get("tailles", []),
         "taille_inconnue": rech.get("taille_inconnue", True),
         "exclure_alternance": bool(cfg.get("ft_exclure_alternance")),
@@ -121,4 +151,7 @@ def options_du_profil() -> dict:
                                                             if "avertissement" in t else {})
                     for t in TAILLES],
         "themes": [{"code": c, "libelle": themes.get(c, c)} for c in THEMES_PROPOSES],
+        # Permis et certifications du profil (D169)
+        "permis": [dict(e) for e in referentiels.france_travail("permis")],
+        "certifications": SUGGESTIONS_CERTIFICATIONS,
     }

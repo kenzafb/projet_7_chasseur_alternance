@@ -2,7 +2,7 @@
    spontanees.js — Entreprises à contacter (D148) : trois étapes (trouver,
    chercher les emails, envoyer), entreprises rangées par moyen de contact
    ============================================================================ */
-import { api, limite, confirmerLancement, majCompteur } from "./api.js";
+import { api, limite, confirmerLancement, majCompteur, lienSur } from "./api.js";
 
 let stats = null;
 let compte = null;    // compte d'envoi (mode test affiché en bandeau)
@@ -59,7 +59,7 @@ const ongletDe = e => e.email ? "pretes" : e.lba?.formulaire ? "lba" : "aucun";
 const AIDES = {
   pretes: "Leur email est trouvé : le Chasseur peut leur envoyer ta candidature (étape 3).",
   lba: "Pas d'email, mais un formulaire sur La Bonne Alternance. Postule là-bas, puis indique-le ici.",
-  aucun: "Aucun moyen de contact trouvé pour l'instant. Le Chasseur réessaiera à la prochaine recherche d'emails.",
+  aucun: "Pas d'email gardé : site non vérifié, ou formulaire de contact seulement (lien sur l'entreprise).",
   faites: "Elles sont aussi dans tes Candidatures, où tu suis leurs réponses.",
 };
 const SOURCES = { sirene: "Sirene", lba: "La Bonne Alternance" };
@@ -73,7 +73,13 @@ function ligne(e) {
   const detail = onglet === "pretes"
     ? `Email trouvé : ${esc(e.email)}${e.email_lba ? " (fourni par La Bonne Alternance)" : ""}`
     : onglet === "lba" ? "Formulaire de candidature sur La Bonne Alternance"
-    : (e.adresses || []).length ? "Adresses à vérifier, voir plus haut" : "Ni email ni formulaire trouvés";
+    : (e.adresses || []).length ? "Adresses à vérifier, voir plus haut"
+    : e.formulaire ? "Pas d'email, mais un formulaire de contact sur son site"
+    : e.site_non_verifie ? "Site non vérifié : ni son SIREN ni son nom trouvés sur un site, aucun email gardé"
+    : "Ni email ni formulaire trouvés";
+  // Formulaire de contact du site vérifié : moyen de candidature à la main (D161)
+  const formulaire = onglet !== "pretes" && lienSur(e.formulaire)
+    ? `<a class="ent__lien" href="${esc(lienSur(e.formulaire))}" target="_blank" rel="noopener">Ouvrir le formulaire de contact<span class="visuellement-cache"> (nouvel onglet)</span></a>` : "";
   const recherche = `${e.nom || ""} ${e.ville || ""} ${e.email || ""}`.toLowerCase();
   return `<li class="ent" data-search-text="${esc(recherche)}">
       <span class="ent__initiale" aria-hidden="true">${esc((e.nom || "?").trim()[0] || "?")}</span>
@@ -83,6 +89,7 @@ function ligne(e) {
         ${onglet === "pretes" && (e.adresses || []).length > 1 ? `<details class="ent__adresses"><summary>Ses ${e.adresses.length} adresses</summary>${listeAdresses(e.adresses)}</details>`
           : onglet === "pretes" && (e.adresses || []).length ? `<p class="ent__detail">${etiquetteAdresse(e.adresses[0])}</p>` : ""}
         ${boutonLba(e)}
+        ${formulaire}
       </div>
     </li>`;
 }

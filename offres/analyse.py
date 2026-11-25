@@ -221,40 +221,37 @@ def analyser_offre(offre, profil, mode="alternance", modele=None, essais=2):
     remontent : jamais de note inventée. En alternance, une offre d'école ou
     de CFA est marquée à archiver (statut_auto)."""
     exiger_profil(profil)   # plus de repli sur un utilisateur par défaut
-    analyse = appeler_structure(construire_messages(offre, profil, mode), AnalyseOffre,
-                                usage="analyse", modele=modele, essais=essais, temperature=0.1)
-    result = _valider_analyse(analyse)
-    appliquer_eligibilite(result, offre, profil, mode)
+    from shared.config import ia_version_analyse
+    if ia_version_analyse() == "v2":
+        # Prompt v2 (D170) : extraction sans le profil, puis jugement en un mot
+        from offres.analyse_v2 import analyser_offre_v2
+        result = analyser_offre_v2(offre, profil, mode, modele=modele, essais=essais)
+    else:
+        analyse = appeler_structure(construire_messages(offre, profil, mode), AnalyseOffre,
+                                    usage="analyse", modele=modele, essais=essais, temperature=0.1)
+        result = _valider_analyse(analyse)
+        appliquer_eligibilite(result, offre, profil, mode)
     # Mode stage : une école peut accueillir un stagiaire (D74), rien à archiver
     if mode == "alternance" and est_ecole_cfa(offre):
         result["statut_auto"] = "archive"
     return result
 
 
-# Détection écoles/CFA (mots-clés) → archivage automatique
-ECOLES_MOTS_CLES = [
-    "iscod", "scholia", "imc alternance", "mydigitalschool", "simplon",
-    "afpa", "cfa", "epitech", "openclassrooms", "studi", "ikigai",
-    "la plateforme", "digital campus", "m2i", "doranco", "efficom",
-    "ecole", "organisme de formation", "centre de formation",
-    "hitema", "h3", "igs", "isefac", "sup de vinci",
-    "aureis","nexa","Groupe IGF",
-]
-
-
+# Détection écoles/CFA : organismes vérifiés de
+# shared/referentiels/organismes_formation.txt, mots entiers (D156). Les mots
+# génériques (« cfa », « école ») ne sont plus que des indices affichés.
 def est_ecole_cfa(offre) -> bool:
-    """Vrai si l'offre semble publiée par une école ou un CFA (mots-clés
-    dans la description, l'entreprise ou le titre ; pas d'IA)."""
-    description_lower = (offre.get("description") or "").lower()
-    entreprise_lower = (offre.get("entreprise") or "").lower()
-    titre_lower = (offre.get("titre") or "").lower()
-    return any(
-        mot in description_lower or mot in entreprise_lower or mot in titre_lower
-        for mot in ECOLES_MOTS_CLES
-    )
+    """Vrai si l'offre nomme un organisme de formation vérifié (titre,
+    entreprise ou description ; pas d'IA). Une offre La Bonne Alternance
+    déléguée à un organisme (marque organisme_formation, D155) n'est jamais
+    écartée ainsi : elle est gardée et marquée."""
+    from shared.marques import ORGANISME_FORMATION, organismes_verifies
+    if ORGANISME_FORMATION in (offre.get("marques") or []):
+        return False
+    return bool(organismes_verifies(offre))
 
 
-def appliquer_eligibilite(result: dict, offre: dict, profil: dict, mode: str) -> dict:
+def appliquer_eligibilite(result: dict, offre: dict, profil: dict, mode: str, malus_souhait: bool = True) -> dict:
     """Critères bloquants décidés en Python (shared/eligibilite.py) à partir
     des champs extraits de l'offre, d'abord contrôlés contre son texte
     (une valeur absente du texte devient non précisée, extraits_ecartes) :
@@ -265,19 +262,26 @@ def appliquer_eligibilite(result: dict, offre: dict, profil: dict, mode: str) ->
     from shared.eligibilite import (PLAFOND_SCORE_INELIGIBLE, controler_extraits, penalite_souhait,
                                     raisons_ineligibilite)
     result["extraits_ecartes"] = controler_extraits(result, offre)
-    points, souhait = penalite_souhait(result, profil)
+    points, souhait = penalite_souhait(result, profil) if malus_souhait else (0, "")   # v2 : plafond (D170)
     if points:
         result["score"] = max(0, result["score"] - points)
         if result["eligible"]:
             result["verdict"] = score_to_verdict(result["score"])
         result["points_faibles"] = [souhait] + result["points_faibles"][:2]
-    raisons = raisons_ineligibilite(result, profil, mode)
+    raisons = raisons_ineligibilite(result, profil, mode, offre)
     result["raison_ineligibilite"] = " ; ".join(raisons)
     if raisons:
         result["eligible"] = False
         result["score"] = min(result["score"], PLAFOND_SCORE_INELIGIBLE)
         result["verdict"] = "ineligible"
         result["points_faibles"] = [f"Inéligible : {r}" for r in raisons] + result["points_faibles"][:2]
+    else:
+        # Exigence un peu au-dessus du profil : éligible, plafond Moyen (D174)
+        from shared.exigences import PLAFOND_RESERVE, reserves
+        for message in reserves(offre, profil, mode):
+            result["score"] = min(result["score"], PLAFOND_RESERVE)
+            result["verdict"] = score_to_verdict(result["score"])
+            result["points_faibles"] = [message] + [x for x in result["points_faibles"] if x != message][:2]
     return result
 
 
@@ -439,6 +443,9 @@ def marquer_non_analysee(offre, mode="alternance", verbeux=True):
         "resume_analyse": "",
         "raison_archivage": "",
     })
+    # Intermédiaire d'école (CAPIVISION) : marqué, jamais archivé (D156)
+    from shared.marques import marquer_intermediaire
+    marquer_intermediaire(offre)
     raison = archivage_mots_cles(offre, mode)
     if raison:
         offre["statut"], offre["raison_archivage"] = "archive", raison

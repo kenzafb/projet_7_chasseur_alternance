@@ -17,6 +17,7 @@ from database.insertion import inserer_ou_ignorer
 from database.models import Candidature
 from offres.pages_lba import lien_invente, page_offre
 from shared.liens import lien_http
+from shared.marques import etiquettes
 from shared.offres import entreprise_connue
 
 
@@ -26,6 +27,7 @@ _CHAMPS = [
     "description", "score", "verdict", "eligible", "points_forts",
     "points_faibles", "resume_analyse", "lettre", "email_candidature",
     "objet_email", "statut", "raison_archivage", "date_trouvee", "date_candidature", "notes", "vue",
+    "marques",
 ]
 # Colonnes DateTime, échangées avec l'app sous forme "AAAA-MM-JJ"
 _DATES = {"date_trouvee", "date_candidature"}
@@ -50,6 +52,9 @@ def candidature_vers_dict(c: Candidature) -> dict:
     d["page_lba"] = page_offre(d)
     # Entreprise inconnue : la lettre l'adresse au service recrutement (D138)
     d["entreprise_connue"] = entreprise_connue(d)
+    # Marques et indices affichés (D154, D156), calculés à la lecture
+    d["marques"] = list(d.get("marques") or [])
+    d["etiquettes"] = etiquettes(d)
     return d
 
 
@@ -175,3 +180,28 @@ def enregistrer_lettre_pdf(user_id: int, ref_offre: str, fichier: str, mode: str
         return ancien
     finally:
         db.close()
+
+
+def sites_des_offres(user_id: int, db=None) -> dict[str, list[str]]:
+    """{nom d'entreprise normalisé: [sites]} lus dans les offres de
+    l'utilisateur (ligne « Site de l'entreprise : » des offres France
+    Travail et LBA), tous modes : source du scraper des spontanées (D160)."""
+    import re
+    from shared.offres import LIGNE_SITE
+    from spontanees.site_officiel import nom_normalise
+    motif = re.compile(re.escape(LIGNE_SITE) + r"(\S+)")
+    propre = db is None
+    db = db or SessionLocal()
+    try:
+        out = {}
+        for nom, description in (db.query(Candidature.entreprise, Candidature.description)
+                                 .filter(Candidature.user_id == user_id,
+                                         Candidature.description.contains(LIGNE_SITE))):
+            cle = nom_normalise(nom or "")
+            for url in motif.findall(description or ""):
+                if cle and lien_http(url) and url not in out.setdefault(cle, []):
+                    out[cle].append(url)
+        return out
+    finally:
+        if propre:
+            db.close()

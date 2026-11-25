@@ -8,14 +8,16 @@ Règles dans shared/referentiels/validation_emails.txt, fichier de données
 à compléter sans toucher au code (préfixes de contact, préfixes écartés,
 messageries grand public), en plus de la liste d'exclusion de D47
 (shared/referentiels/emails_exclus.txt) :
-  - écartée d'office : adresse exclue, ou préfixe écarté (dpo@, presse@...) ;
-  - validée d'office : même domaine que le site de l'entreprise, site retenu
-    parce que son domaine correspond au nom de l'entreprise (ni annuaire, ni
-    sous-domaine d'hébergeur), domaine qui n'est pas un fournisseur
-    générique (gmail.com, orange.fr, wix.com...), et préfixe de contact ou
-    de recrutement (contact@, rh@, recrutement@...) ;
-  - douteuse : tout le reste (autre domaine, messagerie grand public,
-    adresse nominative). L'IA (modèle d'extraction) tranche en un appel par
+  - écartée d'office : adresse exclue (factice, technique), mal formée
+    (« contact@acme.fr.nous » : extension inconnue), préfixe écarté (dpo@,
+    presse@...), site non vérifié (spontanees/site_officiel.py : SIREN ou
+    nom sur le site, D160), ou autre domaine que celui du site vérifié
+    (D162) ;
+  - validée d'office : même domaine que le site vérifié, préfixe de
+    contact ou de recrutement (contact@, rh@, recrutement@...) ;
+  - douteuse : même domaine que le site vérifié mais adresse nominative ou
+    inhabituelle, ou messagerie grand public (gmail.com...) trouvée sur le
+    site vérifié. L'IA (modèle d'extraction) tranche en un appel par
     entreprise, à partir du texte qui entoure chaque adresse sur la page, et
     désigne le meilleur contact (énumérations construites à partir des
     adresses trouvées, revérifiées en Python) ; sans IA, l'adresse reste
@@ -34,11 +36,12 @@ from functools import lru_cache
 from pathlib import Path
 
 from shared.emails_exclus import email_exclu
+from shared.liens import est_preproduction
 
 FICHIER = Path(__file__).resolve().parent / "referentiels" / "validation_emails.txt"
 
 VALIDE, ECARTE, DOUTEUX = "valide", "ecarte", "douteux"
-SECTIONS = ("prefixes_contact", "prefixes_ecartes", "fournisseurs_generiques", "hebergeurs")
+SECTIONS = ("prefixes_contact", "prefixes_ecartes", "fournisseurs_generiques", "hebergeurs", "extensions")
 # Comment une adresse a été validée (extra.validation_emails), affiché dans l'interface
 REGLE, IA, MANUELLE = "regle", "ia", "manuelle"
 RAYON_CONTEXTE = 200   # caractères gardés de part et d'autre de l'adresse
@@ -87,10 +90,28 @@ def generique(domaine: str) -> bool:
     return _dans(domaine, regles()["fournisseurs_generiques"])
 
 
+_LOCAL = re.compile(r"^[a-z0-9](?:[a-z0-9._%+'-]*[a-z0-9_])?$")
+_ETIQUETTE = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$")
+
+
+def mal_formee(email: str) -> bool:
+    """Adresse impossible : partie locale ou domaine mal écrits, extension
+    ni à deux lettres (pays) ni dans la section [extensions]
+    (« info@companyfrance.fr.nous », texte collé à l'adresse, D162)."""
+    local, _, domaine = (email or "").strip().lower().rpartition("@")
+    etiquettes = domaine.split(".")
+    if not _LOCAL.match(local) or ".." in local or len(etiquettes) < 2:
+        return True
+    if not all(_ETIQUETTE.match(e) for e in etiquettes):
+        return True
+    extension = etiquettes[-1]
+    return not (extension.isalpha() and (len(extension) == 2 or extension in regles()["extensions"]))
+
+
 def site_fiable(domaine_site: str | None, nom: str) -> bool:
-    """Le site a-t-il été retenu parce que son domaine correspond au nom de
-    l'entreprise ? Faux pour un annuaire, un sous-domaine d'hébergeur, un
-    fournisseur générique, ou un domaine sans rapport avec le nom."""
+    """Ancienne règle (avant D160) : le domaine du site correspond-il au nom
+    de l'entreprise ? Gardée pour comparer dans scripts/banc_ia ; la
+    validation se fonde maintenant sur le site vérifié."""
     if not domaine_site:
         return False
     domaine = domaine_site.lower().removeprefix("www.")
@@ -100,29 +121,30 @@ def site_fiable(domaine_site: str | None, nom: str) -> bool:
     return not est_annuaire(domaine) and domaine_correspond(domaine, analyser_nom(nom or ""))[0]
 
 
-def classer(email: str, domaine_site: str | None, fiable: bool = False) -> tuple[str, str]:
+def classer(email: str, domaine_site: str | None, verifie: bool = False) -> tuple[str, str]:
     """(VALIDE, ECARTE ou DOUTEUX ; raison lisible) d'après les règles seules.
-    fiable : le site correspond au nom de l'entreprise (site_fiable) ; sans
-    cela, aucune adresse n'est validée d'office."""
+    verifie : domaine_site est le site vérifié de l'entreprise
+    (spontanees/site_officiel.py) ; sans site vérifié, rien n'est gardé."""
     email = (email or "").strip().lower()
     local, _, domaine = email.rpartition("@")
     r = regles()
     if not local or not domaine or email_exclu(email):
         return ECARTE, "liste d'exclusion"
+    if mal_formee(email):
+        return ECARTE, "adresse mal formée"
+    if est_preproduction(domaine):
+        return ECARTE, "domaine de préproduction ou de test"
     if _a_le_prefixe(local, r["prefixes_ecartes"]):
         return ECARTE, "adresse qui ne sert pas à candidater"
+    if not domaine_site or not verifie:
+        return ECARTE, "site de l'entreprise non vérifié"
     if generique(domaine):
-        return DOUTEUX, "fournisseur générique"
-    meme_domaine = bool(domaine_site) and domaine_parent(domaine) == domaine_parent(domaine_site)
-    if meme_domaine and not fiable:
-        return DOUTEUX, "site dont le domaine ne correspond pas au nom de l'entreprise"
-    if meme_domaine and _a_le_prefixe(local, r["prefixes_contact"]):
-        return VALIDE, "domaine du site, adresse de contact"
-    if meme_domaine:
-        return DOUTEUX, "domaine du site, adresse nominative ou inhabituelle"
-    if not domaine_site:
-        return DOUTEUX, "site de l'entreprise inconnu"
-    return DOUTEUX, "autre domaine que le site"
+        return DOUTEUX, "messagerie grand public trouvée sur le site vérifié"
+    if domaine_parent(domaine) != domaine_parent(domaine_site):
+        return ECARTE, "autre domaine que le site vérifié"
+    if _a_le_prefixe(local, r["prefixes_contact"]):
+        return VALIDE, "domaine du site vérifié, adresse de contact"
+    return DOUTEUX, "domaine du site vérifié, adresse nominative ou inhabituelle"
 
 
 def contexte(email: str, texte: str, rayon: int = RAYON_CONTEXTE) -> str:
@@ -179,7 +201,7 @@ def avis_ia(nom: str, domaine_site: str | None, douteuses: list[str], trouvees: 
 
 
 def trier(emails, domaine_site: str | None, nom: str = "", texte: str = "", ia: bool = True,
-          contextes: dict | None = None, log=None, deja_valides=()) -> dict:
+          contextes: dict | None = None, log=None, deja_valides=(), verifie: bool = False) -> dict:
     """Trie des adresses : règles, puis un appel à l'IA (ia=True) pour toutes
     les douteuses de l'entreprise.
     texte : texte des pages lues (pour l'extrait autour de chaque adresse) ;
@@ -189,16 +211,15 @@ def trier(emails, domaine_site: str | None, nom: str = "", texte: str = "", ia: 
     "douteux", "ecartes" [(adresse, raison)], "ecartes_ia" (adresses que
     l'IA n'a pas retenues), "contextes" (des douteuses restantes),
     "meilleur_contact", "ia_bloquee" ou "erreur_ia" (message) si l'IA a
-    échoué : les douteuses le restent. La validation d'office exige un site
-    fiable (site_fiable(domaine_site, nom))."""
+    échoué : les douteuses le restent. verifie : domaine_site est le site
+    vérifié de l'entreprise (D160) ; sinon toutes les adresses sont écartées."""
     from shared.ia import ErreurIABloquante, ErreurIAPassagere
     contextes = dict(contextes or {})
     resultat = {"valides": [], "provenance": {}, "douteux": [], "ecartes": [], "ecartes_ia": [],
                 "contextes": {}, "meilleur_contact": None}
     raisons = {}
-    fiable = site_fiable(domaine_site, nom)
     for email in dict.fromkeys(e.strip().lower() for e in emails or [] if e and e.strip()):
-        decision, raison = classer(email, domaine_site, fiable)
+        decision, raison = classer(email, domaine_site, verifie)
         if decision == ECARTE:
             resultat["ecartes"].append((email, raison))
         elif decision == VALIDE:
@@ -248,3 +269,13 @@ def emails_valides(entreprise: dict) -> list[str]:
     """Adresses validées (par les règles, l'IA ou à la main) : les seules envoyées."""
     douteux = set(emails_douteux(entreprise))
     return [e for e in entreprise.get("emails_trouves") or [] if e not in douteux]
+
+
+def site_verifie(entreprise: dict) -> str | None:
+    """Domaine du site vérifié d'une entreprise (format de lire_entreprises),
+    None sinon (D160) ; un site vérifié en préproduction compte sur son
+    domaine principal (D165)."""
+    from shared.liens import sans_preproduction
+    v = (entreprise.get("_extra") or {}).get("site_verifie") or entreprise.get("site_verifie") or {}
+    d = v.get("domaine") or None
+    return sans_preproduction(d).split("://", 1)[-1] if d else None

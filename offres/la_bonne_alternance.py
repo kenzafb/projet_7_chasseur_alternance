@@ -7,8 +7,10 @@ Recherche La Bonne Alternance (mode alternance), SPEC_SOURCES.md section 3.
   référentiel metiers), envoyés par lots de parametres_lba.CODES_PAR_REQUETE ;
   profil « indifférent » : recherche sans code (décision D37).
 - Niveau de diplôme : jamais envoyé à l'API, qui écarterait les offres sans
-  niveau ; offres d'un autre niveau que le niveau visé du profil écartées
-  après récupération, offres sans niveau gardées (D38).
+  niveau ; offres à plus d'un niveau du niveau visé du profil écartées
+  après récupération, niveaux adjacents gardés et marqués « niveau
+  différent » (D154), offres sans niveau gardées (D38). Offre déléguée à un
+  organisme de formation (is_delegated) : marquée (D155).
 - Géographie : chaque lot est cherché autour de chacun des centres de
   shared.config.LBA_CENTRES, à rayon réduit ; résultats dédoublonnés.
 - Rien de tronqué en silence : un cercle dont la réponse atteint le plafond
@@ -41,11 +43,12 @@ import requests
 from database.dates import instant_depuis_api
 from offres import parametres_lba as P
 from shared.liens import lien_http
+from shared.marques import NIVEAU_DIFFERENT, ORGANISME_FORMATION, ajouter_marque
 from shared.config import DEPTS_IDF, DEPTS_PETITE_COURONNE, LBA_CENTRES, LBA_RAYON_MIN_KM, LBA_REQUETES_MAX
 from shared.criteres import normaliser_recherche
 from shared.domaines import codes_metiers, domaines_du_profil
 from shared.niveaux import NIVEAUX, niveau_europeen
-from shared.offres import detecter_zone, generer_id
+from shared.offres import LIGNE_SITE, detecter_zone, generer_id
 from shared.tailles import SANS_SALARIE, garder_selon_taille, taille_depuis_tranche
 from shared.journal import journaliser
 
@@ -116,13 +119,34 @@ def _normaliser_offre_lba(offre: dict) -> dict | None:
         "domaine":      "Non analysé",
         "lien":         lien,
         "source":       "La Bonne Alternance",
-        "description":  (offer.get("description") or "")[:5000],
+        "description":  ((offer.get("description") or "")[:5000]
+                         + (f"\n{LIGNE_SITE}{site}" if (site := lien_http(workplace.get("website"))) else "")
+                         + "".join(f"\n{x}" for x in lignes_experience(offer.get("access_conditions")))),
         "date_trouvee": instant_depuis_api((offer.get("publication") or {}).get("creation")),
         "score":        0,
         "lettre":       "",
         "statut":       "nouveau",
         "_niveau":      _niveau(P.lire(offre, P.CHAMP_NIVEAU_OFFRE)),
+        # Offre gérée par un organisme de formation pour une entreprise :
+        # gardée et marquée, jamais écartée « École ou CFA » (D155)
+        "marques":      [ORGANISME_FORMATION] if P.lire(offre, P.CHAMP_DELEGUEE) is True else [],
     }
+
+
+_FOURCHETTE = re.compile(r"^\s*(d[ée]butant|\d+)\s*(?:-|à|a)\s*(\d+)\s*ans?\s*$", re.I)
+
+
+def lignes_experience(conditions) -> list[str]:
+    """Fourchette d'expérience de l'offre (access_conditions : « 1-2 ans »,
+    « 3-5 ans », « débutant à 1 an ») en ligne « Expérience : N An(s)
+    (exigée) », lue par shared/exigences.py (D169). Les textes génériques
+    du métier (« Cet emploi est accessible avec... ») ne sont pas repris."""
+    out = []
+    for c in conditions or []:
+        m = _FOURCHETTE.match(str(c))
+        if m and m.group(1).isdigit() and int(m.group(1)) > 0:
+            out.append(f"Expérience : {int(m.group(1))} An(s) (exigée)")
+    return out[:1]
 
 
 def _niveau(valeur) -> int | None:
@@ -389,15 +413,22 @@ def niveau_du_profil(profil: dict, log=journaliser) -> int | None:
         log(f"  LBA : niveau visé « {texte[:40]} » non reconnu, aucun filtre de niveau")
         return None
     log(f"  LBA : niveau visé « {texte[:40]} » : niveau {niveau} ({NIVEAUX[niveau]}), "
-        "offres d'un autre niveau écartées, offres sans niveau gardées")
+        f"offres à plus de {P.ECART_NIVEAU_GARDE} niveau d'écart écartées, niveaux adjacents marqués, "
+        "offres sans niveau gardées")
     return niveau
 
 
 def filtrer_niveau(offres: list[dict], niveau: int | None) -> tuple[list[dict], int]:
-    """Offres du niveau visé ou sans niveau indiqué (décision D38) ; (gardées, écartées)."""
+    """Offres du niveau visé, d'un niveau adjacent (visé ± 1, marquées
+    niveau_different, D154) ou sans niveau indiqué (D38) ; (gardées, écartées)."""
     if niveau is None:
         return offres, 0
-    gardees = [o for o in offres if o.get("_niveau") is None or o["_niveau"] == niveau]
+    gardees = []
+    for o in offres:
+        if o.get("_niveau") is None or o["_niveau"] == niveau:
+            gardees.append(o)
+        elif abs(o["_niveau"] - niveau) <= P.ECART_NIVEAU_GARDE:
+            gardees.append(ajouter_marque(o, NIVEAU_DIFFERENT))
     return gardees, len(offres) - len(gardees)
 
 
@@ -451,7 +482,9 @@ def rechercher_pour_profil(profil: dict, log=journaliser, stop_event=None, **opt
     if resultat:
         resultat["offres"], ecartees = filtrer_niveau(resultat["offres"], niveau)
         if ecartees:
-            log(f"  LBA : {ecartees} offres d'un autre niveau que le niveau {niveau} écartées")
+            log(f"  LBA : {ecartees} offres à plus de {P.ECART_NIVEAU_GARDE} niveau du niveau {niveau} écartées")
+        if adjacentes := sum(1 for o in resultat["offres"] if NIVEAU_DIFFERENT in o.get("marques", [])):
+            log(f"  LBA : {adjacentes} offres d'un niveau adjacent gardées, marquées « niveau différent »")
     return resultat
 
 

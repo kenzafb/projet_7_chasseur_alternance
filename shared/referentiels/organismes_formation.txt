@@ -1,0 +1,54 @@
+# Écoles, CFA et organismes de formation qui publient des offres d'alternance
+# pour recruter leurs élèves (phase 15, décision D156).
+#
+# « + nom » : organisme vérifié. Une offre d'alternance qui le nomme (titre,
+# entreprise ou description) est écartée « École ou CFA ».
+# « = nom » : intermédiaire qui publie pour une école (CAPIVISION pour IGF) :
+# l'offre n'est pas écartée, elle est marquée « Offre déposée par un
+# organisme de formation », comme une offre LBA déléguée (D156).
+# « ? mot » : simple indice, cherché dans le titre et le nom de l'entreprise,
+# affiché sur l'offre (« CFA », « école »), jamais
+# une raison d'écarter : ces mots se trouvent aussi dans les offres des
+# entreprises (« formation au CFA de votre choix », « rythme école-entreprise »).
+#
+# Comparaison en minuscules, sans accents, sur des mots entiers : « studi » ne
+# trouve plus « studio », « h3 » n'est plus cherché (il trouvait « 9h30 »).
+# Une offre La Bonne Alternance déléguée à un organisme (is_delegated) est
+# marquée à part et jamais écartée par cette liste (D155).
+# Tests : tests/test_organismes_formation.py.
+
+# ── Organismes vérifiés (audit du 22 novembre 2026 et liste d'avant) ──
++ iscod
++ scholia
++ imc alternance
++ mydigitalschool
++ my digital school
++ simplon
++ afpa
++ epitech
++ openclassrooms
++ studi
++ ikigai
++ digital campus
++ m2i formation
++ doranco
++ efficom
++ hitema
++ groupe igs
++ isefac
++ sup de vinci
++ aureis
++ aureis formation
++ nexa digital school
++ groupe igf
+
+# ── Intermédiaires : marqués, jamais écartés ──
+= capivision
+
+# ── Indices seulement ──
+? cfa
+? ecole
+? organisme de formation
+? centre de formation
+? la plateforme
+? business school

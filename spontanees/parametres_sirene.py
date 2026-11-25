@@ -41,6 +41,20 @@ VARIABLE_TRANCHE = "trancheEffectifsUniteLegale"
 VARIABLE_CATEGORIE = "categorieEntreprise"
 VARIABLE_CODE_POSTAL = "codePostalEtablissement"
 
+# Établissements cherchés (D159) : tout établissement actif situé en IDF,
+# siège ou non, au lieu des seuls sièges (« etablissementSiege:true ») qui
+# perdaient les entreprises au siège hors d'Île-de-France (2999 sur 3000
+# établissements franciliens non sièges lus à l'audit du 22 novembre 2026).
+# etatAdministratifEtablissement est historisé : periode(...) (syntaxe de
+# l'API, essayée par scripts/audit_sirene.py) trouve aussi un établissement
+# actif autrefois et fermé aujourd'hui, d'où le contrôle de la période
+# courante après réception (recuperation.extraire_infos).
+FILTRE_ETABLISSEMENT = "periode(etatAdministratifEtablissement:A)"
+# Catégorie juridique de l'unité légale (4 chiffres) ; 7xxx : personne
+# morale de droit public (administrations), comptée sans être exclue
+VARIABLE_CATEGORIE_JURIDIQUE = "categorieJuridiqueUniteLegale"
+PREFIXE_ADMINISTRATION = "7"
+
 # « NN » : unité non employeuse (aucun salarié dans l'année de référence
 # ni au 31 décembre), documentation des variables Sirene ; 857 sièges sur
 # 1000 à Paris en 62.01Z. Taille « sans salarié », pas un effectif inconnu

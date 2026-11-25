@@ -35,8 +35,8 @@ def _client(c, mode):
 
 # ─── Sections copiables ───────────────────────────────────────────────────────
 def test_sections_copiables_selon_les_modes():
-    tout = ["identite", "liens", "formation", "experience", "competences", "projets", "lettre_type", "email",
-            "pieces_jointes"]
+    tout = ["identite", "liens", "formation", "experience", "atouts", "competences", "projets", "lettre_type",
+            "email", "pieces_jointes"]                   # atouts : permis, expérience en mois, certifications (D169)
     assert _cles("stage", "alternance") == tout
     assert _cles("alternance", "stage") == tout
     # Formation et niveau d'études « actuel » : pas en job (niveau « obtenu »)
@@ -249,3 +249,15 @@ def test_portfolio_du_stage_conserve_et_copiable(utilisateur):
     r = _client(client, "alternance").post("/api/profil/copie", json={"source": "stage", "sections": ["liens"]})
     assert r.status_code == 200 and lire_profil(uid, mode="alternance")["portfolio"] == "https://ada.fr"
     assert lire_profil(uid, mode="stage")["portfolio"] == "https://ada.fr"
+
+
+def test_permis_experience_certifications_copies(utilisateur):
+    """D169 : communs aux trois modes, rangés dans recherche, copiés sans toucher au reste de recherche."""
+    from database.profil_db import copier_sections, lire_profil, sauvegarder_profil
+    _, uid = utilisateur("a@test.fr", prenom="Alice")
+    sauvegarder_profil(uid, {"recherche": {"permis": ["B"], "experience_mois": 8, "certifications": ["CACES R489"],
+                                           "domaines": ["M18"]}}, mode="job")
+    sauvegarder_profil(uid, {"recherche": {"domaines": ["K21"]}}, mode="stage")
+    copier_sections(uid, "job", "stage", ["atouts"])
+    r = lire_profil(uid, mode="stage")["recherche"]
+    assert (r["permis"], r["experience_mois"], r["certifications"], r["domaines"]) == (["B"], 8, ["CACES R489"], ["K21"])

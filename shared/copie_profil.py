@@ -37,6 +37,7 @@ MODES_DU_CHAMP = {
     "lettre_type": TOUS,
     "email_objet": TOUS, "email_type": TOUS,
     "pieces_jointes": TOUS,
+    "permis": TOUS, "experience_mois": TOUS, "certifications": TOUS,   # D169, dans profils.recherche
 }
 
 # (clé, libellé, champs), dans l'ordre de la page Profil
@@ -45,6 +46,7 @@ SECTIONS = (
     ("liens", "Liens (LinkedIn, GitHub, portfolio)", ("linkedin", "github", "portfolio")),
     ("formation", "Formation et niveau d'études actuel", ("formation", "niveau_etudes")),
     ("experience", "Expérience professionnelle", ("experience",)),
+    ("atouts", "Permis, expérience en mois et certifications", ("permis", "experience_mois", "certifications")),
     ("competences", "Compétences techniques", ("competences",)),
     ("projets", "Projets", ("projets",)),
     ("lettre_type", "Lettre de motivation type", ("lettre_type",)),
@@ -57,6 +59,7 @@ LIBELLES_CHAMPS = {
     "linkedin": "LinkedIn", "github": "GitHub", "portfolio": "Portfolio", "formation": "Formation", "niveau_etudes": "Niveau d'études",
     "experience": "Expérience", "competences": "Compétences", "projets": "Projets", "lettre_type": "Lettre type",
     "email_objet": "Objet du mail", "email_type": "Message du mail", "pieces_jointes": "Pièces jointes",
+    "permis": "Permis", "experience_mois": "Expérience (mois)", "certifications": "Certifications",
 }
 
 
@@ -72,8 +75,10 @@ def _valeur(profil: dict, champ: str):
     v = profil.get(champ)
     if champ == "projets":
         return [p for p in (v or []) if _rempli(p)]
-    if champ in ("competences", "pieces_jointes"):
+    if champ in ("competences", "pieces_jointes", "permis", "certifications"):
         return list(v or [])
+    if champ == "experience_mois":
+        return v if isinstance(v, int) else ""
     return v or ""
 
 

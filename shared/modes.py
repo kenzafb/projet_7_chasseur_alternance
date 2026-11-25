@@ -41,12 +41,16 @@ MODES = {
         "mot_poste": "stage",
         "couleur": "vert",
         # Pas de LBA (alternance uniquement). France Travail n'a ni type ni
-        # nature de contrat « stage » : mot-clé « stage » (essai du 9 octobre
-        # 2026 : 73 offres en IDF, 55 E1, 12 E2, 6 FS), alternance (E2, FS)
-        # écartée, intitulés filtrés par shared/referentiels/intitules_stage.txt
+        # nature de contrat « stage » : mots-clés « stage » et « stagiaire »,
+        # une requête chacun, réunies et dédoublonnées (D152), alternance
+        # (E2, FS) écartée, intitulés filtrés par
+        # shared/referentiels/intitules_stage.txt. Aucun filtre de domaine :
+        # la liste est courte (73 offres en IDF le 9 octobre 2026 avec
+        # « stage » seul) et l'IA juge le domaine (hors domaine : note basse)
         "sources": ["france_travail"],
-        "ft_filtres": {"motsCles": ["stage"]},
+        "ft_filtres": {"motsCles": ["stage", "stagiaire"]},
         "ft_options": ["secteurs"],
+        "ft_sans_domaine": True,          # domaines du profil : pour l'IA seulement
         "ft_exclure_alternance": True,    # natures E2 et FS : champ « alternance » de l'offre
         "ft_intitules_stage": True,       # « stage » doit désigner le poste
     },

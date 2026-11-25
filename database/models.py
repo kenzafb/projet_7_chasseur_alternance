@@ -178,6 +178,8 @@ class Candidature(Base):
     # Offre ouverte au moins une fois dans le volet de la page Offres (D145).
     # Rien à voir avec la table offres_vues, qui dédoublonne les recherches
     vue               = Column(Boolean, nullable=False, default=False, server_default=false())
+    # Marques posées par la recherche (shared.marques, D154) : niveau_different, organisme_formation
+    marques           = Column(JSON, nullable=False, default=list, server_default=text("'[]'"))
 
     # Dernière lettre PDF générée : chemin relatif à LETTRES_PDF_DIR
     # ("user_<id>/lettre_<hex>.pdf"), servie par /api/lettre_pdf/<ref_offre>
