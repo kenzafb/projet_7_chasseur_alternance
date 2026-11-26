@@ -13,6 +13,11 @@ scripts/campagne.py. Pour chaque mode, dans l'ordre :
   3. envoi : spontanees.envoi.main, le même que l'interface, restreint à la
      liste (entreprises ET adresses) montrée.
 
+Connexion à internet (D218, shared/reseau.py) : attendue au démarrage, et
+dès qu'une recherche, un envoi ou un message échoue faute de connexion :
+pause, essai toutes les 30 s, 30 min au plus ; puis arrêt propre, et
+message Telegram dès le retour de la connexion.
+
 Tous les modes sont préparés avant d'attendre les réponses : attendre le
 premier bloquerait le suivant. Verrous : la campagne (une seule à la fois) et
 « spontanees » de l'utilisateur, partagé avec l'interface et tenu seulement
@@ -38,6 +43,7 @@ from shared.erreurs import ErreurUtilisateur
 from shared.journal import journaliser
 from shared.modes import get_mode
 from shared.pipelines import SPONTANEES
+from shared.reseau import ESSAI_S, Reseau
 from shared.telegram import Clic, ErreurTelegram, Telegram
 from shared.verrous import CAMPAGNE, Verrou, nom_pipeline, occupes
 from spontanees import envoi, recherche_emails, recuperation
@@ -49,6 +55,7 @@ ATTENTE_INTERFACE_S = 15 * 60    # l'interface tient le verrou : attente au plus
 ATTENTE_TELEGRAM_S = 25          # interrogation longue
 DELAI_EXTINCTION_S = 120
 REPRISE_ECOUTE_S = 5             # Telegram injoignable : avant de réessayer
+RETOUR_MAX_S = 12 * 3600       # arrêt faute de connexion : message au retour, attendu au plus
 VALIDATIONS = ("telegram", "auto")
 FINS = ("demander", "eteindre", "veille", "rien")
 LIBELLES_FIN = {extinction.ETEINDRE: "Extinction", extinction.VEILLE: "Mise en veille"}
@@ -141,6 +148,8 @@ class _ArretRecherche:
         self.campagne, self.fin = campagne, fin
 
     def raison(self) -> str:
+        if self.campagne.hors_ligne:
+            return "pas d'accès internet"
         if self.campagne.arret:
             return "arrêt demandé"
         if self.campagne.horloge.maintenant() >= self.fin:
@@ -197,10 +206,11 @@ class Campagne:
     principale quand elle attend (tests)."""
 
     def __init__(self, user_id: int, modes, reglages: Reglages, telegram: Telegram | None, horloge=None,
-                 ecoute: bool = False):
+                 ecoute: bool = False, reseau: Reseau | None = None):
         self.user_id, self.modes, self.reglages = user_id, list(modes), reglages
         self.telegram, self.horloge = telegram, horloge or Horloge()
-        self.arret = False                 # SIGTERM, Ctrl+C
+        self.arret = False                 # SIGTERM, Ctrl+C ; ou connexion absente trop longtemps
+        self.reseau = reseau or Reseau(self.horloge, self.log, arret=lambda: self.arret)
         self.bilan = {}                    # mode -> chiffres
         self.attentes: dict[str, Attente] = {}
         self._recus = queue.SimpleQueue()  # clics auxquels il a été répondu, pas encore relevés
@@ -212,6 +222,21 @@ class Campagne:
         self._envoi_en_cours = False
         self._parti = False                # extinction ou veille demandée au système
         self._id = None
+        self._debut = None
+
+    # ─── Arrêt ────────────────────────────────────────────────────────────────
+    @property
+    def arret(self) -> bool:
+        return self._arret or self.hors_ligne
+
+    @arret.setter
+    def arret(self, valeur: bool):
+        self._arret = valeur
+
+    @property
+    def hors_ligne(self) -> bool:
+        """Connexion absente plus de 30 min : la campagne s'arrête (D218)."""
+        return self.reseau.perdu_depuis is not None
 
     # ─── Journal et messages ──────────────────────────────────────────────────
     def log(self, message: str):
@@ -225,13 +250,19 @@ class Campagne:
     def notifier(self, texte: str, boutons=None) -> int:
         """Message Telegram ; 0 s'il n'est pas parti (la campagne continue)."""
         self.log(f"📨 {texte.splitlines()[0]}")
-        if not self.telegram:
+        if not self.telegram or self.hors_ligne:
             return 0
         try:
             return self.telegram.envoyer(texte, boutons)
         except ErreurTelegram as e:
             self.log(f"⚠️  {e}")
-            return 0
+        # Connexion coupée : pause, puis un second essai (D218)
+        if not self.reseau.en_ligne() and self.reseau.attendre("message Telegram"):
+            try:
+                return self.telegram.envoyer(texte, boutons)
+            except ErreurTelegram as e:
+                self.log(f"⚠️  {e}")
+        return 0
 
     def _telegram(self, action):
         """Appel Telegram accessoire : un échec est journalisé."""
@@ -337,11 +368,25 @@ class Campagne:
         verrou = Verrou(CAMPAGNE)
         if not verrou.prendre():
             raise CampagneEnCours("Une campagne est déjà en cours.")
-        etat = "erreur"
+        try:
+            self._deroule()
+        finally:
+            self._arreter_ecoute()
+            verrou.liberer()
+        if self.hors_ligne and not self._arret:
+            self._prevenir_au_retour()          # verrou libéré : une autre campagne peut partir
+        return self.bilan
+
+    def _deroule(self):
         try:
             self._id = campagnes_db.ouvrir(self.user_id)
+            self._debut = self.horloge.maintenant()
             heures, minutes = map(int, self.reglages.heure_limite.split(":"))
             self.limite = self.horloge.maintenant().replace(hour=heures, minute=minutes, second=0, microsecond=0)
+            if not self.reseau.attendre("démarrage"):
+                self.log("⏹️ Campagne arrêtée avant de commencer : pas d'accès internet.")
+                campagnes_db.enregistrer_bilan(self._id, self.bilan, "arretee")
+                return
             if self.telegram:
                 self._telegram(lambda: self.telegram.clics(0))     # clics d'une campagne passée : oubliés
                 if self._avec_ecoute:
@@ -359,19 +404,39 @@ class Campagne:
                 self._attendre_validations()
             etat = "arretee" if self.arret else "terminee"
             campagnes_db.enregistrer_bilan(self._id, self.bilan, etat)
-            if self.arret:
+            if self.hors_ligne:
+                self.log("⏹️ Campagne arrêtée : pas d'accès internet.")
+            elif self.arret:
                 self.notifier("⏹️ Campagne arrêtée. " + self._resume())
             elif not self._parti:
                 self._fin()
-            return self.bilan
         except Exception as e:
             self.notifier(f"❌ Campagne interrompue par une erreur ({type(e).__name__}). Voir le journal.")
             if self._id is not None:
                 campagnes_db.enregistrer_bilan(self._id, self.bilan, "erreur")
             raise
-        finally:
-            self._arreter_ecoute()
-            verrou.liberer()
+
+    def _prevenir_au_retour(self):
+        """Arrêt faute de connexion : message Telegram dès son retour, essayé
+        toutes les 30 s, RETOUR_MAX_S au plus ; Ctrl+C ou SIGTERM l'abandonne."""
+        perdue = self.reseau.perdu_depuis
+        fin = self.horloge.maintenant() + timedelta(seconds=RETOUR_MAX_S)
+        while self.telegram and not self._arret and self.horloge.maintenant() < fin:
+            if self.reseau.en_ligne():
+                revenue = self.horloge.maintenant()
+                texte = (f"⚠️ Campagne du {self._debut:%d/%m à %H:%M} arrêtée : pas d'accès internet depuis "
+                         f"{perdue:%H:%M}, attendu {round(self.reseau.attente_max_s / 60)} min. "
+                         f"Connexion revenue à {revenue:%H:%M}.\n"
+                         + (self._resume() if self.bilan else "Rien n'a été fait."))
+                try:
+                    self.telegram.envoyer(texte)
+                    self.log(f"📨 {texte.splitlines()[0]}")
+                    return
+                except ErreurTelegram as e:
+                    self.log(f"⚠️  {e}")
+            self.horloge.dormir(ESSAI_S)
+        self.log("Message de fin non envoyé : " + ("pas de Telegram." if not self.telegram else
+                                                   "arrêt demandé." if self._arret else "connexion toujours absente."))
 
     def _noter(self, mode: str, **champs):
         self.bilan.setdefault(mode, {}).update(champs)
@@ -424,6 +489,7 @@ class Campagne:
             arret = _ArretRecherche(self, debut + timedelta(minutes=self.reglages.duree_max_min))
             recherche_emails.reinitialiser_recherche()
             while len(envoi.pretes(self.user_id, mode, self.reglages.cible)) < self.reglages.cible:
+                self.reseau.attendre("recherche")        # tout de suite si la connexion est là
                 if raison_arret := arret.raison():
                     raison = raison_arret
                     break
@@ -431,23 +497,29 @@ class Campagne:
                 if reste <= 0:
                     raison = f"nombre maximal d'entreprises examinées atteint ({self.reglages.max_entreprises})"
                     break
-                file = compter_a_scraper(self.user_id, mode)
-                if not file:
-                    if not self._nouvelles_entreprises(mode, arret):
-                        raison = arret.raison() or "plus d'entreprise à trouver"
-                        break
-                    continue
-                recherche_emails.main(self.user_id, stop_event=arret, log_fn=self.log,
-                                      max_scrapees=min(LOT, reste), mode=mode)
+                try:
+                    file = compter_a_scraper(self.user_id, mode)
+                    if not file:
+                        if not self._nouvelles_entreprises(mode, arret):
+                            if not self.reseau.en_ligne():
+                                continue                 # coupure : attendue en haut de la boucle
+                            raison = arret.raison() or "plus d'entreprise à trouver"
+                            break
+                        continue
+                    recherche_emails.main(self.user_id, stop_event=arret, log_fn=self.log,
+                                          max_scrapees=min(LOT, reste), mode=mode, reseau=self.reseau)
+                except Exception as e:   # réseau, source... : le mode s'arrête là, ce qui est prêt reste prêt
+                    self.log(f"❌ {mode} : {type(e).__name__} : {e}")
+                    if not self.reseau.en_ligne():
+                        continue                         # coupure : attendue en haut de la boucle
+                    raison = f"erreur pendant la recherche ({type(e).__name__})"
+                    break
                 faites = file - compter_a_scraper(self.user_id, mode)
                 examinees += faites
                 self.relever()
                 if faites <= 0 and not arret.is_set():
                     raison = "recherche d'emails sans progrès"
                     break
-        except Exception as e:   # réseau, source... : le mode s'arrête là, ce qui est prêt reste prêt
-            raison = f"erreur pendant la recherche ({type(e).__name__})"
-            self.log(f"❌ {mode} : {type(e).__name__} : {e}")
         finally:
             verrou.liberer()
         duree = round((self.horloge.maintenant() - debut).total_seconds() / 60)
@@ -544,6 +616,8 @@ class Campagne:
             return
         self._envoi_en_cours = True
         try:
+            if not self.reseau.attendre("envoi"):
+                raise ErreurUtilisateur("pas d'accès internet, rien n'est envoyé.")
             compte = envoi.verifier_avant_envoi(self.user_id, mode)
             if attente.test and not compte["mode_test"]:
                 raise ErreurUtilisateur("le mode essai a été coupé depuis le résumé : relance la campagne pour valider "
@@ -551,7 +625,7 @@ class Campagne:
             # Essai annoncé ou activé depuis : essai. Jamais réel sans l'avoir annoncé
             r = envoi.main(self.user_id, limite=len(attente.liste), test=attente.test, stop_event=_ArretEnvoi(self),
                            log_fn=self.log, mode=mode, pause=PAUSE_ENVOIS,
-                           autorises={e["id"]: e["adresses"] for e in attente.liste})
+                           autorises={e["id"]: e["adresses"] for e in attente.liste}, reseau=self.reseau)
             self._noter(mode, envoyes=r["envoyes"], echecs=r["echecs"], essai=bool(compte["mode_test"]))
             suite = " Plafond du jour atteint." if r["arret"] == "plafond" else ""
             self.notifier(f"✅ {mode} : {r['envoyes']} emails envoyés, {r['echecs']} échec(s)."

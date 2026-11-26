@@ -22,6 +22,7 @@ Corrections reprises des versions précédentes : faux TLD de la
 déobfuscation (FIX 9), adresses inutiles au recrutement (FIX 10).
 """
 
+import copy
 import re
 import time
 import os
@@ -127,6 +128,8 @@ erreurs_ddg = 0      # requêtes de recherche web en échec (aucun moteur) depui
 _echecs_affilee = 0  # requêtes en échec d'affilée, remis à zéro par un succès
 recherche_arretee = False   # vrai après ECHECS_AVANT_ARRET échecs d'affilée, jusqu'au lancement suivant
 echecs_par_moteur: dict[str, int] = {}
+_dernieres_raisons: list[str] = []   # raisons du dernier échec de toutes les requêtes
+_reseau = None       # shared.reseau.Reseau de la campagne pendant main (D218) ; None : pas d'attente
 
 
 def dbg(msg):
@@ -408,8 +411,35 @@ def _resultats_ddg(requete):
     échec (journalisée), et la recherche s'arrête pour le lancement après
     ECHECS_AVANT_ARRET échecs d'affilée (D187)."""
     global erreurs_ddg, _echecs_affilee, recherche_arretee
-    if recherche_arretee:
-        return []
+    while True:
+        if recherche_arretee:
+            return []
+        resultats = _une_requete(requete)
+        if resultats is not None:
+            return resultats
+        # Connexion coupée : ni un échec du moteur, ni une raison d'arrêter (D218)
+        if _reseau is not None and not _reseau.en_ligne():
+            if _reseau.attendre("recherche web"):
+                continue
+            return []
+        break
+    # Jamais en silence : à l'audit, une panne du moteur laissait 13
+    # entreprises de suite sans aucun candidat, comptées « sans site »
+    erreurs_ddg += 1
+    _echecs_affilee += 1
+    journaliser(f"  [⚠️  Recherche web en échec ({' ; '.join(_dernieres_raisons)}) : {requete}]")
+    if _echecs_affilee >= ECHECS_AVANT_ARRET:
+        recherche_arretee = True
+        journaliser(f"  [⛔ Recherche web arrêtée pour ce lancement : {_echecs_affilee} requêtes d'affilée sans "
+                    f"réponse de {', '.join(backends_recherche())}. Les autres sources du site (Wikidata, LBA, offres, "
+                    "domaines devinés) restent essayées.]")
+    return []
+
+
+def _une_requete(requete):
+    """Résultats du premier moteur qui en donne ; None si aucun (raisons
+    dans _dernieres_raisons)."""
+    global _echecs_affilee
     pause_ddg()
     moteurs, raisons = backends_recherche(), []
     for moteur in moteurs:
@@ -425,17 +455,8 @@ def _resultats_ddg(requete):
         except Exception as e:   # refus pour excès de requêtes, moteur injoignable, aucun résultat...
             echecs_par_moteur[moteur] = echecs_par_moteur.get(moteur, 0) + 1
             raisons.append(f"{moteur} : {type(e).__name__} {str(e)[:60]}".strip())
-    # Jamais en silence : à l'audit, une panne du moteur laissait 13
-    # entreprises de suite sans aucun candidat, comptées « sans site »
-    erreurs_ddg += 1
-    _echecs_affilee += 1
-    journaliser(f"  [⚠️  Recherche web en échec ({' ; '.join(raisons)}) : {requete}]")
-    if _echecs_affilee >= ECHECS_AVANT_ARRET:
-        recherche_arretee = True
-        journaliser(f"  [⛔ Recherche web arrêtée pour ce lancement : {_echecs_affilee} requêtes d'affilée sans "
-                    f"réponse de {', '.join(moteurs)}. Les autres sources du site (Wikidata, LBA, offres, "
-                    "domaines devinés) restent essayées.]")
-    return []
+    _dernieres_raisons[:] = raisons
+    return None
 
 
 def resultat_pertinent(resultat: dict, entreprise: dict, analyse: dict) -> bool:
@@ -614,9 +635,21 @@ def sauvegarder(user_id, entreprises):
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
-def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=None, mode=MODE_DEFAUT):
+def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=None, mode=MODE_DEFAUT,
+         reseau=None):
     """Cherche site, emails et contact des entreprises pas encore traitées,
-    au plus max_scrapees par lancement (None : toutes)."""
+    au plus max_scrapees par lancement (None : toutes). reseau
+    (shared.reseau.Reseau, campagne) : une entreprise lue pendant une coupure
+    est remise en l'état et refaite au retour de la connexion (D218)."""
+    global _reseau
+    _reseau = reseau
+    try:
+        _main(user_id, stop_event, log_fn, on_progress, max_scrapees, mode)
+    finally:
+        _reseau = None
+
+
+def _main(user_id, stop_event, log_fn, on_progress, max_scrapees, mode):
     _log = log_fn or journaliser
     reinitialiser_recherche()
     ia_configuree = analyse_ia_active()   # ANALYSE_IA=false : lecture directe seulement
@@ -669,6 +702,15 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
             _log(f"  ⚠️  IA : {resultat['erreur_ia']} Emails douteux gardés, non validés.")
         return resultat
 
+    def coupure(e, avant) -> bool:
+        """Vrai si la connexion est coupée : e est remise en l'état."""
+        if _reseau is None or _reseau.en_ligne():
+            return False
+        e.clear()
+        e.update(avant)
+        _log("  🌐 Connexion coupée : entreprise remise en l'état, refaite au retour de la connexion")
+        return True
+
     try:
         for e in entreprises:
             if stop_event and stop_event.is_set():
@@ -689,9 +731,18 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
                 on_progress(min(pct, 100), f"{fait}/{len(a_traiter)} entreprises analysées")
 
             touchees.append(e)
-            completer_noms(e)   # sigle, dénominations usuelles, enseignes (D167)
-            verification, essais = identifier(e, sites_offres, recherche=urls_recherche,
-                                              log=_log if DEBUG else None)
+            avant = copy.deepcopy(e)
+            while True:
+                completer_noms(e)   # sigle, dénominations usuelles, enseignes (D167)
+                verification, essais = identifier(e, sites_offres, recherche=urls_recherche,
+                                                  log=_log if DEBUG else None)
+                resultat = extraire(verification, nom, dirigeant) if verification else None
+                if not coupure(e, avant):
+                    break
+                if not _reseau.attendre("recherche d'emails"):
+                    touchees.pop()       # remise en l'état : rien à écrire
+                    sauvegarder(user_id, touchees)
+                    return
             e["essais_site"] = essais[-6:]
             if verification is None:
                 _log(f"  ❌ Site non vérifié ({len(essais)} essayé(s)) : aucun email gardé")
@@ -704,7 +755,6 @@ def main(user_id, stop_event=None, log_fn=None, on_progress=None, max_scrapees=N
             e["site_web"] = verification.url
             e["site_verifie"] = {**verification.resume(), "le": maintenant_utc().isoformat(timespec="seconds")}
             _log(f"  🌐 {verification.url} [{SOURCES[verification.source]}, {verification.detail}]")
-            resultat = extraire(verification, nom, dirigeant)
             source_site = verification.source
 
             emails     = resultat["emails"]
