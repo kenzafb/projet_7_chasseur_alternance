@@ -262,12 +262,15 @@ def domaine_au_nom(url: str, entreprise: dict) -> bool:
     return False
 
 
+# « 85 », « 85 BIS », « 85B » ; le « B » de « 85 BOULEVARD » appartient à la voie (D217)
+_NUMERO_DE_VOIE = re.compile(r"^\s*\d+\s*(?:(?:bis|ter|b|t)\b)?\s*", re.I)
+
+
 def adresses_connues(entreprise: dict) -> list[dict]:
     """Adresses Sirene de l'entreprise : établissement francilien (code postal,
     voie) et siège (annuaire, D167)."""
     extra = entreprise.get("_extra") or {}
-    voie = re.sub(r"^\s*\d+\s*(?:bis|ter|b|t)?\s*", "", str(extra.get("adresse") or entreprise.get("adresse") or ""),
-                  flags=re.I)
+    voie = _NUMERO_DE_VOIE.sub("", str(extra.get("adresse") or entreprise.get("adresse") or ""))
     out = [{"code_postal": str(entreprise.get("code_postal") or ""), "voie": voie}]
     siege = entreprise.get("adresse_siege") or extra.get("adresse_siege")
     if siege:
