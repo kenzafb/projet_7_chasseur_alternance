@@ -1,9 +1,10 @@
-"""D218 : la campagne attend la connexion (démarrage, recherche, envoi,
-message), essai toutes les 30 s, 30 min au plus, puis arrêt propre et
-message au retour. Faux réseau piloté par la fausse horloge : coupé pendant
+"""D218, D219 : la campagne attend la connexion (démarrage, recherche,
+envoi, message), essai toutes les 30 s, jusqu'à l'heure butoir (13:00), 30 min
+au moins ; revenue avant, elle part ou reprend, message à l'appui ; sinon
+arrêt propre et message au retour. Faux réseau piloté par la fausse horloge : coupé pendant
 les intervalles de m.coupures ; rien de vrai ne part (conftest)."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -12,10 +13,10 @@ import spontanees.recherche_emails as se
 import spontanees.site_officiel as S
 from database import campagnes_db, compte_envoi_db
 from database.entreprises_db import ajouter_entreprises, lire_entreprises
-from shared import reseau, smtp
+from shared import extinction, reseau, smtp
 from shared.verrous import CAMPAGNE, Verrou
 from spontanees import envoi
-from tests.test_campagne import FausseHorloge, FauxTelegram, destinataires, entreprises, lancer, monde, une_fois  # noqa: F401
+from tests.test_campagne import PARIS, FausseHorloge, actions, FauxTelegram, destinataires, entreprises, lancer, monde, une_fois  # noqa: F401
 
 MODE = "stage"
 MIN = timedelta(minutes=1)
@@ -68,19 +69,54 @@ def test_coupure_de_5_minutes_essai_toutes_les_30_s(net):
     assert net.horloge.t - debut == 5 * MIN                         # repris au premier essai réussi
     essais = sorted({t for t, _ in net.essais})
     assert all(b - a == timedelta(seconds=30) for a, b in zip(essais, essais[1:], strict=False))
-    assert "Pas d'accès internet (démarrage)" in journal[0] and "Connexion revenue après 5 min" in journal[-1]
+    assert "Pas d'accès internet (démarrage)" in journal[0] and "jusqu'à 13:00" in journal[0]
+    assert "Connexion revenue à 09:05 après 5 min" in journal[-1]
     assert r.coupures == 1 and r.perdu_depuis is None
 
 
-def test_toujours_coupe_abandon_apres_30_minutes(net):
+def test_toujours_coupe_abandon_a_l_heure_butoir(net):
     journal, debut = [], net.horloge.t
     net.couper(600)
     r = attente(net, journal)
     assert not r.attendre("recherche")
-    assert net.horloge.t - debut == 30 * MIN and r.perdu_depuis == debut
-    assert "Toujours pas d'accès internet après 30 min (recherche)" in journal[-1]
-    # Déjà abandonné : plus aucune attente de 30 min
-    assert not r.attendre("envoi") and net.horloge.t - debut == 30 * MIN
+    assert net.horloge.t == debut.replace(hour=13) and r.perdu_depuis == debut and r.fin_attente == net.horloge.t
+    assert "Toujours pas d'accès internet à 13:00 (recherche), coupure depuis 09:00" in journal[-1]
+    # Déjà abandonné : plus aucune attente
+    assert not r.attendre("envoi") and net.horloge.t == debut.replace(hour=13)
+
+
+def test_heure_butoir_reglable(net):
+    net.couper(600)
+    r = attente(net, [], heure_butoir="10:15")
+    assert not r.attendre("démarrage") and net.horloge.t == net.horloge.t.replace(hour=10, minute=15)
+
+
+@pytest.mark.parametrize("heure, minute, abandon", [(12, 50, (13, 20)), (14, 0, (14, 30))])
+def test_coupure_peu_avant_ou_apres_la_butoir_attendue_30_min(net, heure, minute, abandon):
+    """Un trou de 30 s à 14:00 n'arrête pas la campagne : 30 min au moins."""
+    net.horloge.t = net.horloge.t.replace(hour=heure, minute=minute)
+    net.couper(600)
+    r = attente(net, [])
+    r.fixer_butoir(net.horloge.t)
+    assert not r.attendre("envoi") and (net.horloge.t.hour, net.horloge.t.minute) == abandon
+
+
+def test_heure_butoir_du_env(monkeypatch):
+    from spontanees.campagne import reglages_env
+    assert reglages_env().heure_butoir == "13:00"
+    monkeypatch.setenv("CAMPAGNE_HEURE_BUTOIR", "11:30")
+    assert reglages_env().heure_butoir == "11:30"
+    monkeypatch.setenv("CAMPAGNE_HEURE_BUTOIR", "midi")
+    with pytest.raises(Exception, match="CAMPAGNE_HEURE_BUTOIR"):
+        reglages_env()
+
+
+def test_retour_avant_la_butoir_prevenu(net):
+    retours = []
+    net.couper(90)
+    r = attente(net, [], au_retour=lambda *a: retours.append(a))
+    assert r.attendre("envoi")
+    assert retours == [(net.horloge.t - 90 * MIN, net.horloge.t, "envoi")]
 
 
 def test_arret_demande_pendant_l_attente(net):
@@ -206,15 +242,39 @@ def test_demarrage_attend_la_connexion(monde):
     monde.coupures.append((monde.horloge.t, monde.horloge.t + 10 * MIN))
     b = lancer(monde, une_fois("Envoyer"))
     assert b["stage"]["envoyes"] == 3
-    assert monde.telegram.messages[0].startswith("▶️ Campagne commencée")
+    assert monde.telegram.messages[0] == "🌐 Connexion revenue à 09:10, campagne lancée (coupure depuis 09:00)."
+    assert monde.telegram.messages[1].startswith("▶️ Campagne commencée")
     j = journal_de(monde)
-    assert "Pas d'accès internet (démarrage)" in j and "Connexion revenue après 10 min" in j
+    assert "Pas d'accès internet (démarrage)" in j and "Connexion revenue à 09:10 après 10 min" in j
 
 
-def test_demarrage_sans_connexion_arret_puis_message_au_retour(monde, monkeypatch):
+@pytest.fixture
+def prochaine_7h(monkeypatch):
+    """Minuteur du lundi au vendredi à 07:00 : la prochaine est vendredi 27/11."""
+    monkeypatch.setattr(extinction, "prochain_lancement", lambda: datetime(2026, 11, 27, 7, 0, tzinfo=PARIS))
+
+
+def a_sept_heures(monde):
+    monde.horloge.t = monde.horloge.t.replace(hour=7)
+    return monde.horloge.t
+
+
+def test_demarrage_sans_connexion_retour_a_9h_campagne_lancee(monde, prochaine_7h):
     ajouter_entreprises(monde.uid, entreprises(3), MODE)
-    debut = monde.horloge.t
-    monde.coupures.append((debut, debut + 45 * MIN))
+    debut = a_sept_heures(monde)
+    monde.coupures.append((debut, debut.replace(hour=9)))
+    b = lancer(monde, une_fois("Envoyer"))
+    assert b["stage"]["envoyes"] == 3 and monde.scrapees == ["Ent0", "Ent1", "Ent2"]
+    assert monde.telegram.messages[0] == "🌐 Connexion revenue à 09:00, campagne lancée (coupure depuis 07:00)."
+    assert monde.telegram.messages[1].startswith("▶️ Campagne commencée")
+    assert campagnes_db.derniere(monde.uid)["etat"] == "terminee"
+    assert "Connexion revenue à 09:00 après 2 h 00 : reprise (démarrage)" in journal_de(monde)
+
+
+def test_demarrage_sans_connexion_retour_a_14h_trop_tard(monde, prochaine_7h, monkeypatch):
+    ajouter_entreprises(monde.uid, entreprises(3), MODE)
+    debut = a_sept_heures(monde)
+    monde.coupures.append((debut, debut.replace(hour=14)))
     verrou_libre = []
     vrai_envoyer = FauxTelegram.envoyer
 
@@ -224,18 +284,55 @@ def test_demarrage_sans_connexion_arret_puis_message_au_retour(monde, monkeypatc
         v.liberer()
         return vrai_envoyer(self, texte, boutons)
     monkeypatch.setattr(FauxTelegram, "envoyer", envoyer)
-    b = lancer(monde, une_fois("Envoyer"))
-    assert b == {} and monde.scrapees == [] and monde.smtp.messages == []
+    b = lancer(monde, une_fois("Envoyer"), fin="veille")
+    assert b == {} and monde.scrapees == [] and monde.recherches == [] and monde.smtp.messages == []
+    assert actions(monde) == []                                  # ni veille ni extinction
     derniere = campagnes_db.derniere(monde.uid)
     assert derniere["etat"] == "arretee"
-    assert "Toujours pas d'accès internet après 30 min (démarrage)" in derniere["journal"]
+    assert "Toujours pas d'accès internet à 13:00 (démarrage), coupure depuis 07:00" in derniere["journal"]
     assert "arrêtée avant de commencer" in derniere["journal"]
-    # Un seul message, dès le retour de la connexion (09:45)
+    # Un seul message, dès le retour de la connexion (14:00)
     assert len(monde.telegram.messages) == 1, monde.telegram.messages
-    m = monde.telegram.messages[0]
-    assert "pas d'accès internet depuis 09:00" in m and "Connexion revenue à 09:45" in m and "Rien n'a été fait" in m
-    assert "Connexion revenue à 09:45" in campagnes_db.derniere(monde.uid)["journal"]
+    m = monde.telegram.messages[0].splitlines()
+    assert m[0] == ("🌐 Connexion revenue à 14:00, trop tard pour aujourd'hui, "
+                    "prochaine campagne vendredi 27/11 à 07:00.")
+    assert "arrêtée à 13:00 : pas d'accès internet depuis 07:00" in m[1] and m[2] == "Rien n'a été cherché ni envoyé."
     assert verrou_libre[-1]          # une autre campagne pouvait partir pendant l'attente du message
+
+
+def test_message_au_retour_abandonne_avant_la_prochaine_campagne(monde, prochaine_7h):
+    debut = a_sept_heures(monde)
+    monde.coupures.append((debut, debut + timedelta(days=2)))
+    lancer(monde, une_fois("Envoyer"))
+    assert monde.telegram.messages == []
+    assert monde.horloge.t <= datetime(2026, 11, 27, 6, 50, tzinfo=PARIS)
+    assert "connexion toujours absente" in journal_de(monde)
+
+
+def test_coupure_a_10h_retour_a_11h_reprise_la_ou_elle_en_etait(monde, prochaine_7h):
+    """Veille réglée : jamais pendant l'attente, seulement à la fin, après le retour."""
+    ajouter_entreprises(monde.uid, entreprises(10), MODE)
+    monde.horloge.t = monde.horloge.t.replace(hour=9, minute=58)
+    dix = monde.horloge.t.replace(hour=10, minute=0)
+    monde.coupures.append((dix, dix.replace(hour=11)))
+    vues = {}
+
+    def avec_email(nom):
+        vues[nom] = monde.horloge.t
+        return nom in ("Ent5", "Ent6", "Ent7")
+    monde.avec_email = avec_email
+    b = lancer(monde, validation="auto", fin="veille")
+    assert b["stage"]["envoyes"] == 3 and b["stage"]["raison"] == "cible atteinte"
+    assert all(vues[f"Ent{i}"] < dix + 5 * MIN for i in range(5))           # premier lot
+    assert all(vues[f"Ent{i}"] > dix.replace(hour=11) for i in range(5, 8))  # repris au retour
+    assert monde.scrapees == [f"Ent{i}" for i in range(10)]                  # rien refait, rien sauté
+    msgs = monde.telegram.messages
+    # Coupure vue à 10:03, à la fin du premier lot (limite connue de D218)
+    retour = msgs.index("🌐 Connexion revenue à 11:00, campagne reprise (coupure depuis 10:03).")
+    veille = next(i for i, t in enumerate(msgs) if t.startswith("🔌 Mise en veille dans 2 minutes"))
+    assert retour < veille and len(actions(monde)) == 1
+    assert campagnes_db.derniere(monde.uid)["etat"] == "terminee"
+    assert "en panne" not in journal_de(monde)
 
 
 def test_coupure_pendant_la_recherche_pause_puis_reprise(monde):
@@ -273,8 +370,10 @@ def test_coupure_pendant_l_envoi_meme_mail_repris(monde, monkeypatch):
     assert "Pas d'accès internet (envoi)" in journal_de(monde)
 
 
-def test_coupure_trop_longue_pendant_l_envoi(monde, monkeypatch):
+def test_coupure_pendant_l_envoi_au_dela_de_la_butoir(monde, monkeypatch, prochaine_7h):
+    """Coupée à 12:5x : attendue 30 min (au-delà de 13:00), puis arrêt, message au retour."""
     ajouter_entreprises(monde.uid, entreprises(3), MODE)
+    monde.horloge.t = monde.horloge.t.replace(hour=12, minute=45)
     vrai = envoi.envoyer_mail
 
     def envoyer_mail(compte, dest, *a, **k):
@@ -284,12 +383,17 @@ def test_coupure_trop_longue_pendant_l_envoi(monde, monkeypatch):
             raise smtp.ErreurSmtp(smtp.SERVEUR, "Serveur smtp.gmail.com:465 injoignable (OSError).")
         return vrai(compte, dest, *a, **k)
     monkeypatch.setattr(envoi, "envoyer_mail", envoyer_mail)
-    b = lancer(monde, une_fois("Envoyer"))
+    b = lancer(monde, une_fois("Envoyer"), fin="veille")
     assert destinataires(monde) == [["rh@ent0.fr"]] and compte_envoi_db.envois_du_jour(monde.uid) == 1
     assert "pas d'accès internet" in b["stage"]["erreur"]
-    assert campagnes_db.derniere(monde.uid)["etat"] == "arretee"
-    assert "Connexion revenue à" in monde.telegram.messages[-1]
-    assert "stage" in monde.telegram.messages[-1]                 # résumé de ce qui a été fait
+    assert campagnes_db.derniere(monde.uid)["etat"] == "arretee" and actions(monde) == []
+    coupure = monde.coupures[0][0]
+    assert coupure.hour == 12 and monde.horloge.t >= coupure + 50 * MIN
+    dernier = monde.telegram.messages[-1]
+    assert dernier.startswith(f"🌐 Connexion revenue à {monde.coupures[0][1]:%H:%M}, trop tard pour aujourd'hui, "
+                              "prochaine campagne vendredi 27/11 à 07:00.")
+    assert f"arrêtée à {coupure + 30 * MIN:%H:%M}" in dernier
+    assert "stage" in dernier                                     # résumé de ce qui a été fait
 
 
 def test_panne_de_telegram_seule_n_est_pas_une_coupure(monde):

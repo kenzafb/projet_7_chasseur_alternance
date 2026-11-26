@@ -71,6 +71,7 @@ Voir [CAMPAGNE.md](CAMPAGNE.md). Une valeur illisible empêche la campagne de d�
 |---|---|---|
 | `CAMPAGNE_VALIDATION` | `telegram` : rien n'est envoyé sans « Envoyer » ; `auto` : envoi sans attendre. | `telegram` |
 | `CAMPAGNE_HEURE_LIMITE` | Sans réponse à cette heure, rien n'est envoyé. | `16:00` |
+| `CAMPAGNE_HEURE_BUTOIR` | Sans connexion à internet, attendue jusqu'à cette heure (30 min au moins pour une coupure commencée peu avant ou après) ; ensuite, arrêt propre et message au retour. | `13:00` |
 | `CAMPAGNE_DUREE_MAX_MIN` | Durée maximale de la recherche, par mode. | `120` |
 | `CAMPAGNE_MAX_ENTREPRISES` | Entreprises examinées au plus, par mode. | `200` |
 | `CAMPAGNE_FIN` | `demander` (boutons), `eteindre`, `veille` ou `rien`. | `demander` |

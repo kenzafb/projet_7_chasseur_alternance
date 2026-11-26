@@ -13,10 +13,11 @@ scripts/campagne.py. Pour chaque mode, dans l'ordre :
   3. envoi : spontanees.envoi.main, le même que l'interface, restreint à la
      liste (entreprises ET adresses) montrée.
 
-Connexion à internet (D218, shared/reseau.py) : attendue au démarrage, et
-dès qu'une recherche, un envoi ou un message échoue faute de connexion :
-pause, essai toutes les 30 s, 30 min au plus ; puis arrêt propre, et
-message Telegram dès le retour de la connexion.
+Connexion à internet (D218, D219, shared/reseau.py) : attendue au
+démarrage, et dès qu'une recherche, un envoi ou un message échoue faute de
+connexion : pause, essai toutes les 30 s, jusqu'à CAMPAGNE_HEURE_BUTOIR ;
+revenue avant, la campagne part ou reprend là où elle en était, message
+Telegram à l'appui. Sinon : arrêt propre, et message Telegram dès son retour.
 
 Tous les modes sont préparés avant d'attendre les réponses : attendre le
 premier bloquerait le suivant. Verrous : la campagne (une seule à la fois) et
@@ -43,7 +44,7 @@ from shared.erreurs import ErreurUtilisateur
 from shared.journal import journaliser
 from shared.modes import get_mode
 from shared.pipelines import SPONTANEES
-from shared.reseau import ESSAI_S, Reseau
+from shared.reseau import ESSAI_S, HEURE_BUTOIR, Reseau
 from shared.telegram import Clic, ErreurTelegram, Telegram
 from shared.verrous import CAMPAGNE, Verrou, nom_pipeline, occupes
 from spontanees import envoi, recherche_emails, recuperation
@@ -56,6 +57,8 @@ ATTENTE_TELEGRAM_S = 25          # interrogation longue
 DELAI_EXTINCTION_S = 120
 REPRISE_ECOUTE_S = 5             # Telegram injoignable : avant de réessayer
 RETOUR_MAX_S = 12 * 3600       # arrêt faute de connexion : message au retour, attendu au plus
+AVANT_PROCHAINE_S = 10 * 60    # ... et fini avant la prochaine campagne, que le minuteur lance
+JOURS = ("lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche")
 VALIDATIONS = ("telegram", "auto")
 FINS = ("demander", "eteindre", "veille", "rien")
 LIBELLES_FIN = {extinction.ETEINDRE: "Extinction", extinction.VEILLE: "Mise en veille"}
@@ -75,16 +78,19 @@ class Reglages:
     max_entreprises: int = 200
     fin: str = "demander"
     fin_attente_min: int = 60
+    heure_butoir: str = HEURE_BUTOIR
 
     def verifier(self) -> "Reglages":
         if self.validation not in VALIDATIONS:
             raise ErreurUtilisateur(f"CAMPAGNE_VALIDATION : {' ou '.join(VALIDATIONS)}, pas « {self.validation} ».")
         if self.fin not in FINS:
             raise ErreurUtilisateur(f"CAMPAGNE_FIN : {', '.join(FINS)}, pas « {self.fin} ».")
-        try:
-            datetime.strptime(self.heure_limite, "%H:%M")
-        except ValueError:
-            raise ErreurUtilisateur("CAMPAGNE_HEURE_LIMITE : une heure comme 16:00.") from None
+        for variable, heure, exemple in (("CAMPAGNE_HEURE_LIMITE", self.heure_limite, "16:00"),
+                                         ("CAMPAGNE_HEURE_BUTOIR", self.heure_butoir, "13:00")):
+            try:
+                datetime.strptime(heure, "%H:%M")
+            except ValueError:
+                raise ErreurUtilisateur(f"{variable} : une heure comme {exemple}.") from None
         if min(self.cible, self.duree_max_min, self.max_entreprises) < 1 or self.fin_attente_min < 0:
             raise ErreurUtilisateur("Réglages de la campagne : des nombres positifs sont attendus.")
         return self
@@ -92,7 +98,8 @@ class Reglages:
 
 _VARIABLES = {"validation": "CAMPAGNE_VALIDATION", "heure_limite": "CAMPAGNE_HEURE_LIMITE",
               "duree_max_min": "CAMPAGNE_DUREE_MAX_MIN", "max_entreprises": "CAMPAGNE_MAX_ENTREPRISES",
-              "fin": "CAMPAGNE_FIN", "fin_attente_min": "CAMPAGNE_FIN_ATTENTE_MIN"}
+              "fin": "CAMPAGNE_FIN", "fin_attente_min": "CAMPAGNE_FIN_ATTENTE_MIN",
+              "heure_butoir": "CAMPAGNE_HEURE_BUTOIR"}
 
 
 def reglages_env(cible: int = 30) -> Reglages:
@@ -109,7 +116,7 @@ def reglages_env(cible: int = 30) -> Reglages:
             except ValueError:
                 raise ErreurUtilisateur(f"{variable} : un nombre entier est attendu, pas « {texte} ».") from None
         else:
-            valeur = texte if champ == "heure_limite" else texte.lower()
+            valeur = texte if champ.startswith("heure_") else texte.lower()
         r = replace(r, **{champ: valeur})
     return r.verifier()
 
@@ -209,8 +216,11 @@ class Campagne:
                  ecoute: bool = False, reseau: Reseau | None = None):
         self.user_id, self.modes, self.reglages = user_id, list(modes), reglages
         self.telegram, self.horloge = telegram, horloge or Horloge()
-        self.arret = False                 # SIGTERM, Ctrl+C ; ou connexion absente trop longtemps
-        self.reseau = reseau or Reseau(self.horloge, self.log, arret=lambda: self.arret)
+        self.arret = False                 # SIGTERM, Ctrl+C ; ou connexion absente à l'heure butoir
+        self.reseau = reseau or Reseau(self.horloge, self.log, arret=lambda: self.arret,
+                                       heure_butoir=reglages.heure_butoir)
+        self.reseau.au_retour = self._connexion_revenue
+        self._lancee = False               # attente de la connexion au démarrage passée
         self.bilan = {}                    # mode -> chiffres
         self.attentes: dict[str, Attente] = {}
         self._recus = queue.SimpleQueue()  # clics auxquels il a été répondu, pas encore relevés
@@ -235,7 +245,7 @@ class Campagne:
 
     @property
     def hors_ligne(self) -> bool:
-        """Connexion absente plus de 30 min : la campagne s'arrête (D218)."""
+        """Connexion absente à l'heure butoir : la campagne s'arrête (D219)."""
         return self.reseau.perdu_depuis is not None
 
     # ─── Journal et messages ──────────────────────────────────────────────────
@@ -381,12 +391,14 @@ class Campagne:
         try:
             self._id = campagnes_db.ouvrir(self.user_id)
             self._debut = self.horloge.maintenant()
+            self.reseau.fixer_butoir(self._debut)
             heures, minutes = map(int, self.reglages.heure_limite.split(":"))
             self.limite = self.horloge.maintenant().replace(hour=heures, minute=minutes, second=0, microsecond=0)
             if not self.reseau.attendre("démarrage"):
-                self.log("⏹️ Campagne arrêtée avant de commencer : pas d'accès internet.")
+                self.log("⏹️ Campagne arrêtée avant de commencer : pas d'accès internet, rien n'est cherché ni envoyé.")
                 campagnes_db.enregistrer_bilan(self._id, self.bilan, "arretee")
                 return
+            self._lancee = True
             if self.telegram:
                 self._telegram(lambda: self.telegram.clics(0))     # clics d'une campagne passée : oubliés
                 if self._avec_ecoute:
@@ -416,18 +428,38 @@ class Campagne:
                 campagnes_db.enregistrer_bilan(self._id, self.bilan, "erreur")
             raise
 
+    def _connexion_revenue(self, debut: datetime, revenue: datetime, ou: str):
+        """Connexion revenue avant la butoir : message, sans nouvelle attente
+        s'il ne part pas (il serait suivi d'une seconde coupure, déjà journalisée)."""
+        texte = (f"🌐 Connexion revenue à {revenue:%H:%M}, campagne {'reprise' if self._lancee else 'lancée'} "
+                 f"(coupure depuis {debut:%H:%M}).")
+        self.log(f"📨 {texte}")
+        if self.telegram:
+            self._telegram(lambda: self.telegram.envoyer(texte))
+
+    def _prochaine(self) -> tuple[str, datetime | None]:
+        """« prochaine campagne vendredi 27/11 à 07:00 », et cet instant."""
+        quand = extinction.prochain_lancement()
+        if quand is None:
+            return f"pas de prochaine campagne programmée ({extinction.MINUTEUR} inactif)", None
+        quand = quand.astimezone(self.horloge.maintenant().tzinfo)
+        return f"prochaine campagne {JOURS[quand.weekday()]} {quand:%d/%m} à {quand:%H:%M}", quand
+
     def _prevenir_au_retour(self):
         """Arrêt faute de connexion : message Telegram dès son retour, essayé
-        toutes les 30 s, RETOUR_MAX_S au plus ; Ctrl+C ou SIGTERM l'abandonne."""
-        perdue = self.reseau.perdu_depuis
+        toutes les 30 s, RETOUR_MAX_S au plus et fini avant la prochaine
+        campagne ; Ctrl+C ou SIGTERM l'abandonne. Ni recherche ni envoi."""
+        perdue, abandon = self.reseau.perdu_depuis, self.reseau.fin_attente
         fin = self.horloge.maintenant() + timedelta(seconds=RETOUR_MAX_S)
+        if (prochaine := self._prochaine()[1]) is not None:
+            fin = min(fin, prochaine - timedelta(seconds=AVANT_PROCHAINE_S))
         while self.telegram and not self._arret and self.horloge.maintenant() < fin:
             if self.reseau.en_ligne():
                 revenue = self.horloge.maintenant()
-                texte = (f"⚠️ Campagne du {self._debut:%d/%m à %H:%M} arrêtée : pas d'accès internet depuis "
-                         f"{perdue:%H:%M}, attendu {round(self.reseau.attente_max_s / 60)} min. "
-                         f"Connexion revenue à {revenue:%H:%M}.\n"
-                         + (self._resume() if self.bilan else "Rien n'a été fait."))
+                texte = (f"🌐 Connexion revenue à {revenue:%H:%M}, trop tard pour aujourd'hui, {self._prochaine()[0]}.\n"
+                         f"Campagne du {self._debut:%d/%m à %H:%M} arrêtée à {abandon:%H:%M} : pas d'accès internet "
+                         f"depuis {perdue:%H:%M} (heure butoir {self.reglages.heure_butoir}).\n"
+                         + (self._resume() if self.bilan else "Rien n'a été cherché ni envoyé."))
                 try:
                     self.telegram.envoyer(texte)
                     self.log(f"📨 {texte.splitlines()[0]}")
