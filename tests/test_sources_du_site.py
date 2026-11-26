@@ -1,6 +1,8 @@
 """Étape 3, A1 et A2 : site de l'export LBA par SIREN (D166), autres noms de
 Sirene (sigle, dénominations usuelles, enseignes) pour chercher et prouver
 le site (D167)."""
+import pytest
+
 import spontanees.noms_entreprise as N
 import spontanees.site_officiel as S
 from offres import export_lba as X
@@ -119,6 +121,31 @@ def test_domaine_au_nom():
     assert S.domaine_au_nom("https://wetradelocal.io", {"nom": "WETRADELOCAL"})
     assert not S.domaine_au_nom("https://olympic.fermat.edu.vn", {"nom": "FERMAT"})     # domaine principal : edu
     assert not S.domaine_au_nom("https://fondationpierrebellon.org", {"nom": "BELLON SA"})
+
+
+# ─── D217 : numéro et indice ôtés, jamais la première lettre de la voie ──────
+@pytest.mark.parametrize("adresse, voie", [
+    ("85 BOULEVARD DU MONTPARNASSE", "BOULEVARD DU MONTPARNASSE"),
+    ("85 BIS BOULEVARD DU MONTPARNASSE", "BOULEVARD DU MONTPARNASSE"),
+    ("85 B BOULEVARD DU MONTPARNASSE", "BOULEVARD DU MONTPARNASSE"),
+    ("85BIS BOULEVARD DU MONTPARNASSE", "BOULEVARD DU MONTPARNASSE"),
+    ("12 TER RUE BELLINI", "RUE BELLINI"),
+    ("12 ter rue Bellini", "rue Bellini"),
+    ("3 T AVENUE DE SUFFREN", "AVENUE DE SUFFREN"),
+    ("10 BD DES BOUVETS", "BD DES BOUVETS"),
+    ("7 TERRASSE BELLINI", "TERRASSE BELLINI"),
+    ("41 RUE DU CAPITAINE GUYNEMER", "RUE DU CAPITAINE GUYNEMER"),
+    ("TERRASSE BELLINI", "TERRASSE BELLINI"),
+])
+def test_voie_sans_numero_ni_indice(adresse, voie):
+    assert S.adresses_connues({"_extra": {"adresse": adresse}}) == [{"code_postal": "", "voie": voie}]
+
+
+def test_voie_en_boulevard_reconnue_sur_le_site(monkeypatch):
+    brancher(monkeypatch, FauxWeb(_site_sans_siren("https://murex.com", "Murex", "85 boulevard du Montparnasse, Paris")))
+    e = {"nom": "MUREX", "siren": "123456789", "code_postal": "75999", "_extra": {"adresse": "85 BOULEVARD DU MONTPARNASSE"}}
+    v = S.verifier("https://murex.com", e, S.DEVINE)
+    assert v.preuve == "domaine_adresse" and "boulevard du montparnasse" in v.detail
 
 
 # ─── D215 : le .fr d'abord ────────────────────────────────────────────────────
