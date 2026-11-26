@@ -14,7 +14,7 @@ import spontanees.envoi as envoi
 from database import campagnes_db, compte_envoi_db
 from database.entreprises_db import ajouter_entreprises, lire_entreprises, sauvegarder_enrichissement
 from database.entreprises_db import deja_envoyee, marquer_postule_lba, sauvegarder_entreprises
-from shared import config, extinction, telegram
+from shared import config, extinction, reseau, telegram
 from shared.erreurs import ErreurUtilisateur
 from shared.pipelines import ANALYSE, SPONTANEES, Pipelines
 from shared.telegram import Clic
@@ -45,9 +45,10 @@ class FauxTelegram:
         self.horloge, self.reponse = horloge, reponse or (lambda t: [])
         self.messages, self.boutons, self.accuses, self.retires, self.confirmes = [], {}, [], [], 0
         self.panne = False
+        self.coupe = lambda: False       # connexion coupée (D218)
 
     def envoyer(self, texte, boutons=None):
-        if self.panne:
+        if self.panne or self.coupe():
             raise telegram.ErreurTelegram("Telegram injoignable")
         self.messages.append(texte)
         for titre, donnee in boutons or []:
@@ -55,6 +56,8 @@ class FauxTelegram:
         return len(self.messages)
 
     def clics(self, attente=0):
+        if self.coupe():
+            raise telegram.ErreurTelegram("Telegram injoignable")
         if attente:
             self.horloge.dormir(attente)
         return [Clic(str(i), d) for i, d in enumerate(self.reponse(self))]
@@ -98,7 +101,10 @@ def monde(utilisateur, smtp_simule, monkeypatch):
     for mode in ("stage", "job"):
         sauvegarder_profil(uid, profil, mode=mode)
     m = types.SimpleNamespace(uid=uid, client=client, smtp=smtp_simule, scrapees=[], recherches=[], commandes=[], avec_email=lambda nom: True,
-                              source=lambda n: [], logind='s "yes"', horloge=FausseHorloge())
+                              source=lambda n: [], logind='s "yes"', horloge=FausseHorloge(), coupures=[])
+    # Faux réseau (D218) : coupé pendant les intervalles [début, fin) de m.coupures
+    m.coupe = lambda: any(a <= m.horloge.t < b for a, b in m.coupures)
+    monkeypatch.setattr(reseau, "_joindre", lambda url: not m.coupe())
 
     def faux_scraper(user_id, stop_event=None, log_fn=None, max_scrapees=None, mode=MODE, **_):
         restantes = [e for e in lire_entreprises(user_id, mode)
@@ -142,6 +148,8 @@ def entreprises(n, prefixe="Ent"):
 def lancer(m, reponse=None, modes=("stage",), avec_telegram=True, **reglages):
     reglages.setdefault("fin", "rien")
     m.telegram = FauxTelegram(m.horloge, reponse) if avec_telegram else None
+    if m.telegram:
+        m.telegram.coupe = m.coupe
     m.campagne = C.Campagne(m.uid, modes, C.Reglages(**{"cible": 3, **reglages}).verifier(), m.telegram, m.horloge)
     return m.campagne.executer()
 

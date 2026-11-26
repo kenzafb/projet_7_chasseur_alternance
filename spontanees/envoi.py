@@ -247,14 +247,16 @@ def envoyer_mail(compte: dict, destinataires: list[str], objet: str, corps: str,
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
 def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=None, on_progress=None, mode="alternance",
-         pause=None, autorises=None):
+         pause=None, autorises=None, reseau=None):
     """Envoie les candidatures spontanées de l'utilisateur avec SON compte.
     Retourne {"envoyes", "echecs", "arret"} ; arret vaut None (file vidée),
     "limite", "plafond" ou "stop". Lève EnvoiInterrompu sur un problème
     de compte, ErreurUtilisateur ou ChiffrementIndisponible avant tout envoi.
     pause : (min, max) secondes entre deux mails (défaut PAUSE_ENTRE_MAILS).
     autorises : {id d'entreprise: adresses} ; rien d'autre ne part (liste
-    approuvée de la campagne, D213). None : toutes les entreprises."""
+    approuvée de la campagne, D213). None : toutes les entreprises.
+    reseau (shared.reseau.Reseau, campagne) : serveur injoignable parce que
+    la connexion est coupée : pause, puis le même mail (D218)."""
     _log = log_fn or journaliser
     plafond = config.PLAFOND_ENVOIS_JOUR
 
@@ -380,23 +382,34 @@ def main(user_id, limite=LIMITE_PAR_RUN, test=False, stop_event=None, log_fn=Non
         else:
             _log(f"[{idx}/{total}] {nom} → {', '.join(destinataires)}")
 
-        try:
-            envoyer_mail(compte, destinataires, objet, corps_mail, pieces)
-            ok = True
-        except smtp.ErreurSmtp as erreur:
-            liberer_envoi(user_id, jour)
-            if erreur.categorie != smtp.MESSAGE:
-                # Problème de compte ou de serveur : inutile d'essayer les suivantes
-                if erreur.categorie == smtp.AUTH:
-                    marquer_verification(user_id, False)
-                enregistrer()
-                bilan_final("erreur")
-                conseil = (" Vérifie le compte d'envoi dans ton profil, puis relance "
-                           "« Tester la connexion »." if erreur.categorie == smtp.AUTH else "")
-                _log(f"⏹️  Envoi arrêté après {envoyes} mail(s) : problème de compte ou de serveur.")
-                raise EnvoiInterrompu(f"{erreur}{conseil}") from None
-            _log(f"    [❌] {erreur}")
-            ok = False
+        while True:
+            try:
+                envoyer_mail(compte, destinataires, objet, corps_mail, pieces)
+                ok = True
+                break
+            except smtp.ErreurSmtp as erreur:
+                # Connexion coupée (campagne, D218) : pause, puis le même mail
+                if erreur.categorie == smtp.SERVEUR and reseau is not None and not reseau.en_ligne():
+                    if reseau.attendre("envoi"):
+                        continue
+                    liberer_envoi(user_id, jour)
+                    enregistrer()
+                    bilan_final("erreur")
+                    raise EnvoiInterrompu(f"pas d'accès internet, envoi arrêté après {envoyes} mail(s).") from None
+                liberer_envoi(user_id, jour)
+                if erreur.categorie != smtp.MESSAGE:
+                    # Problème de compte ou de serveur : inutile d'essayer les suivantes
+                    if erreur.categorie == smtp.AUTH:
+                        marquer_verification(user_id, False)
+                    enregistrer()
+                    bilan_final("erreur")
+                    conseil = (" Vérifie le compte d'envoi dans ton profil, puis relance "
+                               "« Tester la connexion »." if erreur.categorie == smtp.AUTH else "")
+                    _log(f"⏹️  Envoi arrêté après {envoyes} mail(s) : problème de compte ou de serveur.")
+                    raise EnvoiInterrompu(f"{erreur}{conseil}") from None
+                _log(f"    [❌] {erreur}")
+                ok = False
+                break
 
         if ok:
             _log(f"  ✅ Envoyé à {len(destinataires)} adresse(s)")
